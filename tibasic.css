@@ -335,12 +335,22 @@ body {
 .ac-item.token-string-lit .ac-badge { background: var(--c-string-lit); color: #fff; }
 .ac-item.token-stat      .ac-badge { background: var(--c-stat);      }
 
-.ac-desc {
-  color: var(--text-dim);
-  font-size: 12px;
+.ac-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ac-desc {
+  color: var(--text-dim);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
 }
 
 /* ── Scrollbars ───────────────────────────────────────────────── */
