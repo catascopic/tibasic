@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TI-Basic Editor</title>
+  <link rel="stylesheet" href="tibasic.css">
+  <script type="module" src="https://pyscript.net/releases/2024.11.1/core.js"></script>
+</head>
+<body>
+
+  <div id="loading-overlay">
+    <div class="loading-inner">
+      <div class="loading-spinner"></div>
+      <p>Loading TI-Basic Editor…</p>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+
+    <header id="header">
+      <span class="logo">TI-BASIC</span>
+      <nav id="toolbar">
+        <button class="cat-btn active" data-cat="">ALL</button>
+        <button class="cat-btn" data-cat="control">CTRL</button>
+        <button class="cat-btn" data-cat="io">I/O</button>
+        <button class="cat-btn" data-cat="math">MATH</button>
+        <button class="cat-btn" data-cat="trig">TRIG</button>
+        <button class="cat-btn" data-cat="operator">OPS</button>
+        <button class="cat-btn" data-cat="variable">VARS</button>
+        <button class="cat-btn" data-cat="list">LIST</button>
+        <button class="cat-btn" data-cat="matrix">MATRX</button>
+        <button class="cat-btn" data-cat="string">STR</button>
+      </nav>
+      <div id="header-actions">
+        <button id="btn-clear-line" class="action-btn">Clear Line</button>
+        <button id="btn-clear-all" class="action-btn danger">Clear All</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <div id="editor-panel">
+        <div id="editor"></div>
+      </div>
+
+      <div id="input-panel">
+        <div id="autocomplete" class="hidden"></div>
+        <div id="input-row">
+          <span class="prompt-arrow">▶</span>
+          <input
+            id="token-input"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="type a token name…"
+          >
+        </div>
+        <div id="hints">
+          <kbd>↑↓</kbd> navigate &nbsp;
+          <kbd>Enter</kbd> confirm &nbsp;
+          <kbd>Esc</kbd> dismiss &nbsp;
+          <kbd>Backspace</kbd> delete last token &nbsp;
+          <kbd>Enter</kbd> on empty = new line
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <script type="py" src="tibasic.py" config='{"packages": []}'></script>
+
+</body>
+</html>

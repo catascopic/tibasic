@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Minimal PyScript</title>
+	<script type="module" src="https://pyscript.net/releases/2026.3.1/core.js"></script>
+</head>
+<body>
+
+<p id="message">Hello from HTML.</p>
+<button py-click="on_click">Click me</button>
+
+<script type="py">
+
+from pyscript import document
+import sys
+
+def on_click(event):
+	document.getElementById("message").innerText = sys.version
+
+</script>
+
+</body>
+</html>

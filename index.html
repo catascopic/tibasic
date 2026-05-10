@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TI-Basic Interpreter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+<script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0c0e;
+    --surface:   #111418;
+    --panel:     #181d22;
+    --border:    #2a3540;
+    --screen-bg: #0d1a0f;
+    --screen-fg: #7eff8a;
+    --screen-dim: #3a7a42;
+    --screen-glow: rgba(126,255,138,0.15);
+    --accent:    #00c8ff;
+    --accent2:   #ff6b35;
+    --key-bg:    #1e262f;
+    --key-top:   #252e38;
+    --key-shadow:#0a0e12;
+    --text:      #c8d8e8;
+    --text-dim:  #5a7080;
+    --error:     #ff4444;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 2rem 1rem 4rem;
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(0,200,255,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 90%, rgba(126,255,138,0.03) 0%, transparent 50%);
+  }
+
+  /* ── Header ── */
+  header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: clamp(1.4rem, 4vw, 2.2rem);
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(0,200,255,0.5), 0 0 60px rgba(0,200,255,0.2);
+  }
+  header p {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    margin-top: 0.4rem;
+    text-transform: uppercase;
+  }
+
+  /* ── Main layout ── */
+  .workspace {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 1100px;
+    align-items: start;
+  }
+
+  /* ── Editor panel ── */
+  .editor-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .panel-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+
+  .code-area-wrap {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .code-area-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 4px;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.4);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .line-numbers {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 36px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 0.75rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    overflow: hidden;
+    z-index: 2;
+  }
+  .line-num {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    line-height: 1.6rem;
+    min-height: 1.6rem;
+    width: 100%;
+    text-align: center;
+    opacity: 0.5;
+  }
+
+  #code-editor {
+    width: 100%;
+    min-height: 280px;
+    background: transparent;
+    color: var(--screen-fg);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9rem;
+    line-height: 1.6rem;
+    padding: 0.75rem 0.75rem 0.75rem 48px;
+    border: none;
+    outline: none;
+    resize: vertical;
+    caret-color: var(--screen-fg);
+    position: relative;
+    z-index: 0;
+  }
+  #code-editor::selection { background: rgba(126,255,138,0.2); }
+  #code-editor::placeholder { color: var(--screen-dim); }
+
+  .btn-row {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    padding: 0.65rem 1.4rem;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .btn-run {
+    background: linear-gradient(135deg, #00a844, #007a32);
+    color: #fff;
+    box-shadow: 0 2px 12px rgba(0,168,68,0.35), 0 0 0 1px rgba(0,168,68,0.4);
+    flex: 1;
+  }
+  .btn-run:hover { background: linear-gradient(135deg, #00c050, #009040); box-shadow: 0 4px 20px rgba(0,168,68,0.5); }
+  .btn-run:active { transform: translateY(1px); }
+  .btn-clear {
+    background: var(--key-bg);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .btn-clear:hover { color: var(--text); border-color: var(--accent2); }
+
+  /* ── Examples ── */
+  .examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .ex-btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    padding: 0.35rem 0.75rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .ex-btn:hover { color: var(--accent); border-color: var(--accent); background: rgba(0,200,255,0.05); }
+
+  /* ── Output screen (right panel) ── */
+  .screen-panel {
+    position: sticky;
+    top: 1.5rem;
+  }
+
+  .ti-screen {
+    background: var(--screen-bg);
+    border: 2px solid #1a2e1c;
+    border-radius: 6px 6px 4px 4px;
+    padding: 1rem;
+    min-height: 320px;
+    box-shadow:
+      0 0 0 1px #0a150b,
+      0 0 30px rgba(126,255,138,0.08),
+      inset 0 0 40px rgba(0,0,0,0.5),
+      inset 0 1px 0 rgba(126,255,138,0.05);
+    position: relative;
+    overflow: hidden;
+  }
+  .ti-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(0,0,0,0.08) 3px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+  .ti-screen::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 50%;
+    background: linear-gradient(rgba(255,255,255,0.015), transparent);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .screen-header {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.55rem;
+    letter-spacing: 0.3em;
+    color: var(--screen-dim);
+    text-align: center;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  #output {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--screen-fg);
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 240px;
+    position: relative;
+    z-index: 3;
+    text-shadow: 0 0 8px rgba(126,255,138,0.6);
+  }
+  #output .err { color: var(--error); text-shadow: 0 0 8px rgba(255,68,68,0.5); }
+  #output .prompt { color: var(--screen-dim); }
+  #output .result { color: #b0ffb8; }
+
+  .cursor-blink {
+    display: inline-block;
+    width: 8px;
+    height: 1em;
+    background: var(--screen-fg);
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+    box-shadow: 0 0 6px rgba(126,255,138,0.8);
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── Variables panel ── */
+  .vars-panel {
+    margin-top: 1rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.75rem;
+  }
+  .vars-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+  }
+  .var-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.72rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.25rem;
+  }
+  .var-name { color: var(--accent); }
+  .var-val  { color: var(--screen-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Loading overlay ── */
+  #loading {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 1.5rem;
+  }
+  #loading h2 {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--accent);
+    font-size: 1.1rem;
+    letter-spacing: 0.2em;
+    text-shadow: 0 0 20px rgba(0,200,255,0.5);
+  }
+  .load-bar {
+    width: 220px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .load-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--screen-fg));
+    animation: loading 2s ease-in-out infinite;
+    border-radius: 2px;
+  }
+  @keyframes loading {
+    0%   { width: 0%;   margin-left: 0%; }
+    50%  { width: 60%;  margin-left: 20%; }
+    100% { width: 0%;   margin-left: 100%; }
+  }
+  .load-sub { color: var(--text-dim); font-size: 0.75rem; letter-spacing: 0.15em; }
+
+  /* ── Responsive ── */
+  @media (max-width: 720px) {
+    .workspace { grid-template-columns: 1fr; }
+    .screen-panel { position: static; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h2>INITIALIZING</h2>
+  <div class="load-bar"><div class="load-fill"></div></div>
+  <div class="load-sub">Loading Python runtime…</div>
+</div>
+
+<header>
+  <h1>TI&#8209;BASIC</h1>
+  <p>Interpreter &nbsp;·&nbsp; PyScript + Lark</p>
+</header>
+
+<div class="workspace">
+
+  <!-- LEFT: editor -->
+  <div class="editor-panel">
+    <div>
+      <div class="panel-label">Program</div>
+      <div class="code-area-wrap">
+        <div class="line-numbers" id="line-numbers">
+          <div class="line-num">1</div>
+        </div>
+        <textarea id="code-editor" spellcheck="false"
+          placeholder="Enter TI-Basic code here…
+:Disp &quot;HELLO WORLD&quot;">:Disp "HELLO"
+:5→A
+:A*2→B
+:Disp B
+:For(I,1,5)
+:Disp I
+:End</textarea>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-run" id="run-btn" disabled>▶ RUN</button>
+      <button class="btn btn-clear" id="clear-btn">CLEAR</button>
+    </div>
+
+    <div>
+      <div class="panel-label">Examples</div>
+      <div class="examples">
+        <button class="ex-btn" data-prog=':Disp "HELLO WORLD"'>Hello</button>
+        <button class="ex-btn" data-prog=':5→A&#10;:A*A→B&#10;:Disp "A=",A&#10;:Disp "A²=",B'>Variables</button>
+        <button class="ex-btn" data-prog=':For(I,1,10)&#10;:Disp I&#10;:End'>For Loop</button>
+        <button class="ex-btn" data-prog=':10→N&#10;:0→S&#10;:For(I,1,N)&#10;:S+I→S&#10;:End&#10;:Disp "SUM=",S'>Sum 1–N</button>
+        <button class="ex-btn" data-prog=':5→X&#10;:If X>3&#10;:Then&#10;:Disp "BIG"&#10;:Else&#10;:Disp "SMALL"&#10;:End'>If/Else</button>
+        <button class="ex-btn" data-prog=':1→A&#10;:1→B&#10;:For(I,1,8)&#10;:Disp A&#10;:A+B→C&#10;:B→A&#10;:C→B&#10;:End'>Fibonacci</button>
+        <button class="ex-btn" data-prog=':iPart(7/2)→Q&#10;:remainder(17,5)→R&#10;:abs(-42)→V&#10;:Disp Q,R,V'>Math Fns</button>
+        <button class="ex-btn" data-prog=':1→P&#10;:For(I,1,6)&#10;:P*I→P&#10;:End&#10;:Disp "6!=",P'>Factorial</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: screen + vars -->
+  <div class="screen-panel">
+    <div class="panel-label">Output</div>
+    <div class="ti-screen">
+      <div class="screen-header">TI&#8209;84 PLUS &nbsp;///&nbsp; PRGM</div>
+      <div id="output"><span class="prompt">Ready.</span>
+<span class="cursor-blink"></span></div>
+    </div>
+
+    <div class="vars-panel">
+      <div class="panel-label">Variables</div>
+      <div class="vars-grid" id="vars-grid">
+        <div class="var-chip" style="grid-column:1/-1; color:var(--text-dim); font-size:0.7rem; border:none; background:none;">No variables yet.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════
+     PYTHON / PYSCRIPT
+     ══════════════════════════════════════════ -->
+<script type="py" config='{"packages":["lark"]}'>
+import re
+import math
+from lark import Lark, Transformer, v_args, Token, Tree
+from pyscript import document, window
+
+# ── Grammar ────────────────────────────────────────────────────────────────
+GRAMMAR = r"""
+    program : line+
+    line    : ":" stmt
+
+    stmt    : store_stmt
+            | disp_stmt
+            | input_stmt
+            | if_stmt
+            | for_stmt
+            | while_stmt
+            | expr_stmt
+
+    store_stmt  : expr "→" NAME
+    disp_stmt   : "Disp" disp_args
+    input_stmt  : "Input" NAME
+                | "Input" string "," NAME
+    if_stmt     : "If" expr ":" "Then" line+ (":" "Else" line+)? ":" "End"
+                | "If" expr ":" stmt
+    for_stmt    : "For" "(" NAME "," expr "," expr ("," expr)? ")" line+ ":" "End"
+    while_stmt  : "While" expr line+ ":" "End"
+    expr_stmt   : expr
+
+    disp_args   : disp_item ("," disp_item)*
+    disp_item   : string | expr
+
+    ?expr   : cmp_expr
+    ?cmp_expr : cmp_expr cmp_op add_expr  -> cmp
+              | add_expr
+    cmp_op  : "=" | "≠" | "<" | ">" | "≤" | "≥"
+    ?add_expr : add_expr "+" mul_expr     -> add
+              | add_expr "-" mul_expr     -> sub
+              | mul_expr
+    ?mul_expr : mul_expr "*" pow_expr     -> mul
+              | mul_expr "/" pow_expr     -> div
+              | pow_expr
+    ?pow_expr : neg_expr "^" pow_expr    -> pow
+              | neg_expr
+    ?neg_expr : "-" atom                 -> neg
+              | atom
+    ?atom   : NUMBER                     -> number
+            | NAME "(" args ")"          -> func_call
+            | NAME                       -> var
+            | "(" expr ")"
+            | string
+
+    args    : (expr ("," expr)*)?
+    string  : ESCAPED_STRING
+
+    NAME    : /[A-Zθ][A-Z0-9]*/
+    NUMBER  : /-?(\d+\.?\d*|\.\d+)([Ee][+-]?\d+)?/
+
+    %import common.ESCAPED_STRING
+    %import common.WS
+    %ignore WS
+"""
+
+parser = Lark(GRAMMAR, start="program", ambiguity="resolve")
+
+# ── Interpreter ─────────────────────────────────────────────────────────────
+class TIInterpreter:
+    BUILTINS = {
+        "abs":      abs,
+        "sqrt":     math.sqrt,
+        "sin":      math.sin,
+        "cos":      math.cos,
+        "tan":      math.tan,
+        "log":      math.log10,
+        "ln":       math.log,
+        "int":      math.floor,
+        "iPart":    lambda x: float(int(x)),
+        "fPart":    lambda x: x - int(x),
+        "round":    lambda x, n=9: round(x, int(n)),
+        "max":      max,
+        "min":      min,
+        "remainder":lambda a, b: a % b,
+        "gcd":      math.gcd,
+        "lcm":      math.lcm,
+        "randInt":  lambda a, b: float(__import__("random").randint(int(a), int(b))),
+        "not":      lambda x: 1.0 if x == 0 else 0.0,
+    }
+
+    def __init__(self):
+        self.vars = {}
+        self.output = []
+
+    def fmt(self, v):
+        if isinstance(v, float):
+            if v == int(v) and abs(v) < 1e15:
+                return str(int(v))
+            return str(v)
+        return str(v)
+
+    def run(self, src):
+        # Pre-process: join physical lines that belong to the same logical statement
+        lines = [l.strip() for l in src.splitlines() if l.strip()]
+        # Ensure every line starts with ":"
+        clean = []
+        for l in lines:
+            clean.append(l if l.startswith(":") else ":" + l)
+        code = "\n".join(clean)
+        tree = parser.parse(code)
+        self.exec_lines(tree.children)
+
+    def exec_lines(self, lines):
+        i = 0
+        while i < len(lines):
+            self.exec_stmt(lines[i].children[0])
+            i += 1
+
+    def exec_stmt(self, node):
+        t = node.data
+        if t == "store_stmt":
+            val = self.eval_expr(node.children[0])
+            name = str(node.children[1])
+            self.vars[name] = val
+        elif t == "disp_stmt":
+            args_node = node.children[0]
+            parts = []
+            for item in args_node.children:
+                v = item.children[0]
+                if v.data == "string":
+                    parts.append(v.children[0][1:-1])
+                else:
+                    parts.append(self.fmt(self.eval_expr(v)))
+            self.output.append(" ".join(parts))
+        elif t == "input_stmt":
+            # In non-interactive mode, show prompt
+            if len(node.children) == 2:
+                prompt = node.children[0].children[0][1:-1]
+                name = str(node.children[1])
+            else:
+                prompt = "?"
+                name = str(node.children[0])
+            self.output.append(f"{prompt} [Input not supported in batch mode]")
+        elif t == "if_stmt":
+            self._exec_if(node)
+        elif t == "for_stmt":
+            self._exec_for(node)
+        elif t == "while_stmt":
+            self._exec_while(node)
+        elif t == "expr_stmt":
+            val = self.eval_expr(node.children[0])
+            self.output.append(self.fmt(val))
+
+    def _exec_if(self, node):
+        cond = self.eval_expr(node.children[0])
+        children = node.children[1:]
+        # Find Else boundary: children are lines (Tree with data='line')
+        then_lines, else_lines = [], []
+        in_else = False
+        for c in children:
+            if isinstance(c, Token) and str(c) == "Else":
+                in_else = True
+            elif in_else:
+                else_lines.append(c)
+            else:
+                then_lines.append(c)
+        if cond:
+            self.exec_lines(then_lines)
+        else:
+            self.exec_lines(else_lines)
+
+    def _exec_for(self, node):
+        var_name = str(node.children[0])
+        start = self.eval_expr(node.children[1])
+        stop  = self.eval_expr(node.children[2])
+        step  = self.eval_expr(node.children[3]) if len(node.children) > 4 else 1.0
+        body_lines = node.children[4:] if len(node.children) > 4 else node.children[3:]
+        # Recalculate: children[0]=NAME, [1]=start, [2]=stop, then optional step, then lines
+        # Rebuild: count non-line expr children
+        exprs = [c for c in node.children if isinstance(c, Tree) and c.data != "line"]
+        lines = [c for c in node.children if isinstance(c, Tree) and c.data == "line"]
+        var_name = str(node.children[0])
+        start = self.eval_expr(exprs[0])
+        stop  = self.eval_expr(exprs[1])
+        step  = self.eval_expr(exprs[2]) if len(exprs) > 2 else 1.0
+        val = start
+        iters = 0
+        while (step > 0 and val <= stop) or (step < 0 and val >= stop):
+            if iters > 10000:
+                self.output.append("ERR: LOOP LIMIT EXCEEDED")
+                break
+            self.vars[var_name] = val
+            self.exec_lines(lines)
+            val += step
+            iters += 1
+
+    def _exec_while(self, node):
+        cond_node = node.children[0]
+        lines = node.children[1:]
+        iters = 0
+        while self.eval_expr(cond_node):
+            if iters > 10000:
+                self.output.append("ERR: LOOP LIMIT EXCEEDED")
+                break
+            self.exec_lines(lines)
+            iters += 1
+
+    def eval_expr(self, node):
+        if isinstance(node, Token):
+            return float(node)
+        t = node.data
+        c = node.children
+        if t == "number":
+            return float(c[0])
+        if t == "var":
+            name = str(c[0])
+            if name not in self.vars:
+                raise NameError(f"Undefined variable: {name}")
+            return self.vars[name]
+        if t == "string":
+            return c[0][1:-1]
+        if t == "add": return self.eval_expr(c[0]) + self.eval_expr(c[1])
+        if t == "sub": return self.eval_expr(c[0]) - self.eval_expr(c[1])
+        if t == "mul": return self.eval_expr(c[0]) * self.eval_expr(c[1])
+        if t == "div":
+            d = self.eval_expr(c[1])
+            if d == 0: raise ZeroDivisionError("ERR:DIVIDE BY 0")
+            return self.eval_expr(c[0]) / d
+        if t == "pow": return self.eval_expr(c[0]) ** self.eval_expr(c[1])
+        if t == "neg": return -self.eval_expr(c[0])
+        if t == "cmp":
+            l, op, r = self.eval_expr(c[0]), str(c[1].children[0]), self.eval_expr(c[2])
+            ops = {"=": l==r, "≠": l!=r, "<": l<r, ">": l>r, "≤": l<=r, "≥": l>=r}
+            return 1.0 if ops[op] else 0.0
+        if t == "func_call":
+            name = str(c[0])
+            args_node = c[1]
+            args = [self.eval_expr(a) for a in args_node.children]
+            if name in self.BUILTINS:
+                return float(self.BUILTINS[name](*args))
+            raise NameError(f"Unknown function: {name}")
+        raise ValueError(f"Unknown node: {t}")
+
+
+# ── JS bridge ───────────────────────────────────────────────────────────────
+def run_program(code):
+    interp = TIInterpreter()
+    try:
+        interp.run(code)
+        lines = interp.output
+        html = ""
+        for line in lines:
+            html += f'<span class="result">{line}</span>\n'
+        if not lines:
+            html = '<span class="prompt">Done (no output).</span>\n'
+    except Exception as e:
+        html = f'<span class="err">ERR: {e}</span>\n'
+    html += '<span class="cursor-blink"></span>'
+
+    out_el = document.getElementById("output")
+    out_el.innerHTML = html
+
+    # Update variables panel
+    grid = document.getElementById("vars-grid")
+    if interp.vars:
+        chips = ""
+        for k, v in sorted(interp.vars.items()):
+            fmt_v = interp.fmt(v) if isinstance(v, float) else str(v)
+            chips += f'<div class="var-chip"><span class="var-name">{k}</span><span class="var-val">{fmt_v}</span></div>'
+        grid.innerHTML = chips
+    else:
+        grid.innerHTML = '<div class="var-chip" style="grid-column:1/-1;color:var(--text-dim);font-size:0.7rem;border:none;background:none;">No variables yet.</div>'
+
+window.run_ti = run_program
+
+# Hide loading overlay, enable button
+document.getElementById("loading").style.display = "none"
+document.getElementById("run-btn").disabled = False
+document.getElementById("output").innerHTML = '<span class="prompt">Ready.</span>\n<span class="cursor-blink"></span>'
+</script>
+
+<script>
+// ── Line numbers sync ───────────────────────────────────────────────────────
+const editor = document.getElementById("code-editor");
+const lineNums = document.getElementById("line-numbers");
+
+function updateLineNumbers() {
+  const lines = editor.value.split("\n").length;
+  let html = "";
+  for (let i = 1; i <= lines; i++) html += `<div class="line-num">${i}</div>`;
+  lineNums.innerHTML = html;
+}
+editor.addEventListener("input", updateLineNumbers);
+updateLineNumbers();
+
+// ── Run button ──────────────────────────────────────────────────────────────
+document.getElementById("run-btn").addEventListener("click", () => {
+  const code = editor.value;
+  document.getElementById("output").innerHTML =
+    '<span class="prompt">Running…</span>';
+  setTimeout(() => {
+    try { window.run_ti(code); }
+    catch(e) {
+      document.getElementById("output").innerHTML =
+        `<span class="err">ERR: ${e}</span>\n<span class="cursor-blink"></span>`;
+    }
+  }, 10);
+});
+
+// ── Clear ───────────────────────────────────────────────────────────────────
+document.getElementById("clear-btn").addEventListener("click", () => {
+  editor.value = "";
+  updateLineNumbers();
+  document.getElementById("output").innerHTML =
+    '<span class="prompt">Ready.</span>\n<span class="cursor-blink"></span>';
+  document.getElementById("vars-grid").innerHTML =
+    '<div class="var-chip" style="grid-column:1/-1;color:var(--text-dim);font-size:0.7rem;border:none;background:none;">No variables yet.</div>';
+});
+
+// ── Example snippets ─────────────────────────────────────────────────────────
+document.querySelectorAll(".ex-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    editor.value = btn.dataset.prog;
+    updateLineNumbers();
+  });
+});
+</script>
+</body>
+</html>
