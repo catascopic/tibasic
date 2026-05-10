@@ -152,6 +152,7 @@ def filter_tokens(query: str) -> list[Token]:
 			results.append(token)
 		elif token.name and token.name.lower().startswith(q):
 			results.append(token)
+	results.sort(key=lambda t: t.type != "variable")
 	return results[:18]
 
 
