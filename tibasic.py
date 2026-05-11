@@ -357,6 +357,11 @@ def on_keydown(event):
 
 	key = event.key
 
+	if key == "Tab":
+		event.preventDefault()
+		on_mode_toggle(None)
+		return
+
 	if free_mode:
 		if event.altKey and len(key) == 1:
 			# Alt+key: open autocomplete for that character
