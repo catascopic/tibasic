@@ -13,7 +13,7 @@ free_mode: bool = False
 
 # ── Token Filtering ────────────────────────────────────────────────────────────
 
-def filter_tokens(query: str) -> list[Token]:
+def compute_matches(query: str) -> list[Token]:
 	q = query.lower()
 	results = []
 	for token in TOKENS:
@@ -25,31 +25,6 @@ def filter_tokens(query: str) -> list[Token]:
 			results.append(token)
 	results.sort(key=lambda t: t.type != "variable")
 	return results[:18]
-
-
-def make_number_token(text: str) -> Token:
-	return Token(hex=b'', text=text, type="number", desc="Number literal")
-
-
-def make_string_token(text: str) -> Token:
-	return Token(hex=b'', text=text, type="string-lit", desc="String literal")
-
-
-def make_literal_token(ch: str) -> Token:
-	return Token(hex=b'', text=ch, type="literal", desc="Character")
-
-
-def compute_matches(query: str) -> list[Token]:
-	matches = filter_tokens(query)
-	if query:
-		try:
-			float(query)
-			matches = [make_number_token(query)] + matches
-		except ValueError:
-			pass
-		if query.startswith('"'):
-			matches = [make_string_token(query)] + matches
-	return matches
 
 
 # ── Rendering ─────────────────────────────────────────────────────────────────
@@ -204,8 +179,12 @@ def _free_type_key(event) -> None:
 		render_autocomplete()
 		return
 
-	exact = next((t for t in TOKENS if t.text == key or (t.name and t.name == key)), None)
-	commit_token(exact if exact else make_literal_token(key))
+	if key.islower():
+		exact = next((t for t in TOKENS if t.text == key and t.type == "string"), None)
+	else:
+		exact = next((t for t in TOKENS if t.text == key or (t.name and t.name == key)), None)
+	if exact:
+		commit_token(exact)
 
 
 # ── Event Handlers ─────────────────────────────────────────────────────────────
@@ -265,15 +244,8 @@ def on_keydown(event):
 
 	elif key == "Enter":
 		event.preventDefault()
-		query = document.getElementById("token-input").value.strip()
 		if current_matches:
 			commit_token(current_matches[selected_idx])
-		elif query:
-			try:
-				float(query)
-				commit_token(make_number_token(query))
-			except ValueError:
-				pass
 		else:
 			new_line()
 
