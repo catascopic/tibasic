@@ -7,7 +7,6 @@ lines: list[list[Token]] = [[]]
 current_line: int = 0
 selected_idx: int = 0
 current_matches: list[Token] = []
-active_category: str = ""
 free_mode: bool = False
 
 
@@ -17,8 +16,6 @@ def compute_matches(query: str) -> list[Token]:
 	q = query.lower()
 	results = []
 	for token in TOKENS:
-		if active_category and token.type != active_category:
-			continue
 		if token.text.lower().startswith(q):
 			results.append(token)
 		elif token.name and token.name.lower().startswith(q):
@@ -295,23 +292,6 @@ def on_ac_click(event):
 		selected_idx = idx
 		commit_token(current_matches[idx])
 		document.getElementById("token-input").focus()
-
-
-@when("click", "#toolbar")
-def on_toolbar_click(event):
-	global active_category, current_matches, selected_idx
-	btn = event.target
-	if not btn.classList.contains("cat-btn"):
-		return
-	active_category = btn.dataset.cat
-	for b in document.querySelectorAll(".cat-btn"):
-		b.classList.remove("active")
-	btn.classList.add("active")
-	query = document.getElementById("token-input").value
-	current_matches = compute_matches(query)
-	selected_idx = 0
-	render_autocomplete()
-	document.getElementById("token-input").focus()
 
 
 @when("click", "#mode-toggle")
