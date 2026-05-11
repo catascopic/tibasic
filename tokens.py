@@ -219,7 +219,7 @@ TOKENS: list[Token] = [
 	token(b'\xec', "Plot1(",      "stat",     "Configures stat Plot 1 with a type and data sources"),
 	token(b'\xed', "Plot2(",      "stat",     "Configures stat Plot 2 with a type and data sources"),
 	token(b'\xee', "Plot3(",      "stat",     "Configures stat Plot 3 with a type and data sources"),
-	# 0xef: I forgot, we actually do want to implement these, and you can see them in the HTML: "webref/TI-84+ Tokens - TI-Basic Developer.htm". I'm only trying to implement the original TI-84 Plus commands, so we only need the tokens up to Manual-Fit, although we may want to implement remainder and randIntNoRep because version 2.53MP supports these
+	# 0xef: I forgot, we actually do want to implement these, and you can see them in the HTML: "webref/TI-84+ Tokens - TI-Basic Developer.htm". I'm only trying to implement the original TI-84 Plus commands, so we only need the tokens up to 0xefbf
 	token(b'\xf0', "^",           "math",     "Raises the left operand to the power of the right operand", key='^'),
 	token(b'\xf1', "×√",          "math",     "Computes the x-th root of a value",                          alt="xroot"),
 	token(b'\xf2', "1-Var Stats", "stat",     "Computes one-variable statistics for a dataset"),
@@ -547,16 +547,16 @@ TOKENS: list[Token] = [
 	# Lowercase letters l–z (0xBBBC–0xBBCA)
 	*[token(bytes([0xBB, 0xBC + i]), chr(0x6C + i), "string", f"Lowercase {chr(0x6C + i)}", key=chr(0x6C + i)) for i in range(15)],
 	
-	token(b'\xbb\xcb', "σ", "string", "Lowercase sigma (statistics display)", alt="sigma"),
-	token(b'\xbb\xcc', "τ", "string", "Greek tau (display character)", alt="tau"),
+	token(b'\xbb\xcb', "σ", "string", "sigma (statistics display)", alt="sigma"),
+	token(b'\xbb\xcc', "τ", "string", "tau (display character)", alt="tau"),
 	token(b'\xbb\xcd', "Í", "string", "I-acute (extended)", alt="I-acute"),
 	token(b'\xbb\xce', "GarbageCollect","variable","Defragments archive memory to recover space"),
 	
 	# MISSING: "~" (0xbbcf) - "∠" (0xbbdc)
 	
-	token(b'\xbb\xdd', "ß", "string", "German sharp-s", alt="sharp-s"),
-	token(b'\xbb\xde', "x", "string", "Superscript x (extended display slot)", alt="superscript-x"),  # deprecated
-	token(b'\xbb\xdf', "T", "string", "Subscript T (extended display slot)", alt="subscript-t"),  # deprecated
+	token(b'\xbb\xdd', "ß", "string", "German sharp S", alt="sharp-s"),
+	token(b'\xbb\xde', "x", "string", "Superscript x", alt="superscript-x"),  # deprecated
+	token(b'\xbb\xdf', "T", "string", "Subscript T", alt="subscript-t"),  # deprecated
 	
 	*[token(bytes([0xBB, 0xE0 + i]), chr(0x2080 + i), "string", "Subscript {i}", alt=f"subscript-{i}") for i in range(11)],
 	
@@ -569,7 +569,7 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xf1', "∫", "string", "Integral symbol", alt="integral"),
 	token(b'\xbb\xf2', "🡅", "string", "scroll up"),
 	token(b'\xbb\xf3', "🡇", "string", "scroll down"),
-	token(b'\xbb\xf4', "√", "string", "Square root symbol (extended display character)", alt="root"),  # deprecated
+	token(b'\xbb\xf4', "√", "string", "Square root symbol", alt="root"),  # deprecated
 	token(b'\xbb\xf5', "<funcon>", "string", "Function On", alt='function-on'),  # deprecated
 
 ]
