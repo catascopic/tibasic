@@ -16,9 +16,7 @@ def compute_matches(query: str) -> list[Token]:
 	q = query.lower()
 	results = []
 	for token in TOKENS:
-		if token.text.lower().startswith(q):
-			results.append(token)
-		elif token.name and token.name.lower().startswith(q):
+		if any(a.startswith(q) for a in token.alias)
 			results.append(token)
 	results.sort(key=lambda t: t.type != "variable")
 	return results[:18]
@@ -77,7 +75,7 @@ def render_autocomplete():
 		if token.name:
 			label = document.createElement("span")
 			label.className = "ac-name"
-			label.textContent = token.name
+			label.textContent = '|'.join(token.alias)
 			item.appendChild(label)
 
 		dsc = document.createElement("span")
