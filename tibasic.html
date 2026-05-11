@@ -46,6 +46,7 @@
       <div id="input-panel">
         <div id="autocomplete" class="hidden"></div>
         <div id="input-row">
+          <button id="mode-toggle" class="mode-btn" title="Switch input mode (token vs free-type)">TOKEN</button>
           <span class="prompt-arrow">▶</span>
           <input
             id="token-input"
@@ -56,11 +57,18 @@
           >
         </div>
         <div id="hints">
-          <kbd>↑↓</kbd> navigate &nbsp;
-          <kbd>Enter</kbd> confirm &nbsp;
-          <kbd>Esc</kbd> dismiss &nbsp;
-          <kbd>Backspace</kbd> delete last token &nbsp;
-          <kbd>Enter</kbd> on empty = new line
+          <span id="hints-token">
+            <kbd>↑↓</kbd> navigate &nbsp;
+            <kbd>Enter</kbd> confirm &nbsp;
+            <kbd>Esc</kbd> dismiss &nbsp;
+            <kbd>Backspace</kbd> delete last token &nbsp;
+            <kbd>Enter</kbd> on empty = new line
+          </span>
+          <span id="hints-free" class="hidden">
+            Type token text directly &nbsp;
+            <kbd>Alt</kbd>+key opens autocomplete &nbsp;
+            <kbd>Enter</kbd> on empty = new line
+          </span>
         </div>
       </div>
     </main>
