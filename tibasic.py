@@ -1,135 +1,5 @@
-from dataclasses import dataclass, field
 from pyscript import document, when
-
-
-# ── Token Data Class ───────────────────────────────────────────────────────────
-
-@dataclass
-class Token:
-	text: str	# the actual TI-Basic token, e.g. "√("
-	type: str	# category, e.g. "math"
-	desc: str	# short tooltip / autocomplete description
-	name: str = ""	# keyboard-friendly alias for non-typeable symbols only
-
-
-def tok(text, type, desc, name=""):
-	return Token(text=text, type=type, desc=desc, name=name)
-
-
-# ── Token Database ─────────────────────────────────────────────────────────────
-
-TOKENS: list[Token] = [
-	# Control flow
-	tok("If",     "control", "If conditional"),
-	tok("Then",   "control", "Start If body"),
-	tok("Else",   "control", "Else branch"),
-	tok("End",    "control", "End block"),
-	tok("For(",   "control", "For loop: For(var,start,end[,step])"),
-	tok("While",  "control", "While condition is true"),
-	tok("Repeat", "control", "Repeat until condition is true"),
-	tok("Return", "control", "Return from sub-program"),
-	tok("Stop",   "control", "Stop program"),
-	tok("Goto",   "control", "Jump to label"),
-	tok("Lbl",    "control", "Define a label"),
-	tok("IS>(",   "control", "Increment variable; skip next if >"),
-	tok("DS<(",   "control", "Decrement variable; skip next if <"),
-	tok("Menu(",  "control", "Display a menu"),
-	# I/O
-	tok("Disp",      "io", "Display value on home screen"),
-	tok("DispGraph", "io", "Show graph screen"),
-	tok("DispTable", "io", "Show table screen"),
-	tok("Input",     "io", "Get input from user"),
-	tok("Prompt",    "io", "Prompt user for variable"),
-	tok("Output(",   "io", "Display text at row, col"),
-	tok("getKey",    "io", "Read last keypress code"),
-	tok("ClrHome",   "io", "Clear the home screen"),
-	tok("ClrDraw",   "io", "Clear the drawing screen"),
-	tok("Pause",     "io", "Pause execution"),
-	# Math
-	tok("abs(",      "math", "Absolute value of x"),
-	tok("round(",    "math", "Round x to N decimal places"),
-	tok("iPart(",    "math", "Integer part of x (truncate)"),
-	tok("fPart(",    "math", "Fractional part of x"),
-	tok("int(",      "math", "Greatest integer ≤ x"),
-	tok("min(",      "math", "Minimum of two values or a list"),
-	tok("max(",      "math", "Maximum of two values or a list"),
-	tok("lcm(",      "math", "Least common multiple"),
-	tok("gcd(",      "math", "Greatest common divisor"),
-	tok("log(",      "math", "Base-10 logarithm"),
-	tok("ln(",       "math", "Natural logarithm (base e)"),
-	tok("e^(",       "math", "e raised to a power"),
-	tok("10^(",      "math", "10 raised to a power"),
-	tok("√(",        "math", "Square root of x",              name="sqrt("),
-	tok("³√(",       "math", "Cube root of x",                name="cbrt("),
-	tok("rand",      "math", "Random number in [0, 1)"),
-	tok("randInt(",  "math", "Random integer between A and B"),
-	tok("randNorm(", "math", "Random value from normal distribution"),
-	tok("π",         "math", "Pi (3.14159…)",                 name="pi"),
-	# Trig
-	tok("sin(",    "trig", "Sine of x"),
-	tok("cos(",    "trig", "Cosine of x"),
-	tok("tan(",    "trig", "Tangent of x"),
-	tok("sin⁻¹(", "trig", "Inverse sine (arcsine)",          name="arcsin("),
-	tok("cos⁻¹(", "trig", "Inverse cosine (arccosine)",      name="arccos("),
-	tok("tan⁻¹(", "trig", "Inverse tangent (arctangent)",    name="arctan("),
-	tok("sinh(",   "trig", "Hyperbolic sine"),
-	tok("cosh(",   "trig", "Hyperbolic cosine"),
-	tok("tanh(",   "trig", "Hyperbolic tangent"),
-	# Operators
-	tok("+",  "operator", "Addition"),
-	tok("-",  "operator", "Subtraction"),
-	tok("*",  "operator", "Multiplication"),
-	tok("/",  "operator", "Division"),
-	tok("^",  "operator", "Exponentiation"),
-	tok("²",  "operator", "Square (raised to power 2)",      name="^2"),
-	tok("=",  "operator", "Equality test"),
-	tok("≠",  "operator", "Inequality test",                 name="!="),
-	tok("<",  "operator", "Less than"),
-	tok(">",  "operator", "Greater than"),
-	tok("≤",  "operator", "Less than or equal to",           name="<="),
-	tok("≥",  "operator", "Greater than or equal to",        name=">="),
-	tok("and","operator", "Logical AND"),
-	tok("or", "operator", "Logical OR"),
-	tok("xor","operator", "Logical XOR"),
-	tok("not(","operator","Logical NOT"),
-	tok("→",  "operator", "Store value to variable",         name="->"),
-	tok(")",  "operator", "Close parenthesis"),
-	tok(",",  "operator", "Argument separator"),
-	tok(":",  "operator", "Statement separator"),
-	# Variables A–Z
-	*[tok(chr(c), "variable", f"Variable {chr(c)}")
-	  for c in range(ord("A"), ord("Z") + 1)],
-	tok("θ",  "variable", "Variable theta",                  name="theta"),
-	tok("Ans","variable", "Last computed answer"),
-	# List variables L₁–L₆  (subscript digits not typeable)
-	*[tok(f"L{chr(0x2080 + i)}", "list", f"List variable {i}", name=f"L{i}")
-	  for i in range(1, 7)],
-	# List commands
-	tok("dim(",    "list", "List or matrix dimension"),
-	tok("Fill(",   "list", "Fill list or matrix with value"),
-	tok("seq(",    "list", "Generate a sequence"),
-	tok("sum(",    "list", "Sum of list elements"),
-	tok("prod(",   "list", "Product of list elements"),
-	tok("cumSum(", "list", "Cumulative sum of list"),
-	tok("SortA(",  "list", "Sort list in ascending order"),
-	tok("SortD(",  "list", "Sort list in descending order"),
-	# Matrix variables [A]–[J]
-	*[tok(f"[{chr(ord('A') + i)}]", "matrix", f"Matrix variable {chr(ord('A') + i)}")
-	  for i in range(10)],
-	# Matrix commands
-	tok("det(",      "matrix", "Matrix determinant"),
-	tok("identity(", "matrix", "Identity matrix of size N"),
-	tok("randM(",    "matrix", "Random matrix"),
-	tok("augment(",  "matrix", "Augment two matrices or lists"),
-	# String commands
-	tok("length(",   "string", "Length of a string"),
-	tok("sub(",      "string", "Extract substring"),
-	tok("inString(", "string", "Find position of substring"),
-	# String variables Str0–Str9
-	*[tok(f"Str{i}", "string", f"String variable {i}")
-	  for i in range(10)],
-]
-
+from tokens import Token, TOKENS
 
 # ── App State ──────────────────────────────────────────────────────────────────
 
@@ -158,15 +28,15 @@ def filter_tokens(query: str) -> list[Token]:
 
 
 def make_number_token(text: str) -> Token:
-	return Token(text=text, type="number", desc="Number literal")
+	return Token(hex=b'', text=text, type="number", desc="Number literal")
 
 
 def make_string_token(text: str) -> Token:
-	return Token(text=text, type="string-lit", desc="String literal")
+	return Token(hex=b'', text=text, type="string-lit", desc="String literal")
 
 
 def make_literal_token(ch: str) -> Token:
-	return Token(text=ch, type="literal", desc=f"Character")
+	return Token(hex=b'', text=ch, type="literal", desc="Character")
 
 
 def compute_matches(query: str) -> list[Token]:
