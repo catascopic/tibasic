@@ -1,0 +1,2 @@
+Remove token mode
+color coded words
