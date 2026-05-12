@@ -43,8 +43,9 @@ def render_editor():
 		tokens_wrap.className = "tokens"
 		for ti, token in enumerate(line):
 			chip = document.createElement("span")
-			chip.className = f"token token-{token.category}"
-			chip.textContent = token.display.decode('latin-1')
+			is_space = token.code == b'\x29'
+			chip.className = f"token token-{token.category}" + (" token-space" if is_space else "")
+			chip.textContent = " " if is_space else token.display.decode('latin-1')
 			chip.title = f"{token.desc} (click to delete)"
 			chip.dataset.lineIdx = str(li)
 			chip.dataset.tokIdx = str(ti)
@@ -235,6 +236,12 @@ def on_keydown(event):
 			commit_token(current_matches[selected_idx])
 		else:
 			new_line()
+
+	elif key == " " and " " in KEY_MAP:
+		event.preventDefault()
+		inp = document.getElementById("token-input")
+		if inp.value == "":
+			commit_token(KEY_MAP[" "])
 
 	elif key == "Backspace":
 		inp = document.getElementById("token-input")

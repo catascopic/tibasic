@@ -192,6 +192,7 @@ body {
 	white-space: pre;
 }
 .token:hover { opacity: 0.75; transform: scale(0.96); }
+.token-space { font-family: var(--font-mono); }
 
 /* token type backgrounds */
 /*
