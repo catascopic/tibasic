@@ -44,7 +44,7 @@ def render_editor():
 		for ti, token in enumerate(line):
 			chip = document.createElement("span")
 			chip.className = f"token token-{token.category}"
-			chip.textContent = token.text
+			chip.textContent = token.display.decode('latin-1')
 			chip.title = f"{token.desc} (click to delete)"
 			chip.dataset.lineIdx = str(li)
 			chip.dataset.tokIdx = str(ti)
