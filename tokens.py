@@ -14,11 +14,11 @@ class Token:
 
 
 def token(code: bytes, text: str, category: str, desc: str, alt: str | set[str] | None = None, key: str | None = None):
-	alias = {text}
+	alias = {text.lower()}
 	if isinstance(alt, str):
-		alias.add(alt)
+		alias.add(alt.lower())
 	elif alt is not None:
-		alias.update(alt)
+		alias.update(a.lower() for a in alt)
 	return Token(code, key, text, category, desc, alias, text.endswith('('))
 
 
@@ -27,7 +27,7 @@ TOKENS: list[Token] = [
 	token(b'\x01', "►DMS",        "math",     "Converts a decimal angle to degree-minute-second display", alt='to-DMS'),
 	token(b'\x02', "►Dec",        "math",     "Converts a fraction or expression to decimal form", alt='to-Dec'),
 	token(b'\x03', "►Frac",       "math",     "Converts a decimal to the simplest fraction form", alt='to-Frac'),
-	token(b'\x04', "→",           "operator", "Stores a value into a variable", key='@',                   alt=("->", 'store')),
+	token(b'\x04', "→",           "operator", "Stores a value into a variable", key='`',                   alt=("->", 'store')),
 	token(b'\x05', "Boxplot",     "stat",     "Selects the standard box-and-whisker plot type for a stat plot"),
 	token(b'\x06', "[",           "operator", "Opens a matrix literal", key='['),
 	token(b'\x07', "]",           "operator", "Closes a matrix literal", key=']'),
@@ -70,7 +70,7 @@ TOKENS: list[Token] = [
 	token(b'\x2d', "!",           "math",     "Computes the factorial of a non-negative integer", key='!'),
 	token(b'\x2e', "CubicReg",    "stat",     "Fits a cubic regression model to data"),
 	token(b'\x2f', "QuartReg",    "stat",     "Fits a quartic regression model to data"),
-	*[token(bytes([0x30 + i]), chr(0x41 + i), "number", f"Digit {chr(0x30 + i)}", key=chr(0x30 + i)) for i in range(10)],
+	*[token(bytes([0x30 + i]), chr(0x30 + i), "number", f"Digit {chr(0x30 + i)}", key=chr(0x30 + i)) for i in range(10)],
 	token(b'\x3a', ".",           "number",   "Decimal point in numeric literals", key='.'),
 	token(b'\x3b', "ᴇ",           "math",     "Scientific notation exponent (×10^n)",                      alt="E"),
 	token(b'\x3c', "or",          "operator", "Boolean OR operator"),
@@ -545,19 +545,19 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xcb', "σ", "string", "sigma (statistics display)", alt="sigma"),
 	token(b'\xbb\xcc', "τ", "string", "tau (display character)", alt="tau"),
 	token(b'\xbb\xcd', "Í", "string", "I-acute (extended)", alt="I-acute"),
-	token(b'\xbb\xce', "GarbageCollect","variable","Defragments archive memory to recover space"),
-	token(b'\xbb\xcf', "~",  "string", "Tilde character", alt="tilde"),
-	token(b'\xbb\xd1', "@",  "string", "At sign",       alt="at-sign",   key='@'),
-	token(b'\xbb\xd2', "#",  "string", "Number/hash sign", alt="hash",   key='#'),
-	token(b'\xbb\xd3', "$",  "string", "Dollar sign",   alt="dollar",    key='$'),
-	token(b'\xbb\xd4', "&",  "string", "Ampersand",     alt="ampersand", key='&'),
-	token(b'\xbb\xd5', "`",  "string", "Grave/backtick",alt="backtick"),
-	token(b'\xbb\xd6', ";",  "string", "Semicolon",     alt="semicolon", key=';'),
-	token(b'\xbb\xd7', "\\", "string", "Backslash",     alt="backslash", key='\\'),
-	token(b'\xbb\xd8', "|",  "string", "Pipe/vertical bar", alt="pipe",  key='|'),
-	token(b'\xbb\xd9', "_",  "string", "Underscore",    alt="underscore",key='_'),
-	token(b'\xbb\xda', "%",  "string", "Percent sign",  alt="percent",   key='%'),
-	token(b'\xbb\xdb', "…",  "string", "Ellipsis",      alt="ellipsis"),
+	token(b'\xbb\xce', "GarbageCollect", "variable", "Defragments archive memory to recover space"),
+	token(b'\xbb\xcf', "~", "string", "Tilde character", alt="tilde"),
+	token(b'\xbb\xd1', "@", "string", "At sign",       alt="at-sign",   key='@'),
+	token(b'\xbb\xd2', "#", "string", "Number/hash sign", alt="hash",   key='#'),
+	token(b'\xbb\xd3', "$", "string", "Dollar sign",   alt="dollar",    key='$'),
+	token(b'\xbb\xd4', "&", "string", "Ampersand",     alt="ampersand", key='&'),
+	token(b'\xbb\xd5', "`", "string", "Grave/backtick",alt="backtick"),
+	token(b'\xbb\xd6', ";", "string", "Semicolon",     alt="semicolon", key=';'),
+	token(b'\xbb\xd7', "\\","string", "Backslash",     alt="backslash", key='\\'),
+	token(b'\xbb\xd8', "|", "string", "Pipe/vertical bar", alt="pipe",  key='|'),
+	token(b'\xbb\xd9', "_", "string", "Underscore",    alt="underscore",key='_'),
+	token(b'\xbb\xda', "%", "string", "Percent sign",  alt="percent",   key='%'),
+	token(b'\xbb\xdb', "…", "string", "Ellipsis",      alt="ellipsis"),
 	token(b'\xbb\xdc', "∠", "string", "Angle symbol", alt="angle"),
 	token(b'\xbb\xdd', "ß", "string", "German sharp S", alt="sharp-s"),
 	token(b'\xbb\xde', "x", "string", "Superscript x", alt="superscript-x"),  # deprecated
@@ -666,3 +666,6 @@ if __name__ == '__main__':
 	for i, token in enumerate(check_misc):
 		if token is None:
 			print('MISSING:', hex(0xBB00 + i))
+
+	for token in sorted(TOKENS, key=lambda t: t.code):
+		print(token.code.hex(), token.text)

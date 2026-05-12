@@ -15,10 +15,10 @@ free_mode: bool = False
 # ── Token Filtering ────────────────────────────────────────────────────────────
 
 def compute_matches(query: str) -> list[Token]:
-	q = query.lower()
+	query_norm = query.lower()
 	results = []
 	for token in TOKENS:
-		if any(a.startswith(q) for a in token.alias):
+		if any(a.startswith(query_norm) for a in token.alias):
 			results.append(token)
 	results.sort(key=lambda t: t.category != "variable")
 	return results[:18]
@@ -73,12 +73,6 @@ def render_autocomplete():
 		badge.className = "ac-badge"
 		badge.textContent = token.text
 		item.appendChild(badge)
-
-		if len(token.alias) > 1:
-			label = document.createElement("span")
-			label.className = "ac-name"
-			label.textContent = '|'.join(token.alias)
-			item.appendChild(label)
 
 		dsc = document.createElement("span")
 		dsc.className = "ac-desc"
