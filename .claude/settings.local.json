@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(python)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(find \"C:\\\\Users\\\\Max\\\\Documents\\\\code\" -name \"*token*\" -o -name \"*EF*\" 2>/dev/null | head -20)"
     ]
   }
 }

@@ -61,7 +61,6 @@ TOKENS: list[Token] = [
 	token(b'\x23', "seq(",        "list",     "Generates a list by evaluating an expression over a range of values"),
 	token(b'\x24', "fnInt(",      "math",     "Numerically approximates the definite integral of a function"),
 	token(b'\x25', "nDeriv(",     "math",     "Numerically approximates the derivative of a function at a point"),
-	# 0x26: real
 	token(b'\x27', "fMin(",       "math",     "Finds the x-value at the minimum of a function on an interval"),
 	token(b'\x28', "fMax(",       "math",     "Finds the x-value at the maximum of a function on an interval"),
 	token(b'\x29', " ",           "operator", "Space character used in strings and output", key=' '),
@@ -77,7 +76,7 @@ TOKENS: list[Token] = [
 	token(b'\x3c', "or",          "operator", "Boolean OR operator"),
 	token(b'\x3d', "xor",         "operator", "Boolean XOR operator"),
 	token(b'\x3e', ":",           "control",  "Statement separator", key=':'),
-	# 0x3f: newline
+	token(b'\x3f', "↵",     "control", "Program line separator (newline)", alt="newline"),
 	token(b'\x40', "and",         "operator", "Boolean AND operator"),
 	# Variables A–Z (0x41–0x5A)
 	*[token(bytes([0x41 + i]), chr(0x41 + i), "variable", f"Real variable {chr(0x41 + i)}", key=chr(0x41 + i)) for i in range(26)],
@@ -127,7 +126,7 @@ TOKENS: list[Token] = [
 	token(b'\x8e', "ZDecimal",    "io",       "Sets the window so each pixel is 0.1 unit wide"),
 	token(b'\x8f', "ZoomStat",    "io",       "Adjusts the graphing window to show all stat plot data"),
 	token(b'\x90', "ZoomRcl",     "io",       "Restores a previously stored zoom window"),
-	# 0x91: PrintScreen (I know this isn't implemented, so I understand why you left it out, but let's include it for completeness)
+	token(b'\x91', "PrintScreen", "io", "Prints the current screen to a connected printer (legacy)"),
 	token(b'\x92', "ZoomSto",     "io",       "Saves the current graphing window settings"),
 	token(b'\x93', "Text(",       "io",       "Draws text on the graph screen at specified pixel coordinates"),
 	token(b'\x94', "nPr",         "math",     "Computes the number of permutations of n things taken r at a time"),
@@ -219,7 +218,26 @@ TOKENS: list[Token] = [
 	token(b'\xec', "Plot1(",      "stat",     "Configures stat Plot 1 with a type and data sources"),
 	token(b'\xed', "Plot2(",      "stat",     "Configures stat Plot 2 with a type and data sources"),
 	token(b'\xee', "Plot3(",      "stat",     "Configures stat Plot 3 with a type and data sources"),
-	# 0xef: I forgot, we actually do want to implement these, and you can see them in the HTML: "webref/TI-84+ Tokens - TI-Basic Developer.htm". I'm only trying to implement the original TI-84 Plus commands, so we only need the tokens up to 0xefbf
+	# Two-byte: TI-84+ extended tokens 0xEF xx (0xEF00–0xEF16 are original TI-84+; 0xEF17+ are TI-84+C(S)E only)
+	token(b'\xef\x00', "setDate(",      "io",      "Sets the date on the clock of an OS-enabled calculator"),
+	token(b'\xef\x01', "setTime(",      "io",      "Sets the time on the clock of an OS-enabled calculator"),
+	token(b'\xef\x02', "checkTmr(",     "io",      "Returns the elapsed time in seconds since startTmr was called"),
+	token(b'\xef\x03', "setDtFmt(",     "io",      "Sets the date display format (M/D/Y, D/M/Y, or Y/M/D)"),
+	token(b'\xef\x04', "setTmFmt(",     "io",      "Sets the time display format (12-hour or 24-hour)"),
+	token(b'\xef\x05', "timeCnv(",      "math",    "Converts a number of seconds into a {days,hours,min,sec} list"),
+	token(b'\xef\x06', "dayOfWk(",      "math",    "Returns the day of the week (1=Sun … 7=Sat) for a given date"),
+	token(b'\xef\x07', "getDtStr",      "io",      "Returns the current date as a string in the active format"),
+	token(b'\xef\x08', "getTmStr(",     "io",      "Returns the current time as a string in the active format"),
+	token(b'\xef\x09', "getDate",       "io",      "Returns the current date as a {year, month, day} list"),
+	token(b'\xef\x0a', "getTime",       "io",      "Returns the current time as a {hour, minute, second} list"),
+	token(b'\xef\x10', "ClockOn",       "io",      "Turns on the clock on OS-enabled calculators"),
+	token(b'\xef\x11', "OpenLib(",      "io",      "Opens an application library for use with ExecLib"),
+	token(b'\xef\x12', "ExecLib",       "io",      "Executes a routine from a library opened with OpenLib("),
+	token(b'\xef\x13', "invT(",         "stat",    "Returns the inverse t-distribution value for a given area and degrees of freedom"),
+	token(b'\xef\x14', "χ²GOF-Test(",   "stat",    "Performs a chi-squared goodness-of-fit test",              alt="chi2GOF-Test"),
+	token(b'\xef\x15', "LinRegTInt",    "stat",    "Computes a linear regression t confidence interval"),
+	token(b'\xef\x16', "Manual-Fit",    "stat",    "Fits a line manually to a scatter plot by dragging"),
+
 	token(b'\xf0', "^",           "math",     "Raises the left operand to the power of the right operand", key='^'),
 	token(b'\xf1', "×√",          "math",     "Computes the x-th root of a value",                          alt="xroot"),
 	token(b'\xf2', "1-Var Stats", "stat",     "Computes one-variable statistics for a dataset"),
@@ -309,15 +327,42 @@ TOKENS: list[Token] = [
 	token(b'\x62\x19', "d",    "stat", "Regression coefficient d from the most recent regression"),
 	token(b'\x62\x1a', "e",    "stat", "Regression coefficient e from the most recent regression"),
 	
-	# Missing: "x1" (0x621B) - "Sxp" (0x6231)
-	
+	token(b'\x62\x1b', "x₁",  "stat", "x-value 1 from sinusoidal or other regression",           alt="x1"),
+	token(b'\x62\x1c', "x₂",  "stat", "x-value 2 from sinusoidal or other regression",           alt="x2"),
+	token(b'\x62\x1d', "x₃",  "stat", "x-value 3 from sinusoidal or other regression",           alt="x3"),
+	token(b'\x62\x1e', "y₁",  "stat", "y-value 1 from sinusoidal or other regression",           alt="y1"),
+	token(b'\x62\x1f', "y₂",  "stat", "y-value 2 from sinusoidal or other regression",           alt="y2"),
+	token(b'\x62\x20', "y₃",  "stat", "y-value 3 from sinusoidal or other regression",           alt="y3"),
+	token(b'\x62\x21', "n",   "stat", "Sample size n from hypothesis test output"),
+	token(b'\x62\x22', "p",   "stat", "p-value from hypothesis test output"),
+	token(b'\x62\x23', "z",   "stat", "z-statistic from hypothesis test output"),
+	token(b'\x62\x24', "t",   "stat", "t-statistic from hypothesis test output"),
+	token(b'\x62\x25', "χ²",  "stat", "Chi-squared statistic from hypothesis test output",       alt="chi2"),
+	token(b'\x62\x26', "F",   "stat", "F-statistic from ANOVA or regression test output"),
+	token(b'\x62\x27', "df",  "stat", "Degrees of freedom from hypothesis test output"),
+	token(b'\x62\x28', "p̂",  "stat", "Estimated proportion from 1-Prop test output",            alt="p-hat"),
+	token(b'\x62\x29', "p̂₁", "stat", "Estimated proportion from sample 1 in 2-Prop test",       alt="p-hat1"),
+	token(b'\x62\x2a', "p̂₂", "stat", "Estimated proportion from sample 2 in 2-Prop test",       alt="p-hat2"),
+	token(b'\x62\x2b', "x̄₁", "stat", "Sample mean of x from sample 1 in 2-Samp test",          alt="x-mean1"),
+	token(b'\x62\x2c', "Sx₁", "stat", "Sample standard deviation from sample 1 in 2-Samp test", alt="Sx1"),
+	token(b'\x62\x2d', "n₁",  "stat", "Sample size of sample 1 in 2-Samp test",                 alt="n1"),
+	token(b'\x62\x2e', "x̄₂", "stat", "Sample mean of x from sample 2 in 2-Samp test",          alt="x-mean2"),
+	token(b'\x62\x2f', "Sx₂", "stat", "Sample standard deviation from sample 2 in 2-Samp test", alt="Sx2"),
+	token(b'\x62\x30', "n₂",  "stat", "Sample size of sample 2 in 2-Samp test",                 alt="n2"),
+	token(b'\x62\x31', "Sxp", "stat", "Pooled sample standard deviation from 2-Samp t-test"),
+
 	token(b'\x62\x32', "lower","stat", "Lower bound of a confidence interval"),
 	token(b'\x62\x33', "upper","stat", "Upper bound of a confidence interval"),
 	token(b'\x62\x34', "s",    "stat", "Standard deviation from a regression or test output"),
 	token(b'\x62\x35', "r²",   "stat", "Coefficient of determination from regression",           alt="r^2"),
 	token(b'\x62\x36', "R²",   "stat", "Coefficient of determination (alternate form)",          alt="R^2"),
 	
-	# Missing/Deprecated: "n2" (0x6230) - "Error MS" (0x623C)
+	token(b'\x62\x37', "Factor df", "stat", "Degrees of freedom for the factor in one-way ANOVA",    alt="FactorDF"),
+	token(b'\x62\x38', "Factor SS", "stat", "Sum of squares for the factor in one-way ANOVA",        alt="FactorSS"),
+	token(b'\x62\x39', "Factor MS", "stat", "Mean square for the factor in one-way ANOVA",           alt="FactorMS"),
+	token(b'\x62\x3a', "Error df",  "stat", "Degrees of freedom for the error in one-way ANOVA",     alt="ErrorDF"),
+	token(b'\x62\x3b', "Error SS",  "stat", "Sum of squares for the error in one-way ANOVA",         alt="ErrorSS"),
+	token(b'\x62\x3c', "Error MS",  "stat", "Mean square for the error in one-way ANOVA",            alt="ErrorMS"),
 
 	# Two-byte: Window / Finance variables 0x63 xx
 	token(b'\x63\x02', "Xscl",     "variable", "X-axis tick mark spacing for the graphing window"),
@@ -521,8 +566,10 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x98', "Ñ", "string", "N-tilde",      alt="N-tilde"),
 	token(b'\xbb\x99', "ñ", "string", "n-tilde",      alt="n-tilde"),
 	
-	# MISSING: "´" (0xbb9a) - "¨" (0xbb9c)
-	
+	token(b'\xbb\x9a', "´", "string", "Acute accent", alt="acute-accent"),
+	token(b'\xbb\x9b', "`", "string", "Grave accent", alt="grave-accent"),
+	token(b'\xbb\x9c', "¨", "string", "Diaeresis / umlaut accent", alt="umlaut-accent"),
+
 	token(b'\xbb\x9d', "¿", "string", "Inverted question mark", alt="?-inverted"),
 	token(b'\xbb\x9e', "¡", "string", "Inverted exclamation mark", alt="!-inverted"),
 	token(b'\xbb\x9f', "α", "string", "alpha",  alt="alpha"),
@@ -538,7 +585,7 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xa9', "Σ", "string", "Sigma",  alt="Sigma"),
 	token(b'\xbb\xab', "φ", "string", "phi",    alt="phi"),
 	token(b'\xbb\xac', "Ω", "string", "Omega",  alt="Omega"),
-	# MISSING: 0xbbad
+	token(b'\xbb\xad', "ψ", "string", "Greek psi", alt="psi"),
 	token(b'\xbb\xae', "χ", "string", "chi",    alt="chi"),
 	token(b'\xbb\xaf', "F", "string", "Italic F used in F-statistic display"),
 	
@@ -552,8 +599,21 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xcd', "Í", "string", "I-acute (extended)", alt="I-acute"),
 	token(b'\xbb\xce', "GarbageCollect","variable","Defragments archive memory to recover space"),
 	
-	# MISSING: "~" (0xbbcf) - "∠" (0xbbdc)
-	
+	token(b'\xbb\xcf', "~",  "string", "Tilde character", alt="tilde", key='~'),
+
+	token(b'\xbb\xd1', "@",  "string", "At sign",       alt="at-sign",   key='@'),
+	token(b'\xbb\xd2', "#",  "string", "Number/hash sign", alt="hash",   key='#'),
+	token(b'\xbb\xd3', "$",  "string", "Dollar sign",   alt="dollar",    key='$'),
+	token(b'\xbb\xd4', "&",  "string", "Ampersand",     alt="ampersand", key='&'),
+	token(b'\xbb\xd5', "`",  "string", "Grave/backtick",alt="backtick",  key='`'),
+	token(b'\xbb\xd6', ";",  "string", "Semicolon",     alt="semicolon", key=';'),
+	token(b'\xbb\xd7', "\\", "string", "Backslash",     alt="backslash", key='\\'),
+	token(b'\xbb\xd8', "|",  "string", "Pipe/vertical bar", alt="pipe",  key='|'),
+	token(b'\xbb\xd9', "_",  "string", "Underscore",    alt="underscore",key='_'),
+	token(b'\xbb\xda', "%",  "string", "Percent sign",  alt="percent",   key='%'),
+	token(b'\xbb\xdb', "…",  "string", "Ellipsis",      alt="ellipsis"),
+
+	token(b'\xbb\xdc', "∠", "string", "Angle symbol", alt="angle"),
 	token(b'\xbb\xdd', "ß", "string", "German sharp S", alt="sharp-s"),
 	token(b'\xbb\xde', "x", "string", "Superscript x", alt="superscript-x"),  # deprecated
 	token(b'\xbb\xdf', "T", "string", "Subscript T", alt="subscript-t"),  # deprecated
@@ -575,9 +635,28 @@ TOKENS: list[Token] = [
 ]
 
 if __name__ == '__main__':
+	@dataclass
+	class NullToken:
+		code: bytes
+	
 	check = [None] * 0x100
 	check_misc = [None] * 0xF6
 	duplicate = set()
+	
+	for code in [
+		b'\x00', b'\x26', b'\x5c', b'\x5d', b'\x5e', b'\x60', b'\x61', b'\x62', b'\x63', b'\x7e', b'\xaa', b'\xbb', b'\xef',
+		b'\xbb\x5c', b'\xbb\x5d', b'\xbb\x5e', b'\xbb\x5f', b'\xbb\x60', b'\xbb\x61', b'\xbb\x62', b'\xbb\x63', b'\xbb\x7e', b'\xbb\xaa', b'\xbb\xbb', b'\xbb\xd0', b'\xbb\xef', 
+	]:
+		old_len = len(duplicate)
+		duplicate.add(code)
+		if old_len == len(duplicate):
+			raise ValueError(f"Duplicate: {token}")
+		if len(code) == 1:
+			check[code[0]] = NullToken(code)
+		elif code[0] == 0xBB:
+			check_misc[code[1]] = NullToken(code)
+	
+	
 	for token in TOKENS:
 		old_len = len(duplicate)
 		duplicate.add(token.code)

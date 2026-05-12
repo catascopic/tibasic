@@ -1,6 +1,8 @@
 from pyscript import document, when
 from tokens import Token, TOKENS
 
+KEY_MAP: dict[str, Token] = {t.key: t for t in TOKENS if t.key is not None}
+
 # ── App State ──────────────────────────────────────────────────────────────────
 
 lines: list[list[Token]] = [[]]
@@ -16,9 +18,9 @@ def compute_matches(query: str) -> list[Token]:
 	q = query.lower()
 	results = []
 	for token in TOKENS:
-		if any(a.startswith(q) for a in token.alias)
+		if any(a.startswith(q) for a in token.alias):
 			results.append(token)
-	results.sort(key=lambda t: t.type != "variable")
+	results.sort(key=lambda t: t.category != "variable")
 	return results[:18]
 
 
@@ -41,7 +43,7 @@ def render_editor():
 		tokens_wrap.className = "tokens"
 		for ti, token in enumerate(line):
 			chip = document.createElement("span")
-			chip.className = f"token token-{token.type}"
+			chip.className = f"token token-{token.category}"
 			chip.textContent = token.text
 			chip.title = f"{token.desc} (click to delete)"
 			chip.dataset.lineIdx = str(li)
@@ -64,7 +66,7 @@ def render_autocomplete():
 	dropdown.classList.remove("hidden")
 	for i, token in enumerate(current_matches):
 		item = document.createElement("div")
-		item.className = f"ac-item token-{token.type}" + (" ac-selected" if i == selected_idx else "")
+		item.className = f"ac-item token-{token.category}" + (" ac-selected" if i == selected_idx else "")
 		item.dataset.acIdx = str(i)
 
 		badge = document.createElement("span")
@@ -72,7 +74,7 @@ def render_autocomplete():
 		badge.textContent = token.text
 		item.appendChild(badge)
 
-		if token.name:
+		if len(token.alias) > 1:
 			label = document.createElement("span")
 			label.className = "ac-name"
 			label.textContent = '|'.join(token.alias)
@@ -174,12 +176,8 @@ def _free_type_key(event) -> None:
 		render_autocomplete()
 		return
 
-	if key.islower():
-		exact = next((t for t in TOKENS if t.text == key and t.type == "string"), None)
-	else:
-		exact = next((t for t in TOKENS if t.text == key or (t.name and t.name == key)), None)
-	if exact:
-		commit_token(exact)
+	if key in KEY_MAP:
+		commit_token(KEY_MAP[key])
 
 
 # ── Event Handlers ─────────────────────────────────────────────────────────────
