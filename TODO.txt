@@ -1,2 +1,3 @@
 Remove token mode
 color coded words
+how would I make a grammar for this?

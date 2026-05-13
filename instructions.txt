@@ -1,0 +1,118 @@
+Input: a stream of Token objects. (I'll probably put more data into these tokens later, like the functions they're associated with.)
+Output: A tree of Term objects. Term would be an abstract class (or maybe just a protocol) that has an eval() function.
+Note that most tokens are atomic and don't require parsing, only organizing according to precedence. Exceptions include numeric literals, as well as programs, which start with the [prgm] token followed by up to 8 alphanumeric characters, and user-defined lists, which use the subscript "L" and up to 5 alphanumeric characters. (Both of these also must start with a letter.)
+
+Example (using brackets as delimiters): [1][0][+][2][A][^-1]
+Result:
+AddTerm(
+	term1=NumericLiteral(10),
+	term2=MultTerm(
+		term1=NumericLiteral(2),
+		term2=InvTerm(
+			# Real.A is a variable that implements the "Term" protocol/type
+			term=Real.A,
+		)
+	)
+)
+# Alternatively, we might not need an AddTerm class, we could just have a BinaryOperatorTerm class with op=plus. Same for InvTerm, it could be UnaryTerm with op=inv.
+
+Example: [Horizontal ][rand][(][A][+][B]
+Result:
+# Commands differ from functions in that they don't have parentheses, don't have a return value, and can't be nested.
+CommandTerm(
+	cmd=Commands.horizontal,
+	args=[
+		MultTerm(
+			term1=FunctionTerm(
+				func=Functions.rand,
+				# I'm not sure it's right to call "rand" a function, but I think that's correct. It's just a function that takes no arguments and so it doesn't have parentheses. The only catch is the parser has to know that it's not looking for a close parenthesis. (Keep in mind, though, that functions don't need an explicit close parenthesis.)
+				args=[]
+			),
+			# Note that we don't need an explicit "ParentheticalTerm" or something; the parser will just structure the tree this way when it encounters parentheses.
+			term2=AddTerm(
+				term1=Real.A
+				term2=Real.B
+			)
+		)
+	]
+)
+
+Example: [B][/][3][.][5][->][L1][(][1][+][dim(][L1]
+Result:
+StoreTerm(
+	value=DivTerm(
+		term1=Real.B,
+		term2=NumericLiteral(3.5),
+	),
+	# Variables and ListIndexTarget (along with a few others, including "rand" for setting the seed) would have a method called "store" that StoreTerm can call.
+	target=ListIndexTarget(
+		Lists.L1,
+		AddTerm(
+			term1=NumericLiteral(1),
+			term2=FunctionTerm(
+				func=Functions.dim,
+				args=[
+					Lists.L1
+				],
+			)
+		)
+	)
+)
+
+Example: seq([2][^][N][,][N][,][8][,][1][,][~][1][->][L3]
+Result:
+StoreTerm(
+	value=FunctionTerm(
+		func=Functions.seq,
+		args=[
+			PowerTerm(
+				term1=NumericLiteral(2),
+				term2=Real.N
+			),
+			Real.N,
+			NumericLiteral(8),
+			NumericLiteral(1),
+			NegTerm(
+				term=NumericLiteral(1)
+			),
+		]
+	),
+	target=Lists.L3
+)
+This one is tricky. It should be fine without any special handling, but note that the first argument is an expression to be re-evaluated for each value in the sequence. The second term is also special, in that it's the name of the variable, not its value, but that also should be fine. The last 3 really are just what they evaluate to.
+
+Example: [Menu(]["][C][a][e][s][a][r][ ][C][i][p][h][e][r]["][,]["][E][n][c][r][y][p][t]["][,][E][,]["][D][e][c][r][y][p][t]["][,][D][,]["][E][x][i][t]["][,][X]
+Result:
+CommandTerm(
+	cmd=Commands.menu,
+	args=[
+		StringLiteral("Caesar Cipher"),
+		StringLiteral("Encrypt"),
+		Label('E'),
+		StringLiteral("Decrypt"),
+		Label('D'),
+		StringLiteral("Exit"),
+		Label('X'),
+	]
+)
+This one probably does need some special handling, but I'm not sure what the best approach is. Normally, "E" would get parsed as a variable, and that might even be fine, except that labels can be two characters. So if the user put a 2-length label, it would get parsed as a MultTerm. Maybe each function can specify an inner parser, which takes over parsing the arguments? And maybe they get built into custom objects, too, like this:
+MenuTerm(
+	title=StringLiteral("Caesar Cipher"),
+	branches=[
+		Branch(
+			name=StringLiteral("Encrypt"),
+			label="E",
+		),
+		Branch(
+			name=StringLiteral("Decrypt"),
+			label="D",
+		),
+		Branch(
+			name=StringLiteral("Exit"),
+			label="X",
+		),
+	]
+)
+Note that the names are evaluable (they can be variables/function calls), but the labels aren't and could be stored as plain python strings.
+
+Looking back at the seq( expression, it probably deserves its own object too, if that's the right move.

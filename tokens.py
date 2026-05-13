@@ -106,7 +106,6 @@ class Token:
 	category: str
 	desc: str
 	alias: set[str]
-	is_function: bool
 	display: bytes
 
 
@@ -116,7 +115,7 @@ def token(code: bytes, text: str, category: str, desc: str, alt: str | set[str] 
 		alias.add(alt.lower())
 	elif alt is not None:
 		alias.update(a.lower() for a in alt)
-	return Token(code, key, text, category, desc, alias, text.endswith('('), _encode_display(text))
+	return Token(code, key, text, category, desc, alias, _encode_display(text))
 
 
 
