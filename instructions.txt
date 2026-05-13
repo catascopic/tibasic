@@ -6,7 +6,7 @@ Example (using brackets as delimiters): [1][0][+][2][A][^-1]
 Result:
 AddTerm(
 	term1=NumericLiteral(10),
-	term2=MultTerm(
+	term2=MulTerm(
 		term1=NumericLiteral(2),
 		term2=InvTerm(
 			# Real.A is a variable that implements the "Term" protocol/type
@@ -14,7 +14,7 @@ AddTerm(
 		)
 	)
 )
-# Alternatively, we might not need an AddTerm class, we could just have a BinaryOperatorTerm class with op=plus. Same for InvTerm, it could be UnaryTerm with op=inv.
+# Alternatively, we might not need an AddTerm class, we could just have a BinaryOperatorTerm class (maybe something shorter) with op=plus. Same for InvTerm, it could be UnaryOperatorTerm with op=inv.
 
 Example: [Horizontal ][rand][(][A][+][B]
 Result:
@@ -22,11 +22,11 @@ Result:
 CommandTerm(
 	cmd=Commands.horizontal,
 	args=[
-		MultTerm(
+		MulTerm(
 			term1=FunctionTerm(
 				func=Functions.rand,
 				# I'm not sure it's right to call "rand" a function, but I think that's correct. It's just a function that takes no arguments and so it doesn't have parentheses. The only catch is the parser has to know that it's not looking for a close parenthesis. (Keep in mind, though, that functions don't need an explicit close parenthesis.)
-				args=[]
+				args=[],
 			),
 			# Note that we don't need an explicit "ParentheticalTerm" or something; the parser will just structure the tree this way when it encounters parentheses.
 			term2=AddTerm(
@@ -44,7 +44,7 @@ StoreTerm(
 		term1=Real.B,
 		term2=NumericLiteral(3.5),
 	),
-	# Variables and ListIndexTarget (along with a few others, including "rand" for setting the seed) would have a method called "store" that StoreTerm can call.
+	# Variables and ListIndexTarget (along with a few others, including "rand" for setting the seed) would implement a "store" that StoreTerm can call.
 	target=ListIndexTarget(
 		Lists.L1,
 		AddTerm(
@@ -83,7 +83,7 @@ StoreTerm(
 This one is tricky. It should be fine without any special handling, but note that the first argument is an expression to be re-evaluated for each value in the sequence. The second term is also special, in that it's the name of the variable, not its value, but that also should be fine, as long as variables have a get_name() method or something. The last 3 really are just what they evaluate to.
 
 Example: [Menu(]["][C][a][e][s][a][r][ ][C][i][p][h][e][r]["][,]["][E][n][c][r][y][p][t]["][,][E][,]["][D][e][c][r][y][p][t]["][,][D][,]["][E][x][i][t]["][,][X]
-Result:
+One posible result that might not be great:
 CommandTerm(
 	cmd=Commands.menu,
 	args=[
@@ -96,7 +96,7 @@ CommandTerm(
 		Label('X'),
 	]
 )
-This one probably does need some special handling, but I'm not sure what the best approach is. Normally, "E" would get parsed as a variable, and that might even be fine, except that labels can be two characters. So if the user put a 2-length label, it would get parsed as a MultTerm. Maybe each function can specify an inner parser, which takes over parsing the arguments? And maybe they get built into custom objects, too, like this:
+This one probably does need some special handling, but I'm not sure what the best approach is. Normally, the label "E" would get parsed as a variable, and that might even be fine, except that labels can be two characters. So if the user put a 2-length label, it would get parsed as a MulTerm. Maybe each function can specify an inner parser, which takes over parsing the arguments? And maybe they get built into custom objects, too, like this:
 MenuTerm(
 	title=StringLiteral("Caesar Cipher"),
 	options=[
@@ -147,7 +147,7 @@ CommandTerm(
 
 This probably doesn't need any special handling. All the complexity will probably be contained in the program executor, where If will set some kind of flag to skip the next line, and maybe a second flag to make sure Then is used correctly.
 
-Example: [{][1],[randInt(][1][,][1][0][->][B][G]
+Example: [{][1][,][randInt(][1][,][1][0][->][B][G]
 Result:
 StoreTerm(
 	value=ListLiteral(
