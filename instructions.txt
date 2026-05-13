@@ -60,6 +60,7 @@ StoreTerm(
 )
 
 Example: seq([2][^][N][,][N][,][8][,][1][,][~][1][->][L3]
+(Note that I'm using ~ as the negative sign)
 Result:
 StoreTerm(
 	value=FunctionTerm(
@@ -79,7 +80,7 @@ StoreTerm(
 	),
 	target=Lists.L3
 )
-This one is tricky. It should be fine without any special handling, but note that the first argument is an expression to be re-evaluated for each value in the sequence. The second term is also special, in that it's the name of the variable, not its value, but that also should be fine. The last 3 really are just what they evaluate to.
+This one is tricky. It should be fine without any special handling, but note that the first argument is an expression to be re-evaluated for each value in the sequence. The second term is also special, in that it's the name of the variable, not its value, but that also should be fine, as long as variables have a get_name() method or something. The last 3 really are just what they evaluate to.
 
 Example: [Menu(]["][C][a][e][s][a][r][ ][C][i][p][h][e][r]["][,]["][E][n][c][r][y][p][t]["][,][E][,]["][D][e][c][r][y][p][t]["][,][D][,]["][E][x][i][t]["][,][X]
 Result:
@@ -98,21 +99,70 @@ CommandTerm(
 This one probably does need some special handling, but I'm not sure what the best approach is. Normally, "E" would get parsed as a variable, and that might even be fine, except that labels can be two characters. So if the user put a 2-length label, it would get parsed as a MultTerm. Maybe each function can specify an inner parser, which takes over parsing the arguments? And maybe they get built into custom objects, too, like this:
 MenuTerm(
 	title=StringLiteral("Caesar Cipher"),
-	branches=[
-		Branch(
+	options=[
+		Option(
 			name=StringLiteral("Encrypt"),
 			label="E",
 		),
-		Branch(
+		Option(
 			name=StringLiteral("Decrypt"),
 			label="D",
 		),
-		Branch(
+		Option(
 			name=StringLiteral("Exit"),
 			label="X",
 		),
 	]
 )
-Note that the names are evaluable (they can be variables/function calls), but the labels aren't and could be stored as plain python strings.
+Note that the names are evaluable (they can be variables/function calls), but the labels aren't and probably could be stored as plain python strings.
 
 Looking back at the seq( expression, it probably deserves its own object too, if that's the right move.
+
+Example: [If ][not(][inString(][Str2][,][sub(][Str1][,][X][,][1]
+Result:
+CommandTerm(
+	cmd=Commands.if_,
+	args=[
+		FunctionTerm(
+			func=Functions.not_,
+			args=[
+				FunctionTerm(
+					func=Functions.in_string,
+					args=[
+						Strings.str2,
+						FunctionTerm(
+							func=Functions.sub,
+							args=[
+								Strings.str1,
+								Real.X,
+								NumericLiteral(1),
+							]
+						),
+					]
+				),
+			]
+		),
+	]
+)
+
+This probably doesn't need any special handling. All the complexity will probably be contained in the program executor, where If will set some kind of flag to skip the next line, and maybe a second flag to make sure Then is used correctly.
+
+Example: [{][1],[randInt(][1][,][1][0][->][B][G]
+Result:
+StoreTerm(
+	value=ListLiteral(
+		items=[
+			NumericLiteral(1),
+			FunctionTerm(
+				func=Functions.randInt,
+				args=[
+					NumericLiteral(1),
+					NumericLiteral(10),
+				],
+			),
+		]
+	),
+	target=UserList('BG'),
+)
+
+Note that when storing list data to a list variable, you don't need the subscript L prefix. Maybe the target could just be Identifier('BG') which stores it to a user list after determining that it's list data, but also, there are no other types of store targets that are multiple letters. However, a single letter could represent a Real variable or a list, so maybe we do want to use Identifier('A') any time we see <expression>[->][A].
