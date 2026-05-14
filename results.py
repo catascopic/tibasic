@@ -1,4 +1,4 @@
-"""Statement result types and store-target types returned by the parser."""
+"""Statement result types, store-target types, and the Thunk helper."""
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
@@ -90,6 +90,17 @@ class ClrHomeResult:
 @dataclass
 class DispGraphResult:
 	pass
+
+# ── Thunk (deferred expression re-evaluation) ─────────────────────────────────
+
+@dataclass
+class Thunk:
+	tokens: list  # list[Token]
+	env: dict
+
+	def eval(self):
+		from parser import Parser
+		return Parser(self.tokens, self.env).parse_expr()
 
 # ── Store targets ──────────────────────────────────────────────────────────────
 

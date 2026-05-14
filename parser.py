@@ -1,9 +1,9 @@
 from __future__ import annotations
 import math, cmath, random
 from operations import EXEC_CALLS
-from tokens import Token
+from tokens import Token, EOF_TOKEN
 from results import (
-	ExprResult, StoreResult,
+	ExprResult, StoreResult, Thunk,
 	RealVarTarget, ListVarTarget, UserListTarget, MatrixVarTarget,
 	StringVarTarget, ListElementTarget, MatrixElementTarget, AnsTarget,
 )
@@ -21,37 +21,36 @@ class Parser:
 
 	# ── Primitives ─────────────────────────────────────────────────────────────
 
-	def peek(self) -> Token | None:
-		# there is no whitespace to skip
-		return self.tokens[self.pos] if self.pos < len(self.tokens) else None
+	def peek(self) -> Token:
+		return self.tokens[self.pos] if self.pos < len(self.tokens) else EOF_TOKEN
 
 	def advance(self) -> Token:
 		t = self.peek()
-		if t is None:
+		if t is EOF_TOKEN:
 			raise ParseError("Unexpected end of input")
 		self.pos += 1
 		return t
 
 	def eat_if(self, code: bytes) -> bool:
-		if self.peek() is not None and self.peek().code == code:
+		if self.peek().code == code:
 			self.pos += 1
 			return True
 		return False
 
-	def expect(self, code: bytes) -> Token:
+	def expect(self, code: bytes) -> None:
 		t = self.peek()
-		if t is None or t.code != code:
+		if t.code != code:
 			raise ParseError(f"Expected {code!r}, got {t!r}")
 		self.pos += 1
 
 	def at_end(self) -> bool:
-		return self.pos >= len(self.tokens)
+		return self.peek() is EOF_TOKEN
 
 	# ── Sub-parsers ────────────────────────────────────────────────────────────
 
 	def parse_num_literal(self) -> float:
 		num = []
-		while self.peek() is not None and (self.peek().is_digit() or self.peek().code == b'\x3a'):
+		while self.peek().is_digit() or self.peek().code == b'\x3a':
 			num.append(self.advance().text)
 		try:
 			return float(''.join(num))
@@ -61,7 +60,7 @@ class Parser:
 	def parse_string_literal(self) -> str:
 		"""Opening \" already consumed. Reads until the next \" or end of line."""
 		chars = []
-		while self.peek() is not None and self.peek().code != b'\x2a':
+		while not self.at_end() and self.peek().code != b'\x2a':
 			chars.append(self.advance().text)
 		self.eat_if(b'\x2a')  # closing " is optional
 		return "".join(chars)
@@ -79,7 +78,7 @@ class Parser:
 	def parse_matrix_literal(self) -> list[list]:
 		"""Opening [ already consumed; reads one or more [row] blocks."""
 		rows = []
-		while self.peek() is not None and self.peek().code == b'\x06':  # [
+		while self.peek().code == b'\x06':  # [
 			self.advance()
 			row = [self.parse_expr()]
 			while self.eat_if(b'\x2b'):
@@ -92,39 +91,37 @@ class Parser:
 	def parse_args(self) -> list:
 		"""Comma-separated expressions until ) or end of line. Consumes )."""
 		args = []
-		if self.peek() is not None and self.peek().code != b'\x11':  # )
+		if not self.at_end() and self.peek().code != b'\x11':  # )
 			args.append(self.parse_expr())
 			while self.eat_if(b'\x2b'):  # ,
 				args.append(self.parse_expr())
 		self.eat_if(b'\x11')
 		return args
 
-	def grab_until_comma(self) -> list[Token]:
-		"""Return tokens up to the next top-level comma or ), without evaluating."""
-		depth = 0
-		result = []
+	def _grab_group(self, out: list) -> None:
+		"""Collect tokens into out until a top-level comma or unmatched ), recursing into sub-groups."""
 		while self.pos < len(self.tokens):
 			t = self.tokens[self.pos]
-			if t.is_function() or t.code == b'\x10':  # ( or function-open
-				depth += 1
-			elif t.code == b'\x11':  # )
-				if depth == 0:
-					break
-				depth -= 1
-			elif t.code == b'\x2b' and depth == 0:  # ,
+			if t.code == b'\x2b' or t.code == b'\x11':  # , or )
 				break
-			result.append(t)
+			out.append(t)
 			self.pos += 1
-		return result
+			if t.is_function() or t.code == b'\x10':  # opens a sub-group
+				self._grab_group(out)
+				if self.pos < len(self.tokens) and self.tokens[self.pos].code == b'\x11':
+					out.append(self.tokens[self.pos])
+					self.pos += 1
 
-	def eval_token_list(self, tokens: list[Token]):
-		"""Re-evaluate a captured token list as an expression (used by seq, Σ, etc.)."""
-		return Parser(tokens, self.env).parse_expr()
+	def grab_until_comma(self) -> Thunk:
+		"""Return a Thunk for the tokens up to the next top-level comma or )."""
+		out: list = []
+		self._grab_group(out)
+		return Thunk(out, self.env)
 
 	def parse_label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name."""
 		name = ""
-		while len(name) < 2 and self.peek() is not None:
+		while len(name) < 2:
 			ch = self.peek().text
 			if len(ch) == 1 and (ch.isalnum() or ch == 'θ'):
 				name += ch; self.advance()
@@ -134,10 +131,10 @@ class Parser:
 			raise ParseError("Expected a label name")
 		return name
 
-	def _read_name(self, max_len: int) -> str:
-		"""Read up to max_len alphanumeric tokens as an identifier (prgm, user list)."""
+	def _read_name(self) -> str:
+		"""Read alphanumeric tokens as an identifier (prgm, user list, etc.)."""
 		name = ""
-		while len(name) < max_len and self.peek() is not None:
+		while True:
 			ch = self.peek().text
 			if len(ch) == 1 and (ch.isalnum() or ch == 'θ'):
 				name += ch; self.advance()
@@ -149,9 +146,14 @@ class Parser:
 
 	# ── Atom parser ────────────────────────────────────────────────────────────
 
+	def _check_int_index(self, val) -> int:
+		if val != int(val):
+			raise ParseError(f"Index must be an integer, got {val}")
+		return int(val)
+
 	def parse_atom(self):
 		t = self.peek()
-		if t is None:
+		if self.at_end():
 			raise ParseError("Expected an expression")
 
 		# Numeric literal (multi-token — don't advance here)
@@ -175,64 +177,59 @@ class Parser:
 		if t.code == b'\xb0':  # − (negation)
 			return t.unary_op(self.parse_expr(65))
 
-		# Constants
-		if t.code == b'\xac':
-			return math.pi
-		if t.code == b'\xbb\x31':
-			return math.e
-		if t.code == b'\x2c':
-			return 1j
-
-		# Ans — special: may be followed by (index) if Ans is a list
+		# Ans — special: may be indexed when it holds a list
 		if t.code == b'\x72':
 			val = self.env.get('Ans', 0.0)
-			if isinstance(val, list) and self.peek() is not None and self.peek().code == b'\x10':
+			if isinstance(val, list) and self.peek().code == b'\x10':
 				self.advance()
-				idx = int(self.parse_expr())
+				idx = self._check_int_index(self.parse_expr())
 				self.eat_if(b'\x11')
 				return val[idx - 1]
 			return val
 
-		if t.code == b'\xad':
-			return self.env.get('_getkey', 0.0)  # getKey
-
 		# ∟ user-defined list prefix
 		if t.code == b'\xeb':
-			name = self._read_name(5)
+			name = self._read_name()
 			val  = self.env.get(f'∟{name}', [])
-			if self.peek() is not None and self.peek().code == b'\x10':
+			if self.peek().code == b'\x10':
 				self.advance()
-				idx = int(self.parse_expr());  self.eat_if(b'\x11')
+				idx = self._check_int_index(self.parse_expr())
+				self.eat_if(b'\x11')
 				return val[idx - 1]
 			return val
 
 		# prgm subprogram call
 		if t.code == b'\x5f':
-			raise NotImplementedError(f"prgm{self._read_name(8)}")
+			raise NotImplementedError(f"prgm{self._read_name()}")
 
 		# Function call (token.call drives arg parsing via parse_args / grab_until_comma)
 		if t.is_function():
 			return t.call(self)
 
-		# Variables — look up in env; list/matrix vars support (index) access
+		# Nullary (0-arg, no parentheses): π, e, 𝑖, rand, getKey, getDate, etc.
+		if t.is_nullary():
+			return t.get_value(self.env)
+
+		# Variables — list/matrix vars support (index) access
 		if t.is_real_var():
-			return self.env.get(t.text, 0.0)
+			return self.env.setdefault(t.text, 0.0)
 
 		if t.is_list_var():
 			val = self.env.get(t.text, [])
-			if self.peek() is not None and self.peek().code == b'\x10':
+			if self.peek().code == b'\x10':
 				self.advance()
-				idx = int(self.parse_expr());  self.eat_if(b'\x11')
+				idx = self._check_int_index(self.parse_expr())
+				self.eat_if(b'\x11')
 				return val[idx - 1]
 			return val
 
 		if t.is_matrix_var():
 			val = self.env.get(t.text, [[]])
-			if self.peek() is not None and self.peek().code == b'\x10':
+			if self.peek().code == b'\x10':
 				self.advance()
-				row = int(self.parse_expr())
+				row = self._check_int_index(self.parse_expr())
 				self.expect(b'\x2b')
-				col = int(self.parse_expr())
+				col = self._check_int_index(self.parse_expr())
 				self.eat_if(b'\x11')
 				return val[row - 1][col - 1]
 			return val
@@ -247,7 +244,6 @@ class Parser:
 	_POSTFIX = {b'\x0d', b'\x0f', b'\x0c', b'\x2d', b'\x0e', b'\x0b', b'\x0a'}
 
 	_BP: dict[bytes, tuple[int, int]] = {
-		b'\x04': (5,  5),   # → store (right side parsed as lvalue, not via bp)
 		b'\x3c': (20, 21),  # or
 		b'\x3d': (20, 21),  # xor
 		b'\x40': (30, 31),  # and
@@ -264,6 +260,7 @@ class Parser:
 		b'\x94': (60, 61),  # nPr
 		b'\x95': (60, 61),  # nCr
 		b'\xf1': (60, 61),  # ×√
+		b'\x3b': (65, 66),  # ᴇ (scientific notation, above * below ^)
 		b'\xf0': (70, 69),  # ^ right-assoc
 	}
 	_IMPL_MUL_BP = (60, 61)
@@ -274,8 +271,6 @@ class Parser:
 
 		while True:
 			t = self.peek()
-			if t is None:
-				break
 
 			# Postfix operators
 			if t.code in self._POSTFIX:
@@ -284,13 +279,6 @@ class Parser:
 				self.advance()
 				lhs = t.unary_op(lhs)
 				continue
-
-			# Store — right side is an lvalue, not a general expression
-			if t.code == b'\x04':
-				if self._BP[b'\x04'][0] <= min_bp:
-					break
-				self.advance()
-				return lhs, self.parse_store_target()
 
 			# Explicit binary operator
 			bp = self._BP.get(t.code)
@@ -345,7 +333,7 @@ class Parser:
 			return StringVarTarget(t.code)
 
 		if t.code == b'\xeb':  # user list
-			name = self._read_name(5)
+			name = self._read_name()
 			if self.eat_if(b'\x10'):
 				idx = self.parse_expr();  self.eat_if(b'\x11')
 				return ListElementTarget(name, idx)
@@ -356,21 +344,21 @@ class Parser:
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 
 	def parse_statement(self):
-		t = self.peek()
-		if t is None:
+		if self.at_end():
 			return None
+
+		t = self.peek()
 
 		# Command tokens dispatch via Token.execute (implemented in operations.py)
 		if t.code in EXEC_CALLS:
-			self.advance()  # consume the command token
+			self.advance()
 			return t.execute(self)
 
-		# Expression statement (possibly ending with →)
-		result = self.parse_expr()
-		if isinstance(result, tuple):
-			value, target = result
-			return StoreResult(value, target)
-		return ExprResult(result)
+		# Expression statement, optionally followed by → target
+		value = self.parse_expr()
+		if self.eat_if(b'\x04'):  # →
+			return StoreResult(value, self.parse_store_target())
+		return ExprResult(value)
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────

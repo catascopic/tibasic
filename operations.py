@@ -9,7 +9,7 @@ can drive token consumption themselves.  They call parser.eval_token_list()
 to re-evaluate a captured token sublist — avoiding any circular imports.
 """
 from __future__ import annotations
-import math, cmath, random
+import math, cmath, random, datetime as _dt
 from typing import Any, Callable
 
 from results import (
@@ -58,6 +58,7 @@ BINARY_OPS: dict[bytes, Callable[[Any, Any], Any]] = {
 	b'\x71': lambda a, b: a - b,                                    # -
 	b'\x82': _list_mul,                                             # *
 	b'\x83': lambda a, b: a / b,                                    # /
+	b'\x3b': lambda a, b: a * (10 ** b),                            # ᴇ (scientific notation)
 	b'\xf0': lambda a, b: a ** b,                                   # ^
 	b'\xf1': lambda a, b: b ** (1 / a),                             # ×√ (xroot)
 	b'\x94': _npr,                                                  # nPr
@@ -71,6 +72,25 @@ BINARY_OPS: dict[bytes, Callable[[Any, Any], Any]] = {
 	b'\x40': lambda a, b: 1.0 if a and b else 0.0,                 # and
 	b'\x3c': lambda a, b: 1.0 if a or  b else 0.0,                 # or
 	b'\x3d': lambda a, b: 1.0 if bool(a) != bool(b) else 0.0,     # xor
+}
+
+# ── Nullary values (0-arg, no parentheses) ─────────────────────────────────────
+# Each entry is (env) -> Value.
+
+NULLARY_CALLS: dict[bytes, Callable] = {
+	b'\xac':      lambda env: math.pi,                              # π
+	b'\xbb\x31':  lambda env: math.e,                              # e
+	b'\x2c':      lambda env: 1j,                                   # 𝑖
+	b'\xab':      lambda env: random.random(),                      # rand
+	b'\xad':      lambda env: env.get('_getkey', 0.0),             # getKey
+	b'\xef\x09':  lambda env: [float(_dt.date.today().year),       # getDate
+	              float(_dt.date.today().month), float(_dt.date.today().day)],
+	b'\xef\x0a':  lambda env: [float(_dt.datetime.now().hour),     # getTime
+	              float(_dt.datetime.now().minute), float(_dt.datetime.now().second)],
+	b'\xef\x0b':  lambda env: float(int(_dt.datetime.now().timestamp())),  # startTmr
+	b'\xef\x0c':  lambda env: env.get('_dtfmt', 1.0),              # getDtFmt
+	b'\xef\x0d':  lambda env: env.get('_tmfmt', 12.0),             # getTmFmt
+	b'\xef\x0e':  lambda env: 1.0,                                  # isClockOn
 }
 
 # ── Unary / postfix operators ──────────────────────────────────────────────────
@@ -108,7 +128,7 @@ def _randint_call(parser):
 # ── Special functions (drive their own arg parsing via the parser) ─────────────
 
 def _call_seq(parser) -> list:
-	expr_toks = parser.grab_until_comma()
+	thunk = parser.grab_until_comma()
 	parser.expect(_COMMA)
 	var_tok   = parser.advance()
 	if not var_tok.is_real_var():
@@ -128,13 +148,13 @@ def _call_seq(parser) -> list:
 	n = start
 	while (step > 0 and n <= end + 1e-10) or (step < 0 and n >= end - 1e-10):
 		parser.env[var] = n
-		result.append(parser.eval_token_list(expr_toks))
+		result.append(thunk.eval())
 		n += step
 	parser.env[var] = saved if saved is not None else parser.env.pop(var, None)
 	return result
 
 def _call_sigma(parser) -> float:
-	expr_toks = parser.grab_until_comma()
+	thunk = parser.grab_until_comma()
 	parser.expect(_COMMA)
 	var_tok   = parser.advance()
 	if not var_tok.is_real_var():
@@ -150,12 +170,12 @@ def _call_sigma(parser) -> float:
 	total = 0.0
 	for i in range(start, end + 1):
 		parser.env[var] = float(i)
-		total += parser.eval_token_list(expr_toks)
+		total += thunk.eval()
 	parser.env[var] = saved if saved is not None else parser.env.pop(var, None)
 	return total
 
 def _call_nderiv(parser) -> float:
-	expr_toks = parser.grab_until_comma()
+	thunk = parser.grab_until_comma()
 	parser.expect(_COMMA)
 	var = parser.advance().text
 	parser.expect(_COMMA)
@@ -166,13 +186,13 @@ def _call_nderiv(parser) -> float:
 	parser.eat_if(_RPAREN)
 
 	saved = parser.env.get(var)
-	parser.env[var] = val + h;  fwd = parser.eval_token_list(expr_toks)
-	parser.env[var] = val - h;  bwd = parser.eval_token_list(expr_toks)
+	parser.env[var] = val + h;  fwd = thunk.eval()
+	parser.env[var] = val - h;  bwd = thunk.eval()
 	parser.env[var] = saved if saved is not None else parser.env.pop(var, None)
 	return (fwd - bwd) / (2 * h)
 
 def _call_fnint(parser) -> float:
-	expr_toks = parser.grab_until_comma()
+	thunk = parser.grab_until_comma()
 	parser.expect(_COMMA)
 	var = parser.advance().text
 	parser.expect(_COMMA)
@@ -186,7 +206,7 @@ def _call_fnint(parser) -> float:
 	h = (b - a) / n
 	def f(x):
 		parser.env[var] = x
-		return parser.eval_token_list(expr_toks)
+		return thunk.eval()
 	total = f(a) + f(b)
 	for i in range(1, n):
 		total += (4 if i % 2 else 2) * f(a + i * h)
@@ -331,7 +351,7 @@ def _exec_disp(parser):
 	return DispResult(values)
 
 def _exec_input(parser):
-	if parser.peek() is not None and parser.peek().code == _QUOT:
+	if parser.peek().code == _QUOT:
 		parser.advance()
 		prompt = parser.parse_string_literal()
 		parser.expect(_COMMA)

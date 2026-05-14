@@ -132,23 +132,29 @@ class Token:
 		"""True for tokens that open a function call (text ends with '(')."""
 		return self.text.endswith('(')
 
+	def is_nullary(self) -> bool:
+		"""True for 0-arg no-parenthesis value tokens (π, e, 𝑖, rand, getKey, etc.)."""
+		from operations import NULLARY_CALLS
+		return self.code in NULLARY_CALLS
+
+	def get_value(self, env: dict):
+		"""Evaluate this nullary token against the given environment."""
+		from operations import NULLARY_CALLS
+		return NULLARY_CALLS[self.code](env)
+
 	def can_start_atom(self) -> bool:
 		"""True if this token can appear as the start of an expression atom."""
 		return (
 			self.is_digit() or self.is_real_var() or self.is_list_var() or
 			self.is_matrix_var() or self.is_string_var() or self.is_function() or
+			self.is_nullary() or
 			self.code in (
 				b'\x3a',  # . (decimal point)
 				b'\x10',  # (
 				b'\x08',  # {
 				b'\x2a',  # "
 				b'\xb0',  # − (negation)
-				b'\xac',  # π
 				b'\x72',  # Ans
-				b'\xab',  # rand
-				b'\xad',  # getKey
-				b'\x2c',  # 𝑖
-				b'\xbb\x31',  # e
 				b'\xeb',  # ∟ (user list prefix)
 			)
 		)
@@ -187,6 +193,8 @@ class Token:
 			return None  # not a command token
 		return fn(parser)
 
+
+EOF_TOKEN = Token(b'', None, '', 'eof', 'eof', frozenset(), b'')
 
 def token(code: bytes, text: str, category: str, desc: str, alt: str | set[str] | None = None, key: str | None = None):
 	alias = {text.lower()}
