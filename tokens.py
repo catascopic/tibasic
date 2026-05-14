@@ -108,6 +108,85 @@ class Token:
 	alias: set[str]
 	display: bytes
 
+	# ── Token type predicates ──────────────────────────────────────────────────
+
+	def is_real_var(self) -> bool:
+		return (len(self.code) == 1 and 0x41 <= self.code[0] <= 0x5a) or self.code == b'\x5b'
+
+	def is_list_var(self) -> bool:
+		return len(self.code) == 2 and self.code[0] == 0x5d
+
+	def is_matrix_var(self) -> bool:
+		return len(self.code) == 2 and self.code[0] == 0x5c
+
+	def is_string_var(self) -> bool:
+		return len(self.code) == 2 and self.code[0] == 0xaa
+
+	def is_stat_var(self) -> bool:
+		return len(self.code) == 2 and self.code[0] in (0x62, 0x63)
+
+	def is_digit(self) -> bool:
+		return len(self.code) == 1 and 0x30 <= self.code[0] <= 0x39
+
+	def is_function(self) -> bool:
+		"""True for tokens that open a function call (text ends with '(')."""
+		return self.text.endswith('(')
+
+	def can_start_atom(self) -> bool:
+		"""True if this token can appear as the start of an expression atom."""
+		return (
+			self.is_digit() or self.is_real_var() or self.is_list_var() or
+			self.is_matrix_var() or self.is_string_var() or self.is_function() or
+			self.code in (
+				b'\x3a',  # . (decimal point)
+				b'\x10',  # (
+				b'\x08',  # {
+				b'\x2a',  # "
+				b'\xb0',  # − (negation)
+				b'\xac',  # π
+				b'\x72',  # Ans
+				b'\xab',  # rand
+				b'\xad',  # getKey
+				b'\x2c',  # 𝑖
+				b'\xbb\x31',  # e
+				b'\xeb',  # ∟ (user list prefix)
+			)
+		)
+
+	# ── Operation delegation (implementations live in operations.py) ───────────
+
+	def binary_op(self, lhs, rhs):
+		from operations import BINARY_OPS
+		fn = BINARY_OPS.get(self.code)
+		if fn is None:
+			raise NotImplementedError(f"No binary_op for {self.text!r}")
+		return fn(lhs, rhs)
+
+	def unary_op(self, operand):
+		from operations import UNARY_OPS
+		fn = UNARY_OPS.get(self.code)
+		if fn is None:
+			raise NotImplementedError(f"No unary_op for {self.text!r}")
+		return fn(operand)
+
+	def call(self, parser):
+		"""Evaluate a function call. Parser is positioned after the opening '('."""
+		from operations import FUNCTION_CALLS
+		fn = FUNCTION_CALLS.get(self.code)
+		if fn is None:
+			raise NotImplementedError(f"No call implementation for {self.text!r}")
+		if fn is NotImplemented:
+			raise NotImplementedError(f"{self.text!r} requires executor context")
+		return fn(parser)
+
+	def execute(self, parser):
+		"""Execute a command statement. Returns a StatementResult or None."""
+		from operations import EXEC_CALLS
+		fn = EXEC_CALLS.get(self.code)
+		if fn is None:
+			return None  # not a command token
+		return fn(parser)
+
 
 def token(code: bytes, text: str, category: str, desc: str, alt: str | set[str] | None = None, key: str | None = None):
 	alias = {text.lower()}
