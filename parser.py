@@ -4,7 +4,7 @@ from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
 	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, ANS, NEG, LIST_PREFIX,
-	RAND, DIM
+	RAND, DIM, SCI_E
 )
 from environment import Environment
 
@@ -173,67 +173,46 @@ class Parser:
 			return val
 
 		if t is NEG:
-			return t.unary_op_fn(self.parse_expr(65))
+			return t.unary_op(self.parse_expr(65))
 
-		# Ans may be indexed when it holds a list
-		if t is ANS:
-			val = self.env.ans
-			if isinstance(val, TiList):
-				return self.parse_list_atom(val)
-			return val
-
-		if t.is_list_var():
-			val = self.env.lists[t]
-			return self.parse_list_atom(val)
+		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ10 = 10^10)
+		if t is SCI_E:
+			return SCI_E.binary_op(1.0, self.parse_expr(SCI_E.bp[1]))
 
 		if t is LIST_PREFIX:
 			val = self.env.lists[self._read_name()]
 			return self.parse_list_atom(val)
 
 		# Function call
-		if t.call_fn is not None:
-			return t.call_fn(self)
+		if t.func is not None:
+			return t.func(self)
 
-		# Nullary (0-arg, no parentheses): π, e, 𝑖, rand, getKey, etc.
-		if t.value_fn is not None:
-			return t.value_fn(self.env)
-
-		if t.is_real_var():
-			return self.env.setdefault(t, 0.0)
-
-		if t.is_matrix_var():
-			val = self.env.matrices[t]
-			if self.peek() is L_PAREN:
+		# Variables and nullary constants (π, e, rand, Ans, etc.)
+		if t.resolve is not None:
+			val = t.resolve(self.env)
+			if t.is_list_var():
+				return self.parse_list_atom(val)
+			if t.is_matrix_var() and self.peek() is L_PAREN:
 				return val[self.parse_row_col()]
 			return val
 
-		if t.is_string_var():
-			return self.env.strings[t]
-		if t.is_stat_var():
-			return self.env.stat[t]
-		if t.is_window_var():
-			return self.env.window[t]
-		
-		# TODO: sequence vars, Y-Vars, etc.
-		# Consider some kind of grand variable table, should be pretty easy to do with the byte codes
-
 		raise ParseError(f"Unexpected token in expression: {t.text!r}")
 
-	def parse_list_atom(val):
+	def parse_list_atom(self, val):
 		if self.peek() is L_PAREN:
 			self.advance()
 			idx = self.parse_expr()
 			self.eat_if(R_PAREN)
-			return val[idx]
+			return val[int(idx) - 1]
 		return val
-	
-	def parse_row_col():
+
+	def parse_row_col(self):
 		self.advance()
 		row = self.parse_expr()
 		self.expect(COMMA)
 		col = self.parse_expr()
 		self.eat_if(R_PAREN)
-		return row, col
+		return int(row) - 1, int(col) - 1
 
 	# ── Pratt expression parser ────────────────────────────────────────────────
 
@@ -248,7 +227,7 @@ class Parser:
 				if 80 <= min_bp:
 					break
 				self.advance()
-				lhs = t.unary_op_fn(lhs)
+				lhs = t.unary_op(lhs)
 				continue
 
 			# Explicit binary operator
@@ -257,7 +236,7 @@ class Parser:
 				if left_bp <= min_bp:
 					break
 				self.advance()
-				lhs = t.binary_op_fn(lhs, self.parse_expr(right_bp))
+				lhs = t.binary_op(lhs, self.parse_expr(right_bp))
 				continue
 
 			# Implicit multiplication
@@ -276,29 +255,23 @@ class Parser:
 	def parse_store_target(self, value):
 		t = self.advance()
 
-		if t.is_real_var():
-			self.env.reals[t] = value
+		if t is LIST_PREFIX:
+			self.parse_store_list(self._read_name(), value)
+
+		elif t is DIM:
+			self.parse_store_dim(value)
 
 		elif t.is_list_var():
 			self.parse_store_list(t, value)
-		
-		elif t is LIST_PREFIX:
-			self.parse_store_list(self._read_name(), value)
 
 		elif t.is_matrix_var():
 			if self.eat_if(L_PAREN):
 				self.env.matrices[t][self.parse_row_col()] = value
 			else:
-				self.env.matrices[t] = value
+				t.store(self.env, value)
 
-		elif t.is_string_var():
-			self.env.strings[t] = value
-
-		elif t is RAND:
-			self.env.set_random_seed(value)
-		
-		elif t is DIM:
-			self.parse_store_dim(value)
+		elif t.store is not None:
+			t.store(self.env, value)
 
 		else:
 			raise ParseError(f"Invalid store target: {t}")
@@ -336,10 +309,10 @@ class Parser:
 			name = self._read_name()
 			val = self.env.programs[name].execute()
 
-		# Command tokens dispatch via token.execute_fn
-		elif t.execute_fn is not None:
+		# Command tokens dispatch via token.cmd
+		elif t.cmd is not None:
 			self.advance()
-			t.execute_fn(self)
+			t.cmd(self)
 			
 		# Expression statement, optionally followed by → target
 		else:

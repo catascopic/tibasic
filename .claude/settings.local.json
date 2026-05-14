@@ -5,7 +5,8 @@
       "Bash(python -c ' *)",
       "Bash(find \"C:\\\\Users\\\\Max\\\\Documents\\\\code\" -name \"*token*\" -o -name \"*EF*\" 2>/dev/null | head -20)",
       "Bash(powershell -Command ' *)",
-      "Bash(python tokens.py)"
+      "Bash(python tokens.py)",
+      "Bash(python -c \"import parser; print\\('parser OK'\\)\")"
     ]
   }
 }
