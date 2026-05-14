@@ -178,4 +178,4 @@ MulTerm(
 )
 This one is sort of a gotcha. Since getDate returns a list containing the year, month, and day, you'd expect that you could get the month by indexing. Instead, it does multiplication. (Note that you can multiply a list by a scalar.) Indexing seems to only work on actual variables, including Ans, provided it contains a list. Parentheses are probably the most complicated thing to parse, since you have to figure out if the left operand is a list variable, a weird finance function, or a numeric expression. In the case of [Ans][(][2], you actually don't know at "compile time" what will happen, since it depends on whether Ans contains a list or number! I'm not sure how to handle that.
 
-Please write a parser similar to ExpressionParser/ValueParser works in boiler.
+I'd like to make a parser similar to ExpressionParser/ValueParser works in boiler, but another thing to consider is that the boiler parser is optimized for "compiling" expressions that can be re-evaluated multiple times. The TI-Basic parser doesn't need to do that, and I think it's fine if it re-interprets the same line of code multiple times. Does that make this easier?
