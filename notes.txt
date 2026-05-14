@@ -7,3 +7,13 @@ binary_op_fn -> binary_op
 value_fn -> resolve
 variables also implement resolve
 new field: store(env) for variables, also rand, but not dim since it takes an additional argument and makes more sense as a special case
+
+Move all functions to Environment
+
+Use @vectorized/@complex
+TiList/TiMatrix
+
+What token does the calculator use to separate lines?
+
+remove token categories
+remove token descriptions

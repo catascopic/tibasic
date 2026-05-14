@@ -23,8 +23,8 @@ class Thunk:
 
 
 class Parser:
-	
-	def __init__(self, tokens: list[Token], env: dict):
+
+	def __init__(self, tokens: list[Token], env: Environment):
 		self.tokens = tokens
 		self.pos = 0
 		self.env = env
@@ -334,10 +334,7 @@ class Parser:
 		if t is PRGM:
 			self.advance()
 			name = self._read_name()
-			try:
-				val = self.env.programs[name]
-			except KeyError:
-				raise ValueError(f"Undefined list: {name}")
+			val = self.env.programs[name].execute()
 
 		# Command tokens dispatch via token.execute_fn
 		elif t.execute_fn is not None:

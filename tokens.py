@@ -409,111 +409,6 @@ def _call_fnint(parser) -> float:
 	return total * h / 3
 
 
-# ── Command (exec) functions ───────────────────────────────────────────────────
-
-from results import (
-	IfResult, WhileResult, RepeatResult, ForResult, EndResult,
-	LblResult, GotoResult, ReturnResult, StopResult, PauseResult,
-	DispResult, InputResult, PromptResult, OutputResult, MenuResult,
-	ClrHomeResult, DispGraphResult,
-)
-
-def _exec_if(parser):
-	return IfResult(bool(parser.parse_expr()))
-
-def _exec_while(parser):
-	return WhileResult(bool(parser.parse_expr()))
-
-def _exec_repeat(parser):
-	return RepeatResult()
-
-def _exec_for(parser):
-	var_tok = parser.advance()
-	if not var_tok.is_real_var():
-		raise ValueError("For: first arg must be a variable")
-	parser.expect(COMMA)
-	start = parser.parse_expr()
-	parser.expect(COMMA)
-	end   = parser.parse_expr()
-	step  = 1.0
-	if parser.eat_if(COMMA):
-		step = parser.parse_expr()
-	parser.eat_if(R_PAREN)
-	return ForResult(var_tok.text, float(start), float(end), float(step))
-
-def _exec_lbl(parser):
-	return LblResult(parser.parse_label_name())
-
-def _exec_goto(parser):
-	return GotoResult(parser.parse_label_name())
-
-def _exec_pause(parser):
-	val = parser.parse_expr() if not parser.at_end() else None
-	return PauseResult(val)
-
-def _exec_disp(parser):
-	values = []
-	if not parser.at_end():
-		values.append(parser.parse_expr())
-		while parser.eat_if(COMMA):
-			values.append(parser.parse_expr())
-	return DispResult(values)
-
-def _exec_input(parser):
-	if parser.peek() is QUOTE:
-		parser.advance()
-		prompt = parser.parse_string_literal()
-		parser.expect(COMMA)
-	else:
-		prompt = None
-	target = parser.parse_store_target()
-	return InputResult(prompt, target)
-
-def _exec_prompt(parser):
-	targets = [parser.parse_store_target()]
-	while parser.eat_if(COMMA):
-		targets.append(parser.parse_store_target())
-	return PromptResult(targets)
-
-def _exec_output(parser):
-	row = parser.parse_expr()
-	parser.expect(COMMA)
-	col = parser.parse_expr()
-	parser.expect(COMMA)
-	val = parser.parse_expr()
-	parser.eat_if(R_PAREN)
-	return OutputResult(row, col, val)
-
-def _exec_menu(parser):
-	title = parser.parse_expr()
-	options = []
-	while parser.eat_if(COMMA):
-		name  = parser.parse_expr()
-		parser.expect(COMMA)
-		label = parser.parse_label_name()
-		options.append((name, label))
-	parser.eat_if(R_PAREN)
-	return MenuResult(title, options)
-
-def _exec_is_gt(parser):
-	var_tok = parser.advance()
-	parser.expect(COMMA)
-	limit = parser.parse_expr()
-	parser.eat_if(R_PAREN)
-	name = var_tok.text
-	parser.env[name] = parser.env.get(name, 0.0) + 1
-	return IfResult(parser.env[name] > limit)
-
-def _exec_ds_lt(parser):
-	var_tok = parser.advance()
-	parser.expect(COMMA)
-	limit = parser.parse_expr()
-	parser.eat_if(R_PAREN)
-	name = var_tok.text
-	parser.env[name] = parser.env.get(name, 0.0) - 1
-	return IfResult(parser.env[name] < limit)
-
-
 # ── Token list ─────────────────────────────────────────────────────────────────
 
 TOKENS: list[Token] = [
@@ -694,52 +589,31 @@ TOKENS: list[Token] = [
 		  call_fn=_wrap(math.tanh)),
 	token(b'\xcd', "tanh⁻¹(",	 "func",	 "Returns the inverse hyperbolic tangent of a value", alt="arctanh(",
 		  call_fn=_wrap(math.atanh)),
-	token(b'\xce', "If ",		  "cmd",  "Conditionally executes the next statement or Then/Else block",
-		  execute_fn=_exec_if),
-	token(b'\xcf', "Then",		"cmd",  "Begins the body of an If block when the condition is true",
-		  execute_fn=lambda p: None),
-	token(b'\xd0', "Else",		"cmd",  "Begins the alternate body of an If-Then block when the condition is false",
-		  execute_fn=lambda p: None),
-	token(b'\xd1', "While ",	   "cmd",  "Repeats a block as long as a condition remains true",
-		  execute_fn=_exec_while),
-	token(b'\xd2', "Repeat ",	  "cmd",  "Repeats a block until a condition becomes true (always runs at least once)",
-		  execute_fn=_exec_repeat),
-	token(b'\xd3', "For(",		"cmdfunc",  "Iterates a variable from a start to an end value by a step",
-		  execute_fn=_exec_for),
-	token(b'\xd4', "End",		 "cmd",  "Marks the end of an If-Then, While, Repeat, or For block",
-		  execute_fn=lambda p: EndResult()),
-	token(b'\xd5', "Return",	  "cmd",  "Exits the current program or subprogram and returns to the caller",
-		  execute_fn=lambda p: ReturnResult()),
-	token(b'\xd6', "Lbl ",		 "cmd",  "Defines a label that can be targeted by Goto",
-		  execute_fn=_exec_lbl),
-	token(b'\xd7', "Goto ",		"cmd",  "Jumps execution unconditionally to a specified label",
-		  execute_fn=_exec_goto),
-	token(b'\xd8', "Pause ",	   "cmd",  "Pauses program execution until the user presses ENTER",
-		  execute_fn=_exec_pause),
-	token(b'\xd9', "Stop",		"cmd",  "Terminates program execution immediately",
-		  execute_fn=lambda p: StopResult()),
-	token(b'\xda', "IS>(",		"cmdfunc",  "Increments a variable and skips the next statement if it exceeds a limit",
-		  execute_fn=_exec_is_gt),
-	token(b'\xdb', "DS<(",		"cmdfunc",  "Decrements a variable and skips the next statement if it goes below a limit",
-		  execute_fn=_exec_ds_lt),
-	token(b'\xdc', "Input ",	   "cmd",	   "Prompts the user to enter a value or string",
-		  execute_fn=_exec_input),
-	token(b'\xdd', "Prompt ",	  "cmd",	   "Prompts the user to enter values for one or more variables",
-		  execute_fn=_exec_prompt),
-	token(b'\xde', "Disp ",		"cmd",	   "Displays values or strings on the home screen",
-		  execute_fn=_exec_disp),
-	token(b'\xdf', "DispGraph",   "cmd",	   "Displays the current graph screen",
-		  execute_fn=lambda p: DispGraphResult()),
-	token(b'\xe0', "Output(",	 "cmdfunc",	   "Displays a value or string at a specific row and column on the home screen",
-		  execute_fn=_exec_output),
-	token(b'\xe1', "ClrHome",	 "cmd",	   "Clears the home screen",
-		  execute_fn=lambda p: ClrHomeResult()),
+	token(b'\xce', "If ",		  "cmd",  "Conditionally executes the next statement or Then/Else block"),
+	token(b'\xcf', "Then",		"cmd",  "Begins the body of an If block when the condition is true"),
+	token(b'\xd0', "Else",		"cmd",  "Begins the alternate body of an If-Then block when the condition is false"),
+	token(b'\xd1', "While ",	   "cmd",  "Repeats a block as long as a condition remains true"),
+	token(b'\xd2', "Repeat ",	  "cmd",  "Repeats a block until a condition becomes true (always runs at least once)"),
+	token(b'\xd3', "For(",		"cmdfunc",  "Iterates a variable from a start to an end value by a step"),
+	token(b'\xd4', "End",		 "cmd",  "Marks the end of an If-Then, While, Repeat, or For block"),
+	token(b'\xd5', "Return",	  "cmd",  "Exits the current program or subprogram and returns to the caller"),
+	token(b'\xd6', "Lbl ",		 "cmd",  "Defines a label that can be targeted by Goto"),
+	token(b'\xd7', "Goto ",		"cmd",  "Jumps execution unconditionally to a specified label"),
+	token(b'\xd8', "Pause ",	   "cmd",  "Pauses program execution until the user presses ENTER"),
+	token(b'\xd9', "Stop",		"cmd",  "Terminates program execution immediately"),
+	token(b'\xda', "IS>(",		"cmdfunc",  "Increments a variable and skips the next statement if it exceeds a limit"),
+	token(b'\xdb', "DS<(",		"cmdfunc",  "Decrements a variable and skips the next statement if it goes below a limit"),
+	token(b'\xdc', "Input ",	   "cmd",	   "Prompts the user to enter a value or string"),
+	token(b'\xdd', "Prompt ",	  "cmd",	   "Prompts the user to enter values for one or more variables"),
+	token(b'\xde', "Disp ",		"cmd",	   "Displays values or strings on the home screen"),
+	token(b'\xdf', "DispGraph",   "cmd",	   "Displays the current graph screen"),
+	token(b'\xe0', "Output(",	 "cmdfunc",	   "Displays a value or string at a specific row and column on the home screen"),
+	token(b'\xe1', "ClrHome",	 "cmd",	   "Clears the home screen"),
 	token(b'\xe2', "Fill(",	   "func",	 "Fills all elements of a list or matrix with a specified value"),
 	token(b'\xe3', "SortA(",	  "func",	 "Sorts a list in ascending order in-place"),
 	token(b'\xe4', "SortD(",	  "func",	 "Sorts a list in descending order in-place"),
 	token(b'\xe5', "DispTable",   "cmd",	   "Displays the function table"),
-	token(b'\xe6', "Menu(",	   "cmdfunc",	   "Displays a menu and branches to a label based on user selection",
-		  execute_fn=_exec_menu),
+	token(b'\xe6', "Menu(",	   "cmdfunc",	   "Displays a menu and branches to a label based on user selection"),
 	token(b'\xe7', "Send(",	   "cmdfunc",	   "Sends a list to a connected CBL/CBR device"),
 	token(b'\xe8', "Get(",		"cmdfunc",	   "Retrieves a list from a connected CBL/CBR device"),
 	token(b'\xe9', "PlotsOn",	 "cmd",	 "Turns on one or all stat plots"),
@@ -748,7 +622,8 @@ TOKENS: list[Token] = [
 	token(b'\xec', "Plot1(",	  "cmdfunc",	 "Configures stat Plot 1 with a type and data sources"),
 	token(b'\xed', "Plot2(",	  "cmdfunc",	 "Configures stat Plot 2 with a type and data sources"),
 	token(b'\xee', "Plot3(",	  "cmdfunc",	 "Configures stat Plot 3 with a type and data sources"),
-	POW, XROOT,
+	POW,
+	XROOT,
 	token(b'\xf2', "1-Var Stats ", "cmd",	 "Computes one-variable statistics for a dataset"),
 	token(b'\xf3', "2-Var Stats ", "cmd",	 "Computes two-variable statistics for a paired dataset"),
 	token(b'\xf4', "LinReg(a+bx) ","cmd",	 "Fits a linear regression of the form a+bx to data"),
