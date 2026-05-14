@@ -1,5 +1,7 @@
+from __future__ import annotations
 from dataclasses import dataclass
-import itertools
+from typing import Any
+import math, cmath, random, datetime as _dt, itertools
 
 
 # ── TI-83+ Large Font Display Encoding ────────────────────────────────────────
@@ -11,7 +13,7 @@ _D: dict[str, bytes] = {
 	# ── Multi-char sequences (combining chars / ligatures) ──────────────────────
 	'⁻¹':      b'\x11',       # inverse/reciprocal as single glyph
 	'x̄': b'\xcb',       # x̄  (x + combining macron = x-mean)
-	'ȳ': b'\xcc',       # ȳ  (y + combining macron = y-mean)
+	'ȳ': b'\xcc',       # ȳ  (y + combining macron = y-mean)
 	'p̂': b'\xd8',       # p̂  (p + combining circumflex = p-hat)
 	'₁₀': b'\x90',  # subscript 10
 	# ── Special glyphs 0x01–0x1F ────────────────────────────────────────────────
@@ -107,6 +109,13 @@ class Token:
 	desc: str
 	alias: set[str]
 	display: bytes
+	bp: tuple | None = None         # (left_bp, right_bp) for binary operators
+	binary_op_fn: Any = None        # (lhs, rhs) -> value
+	unary_op_fn: Any = None         # (operand) -> value  (prefix or postfix)
+	postfix: bool = False           # True for postfix unary operators
+	call_fn: Any = None             # (parser) -> value  for function tokens
+	execute_fn: Any = None          # (parser) -> StatementResult  for commands
+	value_fn: Any = None            # (env) -> value  for nullary tokens
 
 	# ── Token type predicates ──────────────────────────────────────────────────
 
@@ -129,21 +138,15 @@ class Token:
 		return len(self.code) == 1 and 0x30 <= self.code[0] <= 0x39
 
 	def is_function(self) -> bool:
-		"""True for tokens that open a function call (text ends with '(')."""
-		return self.text.endswith('(')
+		return self.call_fn is not None
 
 	def is_nullary(self) -> bool:
-		"""True for 0-arg no-parenthesis value tokens (π, e, 𝑖, rand, getKey, etc.)."""
-		from operations import NULLARY_CALLS
-		return self.code in NULLARY_CALLS
+		return self.value_fn is not None
 
 	def get_value(self, env: dict):
-		"""Evaluate this nullary token against the given environment."""
-		from operations import NULLARY_CALLS
-		return NULLARY_CALLS[self.code](env)
+		return self.value_fn(env)
 
 	def can_start_atom(self) -> bool:
-		"""True if this token can appear as the start of an expression atom."""
 		return (
 			self.is_digit() or self.is_real_var() or self.is_list_var() or
 			self.is_matrix_var() or self.is_string_var() or self.is_function() or
@@ -152,46 +155,16 @@ class Token:
 			self is QUOTE or self is NEG or self is ANS or self is LIST_PREFIX
 		)
 
-	# ── Operation delegation (implementations live in operations.py) ───────────
-
-	def binary_op(self, lhs, rhs):
-		from operations import BINARY_OPS
-		fn = BINARY_OPS.get(self.code)
-		if fn is None:
-			raise NotImplementedError(f"No binary_op for {self.text!r}")
-		return fn(lhs, rhs)
-
-	def unary_op(self, operand):
-		from operations import UNARY_OPS
-		fn = UNARY_OPS.get(self.code)
-		if fn is None:
-			raise NotImplementedError(f"No unary_op for {self.text!r}")
-		return fn(operand)
-
-	def call(self, parser):
-		"""Evaluate a function call. Parser is positioned after the opening '('."""
-		from operations import FUNCTION_CALLS
-		fn = FUNCTION_CALLS.get(self.code)
-		if fn is None:
-			raise NotImplementedError(f"No call implementation for {self.text!r}")
-		if fn is NotImplemented:
-			raise NotImplementedError(f"{self.text!r} requires executor context")
-		return fn(parser)
-
-	def execute(self, parser):
-		"""Execute a command statement. Returns a StatementResult or None."""
-		from operations import EXEC_CALLS
-		fn = EXEC_CALLS.get(self.code)
-		if fn is None:
-			return None  # not a command token
-		return fn(parser)
-
 
 EOF_TOKEN = Token(b'', None, '', 'eof', 'eof', frozenset(), b'')
 
 _SEEN: set[bytes] = set()
 
-def token(code: bytes, text: str, category: str, desc: str, alt: str | set[str] | None = None, key: str | None = None) -> Token:
+def token(code: bytes, text: str, category: str, desc: str,
+          alt: str | set[str] | None = None, key: str | None = None, *,
+          bp: tuple | None = None,
+          binary_op_fn=None, unary_op_fn=None, postfix: bool = False,
+          call_fn=None, execute_fn=None, value_fn=None) -> Token:
 	if code in _SEEN:
 		raise ValueError(f"Duplicate token code: {code!r} ({text!r})")
 	_SEEN.add(code)
@@ -200,7 +173,54 @@ def token(code: bytes, text: str, category: str, desc: str, alt: str | set[str] 
 		alias.add(alt.lower())
 	elif alt is not None:
 		alias.update(a.lower() for a in alt)
-	return Token(code, key, text, category, desc, alias, _encode_display(text))
+	return Token(code, key, text, category, desc, alias, _encode_display(text),
+	             bp, binary_op_fn, unary_op_fn, postfix, call_fn, execute_fn, value_fn)
+
+
+# ── Math / operator helpers ────────────────────────────────────────────────────
+
+def _factorial(n: float) -> float:
+	if n < 0 or n != int(n):
+		raise ValueError("Argument to ! must be a non-negative integer")
+	return float(math.factorial(int(n)))
+
+def _ncr(n: float, r: float) -> float:
+	return float(math.comb(int(n), int(r)))
+
+def _npr(n: float, r: float) -> float:
+	return float(math.perm(int(n), int(r)))
+
+def _ti_int(x: float) -> float:
+	"""TI int(): floor for positive, ceiling for negative (truncation toward zero)."""
+	return math.floor(x) if x >= 0 else math.ceil(x)
+
+def _fpart(x: float) -> float:
+	return x - _ti_int(x)
+
+def _list_mul(a, b):
+	if isinstance(a, list) and not isinstance(a[0], list):
+		return [x * b for x in a]
+	if isinstance(b, list) and not isinstance(b[0], list):
+		return [a * x for x in b]
+	return a * b
+
+def _matrix_transpose(m):
+	return [[m[r][c] for r in range(len(m))] for c in range(len(m[0]))]
+
+def _wrap(fn):
+	"""Wrap a plain math function so it takes (parser,) and calls parse_args()."""
+	def call(parser):
+		args = parser.parse_args()
+		return fn(*args)
+	return call
+
+def _randint_call(parser):
+	args = parser.parse_args()
+	a, b = int(args[0]), int(args[1])
+	n = int(args[2]) if len(args) > 2 else 1
+	results = [float(random.randint(a, b)) for _ in range(n)]
+	return results[0] if n == 1 else results
+
 
 # ── Named syntactic tokens (referenced by identity in the parser) ──────────────
 
@@ -219,39 +239,260 @@ COLON       = token(b'\x3e', ":",    "", "Command separator", key=':')
 NEWLINE     = token(b'\x3f', "↵",    "", "Program line separator (newline)", alt="newline")
 PRGM        = token(b'\x5f', "prgm", "", "Calls a named subprogram")
 ANS         = token(b'\x72', "Ans",  "variable", "Contains the result of the last evaluated expression")
-NEG         = token(b'\xb0', "−",    "prefix", "Negates a value (unary minus)", alt=('~', "neg"), key='~')
+NEG         = token(b'\xb0', "−",    "prefix", "Negates a value (unary minus)", alt=('~', "neg"), key='~',
+                    unary_op_fn=lambda x: -x)
 LIST_PREFIX = token(b'\xeb', "∟",    "", "Prefix token for user-defined lists (e.g., ∟NAME)", alt="list-prefix", key='#')
 
 # Postfix operators
-RAD         = token(b'\x0a', "ʳ",   "postfix", "Radian angle-unit suffix", alt="rad")
-DEG         = token(b'\x0b', "°",   "postfix", "Degree angle-unit suffix", alt="deg")
-INV         = token(b'\x0c', "⁻¹",  "postfix", "Computes the multiplicative inverse (reciprocal)", alt=("inv", '^-1'))
-SQ          = token(b'\x0d', "²",   "postfix", "Squares a value or matrix", alt="^2")
-TRANSPOSE   = token(b'\x0e', "ᵀ",   "postfix", "Returns the transpose of a matrix", alt=("T", 'transpose'))
-CUBE        = token(b'\x0f', "³",   "postfix", "Cubes a value", alt="^3")
-FACT        = token(b'\x2d', "!",   "postfix", "Computes the factorial of a non-negative integer", key='!')
+RAD         = token(b'\x0a', "ʳ",   "postfix", "Radian angle-unit suffix", alt="rad",
+                    postfix=True, unary_op_fn=lambda x: x)
+DEG         = token(b'\x0b', "°",   "postfix", "Degree angle-unit suffix", alt="deg",
+                    postfix=True, unary_op_fn=math.radians)
+INV         = token(b'\x0c', "⁻¹",  "postfix", "Computes the multiplicative inverse (reciprocal)", alt=("inv", '^-1'),
+                    postfix=True, unary_op_fn=lambda x: 1 / x)
+SQ          = token(b'\x0d', "²",   "postfix", "Squares a value or matrix", alt="^2",
+                    postfix=True, unary_op_fn=lambda x: x ** 2)
+TRANSPOSE   = token(b'\x0e', "ᵀ",   "postfix", "Returns the transpose of a matrix", alt=("T", 'transpose'),
+                    postfix=True, unary_op_fn=_matrix_transpose)
+CUBE        = token(b'\x0f', "³",   "postfix", "Cubes a value", alt="^3",
+                    postfix=True, unary_op_fn=lambda x: x ** 3)
+FACT        = token(b'\x2d', "!",   "postfix", "Computes the factorial of a non-negative integer", key='!',
+                    postfix=True, unary_op_fn=_factorial)
 
 # Binary operators
-SCI_E       = token(b'\x3b', "ᴇ",   "operator", "Scientific notation exponent (×10^n)", alt="E")
-OR          = token(b'\x3c', "or",  "operator", "Boolean OR operator")
-XOR         = token(b'\x3d', "xor", "operator", "Boolean XOR operator")
-AND         = token(b'\x40', "and", "operator", "Boolean AND operator")
-EQ          = token(b'\x6a', "=",   "operator", "Tests equality between two values", key='=')
-LT          = token(b'\x6b', "<",   "operator", "Tests whether the left operand is less than the right", key='<')
-GT          = token(b'\x6c', ">",   "operator", "Tests whether the left operand is greater than the right", key='>')
-LE          = token(b'\x6d', "≤",   "operator", "Less than or equal to", alt="<=")
-GE          = token(b'\x6e', "≥",   "operator", "Greater than or equal to", alt=">=")
-NE          = token(b'\x6f', "≠",   "operator", "Not equal to", alt="!=")
-ADD         = token(b'\x70', "+",   "operator", "Adds two numbers, matrices, or lists", key='+')
-SUB         = token(b'\x71', "-",   "operator", "Subtraction", key='-')
-MUL         = token(b'\x82', "*",   "operator", "Multiplies two numbers, scalars by matrices, or lists", key='*')
-DIV         = token(b'\x83', "/",   "operator", "Division", key='/')
-NPR         = token(b'\x94', "nPr", "operator", "Computes the number of permutations of n things taken r at a time")
-NCR         = token(b'\x95', "nCr", "operator", "Computes the number of combinations of n things taken r at a time")
-POW         = token(b'\xf0', "^",   "operator", "Raises the left operand to the power of the right operand", key='^')
-XROOT       = token(b'\xf1', "×√",  "operator", "Computes the x-th root of a value", alt="xroot")
+SCI_E       = token(b'\x3b', "ᴇ",   "operator", "Scientific notation exponent (×10^n)", alt="E",
+                    bp=(65, 66), binary_op_fn=lambda a, b: a * (10 ** b))
+OR          = token(b'\x3c', "or",  "operator", "Boolean OR operator",
+                    bp=(20, 21), binary_op_fn=lambda a, b: 1.0 if a or b else 0.0)
+XOR         = token(b'\x3d', "xor", "operator", "Boolean XOR operator",
+                    bp=(20, 21), binary_op_fn=lambda a, b: 1.0 if bool(a) != bool(b) else 0.0)
+AND         = token(b'\x40', "and", "operator", "Boolean AND operator",
+                    bp=(30, 31), binary_op_fn=lambda a, b: 1.0 if a and b else 0.0)
+EQ          = token(b'\x6a', "=",   "operator", "Tests equality between two values", key='=',
+                    bp=(40, 41), binary_op_fn=lambda a, b: 1.0 if a == b else 0.0)
+LT          = token(b'\x6b', "<",   "operator", "Tests whether the left operand is less than the right", key='<',
+                    bp=(40, 41), binary_op_fn=lambda a, b: 1.0 if a < b else 0.0)
+GT          = token(b'\x6c', ">",   "operator", "Tests whether the left operand is greater than the right", key='>',
+                    bp=(40, 41), binary_op_fn=lambda a, b: 1.0 if a > b else 0.0)
+LE          = token(b'\x6d', "≤",   "operator", "Less than or equal to", alt="<=",
+                    bp=(40, 41), binary_op_fn=lambda a, b: 1.0 if a <= b else 0.0)
+GE          = token(b'\x6e', "≥",   "operator", "Greater than or equal to", alt=">=",
+                    bp=(40, 41), binary_op_fn=lambda a, b: 1.0 if a >= b else 0.0)
+NE          = token(b'\x6f', "≠",   "operator", "Not equal to", alt="!=",
+                    bp=(40, 41), binary_op_fn=lambda a, b: 1.0 if a != b else 0.0)
+ADD         = token(b'\x70', "+",   "operator", "Adds two numbers, matrices, or lists", key='+',
+                    bp=(50, 51), binary_op_fn=lambda a, b: a + b)
+SUB         = token(b'\x71', "-",   "operator", "Subtraction", key='-',
+                    bp=(50, 51), binary_op_fn=lambda a, b: a - b)
+MUL         = token(b'\x82', "*",   "operator", "Multiplies two numbers, scalars by matrices, or lists", key='*',
+                    bp=(60, 61), binary_op_fn=_list_mul)
+DIV         = token(b'\x83', "/",   "operator", "Division", key='/',
+                    bp=(60, 61), binary_op_fn=lambda a, b: a / b)
+NPR         = token(b'\x94', "nPr", "operator", "Computes the number of permutations of n things taken r at a time",
+                    bp=(60, 61), binary_op_fn=_npr)
+NCR         = token(b'\x95', "nCr", "operator", "Computes the number of combinations of n things taken r at a time",
+                    bp=(60, 61), binary_op_fn=_ncr)
+POW         = token(b'\xf0', "^",   "operator", "Raises the left operand to the power of the right operand", key='^',
+                    bp=(70, 69), binary_op_fn=lambda a, b: a ** b)
+XROOT       = token(b'\xf1', "×√",  "operator", "Computes the x-th root of a value", alt="xroot",
+                    bp=(60, 61), binary_op_fn=lambda a, b: b ** (1 / a))
 
 
+# ── Special call functions (reference named token constants above) ──────────────
+
+def _call_seq(parser) -> list:
+	thunk = parser.grab_until_comma()
+	parser.expect(COMMA)
+	var_tok = parser.advance()
+	if not var_tok.is_real_var():
+		raise ValueError("seq: second arg must be a variable")
+	var = var_tok.text
+	parser.expect(COMMA)
+	start = parser.parse_expr()
+	parser.expect(COMMA)
+	end   = parser.parse_expr()
+	step  = 1.0
+	if parser.eat_if(COMMA):
+		step = parser.parse_expr()
+	parser.eat_if(R_PAREN)
+
+	saved = parser.env.get(var)
+	result = []
+	n = start
+	while (step > 0 and n <= end + 1e-10) or (step < 0 and n >= end - 1e-10):
+		parser.env[var] = n
+		result.append(thunk.eval())
+		n += step
+	parser.env[var] = saved if saved is not None else parser.env.pop(var, None)
+	return result
+
+def _call_sigma(parser) -> float:
+	thunk = parser.grab_until_comma()
+	parser.expect(COMMA)
+	var_tok = parser.advance()
+	if not var_tok.is_real_var():
+		raise ValueError("Σ: second arg must be a variable")
+	var = var_tok.text
+	parser.expect(COMMA)
+	start = int(parser.parse_expr())
+	parser.expect(COMMA)
+	end   = int(parser.parse_expr())
+	parser.eat_if(R_PAREN)
+
+	saved = parser.env.get(var)
+	total = 0.0
+	for i in range(start, end + 1):
+		parser.env[var] = float(i)
+		total += thunk.eval()
+	parser.env[var] = saved if saved is not None else parser.env.pop(var, None)
+	return total
+
+def _call_nderiv(parser) -> float:
+	thunk = parser.grab_until_comma()
+	parser.expect(COMMA)
+	var = parser.advance().text
+	parser.expect(COMMA)
+	val = parser.parse_expr()
+	h   = 1e-5
+	if parser.eat_if(COMMA):
+		h = parser.parse_expr()
+	parser.eat_if(R_PAREN)
+
+	saved = parser.env.get(var)
+	parser.env[var] = val + h;  fwd = thunk.eval()
+	parser.env[var] = val - h;  bwd = thunk.eval()
+	parser.env[var] = saved if saved is not None else parser.env.pop(var, None)
+	return (fwd - bwd) / (2 * h)
+
+def _call_fnint(parser) -> float:
+	thunk = parser.grab_until_comma()
+	parser.expect(COMMA)
+	var = parser.advance().text
+	parser.expect(COMMA)
+	a = parser.parse_expr()
+	parser.expect(COMMA)
+	b = parser.parse_expr()
+	parser.eat_if(R_PAREN)
+
+	saved = parser.env.get(var)
+	n = 1000
+	h = (b - a) / n
+	def f(x):
+		parser.env[var] = x
+		return thunk.eval()
+	total = f(a) + f(b)
+	for i in range(1, n):
+		total += (4 if i % 2 else 2) * f(a + i * h)
+	parser.env[var] = saved if saved is not None else parser.env.pop(var, None)
+	return total * h / 3
+
+
+# ── Command (exec) functions ───────────────────────────────────────────────────
+
+from results import (
+	IfResult, WhileResult, RepeatResult, ForResult, EndResult,
+	LblResult, GotoResult, ReturnResult, StopResult, PauseResult,
+	DispResult, InputResult, PromptResult, OutputResult, MenuResult,
+	ClrHomeResult, DispGraphResult,
+)
+
+def _exec_if(parser):
+	return IfResult(bool(parser.parse_expr()))
+
+def _exec_while(parser):
+	return WhileResult(bool(parser.parse_expr()))
+
+def _exec_repeat(parser):
+	return RepeatResult()
+
+def _exec_for(parser):
+	var_tok = parser.advance()
+	if not var_tok.is_real_var():
+		raise ValueError("For: first arg must be a variable")
+	parser.expect(COMMA)
+	start = parser.parse_expr()
+	parser.expect(COMMA)
+	end   = parser.parse_expr()
+	step  = 1.0
+	if parser.eat_if(COMMA):
+		step = parser.parse_expr()
+	parser.eat_if(R_PAREN)
+	return ForResult(var_tok.text, float(start), float(end), float(step))
+
+def _exec_lbl(parser):
+	return LblResult(parser.parse_label_name())
+
+def _exec_goto(parser):
+	return GotoResult(parser.parse_label_name())
+
+def _exec_pause(parser):
+	val = parser.parse_expr() if not parser.at_end() else None
+	return PauseResult(val)
+
+def _exec_disp(parser):
+	values = []
+	if not parser.at_end():
+		values.append(parser.parse_expr())
+		while parser.eat_if(COMMA):
+			values.append(parser.parse_expr())
+	return DispResult(values)
+
+def _exec_input(parser):
+	if parser.peek() is QUOTE:
+		parser.advance()
+		prompt = parser.parse_string_literal()
+		parser.expect(COMMA)
+	else:
+		prompt = None
+	target = parser.parse_store_target()
+	return InputResult(prompt, target)
+
+def _exec_prompt(parser):
+	targets = [parser.parse_store_target()]
+	while parser.eat_if(COMMA):
+		targets.append(parser.parse_store_target())
+	return PromptResult(targets)
+
+def _exec_output(parser):
+	row = parser.parse_expr()
+	parser.expect(COMMA)
+	col = parser.parse_expr()
+	parser.expect(COMMA)
+	val = parser.parse_expr()
+	parser.eat_if(R_PAREN)
+	return OutputResult(row, col, val)
+
+def _exec_menu(parser):
+	title = parser.parse_expr()
+	options = []
+	while parser.eat_if(COMMA):
+		name  = parser.parse_expr()
+		parser.expect(COMMA)
+		label = parser.parse_label_name()
+		options.append((name, label))
+	parser.eat_if(R_PAREN)
+	return MenuResult(title, options)
+
+def _exec_is_gt(parser):
+	var_tok = parser.advance()
+	parser.expect(COMMA)
+	limit = parser.parse_expr()
+	parser.eat_if(R_PAREN)
+	name = var_tok.text
+	parser.env[name] = parser.env.get(name, 0.0) + 1
+	return IfResult(parser.env[name] > limit)
+
+def _exec_ds_lt(parser):
+	var_tok = parser.advance()
+	parser.expect(COMMA)
+	limit = parser.parse_expr()
+	parser.eat_if(R_PAREN)
+	name = var_tok.text
+	parser.env[name] = parser.env.get(name, 0.0) - 1
+	return IfResult(parser.env[name] < limit)
+
+
+# ── Token list ─────────────────────────────────────────────────────────────────
 
 TOKENS: list[Token] = [
 	# One-byte tokens
@@ -263,31 +504,41 @@ TOKENS: list[Token] = [
 	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE,
 	RAD, DEG, INV, SQ, TRANSPOSE, CUBE,
 	L_PAREN, R_PAREN,
-	token(b'\x12', "round(",      "func",     "Rounds a number to a specified number of decimal places"),
+	token(b'\x12', "round(",      "func",     "Rounds a number to a specified number of decimal places",
+	      call_fn=_wrap(lambda a, b=0: round(a, int(b)))),
 	token(b'\x13', "pxl-Test(",   "func",       "Returns 1 if the specified screen pixel is on, 0 otherwise"),
 	token(b'\x14', "augment(",    "func",   "Concatenates two matrices or two lists horizontally"),
 	token(b'\x15', "rowSwap(",    "func",   "Swaps two rows of a matrix"),
 	token(b'\x16', "row+(",       "func",   "Adds one matrix row to another and stores the result"),
 	token(b'\x17', "*row(",       "func",   "Multiplies a matrix row by a scalar"),
 	token(b'\x18', "*row+(",      "func",   "Multiplies a matrix row by a scalar and adds it to another row"),
-	token(b'\x19', "max(",        "func",     "Returns the maximum of two values or of all elements in a list"),
-	token(b'\x1a', "min(",        "func",     "Returns the minimum of two values or of all elements in a list"),
+	token(b'\x19', "max(",        "func",     "Returns the maximum of two values or of all elements in a list",
+	      call_fn=_wrap(lambda *a: max(a) if len(a) > 1 else max(a[0]))),
+	token(b'\x1a', "min(",        "func",     "Returns the minimum of two values or of all elements in a list",
+	      call_fn=_wrap(lambda *a: min(a) if len(a) > 1 else min(a[0]))),
 	token(b'\x1b', "R►Pr(",       "func",     "Converts rectangular coordinates to the r component of polar coordinates", alt='R-to-Pr'),
 	token(b'\x1c', "R►Pθ(",       "func",     "Converts rectangular coordinates to the θ component of polar coordinates", alt='R-to-P-theta'),
 	token(b'\x1d', "P►Rx(",       "func",     "Converts polar coordinates to the x component of rectangular coordinates", alt='R-to-Px'),
 	token(b'\x1e', "P►Ry(",       "func",     "Converts polar coordinates to the y component of rectangular coordinates", alt='R-to-Py'),
-	token(b'\x1f', "median(",     "func",     "Returns the median of a list of values"),
+	token(b'\x1f', "median(",     "func",     "Returns the median of a list of values",
+	      call_fn=_wrap(lambda a, b=None: float(sorted(a)[len(a) // 2]))),
 	token(b'\x20', "randM(",      "func",   "Generates a random matrix of given dimensions with integer entries"),
-	token(b'\x21', "mean(",       "func",     "Returns the arithmetic mean of a list"),
+	token(b'\x21', "mean(",       "func",     "Returns the arithmetic mean of a list",
+	      call_fn=_wrap(lambda a, b=None: (
+	          sum(a) / len(a) if b is None else sum(x * w for x, w in zip(a, b)) / sum(b)))),
 	token(b'\x22', "solve(",      "func",     "Numerically solves an equation for a specified variable near a given guess"),
-	token(b'\x23', "seq(",        "func",     "Generates a list by evaluating an expression over a range of values"),
-	token(b'\x24', "fnInt(",      "func",     "Numerically approximates the definite integral of a function"),
-	token(b'\x25', "nDeriv(",     "func",     "Numerically approximates the derivative of a function at a point"),
+	token(b'\x23', "seq(",        "func",     "Generates a list by evaluating an expression over a range of values",
+	      call_fn=_call_seq),
+	token(b'\x24', "fnInt(",      "func",     "Numerically approximates the definite integral of a function",
+	      call_fn=_call_fnint),
+	token(b'\x25', "nDeriv(",     "func",     "Numerically approximates the derivative of a function at a point",
+	      call_fn=_call_nderiv),
 	token(b'\x27', "fMin(",       "func",     "Finds the x-value at the minimum of a function on an interval"),
 	token(b'\x28', "fMax(",       "func",     "Finds the x-value at the maximum of a function on an interval"),
 	token(b'\x29', " ",           "str", "Space character used in strings and output", key=' '),
 	QUOTE, COMMA,
-	token(b'\x2c', "𝑖",           "val",     "The imaginary unit, equal to √(−1)",                        alt="imaginary"),  # maybe-key
+	token(b'\x2c', "𝑖",           "val",     "The imaginary unit, equal to √(−1)", alt="imaginary",
+	      value_fn=lambda env: 1j),
 	FACT,
 	token(b'\x2e', "CubicReg ",    "cmd",     "Fits a cubic regression model to data"),
 	token(b'\x2f', "QuartReg ",    "cmd",     "Fits a quartic regression model to data"),
@@ -295,7 +546,7 @@ TOKENS: list[Token] = [
 	DOT, SCI_E, OR, XOR, COLON, NEWLINE, AND,
 	# Variables A–Z (0x41–0x5A)
 	*[token(bytes([0x41 + i]), chr(0x41 + i), "var", f"Real variable {chr(0x41 + i)}", key=chr(0x41 + i)) for i in range(26)],
-	token(b'\x5b', "θ",           "var", "Variable theta",                                            alt="theta"),  # maybe-key
+	token(b'\x5b', "θ",           "var", "Variable theta", alt="theta"),
 	PRGM,
 	token(b'\x64', "Radian",      "mode",  "Sets angle mode to radians"),
 	token(b'\x65', "Degree",      "mode",  "Sets angle mode to degrees"),
@@ -358,65 +609,118 @@ TOKENS: list[Token] = [
 	token(b'\xa7', "Tangent(",    "cmdfunc",       "Draws the tangent line to a function at a specified x-value"),
 	token(b'\xa8', "DrawInv",     "io",       "Draws the inverse of a function on the graph screen"),
 	token(b'\xa9', "DrawF",       "io",       "Draws a function on the graph screen"),
-	token(b'\xab', "rand",        "var",     "Generates a uniformly random real number between 0 and 1"),  # TODO: is var correct?
-	token(b'\xac', "π",           "val",     "The mathematical constant pi (≈3.14159...)",                 alt="pi"),  # maybe-key
-	token(b'\xad', "getKey",      "val",       "Returns the keycode of the last key pressed, or 0 if none"),
-	token(b'\xae', "'",           "str",   "Apostrophe / single-quote character",                        alt="apostrophe", key="'"),  # DMS MODE?
+	token(b'\xab', "rand",        "var",     "Generates a uniformly random real number between 0 and 1",
+	      value_fn=lambda env: random.random()),
+	token(b'\xac', "π",           "val",     "The mathematical constant pi (≈3.14159...)", alt="pi",
+	      value_fn=lambda env: math.pi),
+	token(b'\xad', "getKey",      "val",       "Returns the keycode of the last key pressed, or 0 if none",
+	      value_fn=lambda env: env.get('_getkey', 0.0)),
+	token(b'\xae', "'",           "str",   "Apostrophe / single-quote character", alt="apostrophe", key="'"),
 	token(b'\xaf', "?",           "str",       "Displays a question-mark prompt to wait for user input (legacy)", key='?'),
 	NEG,
-	token(b'\xb1', "int(",        "func",     "Returns the greatest integer less than or equal to a number (floor)"),
-	token(b'\xb2', "abs(",        "func",     "Returns the absolute value of a number"),
-	token(b'\xb3', "det(",        "func",   "Returns the determinant of a square matrix"),
-	token(b'\xb4', "identity(",   "func",   "Returns an n×n identity matrix"),
-	token(b'\xb5', "dim(",        "func",     "Returns the length of a list or the dimensions of a matrix"),
-	token(b'\xb6', "sum(",        "func",     "Returns the sum of all elements in a list"),
-	token(b'\xb7', "prod(",       "func",     "Returns the product of all elements in a list"),
-	token(b'\xb8', "not(",        "func", "Returns the boolean NOT of a value (0→1, nonzero→0)"),
-	token(b'\xb9', "iPart(",      "func",     "Returns the integer part (truncation toward zero) of a number"),
-	token(b'\xba', "fPart(",      "func",     "Returns the fractional part of a number"),
-	token(b'\xbc', "√(",          "func",     "Returns the square root of a non-negative number",           alt=("sqrt(", 'squareroot')),
-	token(b'\xbd', "³√(",         "func",     "Returns the cube root of a number",                         alt=("cbrt(", 'cuberoot')),
-	token(b'\xbe', "ln(",         "func",     "Returns the natural logarithm of a positive number"),
-	token(b'\xbf', "e^(",         "func",     "Returns e raised to the specified power"),
-	token(b'\xc0', "log(",        "func",     "Returns the base-10 logarithm of a positive number"),
-	token(b'\xc1', "10^(",        "func",     "Returns 10 raised to the specified power"),
-	token(b'\xc2', "sin(",        "func",     "Returns the sine of an angle"),
-	token(b'\xc3', "sin⁻¹(",      "func",     "Returns the arcsine (inverse sine) of a value",             alt="arcsin("),
-	token(b'\xc4', "cos(",        "func",     "Returns the cosine of an angle"),
-	token(b'\xc5', "cos⁻¹(",      "func",     "Returns the arccosine (inverse cosine) of a value",         alt="arccos("),
-	token(b'\xc6', "tan(",        "func",     "Returns the tangent of an angle"),
-	token(b'\xc7', "tan⁻¹(",      "func",     "Returns the arctangent (inverse tangent) of a value",       alt="arctan("),
-	token(b'\xc8', "sinh(",       "func",     "Returns the hyperbolic sine of a value"),
-	token(b'\xc9', "sinh⁻¹(",     "func",     "Returns the inverse hyperbolic sine of a value",             alt="arcsinh("),
-	token(b'\xca', "cosh(",       "func",     "Returns the hyperbolic cosine of a value"),
-	token(b'\xcb', "cosh⁻¹(",     "func",     "Returns the inverse hyperbolic cosine of a value",          alt="arccosh("),
-	token(b'\xcc', "tanh(",       "func",     "Returns the hyperbolic tangent of a value"),
-	token(b'\xcd', "tanh⁻¹(",     "func",     "Returns the inverse hyperbolic tangent of a value",         alt="arctanh("),
-	token(b'\xce', "If ",          "cmd",  "Conditionally executes the next statement or Then/Else block"),
-	token(b'\xcf', "Then",        "cmd",  "Begins the body of an If block when the condition is true"),
-	token(b'\xd0', "Else",        "cmd",  "Begins the alternate body of an If-Then block when the condition is false"),
-	token(b'\xd1', "While ",       "cmd",  "Repeats a block as long as a condition remains true"),
-	token(b'\xd2', "Repeat ",      "cmd",  "Repeats a block until a condition becomes true (always runs at least once)"),
-	token(b'\xd3', "For(",        "cmdfunc",  "Iterates a variable from a start to an end value by a step"),  # TODO: Should be command?
-	token(b'\xd4', "End",         "cmd",  "Marks the end of an If-Then, While, Repeat, or For block"),
-	token(b'\xd5', "Return",      "cmd",  "Exits the current program or subprogram and returns to the caller"),
-	token(b'\xd6', "Lbl ",         "cmd",  "Defines a label that can be targeted by Goto"),
-	token(b'\xd7', "Goto ",        "cmd",  "Jumps execution unconditionally to a specified label"),
-	token(b'\xd8', "Pause ",       "cmd",  "Pauses program execution until the user presses ENTER"),
-	token(b'\xd9', "Stop",        "cmd",  "Terminates program execution immediately"),
-	token(b'\xda', "IS>(",        "cmdfunc",  "Increments a variable and skips the next statement if it exceeds a limit"),
-	token(b'\xdb', "DS<(",        "cmdfunc",  "Decrements a variable and skips the next statement if it goes below a limit"),
-	token(b'\xdc', "Input ",       "cmd",       "Prompts the user to enter a value or string"),
-	token(b'\xdd', "Prompt ",      "cmd",       "Prompts the user to enter values for one or more variables"),
-	token(b'\xde', "Disp ",        "cmd",       "Displays values or strings on the home screen"),
-	token(b'\xdf', "DispGraph",   "cmd",       "Displays the current graph screen"),
-	token(b'\xe0', "Output(",     "cmdfunc",       "Displays a value or string at a specific row and column on the home screen"),
-	token(b'\xe1', "ClrHome",     "cmd",       "Clears the home screen"),
+	token(b'\xb1', "int(",        "func",     "Returns the greatest integer less than or equal to a number (floor)",
+	      call_fn=_wrap(_ti_int)),
+	token(b'\xb2', "abs(",        "func",     "Returns the absolute value of a number",
+	      call_fn=_wrap(abs)),
+	token(b'\xb3', "det(",        "func",   "Returns the determinant of a square matrix",
+	      call_fn=_wrap(lambda m: float(sum(m[i][i] for i in range(len(m)))))),
+	token(b'\xb4', "identity(",   "func",   "Returns an n×n identity matrix",
+	      call_fn=_wrap(lambda n: [[1.0 if r == c else 0.0 for c in range(int(n))] for r in range(int(n))])),
+	token(b'\xb5', "dim(",        "func",     "Returns the length of a list or the dimensions of a matrix",
+	      call_fn=_wrap(lambda a: float(len(a)) if isinstance(a, list) and not isinstance(a[0], list)
+	                              else [float(len(a)), float(len(a[0]))])),
+	token(b'\xb6', "sum(",        "func",     "Returns the sum of all elements in a list",
+	      call_fn=_wrap(lambda a: sum(a))),
+	token(b'\xb7', "prod(",       "func",     "Returns the product of all elements in a list",
+	      call_fn=_wrap(math.prod)),
+	token(b'\xb8', "not(",        "func", "Returns the boolean NOT of a value (0→1, nonzero→0)",
+	      call_fn=_wrap(lambda a: float(not a))),
+	token(b'\xb9', "iPart(",      "func",     "Returns the integer part (truncation toward zero) of a number",
+	      call_fn=_wrap(math.trunc)),
+	token(b'\xba', "fPart(",      "func",     "Returns the fractional part of a number",
+	      call_fn=_wrap(_fpart)),
+	token(b'\xbc', "√(",          "func",     "Returns the square root of a non-negative number", alt=("sqrt(", 'squareroot'),
+	      call_fn=_wrap(lambda a: cmath.sqrt(a) if a < 0 else math.sqrt(a))),
+	token(b'\xbd', "³√(",         "func",     "Returns the cube root of a number", alt=("cbrt(", 'cuberoot'),
+	      call_fn=_wrap(lambda a: -(-a) ** (1 / 3) if a < 0 else a ** (1 / 3))),
+	token(b'\xbe', "ln(",         "func",     "Returns the natural logarithm of a positive number",
+	      call_fn=_wrap(cmath.log)),
+	token(b'\xbf', "e^(",         "func",     "Returns e raised to the specified power",
+	      call_fn=_wrap(cmath.exp)),
+	token(b'\xc0', "log(",        "func",     "Returns the base-10 logarithm of a positive number",
+	      call_fn=_wrap(cmath.log10)),
+	token(b'\xc1', "10^(",        "func",     "Returns 10 raised to the specified power",
+	      call_fn=_wrap(lambda a: 10 ** a)),
+	token(b'\xc2', "sin(",        "func",     "Returns the sine of an angle",
+	      call_fn=_wrap(math.sin)),
+	token(b'\xc3', "sin⁻¹(",      "func",     "Returns the arcsine (inverse sine) of a value", alt="arcsin(",
+	      call_fn=_wrap(math.asin)),
+	token(b'\xc4', "cos(",        "func",     "Returns the cosine of an angle",
+	      call_fn=_wrap(math.cos)),
+	token(b'\xc5', "cos⁻¹(",      "func",     "Returns the arccosine (inverse cosine) of a value", alt="arccos(",
+	      call_fn=_wrap(math.acos)),
+	token(b'\xc6', "tan(",        "func",     "Returns the tangent of an angle",
+	      call_fn=_wrap(math.tan)),
+	token(b'\xc7', "tan⁻¹(",      "func",     "Returns the arctangent (inverse tangent) of a value", alt="arctan(",
+	      call_fn=_wrap(math.atan)),
+	token(b'\xc8', "sinh(",       "func",     "Returns the hyperbolic sine of a value",
+	      call_fn=_wrap(math.sinh)),
+	token(b'\xc9', "sinh⁻¹(",     "func",     "Returns the inverse hyperbolic sine of a value", alt="arcsinh(",
+	      call_fn=_wrap(math.asinh)),
+	token(b'\xca', "cosh(",       "func",     "Returns the hyperbolic cosine of a value",
+	      call_fn=_wrap(math.cosh)),
+	token(b'\xcb', "cosh⁻¹(",     "func",     "Returns the inverse hyperbolic cosine of a value", alt="arccosh(",
+	      call_fn=_wrap(math.acosh)),
+	token(b'\xcc', "tanh(",       "func",     "Returns the hyperbolic tangent of a value",
+	      call_fn=_wrap(math.tanh)),
+	token(b'\xcd', "tanh⁻¹(",     "func",     "Returns the inverse hyperbolic tangent of a value", alt="arctanh(",
+	      call_fn=_wrap(math.atanh)),
+	token(b'\xce', "If ",          "cmd",  "Conditionally executes the next statement or Then/Else block",
+	      execute_fn=_exec_if),
+	token(b'\xcf', "Then",        "cmd",  "Begins the body of an If block when the condition is true",
+	      execute_fn=lambda p: None),
+	token(b'\xd0', "Else",        "cmd",  "Begins the alternate body of an If-Then block when the condition is false",
+	      execute_fn=lambda p: None),
+	token(b'\xd1', "While ",       "cmd",  "Repeats a block as long as a condition remains true",
+	      execute_fn=_exec_while),
+	token(b'\xd2', "Repeat ",      "cmd",  "Repeats a block until a condition becomes true (always runs at least once)",
+	      execute_fn=_exec_repeat),
+	token(b'\xd3', "For(",        "cmdfunc",  "Iterates a variable from a start to an end value by a step",
+	      execute_fn=_exec_for),
+	token(b'\xd4', "End",         "cmd",  "Marks the end of an If-Then, While, Repeat, or For block",
+	      execute_fn=lambda p: EndResult()),
+	token(b'\xd5', "Return",      "cmd",  "Exits the current program or subprogram and returns to the caller",
+	      execute_fn=lambda p: ReturnResult()),
+	token(b'\xd6', "Lbl ",         "cmd",  "Defines a label that can be targeted by Goto",
+	      execute_fn=_exec_lbl),
+	token(b'\xd7', "Goto ",        "cmd",  "Jumps execution unconditionally to a specified label",
+	      execute_fn=_exec_goto),
+	token(b'\xd8', "Pause ",       "cmd",  "Pauses program execution until the user presses ENTER",
+	      execute_fn=_exec_pause),
+	token(b'\xd9', "Stop",        "cmd",  "Terminates program execution immediately",
+	      execute_fn=lambda p: StopResult()),
+	token(b'\xda', "IS>(",        "cmdfunc",  "Increments a variable and skips the next statement if it exceeds a limit",
+	      execute_fn=_exec_is_gt),
+	token(b'\xdb', "DS<(",        "cmdfunc",  "Decrements a variable and skips the next statement if it goes below a limit",
+	      execute_fn=_exec_ds_lt),
+	token(b'\xdc', "Input ",       "cmd",       "Prompts the user to enter a value or string",
+	      execute_fn=_exec_input),
+	token(b'\xdd', "Prompt ",      "cmd",       "Prompts the user to enter values for one or more variables",
+	      execute_fn=_exec_prompt),
+	token(b'\xde', "Disp ",        "cmd",       "Displays values or strings on the home screen",
+	      execute_fn=_exec_disp),
+	token(b'\xdf', "DispGraph",   "cmd",       "Displays the current graph screen",
+	      execute_fn=lambda p: DispGraphResult()),
+	token(b'\xe0', "Output(",     "cmdfunc",       "Displays a value or string at a specific row and column on the home screen",
+	      execute_fn=_exec_output),
+	token(b'\xe1', "ClrHome",     "cmd",       "Clears the home screen",
+	      execute_fn=lambda p: ClrHomeResult()),
 	token(b'\xe2', "Fill(",       "func",     "Fills all elements of a list or matrix with a specified value"),
 	token(b'\xe3', "SortA(",      "func",     "Sorts a list in ascending order in-place"),
 	token(b'\xe4', "SortD(",      "func",     "Sorts a list in descending order in-place"),
 	token(b'\xe5', "DispTable",   "cmd",       "Displays the function table"),
-	token(b'\xe6', "Menu(",       "cmdfunc",       "Displays a menu and branches to a label based on user selection"),
+	token(b'\xe6', "Menu(",       "cmdfunc",       "Displays a menu and branches to a label based on user selection",
+	      execute_fn=_exec_menu),
 	token(b'\xe7', "Send(",       "cmdfunc",       "Sends a list to a connected CBL/CBR device"),
 	token(b'\xe8', "Get(",        "cmdfunc",       "Retrieves a list from a connected CBL/CBR device"),
 	token(b'\xe9', "PlotsOn",     "cmd",     "Turns on one or all stat plots"),
@@ -449,29 +753,29 @@ TOKENS: list[Token] = [
 
 	# Two-byte: Y= equation variables 0x5E xx
 	*[token(
-		bytes([0x5e, 0x10 + i]), 
-		f"Y{chr(0x2080 + (i + 1) % 10)}", 
-		"var", 
-		f"Function Y{(i + 1) % 10}", 
+		bytes([0x5e, 0x10 + i]),
+		f"Y{chr(0x2080 + (i + 1) % 10)}",
+		"var",
+		f"Function Y{(i + 1) % 10}",
 		alt=f"Y{(i + 1) % 10}"
 	) for i in range(10)],
 
 	*[token(
 		bytes([0x5e, 0x20 + i]),
-		f"{x}{chr(0x2080 + n)}ₜ", 
-		"var", 
-		f"Parametric function {x}{n}", 
+		f"{x}{chr(0x2080 + n)}ₜ",
+		"var",
+		f"Parametric function {x}{n}",
 		alt=f"{x}{n}t"
 	) for i, (n, x) in enumerate(itertools.product(range(1, 7), 'XY'))],
 
 	*[token(
-		bytes([0x5e, 0x40 + i]), 
-		f"r{chr(0x2081 + i)}", 
-		"var", 
-		f"Polar function r{i + 1}", 
+		bytes([0x5e, 0x40 + i]),
+		f"r{chr(0x2081 + i)}",
+		"var",
+		f"Polar function r{i + 1}",
 		alt=f"r{(i + 1)}"
 	) for i in range(6)],
-	
+
 	token(b'\x5e\x80', "u",   "var", "Sequence function u",                alt="sequence-u"),
 	token(b'\x5e\x81', "v",   "var", "Sequence function v",                alt="sequence-v"),
 	token(b'\x5e\x82', "w",   "var", "Sequence function w",                alt="sequence-w"),
@@ -609,14 +913,19 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x05', "►Nom(",        "func",   "Converts an effective interest rate to a nominal rate",        alt="to-Nom"),
 	token(b'\xbb\x06', "►Eff(",        "func",   "Converts a nominal interest rate to an effective rate",        alt="to-Eff"),
 	token(b'\xbb\x07', "dbd(",         "func",   "Calculates the number of days between two dates"),
-	token(b'\xbb\x08', "lcm(",         "func",   "Returns the least common multiple of two integers"),
-	token(b'\xbb\x09', "gcd(",         "func",   "Returns the greatest common divisor of two integers"),
-	token(b'\xbb\x0a', "randInt(",     "func",   "Generates a uniformly random integer between two bounds"),
+	token(b'\xbb\x08', "lcm(",         "func",   "Returns the least common multiple of two integers",
+	      call_fn=_wrap(math.lcm)),
+	token(b'\xbb\x09', "gcd(",         "func",   "Returns the greatest common divisor of two integers",
+	      call_fn=_wrap(math.gcd)),
+	token(b'\xbb\x0a', "randInt(",     "func",   "Generates a uniformly random integer between two bounds",
+	      call_fn=_randint_call),
 	token(b'\xbb\x0b', "randBin(",     "func",   "Generates a random integer from a binomial distribution"),
-	token(b'\xbb\x0c', "sub(",         "func", "Extracts a substring from a string"),
+	token(b'\xbb\x0c', "sub(",         "func", "Extracts a substring from a string",
+	      call_fn=_wrap(lambda s, start, length: s[int(start) - 1 : int(start) - 1 + int(length)])),
 	token(b'\xbb\x0d', "stdDev(",      "func",   "Returns the sample standard deviation of a list"),
 	token(b'\xbb\x0e', "variance(",    "func",   "Returns the sample variance of a list"),
-	token(b'\xbb\x0f', "inString(",    "func", "Returns the position of a substring within a string"),
+	token(b'\xbb\x0f', "inString(",    "func", "Returns the position of a substring within a string",
+	      call_fn=_wrap(lambda s, sub: float(s.find(sub) + 1) if sub in s else 0.0)),
 	token(b'\xbb\x10', "normalcdf(",   "func",   "Computes the normal distribution CDF between two bounds"),
 	token(b'\xbb\x11', "invNorm(",     "func",   "Returns the inverse normal (z-score) for a given area"),
 	token(b'\xbb\x12', "tcdf(",        "func",   "Computes the Student's t distribution CDF between two bounds"),
@@ -632,25 +941,34 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x1c', "tpdf(",        "func",   "Computes the Student's t probability density at a given value"),
 	token(b'\xbb\x1d', "χ²pdf(",       "func",   "Computes the chi-squared probability density at a given value", alt="chi2pdf"),
 	token(b'\xbb\x1e', "Fpdf(",        "func",   "Computes the F distribution probability density at a given value"),
-	token(b'\xbb\x1f', "randNorm(",    "func",   "Generates a random number from a normal distribution"),
+	token(b'\xbb\x1f', "randNorm(",    "func",   "Generates a random number from a normal distribution",
+	      call_fn=_wrap(lambda mu, sigma: random.gauss(mu, sigma))),
 	token(b'\xbb\x20', "tvm_Pmt",      "finfunc",   "Computes the payment amount for a TVM calculation"),
 	token(b'\xbb\x21', "tvm_I%",       "finfunc",   "Computes the interest rate for a TVM calculation"),
 	token(b'\xbb\x22', "tvm_PV",       "finfunc",   "Computes the present value for a TVM calculation"),
 	token(b'\xbb\x23', "tvm_N",        "finfunc",   "Computes the number of periods for a TVM calculation"),
 	token(b'\xbb\x24', "tvm_FV",       "finfunc",   "Computes the future value for a TVM calculation"),
-	token(b'\xbb\x25', "conj(",        "func",   "Returns the complex conjugate of a complex number"),
-	token(b'\xbb\x26', "real(",        "func",   "Returns the real part of a complex number"),
-	token(b'\xbb\x27', "imag(",        "func",   "Returns the imaginary part of a complex number"),
-	token(b'\xbb\x28', "angle(",       "func",   "Returns the polar angle (argument) of a complex number"),
-	token(b'\xbb\x29', "cumSum(",      "func",   "Returns a list of cumulative sums from a list"),
+	token(b'\xbb\x25', "conj(",        "func",   "Returns the complex conjugate of a complex number",
+	      call_fn=_wrap(lambda a: complex(a.real, -a.imag))),
+	token(b'\xbb\x26', "real(",        "func",   "Returns the real part of a complex number",
+	      call_fn=_wrap(lambda a: a.real)),
+	token(b'\xbb\x27', "imag(",        "func",   "Returns the imaginary part of a complex number",
+	      call_fn=_wrap(lambda a: a.imag)),
+	token(b'\xbb\x28', "angle(",       "func",   "Returns the polar angle (argument) of a complex number",
+	      call_fn=_wrap(cmath.phase)),
+	token(b'\xbb\x29', "cumSum(",      "func",   "Returns a list of cumulative sums from a list",
+	      call_fn=_wrap(lambda a: [sum(a[:i + 1]) for i in range(len(a))])),
 	token(b'\xbb\x2a', "expr(",        "func", "Evaluates a string as a mathematical expression"),
-	token(b'\xbb\x2b', "length(",      "func", "Returns the number of characters in a string"),
-	token(b'\xbb\x2c', "ΔList(",       "func",   "Returns a list of first differences of a list",           alt="dList("),
+	token(b'\xbb\x2b', "length(",      "func", "Returns the number of characters in a string",
+	      call_fn=_wrap(lambda s: float(len(s)))),
+	token(b'\xbb\x2c', "ΔList(",       "func",   "Returns a list of first differences of a list", alt="dList(",
+	      call_fn=_wrap(lambda a: [a[i + 1] - a[i] for i in range(len(a) - 1)])),
 	token(b'\xbb\x2d', "ref(",         "func", "Reduces a matrix to row-echelon form"),
 	token(b'\xbb\x2e', "rref(",        "func", "Reduces a matrix to reduced row-echelon form"),
 	token(b'\xbb\x2f', "►Rect",        "converter",   "Converts a complex number from polar to rectangular display", alt="to-Rect"),
 	token(b'\xbb\x30', "►Polar",       "converter",   "Converts a complex number from rectangular to polar display", alt="to-Polar"),
-	token(b'\xbb\x31', "𝑒",            "val",   "The mathematical constant e (≈2.71828...)"),
+	token(b'\xbb\x31', "𝑒",            "val",   "The mathematical constant e (≈2.71828...)",
+	      value_fn=lambda env: math.e),
 	token(b'\xbb\x32', "SinReg ",       "cmd",   "Fits a sinusoidal regression model to data"),
 	token(b'\xbb\x33', "Logistic ",     "cmd",   "Fits a logistic regression model to data"),
 	token(b'\xbb\x34', "LinRegTTest ",  "cmd",   "Performs a linear regression t-test"),
@@ -720,7 +1038,7 @@ TOKENS: list[Token] = [
 			(0x96, "Ç", "C-cedilla"),  (0x97, "ç", "c-cedilla"),
 			(0x98, "Ñ", "N-tilde"),    (0x99, "ñ", "n-tilde"),
 		]],
-	
+
 	token(b'\xbb\x9a', "´", "str", "Acute accent", alt="acute-accent"),
 	token(b'\xbb\x9b', "`", "str", "Grave accent", alt="grave-accent"),
 	token(b'\xbb\x9c', "¨", "str", "Diaeresis / umlaut accent", alt="umlaut-accent"),
@@ -734,7 +1052,7 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xa4', "ε", "str", "epsilon", alt="epsilon"),
 	token(b'\xbb\xa5', "λ", "str", "lambda", alt="lambda"),
 	token(b'\xbb\xa6', "μ", "str", "mu",     alt="mu"),
-	token(b'\xbb\xa7', "π", "str", "pi (non-mathematical)", alt="pi-non-math"),  # deprecated
+	token(b'\xbb\xa7', "π", "str", "pi (non-mathematical)", alt="pi-non-math"),
 	token(b'\xbb\xa8', "ρ", "str", "rho",    alt="rho"),
 	token(b'\xbb\xa9', "Σ", "str", "Sigma",  alt="Sigma"),
 	token(b'\xbb\xab', "φ", "str", "phi",    alt="phi"),
@@ -742,12 +1060,12 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xad', "ψ", "str", "Greek psi", alt="psi"),
 	token(b'\xbb\xae', "χ", "str", "chi",    alt="chi"),
 	token(b'\xbb\xaf', "F", "str", "Italic F used in F-statistic display"),
-	
+
 	# Lowercase letters a–k (0xBBB0–0xBBBA; 0xBBBB is unused)
 	*[token(bytes([0xBB, 0xB0 + i]), chr(0x61 + i), "str", f"Lowercase {chr(0x61 + i)}", key=chr(0x61 + i)) for i in range(11)],
 	# Lowercase letters l–z (0xBBBC–0xBBCA)
 	*[token(bytes([0xBB, 0xBC + i]), chr(0x6C + i), "str", f"Lowercase {chr(0x6C + i)}", key=chr(0x6C + i)) for i in range(15)],
-	
+
 	token(b'\xbb\xcb', "σ", "str", "sigma (statistics display)", alt="sigma"),
 	token(b'\xbb\xcc', "τ", "str", "tau (display character)", alt="tau"),
 	token(b'\xbb\xcd', "Í", "str", "I-acute (extended)", alt="I-acute"),
@@ -766,26 +1084,24 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xdb', "…", "str", "Ellipsis",      alt="ellipsis"),
 	token(b'\xbb\xdc', "∠", "str", "Angle symbol", alt="angle"),
 	token(b'\xbb\xdd', "ß", "str", "German sharp S", alt="sharp-s"),
-	token(b'\xbb\xde', "x", "str", "Superscript x", alt="superscript-x"),  # deprecated
-	token(b'\xbb\xdf', "T", "str", "Subscript T", alt="subscript-t"),  # deprecated
-	
+	token(b'\xbb\xde', "x", "str", "Superscript x", alt="superscript-x"),
+	token(b'\xbb\xdf', "T", "str", "Subscript T", alt="subscript-t"),
+
 	*[token(bytes([0xBB, 0xE0 + i]), chr(0x2080 + i), "string", "Subscript {i}", alt=f"subscript-{i}") for i in range(10)],
 	token(b'\xbb\xea', "₁₀", "str", "Subscript 10", alt=f"subscript-10"),
-	
+
 	token(b'\xbb\xeb', "←", "str", "Left arrow",   alt="left-arrow"),
 	token(b'\xbb\xec', "→", "str", "Right arrow", alt="right-arrow"),
 	token(b'\xbb\xed', "↑", "str", "Up arrow",     alt="up-arrow"),
 	token(b'\xbb\xee', "↓", "str", "Down arrow",   alt="down-arrow"),
-	token(b'\xbb\xf0', "x", "str", "x"),  # deprecated
+	token(b'\xbb\xf0', "x", "str", "x"),
 	token(b'\xbb\xf1', "∫", "str", "Integral symbol", alt="integral"),
 	token(b'\xbb\xf2', "🡅", "str", "scroll up"),
 	token(b'\xbb\xf3', "🡇", "str", "scroll down"),
-	token(b'\xbb\xf4', "√", "str", "Square root symbol", alt="root"),  # deprecated
-	token(b'\xbb\xf5', "<funcon>", "str", "Function On", alt='function-on'),  # deprecated
+	token(b'\xbb\xf4', "√", "str", "Square root symbol", alt="root"),
+	token(b'\xbb\xf5', "<funcon>", "str", "Function On", alt='function-on'),
 
 	# Two-byte: TI-84+ extended tokens 0xEF xx
-	# 0xEF00–0xEF0F and 0xEF10–0xEF1E: original TI-84+ OS; 0xEF17–0xEF1E also on TI-84+ non-CE newer OS
-	# 0xEF30–0xEF3D: TI-84 Plus (non-CE) newer OS only
 	token(b'\xef\x00', "setDate(",      "cmdfunc",      "Sets the date on the clock of an OS-enabled calculator"),
 	token(b'\xef\x01', "setTime(",      "cmdfunc",      "Sets the time on the clock of an OS-enabled calculator"),
 	token(b'\xef\x02', "checkTmr(",     "func",      "Returns the elapsed time in seconds since startTmr was called"),
@@ -795,12 +1111,20 @@ TOKENS: list[Token] = [
 	token(b'\xef\x06', "dayOfWk(",      "func",    "Returns the day of the week (1=Sun … 7=Sat) for a given date"),
 	token(b'\xef\x07', "getDtStr(",     "func",      "Returns the current date as a string in the active format"),
 	token(b'\xef\x08', "getTmStr(",     "func",      "Returns the current time as a string in the active format"),
-	token(b'\xef\x09', "getDate",       "val",      "Returns the current date as a {year, month, day} list"),
-	token(b'\xef\x0a', "getTime",       "val",      "Returns the current time as a {hour, minute, second} list"),
-	token(b'\xef\x0b', "startTmr",      "val",      "Starts a timer and returns a reference value for checkTmr("),
-	token(b'\xef\x0c', "getDtFmt",      "val",      "Returns the current date format setting as a number"),
-	token(b'\xef\x0d', "getTmFmt",      "val",      "Returns the current time format setting as a number"),
-	token(b'\xef\x0e', "isClockOn",     "val",      "Returns 1 if the clock is currently on, 0 if off"),
+	token(b'\xef\x09', "getDate",       "val",      "Returns the current date as a {year, month, day} list",
+	      value_fn=lambda env: [float(_dt.date.today().year),
+	                            float(_dt.date.today().month), float(_dt.date.today().day)]),
+	token(b'\xef\x0a', "getTime",       "val",      "Returns the current time as a {hour, minute, second} list",
+	      value_fn=lambda env: [float(_dt.datetime.now().hour),
+	                            float(_dt.datetime.now().minute), float(_dt.datetime.now().second)]),
+	token(b'\xef\x0b', "startTmr",      "val",      "Starts a timer and returns a reference value for checkTmr(",
+	      value_fn=lambda env: float(int(_dt.datetime.now().timestamp()))),
+	token(b'\xef\x0c', "getDtFmt",      "val",      "Returns the current date format setting as a number",
+	      value_fn=lambda env: env.get('_dtfmt', 1.0)),
+	token(b'\xef\x0d', "getTmFmt",      "val",      "Returns the current time format setting as a number",
+	      value_fn=lambda env: env.get('_tmfmt', 12.0)),
+	token(b'\xef\x0e', "isClockOn",     "val",      "Returns 1 if the clock is currently on, 0 if off",
+	      value_fn=lambda env: 1.0),
 	token(b'\xef\x0f', "ClockOff",      "cmd",      "Turns off the clock on OS-enabled calculators"),
 	token(b'\xef\x10', "ClockOn",       "cmd",      "Turns on the clock on OS-enabled calculators"),
 	token(b'\xef\x11', "OpenLib(",      "cmdfunc",      "Opens an application library for use with ExecLib"),
@@ -819,10 +1143,15 @@ TOKENS: list[Token] = [
 	token(b'\xef\x1e', "<mathprintbox>",  "",      ""),
 	token(b'\xef\x30', "►n/d◄►Un/d",   "converter","Converts between proper fraction and mixed number display"),
 	token(b'\xef\x31', "►F◄►D",         "converter","Converts between fraction and decimal display"),
-	token(b'\xef\x32', "remainder(",    "func",    "Returns the remainder of integer division"),
-	token(b'\xef\x33', "Σ(",            "func",    "Summation: evaluates an expression over a range of integer values", alt='sigma('),
-	token(b'\xef\x34', "logBASE(",      "func",    "Returns the logarithm of a value in a specified base"),
-	token(b'\xef\x35', "randIntNoRep(", "func",    "Returns a list of non-repeating random integers in a range"),
+	token(b'\xef\x32', "remainder(",    "func",    "Returns the remainder of integer division",
+	      call_fn=_wrap(lambda a, b: float(int(a) % int(b)))),
+	token(b'\xef\x33', "Σ(",            "func",    "Summation: evaluates an expression over a range of integer values", alt='sigma(',
+	      call_fn=_call_sigma),
+	token(b'\xef\x34', "logBASE(",      "func",    "Returns the logarithm of a value in a specified base",
+	      call_fn=_wrap(lambda a, b: math.log(a) / math.log(b))),
+	token(b'\xef\x35', "randIntNoRep(", "func",    "Returns a list of non-repeating random integers in a range",
+	      call_fn=_wrap(lambda a, b, n=None: random.sample(
+	          range(int(a), int(b) + 1), int(b - a + 1) if n is None else int(n)))),
 	token(b'\xef\x36', "MATHPRINT",     "cmd", "Mode setting: enables MathPrint display mode"),
 	token(b'\xef\x37', "CLASSIC",       "cmd", "Mode setting: enables Classic (linear) display mode"),
 	token(b'\xef\x38', "n/d",           "cmd","Fraction template: enters a proper fraction"),
@@ -838,14 +1167,14 @@ if __name__ == '__main__':
 	@dataclass
 	class NullToken:
 		code: bytes
-	
+
 	check = [None] * 0x100
 	check_misc = [None] * 0xF6
 	duplicate = set()
-	
+
 	for code in [
 		b'\x00', b'\x26', b'\x5c', b'\x5d', b'\x5e', b'\x60', b'\x61', b'\x62', b'\x63', b'\x7e', b'\xaa', b'\xbb', b'\xef',
-		b'\xbb\x5c', b'\xbb\x5d', b'\xbb\x5e', b'\xbb\x5f', b'\xbb\x60', b'\xbb\x61', b'\xbb\x62', b'\xbb\x63', b'\xbb\x7e', b'\xbb\xaa', b'\xbb\xbb', b'\xbb\xd0', b'\xbb\xef', 
+		b'\xbb\x5c', b'\xbb\x5d', b'\xbb\x5e', b'\xbb\x5f', b'\xbb\x60', b'\xbb\x61', b'\xbb\x62', b'\xbb\x63', b'\xbb\x7e', b'\xbb\xaa', b'\xbb\xbb', b'\xbb\xd0', b'\xbb\xef',
 	]:
 		old_len = len(duplicate)
 		duplicate.add(code)
@@ -855,7 +1184,7 @@ if __name__ == '__main__':
 			check[code[0]] = NullToken(code)
 		elif code[0] == 0xBB:
 			check_misc[code[1]] = NullToken(code)
-	
+
 	for token in TOKENS:
 		old_len = len(duplicate)
 		duplicate.add(token.code)
@@ -865,11 +1194,11 @@ if __name__ == '__main__':
 			check[token.code[0]] = token
 		elif token.code[0] == 0xBB:
 			check_misc[token.code[1]] = token
-	
+
 	for i, token in enumerate(check):
 		if token is None:
 			print('MISSING:', hex(i))
-	
+
 	for i, token in enumerate(check_misc):
 		if token is None:
 			print('MISSING:', hex(0xBB00 + i))

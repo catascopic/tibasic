@@ -1,13 +1,9 @@
 from __future__ import annotations
 import math, cmath, random
-from operations import EXEC_CALLS
 from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
 	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, ANS, NEG, LIST_PREFIX,
-	RAD, DEG, INV, SQ, TRANSPOSE, CUBE, FACT,
-	SCI_E, OR, XOR, AND, EQ, LT, GT, LE, GE, NE,
-	ADD, SUB, MUL, DIV, NPR, NCR, POW, XROOT,
 )
 from results import (
 	ExprResult, StoreResult, Thunk,
@@ -178,7 +174,7 @@ class Parser:
 			return val
 
 		if t is NEG:
-			return t.unary_op(self.parse_expr(65))
+			return t.unary_op_fn(self.parse_expr(65))
 
 		# Ans — special: may be indexed when it holds a list
 		if t is ANS:
@@ -205,13 +201,13 @@ class Parser:
 		if t is PRGM:
 			raise NotImplementedError(f"prgm{self._read_name()}")
 
-		# Function call (token.call drives arg parsing via parse_args / grab_until_comma)
-		if t.is_function():
-			return t.call(self)
+		# Function call
+		if t.call_fn is not None:
+			return t.call_fn(self)
 
-		# Nullary (0-arg, no parentheses): π, e, 𝑖, rand, getKey, getDate, etc.
-		if t.is_nullary():
-			return t.get_value(self.env)
+		# Nullary (0-arg, no parentheses): π, e, 𝑖, rand, getKey, etc.
+		if t.value_fn is not None:
+			return t.value_fn(self.env)
 
 		# Variables — list/matrix vars support (index) access
 		if t.is_real_var():
@@ -244,31 +240,6 @@ class Parser:
 
 	# ── Pratt expression parser ────────────────────────────────────────────────
 
-	_POSTFIX = {SQ, CUBE, INV, FACT, TRANSPOSE, DEG, RAD}
-
-	_BP: dict[Token, tuple[int, int]] = {
-		OR:    (20, 21),
-		XOR:   (20, 21),
-		AND:   (30, 31),
-		EQ:    (40, 41),
-		LT:    (40, 41),
-		GT:    (40, 41),
-		LE:    (40, 41),
-		GE:    (40, 41),
-		NE:    (40, 41),
-		ADD:   (50, 51),
-		SUB:   (50, 51),
-		MUL:   (60, 61),
-		DIV:   (60, 61),
-		NPR:   (60, 61),
-		NCR:   (60, 61),
-		XROOT: (60, 61),
-		SCI_E: (65, 66),  # above * below ^
-		POW:   (70, 69),  # right-associative
-	}
-	_IMPL_MUL_BP = (60, 61)
-	_POSTFIX_BP  = 80
-
 	def parse_expr(self, min_bp: int = 0):
 		lhs = self.parse_atom()
 
@@ -276,29 +247,27 @@ class Parser:
 			t = self.peek()
 
 			# Postfix operators
-			if t in self._POSTFIX:
-				if self._POSTFIX_BP <= min_bp:
+			if t.postfix:
+				if 80 <= min_bp:
 					break
 				self.advance()
-				lhs = t.unary_op(lhs)
+				lhs = t.unary_op_fn(lhs)
 				continue
 
 			# Explicit binary operator
-			bp = self._BP.get(t.code)
-			if bp is not None:
-				left_bp, right_bp = bp
+			if t.bp is not None:
+				left_bp, right_bp = t.bp
 				if left_bp <= min_bp:
 					break
 				self.advance()
-				lhs = t.binary_op(lhs, self.parse_expr(right_bp))
+				lhs = t.binary_op_fn(lhs, self.parse_expr(right_bp))
 				continue
 
 			# Implicit multiplication
 			if t.can_start_atom():
-				left_bp, right_bp = self._IMPL_MUL_BP
-				if left_bp <= min_bp:
+				if 60 <= min_bp:
 					break
-				lhs = lhs * self.parse_expr(right_bp)
+				lhs = lhs * self.parse_expr(61)
 				continue
 
 			break
@@ -353,10 +322,10 @@ class Parser:
 
 		t = self.peek()
 
-		# Command tokens dispatch via Token.execute (implemented in operations.py)
-		if t.code in EXEC_CALLS:
+		# Command tokens dispatch via token.execute_fn
+		if t.execute_fn is not None:
 			self.advance()
-			return t.execute(self)
+			return t.execute_fn(self)
 
 		# Expression statement, optionally followed by → target
 		value = self.parse_expr()
