@@ -6,4 +6,4 @@ unary_op_fn -> unary_op
 binary_op_fn -> binary_op
 value_fn -> resolve
 variables also implement resolve
-new field: store(env)?
+new field: store(env) for variables, also rand, but not dim since it takes an additional argument and makes more sense as a special case
