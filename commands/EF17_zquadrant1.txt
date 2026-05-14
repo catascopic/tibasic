@@ -1,0 +1,25 @@
+This article is a stub. You can help TI-Basic Developer by
+expanding it
+.
+Command Summary
+Puts Quadrant 1 in the viewing window.
+Command Syntax
+none
+Menu Location
+[Zoom][Alpha][Math]
+Calculator Compatibility
+OS 2.53MP and above
+Token Size
+2 bytes
+ZQuadrant1 was introduced in OS 2.53MP. As it's name might imply, it puts Quadrant I in the viewing window (the upper-left quadrant). Here are the window settings it affects:
+Xmin is set to 0 and Xmax is set to 9.4 making each pixel .1 units.
+Ymin is set to 0 and Ymax is set to 9.4 (each pixel is 47/310 units)
+Xscl and Yscl are set to 1
+ΔX is set to .1
+ΔY is set to 47/310
+Xres is set to 1
+This command does not seem to work in programs.
+Related Commands
+ZDecimal
+ZSquare
+.

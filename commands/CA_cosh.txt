@@ -1,0 +1,48 @@
+Command Summary
+Calculates the hyperbolic cosine of a value.
+Command Syntax
+cosh(
+value
+)
+Menu Location
+The cosh( command is only found in the Catalog. Press:
+2nd CATALOG to access the command catalog.
+C to skip to commands starting with C.
+Scroll down and select cosh(.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+Calculates the hyperbolic cosine of a value. The hyperbolic trig functions
+sinh(
+,
+cosh(
+, and
+tanh(
+are an analog of normal trig functions, but for a hyperbola, rather than a circle. They can be expressed in terms of real powers of
+e
+, and don't depend on the
+Degree
+or
+Radian
+mode setting.
+cosh(0)
+    1
+cosh(1)
+    1.543080635
+Like normal trig commands,
+cosh(
+works on
+lists
+as well, but not on complex numbers, even though the function is often extended to the complex numbers in mathematics.
+Formulas
+The definition of hyperbolic cosine is:
+(1)
+\begin{align} \cosh{x}=\frac{e^x+e^{-x}}{2} \end{align}
+Related Commands
+sinh(
+sinh‾¹(
+cosh‾¹(
+tanh(
+tanh‾¹(
+.

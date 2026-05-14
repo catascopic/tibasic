@@ -1,0 +1,35 @@
+Command Summary
+Displays the table screen.
+Command Syntax
+DispTable
+Menu Location
+While editing a program, press:
+PRGM to access the program menu
+RIGHT to select the I/O submenu
+5 to select DispTable, or use arrows and ENTER
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The
+DispTable
+comand displays the table screen you normally see by pressing 2nd TABLE, from a running program. The user will see the table screen with a "paused" run indicator, and will be able to use arrows to scroll through it. Pressing ENTER will exit the screen and continue the program.
+Advanced Uses
+The user can't select any cells in the table to be evaluated if they're not, already. So it's best to select the
+IndpntAuto
+and
+DependAuto
+options from the 2nd TBLSET menu before using this command.
+IndpntAsk
+can also work, however, as long as you store to
+TblInput
+first.
+Error Conditions
+ERR:INVALID
+occurs if this statement is used outside a program.
+Related Commands
+IndpntAsk
+IndpntAuto
+DependAsk
+DependAuto
+.

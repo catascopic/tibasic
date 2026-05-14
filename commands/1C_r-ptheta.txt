@@ -1,0 +1,69 @@
+Command Summary
+R►Pθ( calculates the angle coordinate (in polar coordinates) given the Cartesian coordinates.
+Command Syntax
+R►Pθ(
+x
+,
+y
+)
+Menu Location
+Press:
+2nd ANGLE to access the angle menu.
+6 to select R►Pθ(, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+R►Pθ( (Rectangular to polar θ) takes the (
+x
+,
+y
+) (Cartesian) coordinate, and returns the angle that the ray from (0,0) to (
+x
+,
+y
+) makes with the positive x-axis. This is the θ-coordinate of the same point in (
+r
+,
+θ
+) (polar) mode. The identity used for this conversion is tan(
+θ
+)=
+y
+/x
+, with the correct inverse being chosen depending on the quadrant that the point is in. The range of the angle returned is -π<
+θ
+≤π. R►Pθ( can also be used on lists.
+R►Pθ( is equivalent to the atan2() instruction seen in C/++ and FORTRAN.
+R►Pθ(3,4)
+    .927295218
+tanֿ¹(4/3)
+    .927295218
+R►Pθ(0,{1,-1})
+    {1.570796327, -1.57096327}
+R►Pθ( is affected by
+Degree
+and
+Radian
+mode in its output, which is an angle measured in degrees or radians respectively.
+Advanced Uses
+If you want the result to always be a radian angle, regardless of mode settings, you can divide the result by 1
+r
+:
+R►Pθ(x,y)/1^^r
+If you want the result to always be a degree angle, regardless of mode settings, you can divide the result by 1
+°
+:
+R►Pθ(x,y)/1°
+Error Conditions
+ERR:DATA TYPE
+is thrown if you input a complex argument.
+ERR:DIM MISMATCH
+is thrown if two list arguments have different dimensions.
+Related Commands
+P►Rx(
+P►Ry(
+R►Pr(
+angle(
+tanֿ¹(
+.

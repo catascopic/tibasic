@@ -1,0 +1,24 @@
+Command Summary
+Mode command that sets Answers to AUTO.
+Command Syntax
+AUTO Answer
+Menu Location
+Press:
+MODE
+DOWN until you see Answers
+ENTER on AUTO
+Alternatively, access the catalog.
+Calculator Compatibility
+TI-84 2.53MP only
+Token Size
+2 bytes
+The
+AUTO Answer
+command is a mode command that changes the Answers mode to AUTO. The AUTO mode is in essence the same mode that lower OS models use. The calculator will evaluate a numerical expression and return a decimal or number in scientific notation, unless
+►Frac
+is used.
+In the Mathprint mode, no noticeable difference is seen unless the answer is converted to a fraction.
+Related Commands
+DEC Answer
+FRAC Answer
+.

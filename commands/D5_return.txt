@@ -1,0 +1,44 @@
+Command Summary
+Stops the program and returns the user to the home screen. If the program is a subprogram, however, it just stops the subprogram and returns program execution to the parent program.
+Command Syntax
+Return
+Menu Location
+Press:
+PRGM to enter the PRGM menu
+ALPHA SIN to choose Return, or use arrows
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+When the Return command is used in a program it exits the program (terminating the program execution) and returns the user to the home screen. If it is encountered within
+loops
+, the loops will be stopped.
+There is some distinction when using Return with
+subprograms
+: the Return command will stop the program execution of the subprogram, and program execution will go back to the calling program, continuing right after the subprogram call. If this functionality is not desired, then you should use the
+Stop
+command instead. Generally, though, you should use Return instead of Stop.
+:ClrHome
+:Input "Guess:",A
+:Stop
+Replace Stop with Return
+:ClrHome
+:Input "Guess:",A
+:Return
+Optimization
+You don't have to put a Return command at the end of a program or subprogram if you can organize the program so that it just naturally quits. When the calculator reaches the end of a program, it will automatically stop executing as if it had encountered a Return command (the Return is implied).
+:ClrHome
+:Input "Guess:",A
+:Return
+Remove the Return
+:ClrHome
+:Input "Guess:",A
+Error Conditions
+ERR:INVALID
+occurs if this statement is used outside a program.
+Related Commands
+prgm
+Stop
+See Also
+Subprograms
+.

@@ -1,0 +1,60 @@
+Command Summary
+Stores the contents of an equation variable to a string.
+Command Syntax
+Equ►String(
+equation
+,
+string
+Menu Location
+This command is found only in the catalog. Press:
+2nd CATALOG to access the catalog
+F to skip to commands starting with F
+Scroll up to Equ►String( and select it.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+This command stores the contents of an equation variable (such as Y
+1
+or X
+1T
+) to a string (one of Str0, Str1, … Str9). This can be used when you want to display the equation as text (either using the
+Text(
+command on the graph screen, or the
+Output(
+or
+Disp
+commands on the home screen). For example:
+:Equ►String(Y1,Str1
+:Text(0,0,"Y1(X)=",Str1
+Apart from cases in which the user has already stored to the equation variable prior to running the program, about the only situation in which you would use
+Equ►String(
+is for the output of a
+regression
+.
+Advanced
+You can use
+Equ►String(
+(outside a program) to get the
+→
+or " symbols in a string:
+Type them on the home screen and press [ENTER]
+Select 2:Quit when the
+ERR:SYNTAX
+comes up.
+Press [Y=] to go to the equation editor.
+Press [2nd] [ENTRY] to recall the symbols to Y
+1
+Now, use
+Equ►String(
+Y
+1
+,Str1
+)
+to store the symbols to a string.
+Related Commands
+String►Equ(
+expr(
+See Also
+Number to String
+.

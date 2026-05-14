@@ -1,0 +1,85 @@
+Character Types
+Letters
+A-Z, a-z, θ
+Numbers
+0-9
+Symbols
+!, ', ", etc.
+Variables
+L
+1
+, ΔTbl, etc.
+Functions
+sin(, max(, etc.
+Commands
+Disp, If, etc.
+There are several different kinds of characters that you can use in TI-Basic, including letters, numbers, symbols, variables, functions, and even other commands. You can
+store
+the characters together in groups as
+strings
+, and you can then perform operations on the strings or the calculator can display them on the screen.
+:"ABC123
+:Disp Ans
+:Disp expr(sub(Ans,4,3
+Although lowercase letters are not available by default, a good substitute is the
+statistics variables
+by pressing VARS and then scrolling down to Statistics. You will not find variables for all of the lowercase letters, but you will find: a, b, c, d, e, i, n, p, r, s, t, u, v, w, and z. Another way to access lowercase letters is by using an
+assembly
+program to turn on the lowercase flag that the calculator uses for enabling lowercase letters.
+While lowercase letters look nice, they are the epitome of memory wasters: at a single character, they each take up 2 bytes of memory. A program that uses a lot of lowercase letters can fill up all of RAM very quickly! This may be avoided by using uppercase letters instead, which only take up 1 byte each.
+Advanced Uses
+Back when the TI-82 and TI-83 calculators were popular, most people didn't know about the statistics variables and there weren't many assembly programs available for setting the lowercase flag, so you would see people making text by putting together multiple functions or commands and using different pieces of them.
+For example, to make the word "Hell" you can use
+Horiz
+to get the 'H',
+e
+to get the 'e', and two copies of
+ln(
+to get the 'll'. You would then just erase the leftover characters (in this case, 'n(') with spaces.
+:Output(2,1,"Horiz
+:Output(2,2,"e
+:Output(2,3,"ln(
+:Output(2,4,"ln(
+:Output(2,5," (2 spaces)
+Similar to the lowercase letters, the calculator actually has several additional ASCII characters built-in that are only available through an assembly program. It's a shame that these characters aren't available, since some of them (such as @, &, #, $, %, and the internal characters like ä) would be very useful in games and text programs.
+You can also save memory by replacing words such as "If", " or ", " and " with the appropriate commands, when displaying text. Such a command will only take up 1 byte, whereas the text may be much larger memory-wise.
+The two characters that you can't put in a string using a TI-Basic program are quotation marks (") and the store command (→). However, you can mimic these respectively on the graph screen with the
+Text(
+command by using two apostrophes (''), and a subtract sign with a greater than sign (—>). Alternatively, you can use the following method to put either one or both of these symbols into Str1, outside a program:
+Type them on the home screen and press [ENTER]
+Select 2:Quit when the
+ERR:SYNTAX
+comes up.
+Press [Y=] to go to the equation editor.
+Press [2nd] [ENTRY] to recall the symbols to Y
+1
+Now, use Equ►String(Y
+1
+,Str1) to store the symbols to a string.
+Problems using Characters
+Because the calculator treats each character as a
+token
+, including functions and commands, this can create problems. For example, if you ask the user to
+input
+a name, they could enter "InputPromptDisp123" (using the respective commands), and the calculator would count it as just six characters — 'Input' (1), 'Prompt' (2), 'Disp' (3), '1' (4), '2' (5), and '3' (6).
+:ClrHome
+:Input "Name? ",Str1
+:Output(2,2,"Name: "+Str1
+Related to that problem, if you are trying to position some text on the screen so that it looks nice (such as centering it), the text would now be completely thrown off since there are several additional letters being displayed ('nput', 'rompt', and 'isp'). Even if you try checking to make sure that the text is the appropriate length (using the
+length(
+command), that doesn't tell you how many letters are in the function or command.
+When you are dealing with many different kinds of users, especially those with little to no knowledge of TI-Basic, you need to be cognizant of these kinds of problems and design your program so that it takes them into account (see
+usability
+for more information). There are a few different ways to
+validate user input
+, but one of the simplest is to create a string of acceptable characters that you check the user input against, and then tell the user if their input contained any unacceptable characters.
+:"ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz→Str0
+:Repeat I
+:ClrHome
+:Input "Name? ",Str1
+:min(seq(inString(Str0,sub(Str1,I,1)),I,1,length(Str1→I
+:If not(Ans
+:Pause "Invalid Name!
+:End
+In this example, our string of acceptable characters is letters (both uppercase and lowercase), as well as a space. When the user inputs a name, we loop through all of the characters in the name and get their positions in our acceptable characters string. If any of the characters weren't in the string, then its position will be zero, and when we take the minimum of all the positions, the smallest will be zero. We then tell the user it was an invalid name and ask them to input a new name.
+.

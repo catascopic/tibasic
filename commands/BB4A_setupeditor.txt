@@ -1,0 +1,71 @@
+Command Summary
+Sets which lists are shown in the List Editor. As a side effect, unarchives the lists, and creates them if they don't exist.
+By default, works with L1-L6.
+Command Syntax
+SetUpEditor
+[
+list
+,
+list
+,…]
+Menu Location
+Press:
+STAT to enter the STAT menu.
+5 to choose SetUpEditor, or use arrows.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+The
+SetUpEditor
+command is used to define which lists are shown in the List Editor (which can be accessed by pressing [STAT] [ENTER] [Edit…]). The list editor provides a convenient interface for viewing and editing items inside lists (especially when the elements of two lists are connected to each other, such as a list for X-coordinates and one for Y-coordinates, since they will be shown in the same row).
+If the command is called without any arguments, it uses the default six lists: L1, L2, L3, L4, L5, and L6.
+:SetUpEditor
+However, you can use it to select any lists that you have defined, or even lists that are archived or not yet defined. To do this, simply put the lists you want as arguments to the command. For example, if you want to edit the lists FOO and BAR, do:
+:SetUpEditor FOO,BAR
+Both the list editor itself and the
+SetUpEditor
+command support up to 20 lists. If you specify more than 20, the 21st and beyond will be ignored.
+The List Editor doesn't do anything when you are running a program, so it may seem as though
+SetUpEditor
+is nearly useless in programs. This is not the case, however, because of
+SetUpEditor
+'s powerful side effect: if the lists it is given as arguments are archived, it will unarchive them. If they don't exist, it will create empty lists with zero items. If the lists exist, the items stored inside are not modified.
+Advanced Uses
+Due to this side effect,
+SetUpEditor
+can be used for lists with external data such as
+saved
+games or
+high scores
+. When the user first runs the program, the assumption is you don't know anything about the state of those lists: they may be archived, or they may not even exist. You can deal with both of those individually: storing to the dimension will create the list if it didn't exist, and the
+UnArchive
+command will move the list to RAM if it wasn't there.
+However, if you're wrong about the list, both of these commands will cause an error. If the list exists but is archived, storing to its dimension will cause an
+ERR:ARCHIVE
+error. If the list doesn't exist, unarchiving it will cause an
+ERR:UNDEFINED
+error. Sounds like a vicious circle.
+The
+SetUpEditor
+command allows you to deal with both of these problems at once. Say the program saves its data in LSAVE. Use the
+SetUpEditor
+command on it, and from then on you know that the list exists AND that it is unarchived.
+:SetUpEditor SAVE
+At the end of the program, you should
+clean up
+after yourself, though. You don't want the user to see the list SAVE in the editor (he might be tempted to edit it and give himself a huge high score, for one thing). So you should use the SetUpEditor command again, this time without arguments, to reset the editor to its default state.
+For more information about using
+SetUpEditor
+in the context of saving data, see the page on
+saving
+.
+Similar Commands
+dim(
+ClrList
+UnArchive
+See Also
+Saving Data
+Highscores
+Program Cleanup
+.

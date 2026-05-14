@@ -1,0 +1,47 @@
+Command Summary
+Zooms to a graphing window which works for all currently selected
+plots
+.
+Command Syntax
+ZoomStat
+Menu Location
+Press:
+ZOOM to access the zoom menu.
+9 to select ZoomStat, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The ZoomStat command command zooms to a graphing window that accurately represents all the currently defined stat plots (see the
+PlotN(
+commands). You can think of it as
+ZoomFit
+, but for plots rather than equations.
+The specific function of the command is as follows: first, the minimum and maximum X and Y coordinates that stat plots will be using are calculated. Xmin, Xmax, Ymin, and Ymax are calculated to fit all these coordinates plus a padding on either side. The padding is 10% of the unpadded range on the left and right (for Xmin and Xmax), and 17% of the unpadded range on the top and bottom (for Ymin and Ymax).
+Of course, the exact function varies slightly with the type of plot defined. For example, Ymin and Ymax will not be affected by
+Boxplot
+and
+Modboxplot
+plots, since they ignore Y-coordinates when graphing. Also,
+Histogram
+fitting is a bit trickier than others. Xscl and Yscl also are changed for histograms, though not for the other plots.
+For all plots except Histogram, ZoomStat will create a window with Xmin=Xmax (or Ymin=Ymax) if the X range (or Y range) of the data is 0. This will throw an
+ERR:WINDOW RANGE
+. If a Histogram causes this error, though,
+ERR:STAT
+is thrown, and
+then
+when you access the graphscreen
+ERR:WINDOW RANGE
+will occur.
+Error Conditions
+ERR:INVALID
+is thrown if this command is using outside a program (although the menu option, of course, is fine).
+ERR:STAT
+is thrown when trying to ZoomFit to a Histogram with only one distinct number in the data list.
+ERR:WINDOW RANGE
+is thrown when the window ends up being empty.
+Related Commands
+ZoomFit
+ZBox
+.

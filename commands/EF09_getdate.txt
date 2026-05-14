@@ -1,0 +1,40 @@
+Command Summary
+Returns a list with the current date that the clock has on the TI-84+/SE/CE.
+Command Syntax
+getDate→
+Variable
+Menu Location
+This command can only be found in the catalog. Press:
+2nd CATALOG to enter the command catalog
+G to skip to commands starting with G
+Scroll down to getDate and select it
+Calculator Compatibility
+TI-84+/SE/CE
+Token Size
+2 bytes
+The
+getDate
+command returns the current date that the clock has on the TI-84+/SE/CE calculators in
+list
+format — {
+year
+,
+month
+,
+day
+}. You can
+store
+this list to a variable for later use, or manipulate it the same way you do with other lists. Of course, this command only works if the date has actually been set, so you should use the
+setDate(
+command before using it.
+An interesting note about this command is that you cannot index
+getDate
+directly to get individual elements; if you try, each element of the clock is instead multiplied by the number. You may, however, call the command and thus store it in
+Ans
+, then retrieve individual elements.
+Related Commands
+getDtFmt
+getDtStr(
+setDate(
+setDtFmt(
+.

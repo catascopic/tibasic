@@ -1,0 +1,57 @@
+Command Summary
+The mathematical symbol
+i
+, short for √(-1).
+Command Syntax
+i
+To enter a complex number:
+real-part
++
+imag-part i
+Menu Location
+Press 2nd
+i
+to paste
+i
+.
+Calculator Compatibility
+TI-83/84/+/SE/CSE/CE
+Token Size
+1 byte
+The
+i
+symbol is short for √(-1), and is used for complex numbers in algebra and complex analysis. On the calculator, entering
+i
+will not cause an error, even in
+Real
+mode, but operations that result in a complex number (such as taking the square root of a negative number) will. If you're dealing with complex numbers, then, it's best to switch to
+a+bi
+or
+re^θi
+mode.
+Advanced Uses
+By using
+i
+in a calculation, the calculator switches to complex number mode to do it, even if in
+Real
+mode. So √(-1) will throw an
+ERR:NONREAL ANS
+, but √(0
+i
+-1) will not (even though it's the same number). This can be used to force calculations to be done using complex numbers regardless of the mode setting — usually by adding or subtracting 0
+i
+, although more clever ways can be found.
+A good example of this technique is our
+Quadratic Formula
+routine.
+Related Commands
+π
+e
+Real
+,
+a+bi
+, and
+re^θi
+See Also
+Quadratic Formula
+.

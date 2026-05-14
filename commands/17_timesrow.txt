@@ -1,0 +1,40 @@
+Command Summary
+Multiplies a row by a scalar.
+Command Syntax
+*row(
+factor
+,
+matrix
+,
+row
+)
+Menu Location
+Press:
+MATRX (on a TI-83) or 2nd MATRX (TI-83+ or higher) to access the matrix menu.
+RIGHT to access the MATH submenu.
+ALPHA E to select *row(, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The *row( command multiplies a row of a matrix by a scalar factor and returns the result. It is an elementary row operation used in Gaussian Elimination.
+[[1,2][3,4]]
+    [[1 2]
+     [3 4]]
+*row(10,Ans,1)
+    [[10 20]
+     [3  4 ]]
+Advanced Uses
+You can multiply columns instead of rows with the aid of the
+T
+(
+transpose
+) command.
+Error Conditions
+ERR:INVALID DIM
+is thrown if the row argument isn't a valid row (is larger than the size of the matrix, or otherwise bad)
+Related Commands
+rowSwap(
+row+(
+*row+(
+.

@@ -1,0 +1,45 @@
+Command Summary
+Returns the truth value of
+value1
+or
+value2
+being true.
+Command Syntax
+value1
+or
+value2
+Menu Location
+Press:
+2nd TEST to access the test menu.
+RIGHT to access the LOGIC submenu.
+2 to select or, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+or
+takes two numbers or expressions, and checks to see if
+either one
+is True. If both are False, it returns 0. If at least one is True, it returns 1.
+or
+is commutative (i.e. the order of arguments does not matter). As with
+and
+, you can use variables and expressions, and use multiple
+or
+'s together.
+:0 or 1-1
+           0
+
+:0 or -1
+           1
+
+:2 or 6*4
+           1
+
+:0 or 1 or 0
+           1
+Related Commands
+and
+xor
+not(
+.

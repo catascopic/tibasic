@@ -1,0 +1,66 @@
+Command Summary
+Sets the dimension of a list or lists to 0.
+Command Syntax
+ClrList
+list1
+,
+[
+list2
+,
+list3
+, …]
+Menu Location
+Press:
+STAT to access the statistics menu
+4 to select ClrList, or use arrows.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+ClrList
+sets the length of a list (or several lists) to 0. This is virtually equivalent to deleting the list, except for several differences:
+The list still exists — it will be shown in the memory management menu and the list menu
+Calling the
+dim(
+command on it will return 0, rather than an error.
+ClrList
+can clear multiple lists at the same time
+Advanced Uses
+You might use
+ClrList
+when building up a list element by element and using
+dim(
+in the process:
+:ClrList L1
+:While 10>dim(L1
+:Input X
+:X→L1(1+dim(L1
+:End
+Optimization
+Using
+DelVar
+instead of
+ClrList
+allows you to save a tiny bit of memory (between 12 and 16 bytes) that
+ClrList
+doesn't delete, while keeping almost every aspect of the list clearing the same. If you are clearing several lists, you can separate them with commas as the arguments to
+ClrList
+, which can save space. Using
+ClrList
+is also substantially faster than
+DelVar
+if the list is going to be cleared many times.
+Error Conditions
+ERR:SYNTAX
+is thrown if you leave off the
+∟
+symbol when referring to a custom list (i.e.,
+ClrList
+B will not work; you have to use
+ClrList
+∟B).
+Related Commands
+ClrAllLists
+DelVar
+dim(
+.

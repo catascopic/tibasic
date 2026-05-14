@@ -1,0 +1,23 @@
+Command Summary
+Sets the TVM solver to use payments at the end of a period.
+Command Syntax
+Pmt_End
+Menu Location
+On the TI-83, press:
+2nd FINANCE to access the finance menu.
+ALPHA E to select Pmt_End, or use arrows and ENTER.
+On the TI-83+ or higher, press:
+APPS to access the applications menu.
+ENTER to select Finance…
+ALPHA E to select Pmt_End, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+The Pmt_End and
+Pmt_Bgn
+commands toggle a setting with the finance solver. In Pmt_End mode, the calculator assumes that the payments are made at the end of each time period, rather than at the beginning.
+Make sure to set the calculator to one of the modes before using the finance solving commands in a program, since otherwise the result is unpredictable.
+Related Commands
+Pmt_Bgn
+.

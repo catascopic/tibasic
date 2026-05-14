@@ -1,0 +1,60 @@
+Command Summary
+Returns the real part of a complex value.
+Command Syntax
+real(
+value
+)
+Menu Location
+Press:
+MATH to access the
+math
+menu.
+RIGHT, RIGHT to access the CPX (complex) submenu.
+2 to select real(, or use arrows.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+real(
+z
+) returns the real part of the complex number
+z
+. If
+z
+is represented as
+x
++i
+y
+where
+x
+and
+y
+are both real, real(
+z
+) returns
+x
+. Also works on a list of complex numbers.
+real(3+4i)
+     3
+Advanced Uses
+The real( command is expanded by several
+assembly libraries
+(such as
+xLIB
+and
+Omnicalc
+) to call their own routines. If xLib is installed, then real( will no longer work as intended even in programs that want to use it for its intended purpose.
+If you actually want to take the real part of a complex number, and want the program to work with one of these assembly libraries, you could use the
+imag(
+command instead - real(Z) is equivalent to imag(Z
+i
+). Alternatively, you could tell people using your program to uninstall xLIB or Omnicalc first.
+If a program you downloaded has an error and 2:Goto takes you to a line with real( and a bunch of arguments, this is probably because the program uses Omnicalc or xLIB which you don't have installed.
+Related Commands
+abs(
+angle(
+conj(
+imag(
+See Also
+Assembly Libraries
+.

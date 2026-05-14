@@ -1,0 +1,30 @@
+Command Summary
+Zooms to a larger graphing window with the same center.
+Command Syntax
+Zoom Out
+Menu Location
+Press:
+ZOOM to access the zoom menu.
+3 to select Zoom Out, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+Outside a program, the Zoom Out tool allows you to pick a point on the graph screen and change the graphing window to a larger one centered at that point. The Zoom Out command, used in a program, also changes the graphing window to a larger one, but doesn't let you pick a point — it uses the center of the screen.
+The variables
+XFact
+and
+YFact
+are used to determine how much the graphing window changes: the total width of the screen, Xmax-Xmin, is multiplied by XFact, and the total height, Ymax-Ymin, is multiplied by YFact. Because you can't store a value less than 1 to either of these variables, the screen is guaranteed to get no smaller.
+Aside from Xmin, Xmax, Ymin, and Ymax, no window variables are modified by this command (although ΔX and ΔY change
+as they are defined
+).
+Error Conditions
+ERR:INVALID
+occurs if this command is used outside a program.
+ERR:ZOOM
+is thrown if an overflow occurs calculating the new window dimensions (the window is too big)
+Related Commands
+Zoom In
+ZBox
+.

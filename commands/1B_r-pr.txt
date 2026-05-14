@@ -1,0 +1,73 @@
+Command Summary
+R►Pr( calculates the radius component (in polar coordinates) given the Cartesian coordinates.
+Command Syntax
+R►Pr(
+x
+,
+y
+)
+Menu Location
+Press:
+2nd ANGLE to access the angle menu.
+5 to select R►Pr(, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+R►Pr( (Rectangular to polar radius) takes the (
+x
+,
+y
+) (Cartesian) coordinates, and gives the radius coordinate
+r
+of the same point in (
+r
+,
+θ
+) (polar) mode. The identity used for this conversion is
+r
+² =
+x
+²+
+y
+²
+R►Pr(3,4)
+    5
+√(3²+4²)
+    5
+R►Pr({6,5},{8,12})
+    {10 13}
+The function works even when the equivalent √(
+x
+²+
+y
+²) fails due to overflow:
+R►Pr(3e99,4e99)
+    5e99
+Optimization
+R►Pr( is the smallest way to implement the distance formula
+$d=\sqrt{(x_1-x_2)^2+(y_1-y_2)^2}$
+. Just give the values x
+1
+-x
+2
+and y
+1
+- y
+2
+as arguments:
+:√((5-2)²+(4-0)²)
+can be
+:R►Pr(5-2,4-0)
+Error Conditions
+ERR:DATA TYPE
+is thrown if you input a complex argument.
+ERR:DIM MISMATCH
+is thrown if two list arguments have different dimensions.
+Related Commands
+P►Rx(
+P►Ry(
+R►Pθ(
+abs(
+√(
+.

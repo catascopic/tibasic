@@ -1,0 +1,3 @@
+n/d_Un/d is the command for switching between an improper fraction and a mixed number.
+It is accessible by pressing ALPHA then Y= then 3.
+.

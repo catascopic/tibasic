@@ -1,0 +1,24 @@
+Command Summary
+The equation or plot being traced is displayed in long form at the top of the screen.
+Command Syntax
+ExprOn
+Menu Location
+Press:
+2nd FORMAT to access the graph format menu
+Use arrows and ENTER to select ExprOn
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+The
+ExprOn
+command enables a "long" form of displaying the equation or plot being traced.
+In this mode, when tracing an equation, the equation's name and its formula are written in small font at the top of the screen. For example, when tracing Y
+1
+which is equal to 2X, "Y1=2X" will be displayed.
+When tracing a plot, the plot number is written, followed by the list or lists that it describes. For example, when tracing Plot1, which is a scatter plot of ∟X and ∟Y, "P1:X,Y" will be displayed.
+Related Commands
+ExprOff
+CoordOn
+CoordOff
+.

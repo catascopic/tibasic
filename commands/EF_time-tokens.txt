@@ -1,0 +1,172 @@
+Note:
+The top half of this table is incorrect. An accurate version can be found in the
+TI Toolkit token sheets
+.
+The token 0xEF signifies the beginning of a two-byte token added on the TI-84+(C[S]E). The tokens up to
+Manual-Fit
+are for the TI-84+ and the others for the corresponding TI-84+C(S)E.
+TI-84+(C[S]E) Tokens (0x00 - 0x6F)
+0
+1
+2
+3
+4
+5
+6
+0
+setDate(
+ClockOn
+►n/d◄►Un/d
+Image1
+1
+setTime(
+OpenLib(
+►F◄►D
+BLUE
+Image2
+2
+checkTmr(
+ExecLib
+remainder(
+RED
+Image3
+3
+setDtFmt(
+invT(
+Σ(
+BLACK
+Image4
+4
+setTmFmt(
+χ²GOF-Test(
+logBASE(
+MAGENTA
+Image5
+BackgroundOff
+5
+timeCnv(
+LinRegTInt
+randIntNoRep(
+GREEN
+Image6
+GraphColor(
+6
+dayOfWk(
+Manual-Fit
+MATHPRINT
+ORANGE
+Image7
+7
+getDtStr
+ZQuadrant1
+CLASSIC
+BROWN
+Image8
+TextColor(
+8
+getTmStr(
+ZFrac1/2
+n/d
+NAVY
+Image9
+Asm84CPrgm
+9
+getDate
+ZFrac1/3
+Un/d
+LTBLUE
+Image0
+compiled asm (CSE)
+A
+getTime
+ZFrac1/4
+AUTO
+YELLOW
+Gridline
+DetectAsymOn
+B
+startTmr
+ZFrac1/5
+DEC
+WHITE
+BackgroundOn
+DetectAsymOff
+C
+getDtFmt
+ZFrac1/8
+FRAC
+LTGREY
+BorderColor
+D
+getTmFmt
+ZFrac1/10
+FRAC-APPROX
+MEDGREY
+E
+isClockOn
+mathprintbox
+GREY
+F
+ClockOff
+DARKGREY
+Note: these are tokens for the CE, from 80h and upper only OS 5.2 and from 9Eh and upper only OS 5.3.
+TI-84+(C[S]E) Tokens (0x70 - 0xAF)
+7
+8
+9
+A
+0
+SEQ(n+1)
+Insert Line Above
+1
+Quartiles Setting…
+SEQ(n+2)
+Cut Line
+2
+u(n-2)
+LEFT
+Copy Line
+3
+tinydotplot
+v(n-2)
+CENTER
+Paste Line Below
+4
+Thin
+w(n-2)
+RIGHT
+Insert Comment Above
+5
+Dot-Thin
+u(n-1)
+invBinom(
+Quit Editor
+6
+v(n-1)
+Wait
+piecewise(
+7
+w(n-1)
+toString(
+8
+u(n)
+eval(
+9
+PlySmlt2
+v(n)
+A
+Asm84CEPrgm
+w(n)
+B
+compiled asm (CE)
+u(n+1)
+C
+v(n+1)
+D
+w(n+1)
+E
+Execute Program
+F
+SEQ(n)
+Undo Clear
+.

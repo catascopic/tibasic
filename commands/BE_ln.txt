@@ -1,0 +1,45 @@
+Command Summary
+Computes the (principal branch of the) natural logarithm.
+Command Syntax
+ln(
+value
+)
+Menu Location
+Press the LN key to paste ln(.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The ln( command computes the natural logarithm of a value — the exponent to which the constant
+e
+must be raised, to get that value. This makes it the inverse of the
+e^(
+command.
+ln( is a real number for all positive real values. For negative numbers, ln( is an imaginary number (so taking ln( of a negative number will cause
+ERR:NONREAL ANS
+to be thrown in
+Real
+mode), and of course it's a complex number for complex values. ln( is not defined at 0, even if you're in a complex mode.
+Advanced Uses
+Using either the ln( or the
+log(
+command, logarithms of any base can be calculated, using the identity:
+(1)
+\begin{align} \log_b{x} = \frac{\ln{x}}{\ln{b}} = \frac{\log{x}}{\log{b}} \end{align}
+So, to take the base B log of a number X, you could use either of the following equivalent ways:
+:log(X)/log(B)
+:ln(X)/ln(B)
+This is the exponent to which B must be raised, to get X.
+Error Conditions
+ERR:DOMAIN
+when calculating ln(0).
+ERR:NONREAL ANS
+if taking ln( of a negative number in
+Real
+mode.
+Related Commands
+e
+e^(
+log(
+logBASE(
+.

@@ -1,0 +1,51 @@
+Command Summary
+Solves for the specified finance variable.
+Command Syntax
+tvm_Pmt(
+N
+,I%,PV,FV,P/Y,C/Y)
+tvm_I%(
+N
+,PV,PMT,FV,P/Y,C/Y)
+tvm_PV(
+N
+,I%,PMT,FV,P/Y,C/Y)
+tvm_
+N
+(I%,PV,PMT,FV,P/Y,C/Y)
+tvm_FV(
+N
+,I%,PV,PMT,P/Y,C/Y)
+All arguments are optional.
+Menu Location
+On the TI-83, press:
+2nd FINANCE to access the finance menu.
+2 through 6 to select tvm_Pmt through tvm_FV respectively.
+On the TI-83+ and higher, press:
+APPS to access the applications menu.
+1 or ENTER to select Finance…
+2 through 6 to select tvm_Pmt through tvm_FV respectively.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+The tvm_
+VAR
+commands use the TVM (Time Value of Money) solver to solve for the variable
+VAR
+. They're usually used in programs, since outside a program it's easier to use the interactive solver (the first option in the finance menu).
+All five commands can be used by themselves, with no arguments. In that case, they will return the value of
+VAR
+solved from the current values of the other finance variables.
+If you give them arguments, the values you give will replace the values of the finance variables. You can supply as many or as few arguments as needed, and the finance variables will be replaced in the order:
+N
+, I%, PV, PMT, FV, P/Y, C/Y (skipping the one you're solving for).
+Error Conditions
+ERR:ITERATIONS
+is thrown if the maximum amount of iterations was exceeded in computing I% (this usually means there is no solution)
+ERR:NO SIGN CHG
+is thrown if calculating I% when FV, (N*PMT), and PV all have the same sign.
+Related Commands
+Pmt_End
+Pmt_Bgn
+.

@@ -1,0 +1,32 @@
+Command Summary
+Returns whether the clock on the TI-84+/SE is on or off.
+Command Syntax
+isClockOn
+Menu Location
+This command can only be found in the catalog. Press:
+2nd CATALOG to enter the command catalog
+i to skip to commands starting with I
+Scroll down to isClockOn and select it
+Calculator Compatibility
+TI-84+/SE
+Token Size
+2 bytes
+The
+isClockOn
+command returns whether the clock on the TI-84+/SE calculators is on or off. The command will return 1 if the clock is enabled and 0 if it is not. You can store it to a
+variable
+for later use, or use it in
+conditionals
+and
+loops
+as part of the condition. For example, here is how you would check to see if the clock is on:
+:If isClockOn
+:Then
+  (code if clock is on)
+:Else
+  (code if clock is off)
+:End
+Related Commands
+ClockOff
+ClockOn
+.

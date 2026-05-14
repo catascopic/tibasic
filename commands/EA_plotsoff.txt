@@ -1,0 +1,23 @@
+Command Summary
+Turns stat plots (all of them, or only those specified) off.
+Command Syntax
+PlotsOff
+numbers//
+Menu Location
+Press:
+2nd PLOT to access the stat plot menu.
+4 to select PlotsOff, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+By itself, the command will turn off all three stat plots.
+If it is given arguments, there can be any number of them (actually, no more than 255, but this won't stop most people), but they must all be numbers 1 to 3. Then, the command will only turn off the specified plots. Unlike some commands, it is okay to give PlotsOff an expression as an argument (for example, PlotsOff X), as long as it has a value of 1, 2, or 3.
+Error Conditions
+ERR:DOMAIN
+is thrown if a plot that is not 1, 2, or 3 is specified.
+Related Commands
+Plot1(, Plot2(, Plot3(
+PlotsOn
+Select(
+.

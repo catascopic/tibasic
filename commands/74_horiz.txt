@@ -1,0 +1,25 @@
+Command Summary
+Sets the screen mode to Horiz.
+Command Syntax
+Horiz
+Menu Location
+In the program editor,
+Press [MODE]
+Press [DOWN] seven times
+Press [RIGHT]
+Press [ENTER] to insert Horiz
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+Horiz
+is usually at the beginning of a program. It is used at the beginning to ensure that the screen mode is
+Horiz
+, for programs such as Hangman that want to use
+Input
+but also have the graph screen shown. Note that if you use pixels, the y-coordinate can be no larger than 30, since that is the maximum pixel's range.
+:Horiz
+Related Commands
+Full
+G-T
+.

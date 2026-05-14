@@ -1,0 +1,125 @@
+Command Summary
+Increments a variable by 1 and skips the next command if the variable is greater than the value.
+Command Syntax
+IS>(
+variable
+,
+value
+)
+command
+Menu Location
+While editing a program, press:
+PRGM to enter the PRGM menu
+A to choose IS>(, or use arrows
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The increment and skip if greater than command —
+IS>(
+— is a specialized conditional command. It is equivalent to an
+If
+conditional, except the next command will be skipped when the condition is true and it has a
+variable
+update built-in. However, it is not used very often (if anything, it is often misused as a looping command) because of its obscure name and somewhat limited application.
+The
+IS>(
+command takes two arguments:
+A variable, which is limited only to one of the real variables (
+A
+-
+Z
+or
+θ
+).
+A value, which can be any expression which evaluates to a real number.
+When
+IS>(
+is executed it adds one to the variable (increments it by one), and compares it to the value. The next command will be skipped if the variable is greater than the value, while the next command will be executed if the variable is less than or equal to the value.
+The command
+IS>(A,B
+is equivalent to the following code:
+:A+1→A
+:If A≤B
+Here are the two main cases where the
+IS>(
+command is used:
+:7→A
+:IS>(A,6
+:Disp "Skipped
+Initializes
+A
+to 7 and then compares to the value
+7>6 is true so the display message won't be displayed
+:1→B
+:IS>(B,2
+:Disp "Not Skipped
+Initializes
+B
+to 1 and then compares to the value
+1>2 is false so the display message will be displayed
+Note: In addition to both of these cases, there is also the case where the variable and the value are equal to each other. This case is shown below under the 'Advanced Uses' section because it has some added background that goes with it.
+Advanced Uses
+When you want the skipping feature of the
+IS>(
+command to always occur, you just have to use the same variable for both the variable and value arguments of the command:
+:IS>(B,B
+An undefined error will occur if the variable and/or value doesn't exist before the
+IS>(
+command is used, which happens when the
+DelVar
+command is used. Consequently, you should not use
+DelVar
+with
+IS>(
+.
+Similar code can be used as a substitute for
+B+1→B
+if you don't want to change
+Ans
+:
+:IS>(B,B:
+Note that due to the colon after the line, there will be no statement skipped, so you don't have to worry about that.
+Optimization
+Because the
+IS>(
+command has the variable update built-in, it is smaller than manually incrementing a variable by one along with using an
+If
+conditional.
+:A+1→A
+can be
+:IS>(A,0
+The one caution about this is that if the variable is greater than the value (in this case, '0'), the next command will be skipped. If you don't want the skipping functionality, then you need to make sure that the value is never less than the variable. This is not always possible to do. Also,
+IS>(
+is slightly slower than its more normal counterpart.
+Related to the example code given,
+IS>(
+should always have a command following after it (i.e., it's not the last command in a program) because it will return an error otherwise. If you have no particular code choice, just put an empty line or something meaningless.
+Command Timings
+Using
+IS>(
+to increment a variable is approximately 25% slower than using code like
+X+1→X
+. However, it is faster to use
+IS>(
+than to construct an
+If
+statement to do the same thing.
+Note, however, that a quirk in the
+For(
+command (see its Optimizations section) will slow down the
+IS>(
+command significantly if a closing parenthesis is not used for the
+For(
+statement.
+Error Conditions
+ERR:INVALID
+occurs if this statement is used outside a program.
+ERR:UNDEFINED
+is thrown if the variable to be incremented is not defined.
+ERR:SYNTAX
+is thrown if there is no next line to skip, or if there is only one next line and it is empty.
+Related Commands
+DS<(
+If
+.

@@ -1,0 +1,30 @@
+Command Summary
+Mode command that puts the calculator into Classic mode.
+Command Syntax
+MATHPRINT
+Menu Location
+Press:
+MODE
+DOWN until you reach Mathprint or Classic
+ENTER on Mathprint
+Alternatively, use the catalog.
+Calculator Compatibility
+TI-84 2.53MP or later
+Token Size
+2 bytes
+MATHPRINT will put the calculator into Mathprint mode as opposed to Classic mode. In MathPrint mode, enhanced homescreen input formatting is available. The Classic mode will make the calculator display everything as a calculator of lower OS would, including input. For instance, rather than superscripting exponents as Mathprint mode would, Classic mode uses the simple caret syntax (
+^
+).
+Mathprint mode
+:
+2
+4
+16
+Classic mode
+:
+2^4
+16
+When in Mathprint mode, text and numbers are displayed much slower than classic on the home screen and the function menus load slower. This can be inconvenient in games that use the home screen, but can also make solving equations that involve fractions and exponents easier as the numbers are in their correct positions and are the appropriate size.
+Related Commands
+CLASSIC
+.

@@ -1,0 +1,51 @@
+Command Summary
+Calculates the differences between consecutive terms of a list.
+Command Syntax
+ΔList(
+list
+)
+Menu Location
+Press:
+2nd LIST to access the list menu.
+RIGHT to access the OPS submenu.
+7 to select ΔList(, or use arrows.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+ΔList(
+calculates the differences between consecutive terms of a list, and returns them in a new list.
+ΔList({0,1,4,9,16,25,36})
+    {1 3 5 7 9 11}
+Advanced Uses
+The ΔList( command is very nearly the inverse of the
+cumSum(
+command, which calculates the cumulative sums of a list. For any list,
+ΔList(cumSum(
+list
+))
+will return the same list, but without its first element:
+ΔList(cumSum({1,2,3,4,5,6,7}))
+    {2 3 4 5 6 7}
+Removing the first element would otherwise be a difficult procedure involving the
+seq(
+command, so this is a useful trick to know.
+If a list is sorted in ascending order,
+min(ΔList(
+list
+))
+will return 0 (false) if there are repeating values in the list, and a value corresponding to true if they are all distinct. The number of repeating elements can be determined similarly via
+1+sum(0≠ΔList(
+list
+))
+(again, so long as the list is sorted).
+Error Conditions
+ERR:INVALID DIM
+is thrown if
+ΔList(
+is run on a single element list.
+Related Commands
+sum(
+cumSum(
+augment(
+.

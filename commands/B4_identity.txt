@@ -1,0 +1,61 @@
+Command Summary
+Creates an
+n
+by
+n
+identity matrix.
+Command Syntax
+identity(
+n
+)
+Menu Location
+Press:
+MATRX (on the 83) or 2ND MATRX (83+ or higher) to access the matrix menu.
+LEFT to access the MATH submenu.
+5 to select identity(, or use arrows.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The
+identity(
+command generates an identity matrix: that is, a matrix [B] such that for any other matrix [A], [A]*[B]=[A] (if [A] is the right size to make the multiplication valid).
+The identity matrix is square (that is, the row dimension equals the column dimension); all of its elements are 0 except for the elements along the main diagonal (the diagonal going from top left to bottom right).
+The command itself takes one argument: the size of the matrix, used for both row and column size, that is,
+identity(n)
+creates an
+n
+by
+n
+matrix.
+:dim([A]
+:identity(Ans(2→[B]
+:[A][B]=[A]  // should always return 1, meaning 'true'
+Optimization
+The
+identity(
+command can be used as a quick way to create an empty square matrix:
+0identity(n)
+will create an
+n
+by
+n
+matrix containing only 0 as an element. This is faster and smaller than the
+dim(
+and
+Fill(
+commands used for the same purpose:
+:{5,5→dim([A]
+:Fill(0,[A]
+can be
+:0identity(5→[A]
+Error Conditions
+ERR:INVALID DIM
+occurs if the size is not an integer 1-99. In practice, however,
+identity(21)
+is already too large for the calculator to generate.
+ERR:MEMORY
+occurs if the size of the created matrix exceeds memory limits. This limit is hard-fixed to 3611 bytes (the size of a 20x20 matrix), regardless of having sufficient RAM to hold a larger matrix.
+Related Commands
+det(
+.

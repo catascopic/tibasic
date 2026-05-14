@@ -1,0 +1,56 @@
+Command Summary
+Returns the logical value of
+value1
+and
+value2
+being true.
+Command Syntax
+value1
+and
+value2
+Menu Location
+Press:
+2nd TEST to access the test menu.
+RIGHT to access the LOGIC submenu.
+ENTER to select and.
+Calculator Compatibility
+TI-83/84/+/SE/CSE/CE
+Token Size
+1 byte
+and
+takes two numbers, variables, or expressions and tests to see if they are both True (not equal to 0). If they are, it returns 1. If either input is False (0), it returns 0. Note that the order of the operators doesn't matter (i.e.
+and
+is commutative), and that multiple
+and
+'s can be used together
+:0 and 0 
+           0
+
+:0 and 1
+           0 
+
+:1 and 2           (2 counts as True, just like one)
+           1
+
+:1→X
+:X and 2+2         (you can use variables and expressions)
+           1
+
+:1 and 1 and 2-2   (the last input evaluates to 0, or false)
+           0
+Optimization
+Multiplying
+two values has the same truth value as
+and
+; thus,
+and
+can sometimes be replaced by multiplication. Because the calculator does implicit multiplication, meaning it automatically recognises when you want to multiply, you don't need to use the * sign.
+:If A and B
+can be
+:If AB
+However, do not use this optimization if A and B might be expected to take on large values, as an overflow error might occur.
+Related Commands
+or
+xor
+not(
+.

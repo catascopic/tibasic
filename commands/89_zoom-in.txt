@@ -1,0 +1,30 @@
+Command Summary
+Zooms to a smaller graphing window with the same centre.
+Command Syntax
+Zoom In
+Menu Location
+Press:
+ZOOM to access the zoom menu.
+2 to select Zoom In, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+Outside a program, the Zoom In tool allows you to pick a point on the graph screen and change the graphing window to a smaller one centered at that point. The Zoom In command, used in a program, also changes the graphing window to a smaller one, but doesn't let you pick a point — it uses the center of the screen.
+The variables
+XFact
+and
+YFact
+are used to determine how much the graphing window changes: the total width of the screen, Xmax-Xmin, is divided by XFact, and the total height, Ymax-Ymin, is divided by YFact. Because you can't store a value less than 1 to either of these variables, the screen is guaranteed to get no larger.
+Aside from Xmin, Xmax, Ymin, and Ymax, no window variables are modified by this command (although ΔX and ΔY change
+as they are defined
+).
+Error Conditions
+ERR:INVALID
+occurs if this command is used outside a program.
+ERR:WINDOW RANGE
+is thrown if the window is zoomed in beyond the level of the calculator's precision.
+Related Commands
+Zoom Out
+ZBox
+.

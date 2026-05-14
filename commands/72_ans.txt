@@ -1,0 +1,157 @@
+Command Summary
+Returns the last answer.
+Command Syntax
+Ans[
+→Variable
+]
+Menu Location
+While editing a program, press [2nd] then [(-)]
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The
+Ans
+variable holds the last answer that was stored in the calculator. Because
+Ans
+is stored in a special storage area built-in to the calculator, and it is extensively used by the calculator, you cannot delete it. Ans is also useful; it can make your programs both smaller and faster:
+Unlike other variables which have a value type hard-coded in (i.e., a
+string
+can only hold text, and
+lists
+and
+matrices
+can only hold numbers),
+Ans
+can take on whatever value you want: a real or complex, list, matrix, or string are all acceptable.
+Along with the
+finance
+variables,
+Ans
+is faster than the real, complex, list, matrix, and string variables; and subsequently, you should try to use it as much as possible.
+One of the most common places to use
+Ans
+is in place of storing a value to a variable. Just paste the
+Ans
+variable to the location where the variable was called, and then when the expression is evaluated, the calculator will use the current value of
+Ans
+. Using the
+Ans
+variable allows you to eliminate the variable, which helps save a little or a lot of memory (depending on the type of variable and its size).
+Instead of:
+30+5A→B
+Disp 25A,B
+A shorter version would be:
+30+5A
+Disp 25A,Ans
+(Since the
+Ans
+token is only 1 byte, you've just saved two bytes. In longer programs the savings can add up!)
+The one major drawback to using
+Ans
+is that its current value is only temporary.
+What commands modify Ans?
+Whenever you:
+Store
+a value to a variable, such as
+1→X
+Place an expression or string on a line by itself, such as
+1+2
+or
+"Hello"
+Use the optional argument of the
+Pause
+command such as
+Pause X
+.
+Ans
+will be updated to the new value.
+If you're performing multiple calculations across multiple variables, you might be better off storing each in a separate variable.
+What commands do NOT modify Ans?
+There are several cases in which changing the value of a variable does not modify
+Ans
+, thus preserving its current value for later use:
+Asking a user for input via
+Prompt X
+or
+Input "X:",X
+Storing to an
+equation variable
+such as
+"X+1"→Y₁
+Using
+DelVar
+to delete a variable (i.e. set its value to zero, if it's a real variable)
+For(
+loops
+Changing the value with
+IS>(
+or
+DS<(
+Also most other commands that do not modify variables will preserve
+Ans
+, including:
+ClrHome
+If … Then … Else … End
+Disp
+Output()
+Repeat
+While
+Lbl
+Goto
+Menu()
+Pause
+(when there's no parameter following it, otherwise the parameter will be stored in
+Ans
+!)
+Knowing these cases can be very useful, allowing you to make efficient use of
+Ans
+to store a result and re-use it in later lines rather than create a temporary variable for it.
+Using Ans with Lists
+Ans
+can be used to store lists and access individual items. Take the following example:
+10→A
+{11,22,33}
+Disp Ans(1),Ans(2)
+In this example, the calculator is smart enough to know that
+Ans
+is currently holding a list, and so will interpret the
+(1)
+and
+(2)
+as accessing items from the list. As such it will display
+11
+and
+22
+. Trying to access
+Ans(4)
+will display an error.
+However if we removed line 2 from the code above,
+Ans
+would instead be holding the value
+10
+, and as such
+Ans
+would be
+multiplied
+by 1 and 2, resulting in
+10
+and
+20
+.
+The
+augment
+()
+function can also be used with
+Ans
+to add additional items to your list, for example:
+{1,2}
+augment(Ans,{3,4})
+Disp Ans
+This will display
+{1 2 3 4}
+Timing
+Storing a real value into
+Ans
+takes approximately 1.0 ms. This does not include the time needed to compute or retrieve the value, which may be significant.
+.

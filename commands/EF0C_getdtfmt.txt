@@ -1,0 +1,27 @@
+Command Summary
+Returns the date format of the clock on the TI-84+/SE/CE.
+Command Syntax
+getDtFmt→
+Variable
+Menu Location
+This command can only be found in the catalog. Press:
+2nd CATALOG to enter the command catalog
+g to skip to commands starting with G
+Scroll down to getDtFmt( and select it
+Calculator Compatibility
+TI-84+/SE/CE
+Token Size
+2 bytes
+The
+getDtFmt(
+command returns the current date format of the clock on the TI-84+/SE/CE calculators as an integer. There are three different date formats available: 1 (M/D/Y), 2 (D/M/Y), and 3 (Y/M/D). You can store this value to a
+variable
+for later use. Of course, this command only works if the date format has actually been set, so you should use the
+setDtFmt(
+command before using it.
+Related Commands
+getDate
+setDate(
+setDtFmt(
+getDtStr(
+.

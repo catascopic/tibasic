@@ -1,0 +1,27 @@
+Command Summary
+Returns the current time of the clock on the TI-84+/SE as a string.
+Command Syntax
+getTmStr(
+value
+)→
+variable
+Menu Location
+This command can only be found in the catalog. Press:
+2nd CATALOG to enter the command catalog
+g to skip to commands starting with G
+Scroll down to getTmStr( and select it
+Calculator Compatibility
+TI-84+/SE
+Token Size
+2 bytes
+The getTmStr( command returns the current time of the clock on the TI-84+/SE calculators as a string based on the time format that is specified. There are two different time formats available: 12 (12 hour) or 24 (24 hour). You can store this value to a
+string
+variable for later use, or manipulate it the same way you do with other strings. Of course, this command only works if the time format has actually been set, so you should use the
+setTmFmt(
+command before using it.
+Related Commands
+getTime
+getTmFmt
+setTime(
+setTmFmt(
+.

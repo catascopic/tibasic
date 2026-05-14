@@ -1,0 +1,31 @@
+Command Summary
+Short for dividing by 100.
+Command Syntax
+value
+%
+Menu Location
+This command can only be accessed through a hex editor (its hex code is 0xBB 0xDA)
+Calculator Compatibility
+TI-83/84+/SE, OS v1.15+
+Token Size
+2 bytes
+The % symbol is an undocumented command on the TI-83 series calculators starting with OS version 1.15. It's useful as a shortcut for percents - it divides by 100, so it will convert numbers to percentages. For example, 50% will become 50/100 or 1/2, which is just what 50% should be.
+Although this trick can save you a few bytes, it also makes your program incompatible with old OS versions — it's up to you to decide if the tradeoff is worth it.
+The % symbol is not quite equivalent to the value 0.01: typing in % by itself will give you a syntax error, as expected.
+Entering the % symbol
+There are several assembly programs out there that can let you access the % symbol if you know what you're doing, but here is a short, self-contained way. First, create an assembly program by entering the following into the program editor:
+:AsmPrgmEFF1423605C9
+:BBDA
+Then compile it: for example, if you entered the above into prgmX, and prgmY is free, then you can run
+AsmComp(prgmX,prgmY
+Then run the compiled assembly program:
+Asm(prgmY
+Now the compiled assembly program will become unlocked and contain the characters:
+:??ˣ√B6BoxPlotsinh⁻¹(%
+Most of this is garbage data and can be deleted, and the final character is the % character we wanted. (If you delete the other characters, then the % symbol can be accessed at any time by pressing [2nd][RCL] and choosing prgmY.)
+Error Conditions
+ERR:INVALID
+is thrown on older operating system versions.
+Related Commands
+sub(
+.

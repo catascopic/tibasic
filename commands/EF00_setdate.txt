@@ -1,0 +1,34 @@
+Command Summary
+Sets the date of the clock on the TI-84+/SE.
+Command Syntax
+setDate(
+year
+,
+month
+,
+day
+)
+Menu Location
+This command can only be found in the catalog. Press:
+2nd CATALOG to enter the command catalog
+s to skip to commands starting with S
+Scroll down to setDate( and select it
+Calculator Compatibility
+TI-84+/SE
+Token Size
+2 bytes
+The setDate( command sets the date of the clock on the TI-84+/SE calculators. It takes three arguments: the year, the month, and the day. All three of these must be integers; in particular, year must be four digits, and month and day can be one or two digits. They represent the associated value that goes with a respective date. For example, this would set the date to January 1, 2008:
+:setDate(2008,1,1
+Once you have set the date, you can display it in three different formats on the
+mode screen
+using the
+setDtFmt(
+command: Month/Day/Year, Day/Month/Year, or Year/Month/Day. Of course, the date will only show up if the clock is on; if you need to turn the clock on, use the
+ClockOn
+command or select 'TURN CLOCK ON' , displayed in place of the clock on the mode screen.
+Related Commands
+getDate
+getDtFmt
+getDtStr(
+setDtFmt(
+.

@@ -1,0 +1,48 @@
+Command Summary
+Finds the greatest common divisor of two values.
+Command Syntax
+gcd(
+value1
+,
+value2
+)
+Menu Location
+Press:
+MATH to access the
+math
+menu.
+RIGHT to access the NUM submenu.
+9 to select gcd(, or use arrows.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+The
+gcd(
+command returns the
+greatest common divisor
+(GCD) of two nonnegative integers. It also works on lists.
+gcd(8,6)
+     2
+gcd({9,12},6)
+     {3 6}
+gcd({14,12},{6,8})
+     {2 4}
+Advanced Uses
+A
+gcd(
+command can be nested inside another
+gcd(
+command to compare up to four numbers.
+Error Conditions
+ERR:DIM MISMATCH
+is thrown if the arguments are two lists that don't have the same number of elements.
+ERR:DOMAIN
+is thrown if the arguments aren't positive integers (or lists of positive integers) less than
+1E12
+.
+Related Commands
+lcm(
+See Also
+Extended Euclidean Algorithm
+.

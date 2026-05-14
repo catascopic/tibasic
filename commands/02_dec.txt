@@ -1,0 +1,26 @@
+Command Summary
+Displays the decimal form of a fraction.
+Command Syntax
+<fraction>
+►Dec
+Menu Location
+While editing a program, press:
+MATH to enter the
+MATH
+menu
+2 or use the arrow keys to select
+Calculator Compatibility
+TI-83/84/+/SE/CE
+Token Size
+1 byte
+This command is generally useless. Its supposed use is to convert numbers into decimal form, but any typed fractions are displayed as decimals anyway.
+1/3
+     .3333333333
+1/3►Dec
+     .3333333333
+In 2.53 MP or higher, typed fractions are displayed in fraction form. Therefore, the
+►Dec
+command is useful in this case.
+Related Commands
+►Frac
+.

@@ -1,0 +1,45 @@
+Command Summary
+Finds the least common multiple of two values.
+Command Syntax
+lcm(
+value1
+,
+value2
+)
+Menu Location
+Press:
+MATH to access the
+math
+menu.
+RIGHT to access the NUM submenu.
+8 to select lcm(, or use arrows.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+Returns the least common multiple (LCM) of two nonnegative integers; lcm(
+a
+,
+b
+) is equivalent to
+a
+b
+/gcd(
+a
+,
+b
+). Also works on lists.
+lcm(8,6)
+     24
+lcm({9,12},6)
+     {18 12}
+lcm({14,12},{6,8})
+     {42 24}
+Error Conditions
+ERR:DIM MISMATCH
+is thrown if the arguments are two lists that don't have the same number of elements.
+ERR:DOMAIN
+is thrown if the arguments aren't positive integers (or lists of positive integers) less than 1e12.
+Related Commands
+gcd(
+.

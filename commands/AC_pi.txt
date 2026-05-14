@@ -1,0 +1,21 @@
+Command Summary
+The mathematical constant
+π
+Command Syntax
+π
+Menu Location
+Press 2nd π to paste the π symbol.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The π constant on the calculator approximates the mathematical constant
+π
+(pi), defined as the ratio of a circle's circumference to its diameter. It's fairly important in many areas of mathematics, but especially trigonometry. Probably the most common use of π on the TI-83 series calculators is for dealing with angles in
+radian
+form.
+The approximate value of π stored on the calculator is 3.1415926535898.
+Related Commands
+e
+r
+.

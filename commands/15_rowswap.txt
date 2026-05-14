@@ -1,0 +1,40 @@
+Command Summary
+Swaps two rows of a matrix.
+Command Syntax
+rowSwap(
+matrix
+,
+row1
+,
+row2
+)
+Menu Location
+Press:
+MATRX (on a TI-83) or 2nd MATRX (TI-83+ or higher) to access the matrix menu.
+RIGHT to access the MATH submenu.
+ALPHA C to select rowSwap(, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The rowSwap( command swaps two rows of a matrix and returns the result. It is an elementary row operation used in Gaussian Elimination.
+[[1,2][3,4]]
+    [[1 2]
+     [3 4]]
+rowSwap(Ans,1,2)
+    [[3 4]
+     [1 2]]
+Advanced Uses
+You can swap columns instead of rows with the aid of the
+T
+(
+transpose
+) command.
+Error Conditions
+ERR:INVALID DIM
+is thrown if one of the row arguments isn't a valid row (larger than the matrix size, or otherwise bad)
+Related Commands
+row+(
+*row(
+*row+(
+.

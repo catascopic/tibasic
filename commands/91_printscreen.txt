@@ -1,0 +1,23 @@
+Command Summary
+This command doesn't exist. A
+token
+for it does, though.
+Command Syntax
+PrintScreen
+Menu Location
+This command requires a hex editor to access.
+Calculator Compatibility
+TI-82
+Token Size
+1 byte
+On the TI-82, the PrintScreen command could be found in the I/O submenu of the PRGM menu. According to the TI-82 manual, it "prints the current screen on a printer attached to an IBM®-compatible computer or a Macintosh® if you are using TI-GRAPH LINK™ software". Aside from this potential interaction with computers, it was otherwise equivalent to
+Pause
+.
+On the TI-83 series calculators or higher, a token is still set aside for the PrintScreen command. However, the command doesn't actually do anything, and will cause an error if you try to use it. It's not accessible through any menus, though, so that's okay.
+The only potential use is to save on memory if you ever need to display "PrintScreen" somewhere - you can display this token instead.
+Error Conditions
+ERR:INVALID
+occurs if this statement is used outside a program.
+ERR:INVALID
+also occurs if this statement is used inside a program.
+.

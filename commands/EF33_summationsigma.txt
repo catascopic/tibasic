@@ -1,0 +1,12 @@
+This command will open up a template that allows you to evaluate an expression in sigma notation.
+This command is accessible by pressing ALPHA then WINDOW then 2.
+This command is especially useful for statistics and algebra.
+It is also available in the programming mode. You can access it either through the catalog or the same way specified above.
+The syntax for this command is
+Σ(Expression,Variable,Starting number,Ending number)
+An example would be to determine the sum of 2*X for X going from 1 to 10.
+It would look like this:
+Σ(2X,X,1,10
+The result would be
+110
+.

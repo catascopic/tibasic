@@ -1,0 +1,76 @@
+Command Summary
+Raises a number to a power.
+Command Syntax
+x
+^
+y
+Menu Location
+Press [^]
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The ^ operator is used to raise a number to a power. It can be used with numbers, expressions, and lists. It can be used for taking nonnegative integer powers of square matrices (up to the 255th power only, however), but not for negative powers (use
+ֿ¹
+instead) or matrix exponentials (which the TI-83+ cannot do).
+In general,
+x
+^
+y
+returns the same results as
+e
+^(
+y
+*ln(
+x
+)). For expressions of the form
+x
+^(
+p
+/q
+), where
+p
+and
+q
+are integers and
+q
+is an odd number, the principal branch is returned if
+x
+is complex, but the real branch is returned if
+x
+is a negative real number.
+(-1)^(1/3)
+        -1
+(-1+0i)^(1/3)
+        .5+.8660254038i
+Optimization
+When raising 10 or
+e
+to a power, use the
+10^(
+and
+e^(
+commands instead. Similarly, use the
+²
+,
+³
+, or
+ֿ¹
+commands for raising a number to the 2, 3, or -1 power.
+Error Conditions
+ERR:DOMAIN
+is thrown when calculating 0^0, or raising 0 to a negative power.
+ERR:NONREAL ANS
+is thrown in
+Real
+mode if the result is complex (and the operands are real)
+Related Commands
+*
+,
+/
+,
+×√
+10^(
+,
+e^(
+.

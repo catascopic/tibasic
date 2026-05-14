@@ -1,0 +1,26 @@
+Command Summary
+Disables automatic calculations in the table.
+Command Syntax
+DependAsk
+Menu Location
+Press:
+2nd TBLSET to access the table settings menu.
+Use arrows and ENTER to select Ask from the Depend: line.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+When the
+DependAsk
+setting (opposed to the
+DependAuto
+setting) is turned on, values in the table are not automatically calculated. To calculate the value of an equation, you have to select the column corresponding to that equation in the row corresponding to the value at which to calculate it, and press ENTER. For example, to calculate Y1 at X=0, select the X=0 column, scroll right to Y1, and press ENTER.
+The
+DependAsk
+setting might be useful when dealing with a difficult-to-calculate function, for which you wouldn't want to have to calculate values that aren't really necessary.
+Related Commands
+IndpntAuto
+IndpntAsk
+DependAuto
+DispTable
+.

@@ -1,0 +1,54 @@
+Command Summary
+Turns on equations in the Y= editor (all of them, or only the ones specified)
+Command Syntax
+FnOn
+numbers//
+Menu Location
+Press:
+VARS to access the variables menu.
+RIGHT to access the Y-VARS submenu.
+4 to select On/Off…, or use arrows and ENTER.
+ENTER to select FnOn.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The
+FnOn
+command is used to turn on equations in the current
+graphing mode
+. When you define an equation, it's turned on by default, but the
+FnOff
+command can turn an equation off (in which case, it's still defined, but isn't graphed). To turn functions on and off manually, put your cursor over the = symbol in the equation editor, and press enter.
+When
+FnOn
+is used by itself, it will turn on all defined equations in the current graphing mode. You can also specify which equations to turn on, by writing their numbers after
+FnOn
+: for example,
+FnOn 1
+will turn off the first equation, and
+FnOn 2,3,4,5
+will turn the second, third, fourth, and fifth. The numbers you give
+FnOn
+have to be valid equation numbers in the graphing mode. When turning equations on and off in
+sequence
+mode, use 1 for
+u
+, 2 for
+v
+, and 3 for
+w
+.
+The most common use for
+FnOn
+and
+FnOff
+is to disable functions when running a program, so that they won't interfere with what you're doing on the graph screen, then enable them again when you're done.
+Error Conditions
+ERR:DOMAIN
+is thrown if an equation number isn't valid in the current graphing mode, or at all.
+Related Commands
+FnOff
+PlotsOn
+PlotsOff
+.

@@ -1,0 +1,24 @@
+Command Summary
+Puts the calculator in "normal" mode regarding scientific notation.
+Command Syntax
+Normal
+Menu Location
+While editing a program, press:
+MODE to access the mode menu.
+ENTER to select Normal.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The Normal command puts the calculator in normal number mode, in which it only uses scientific notation for large enough numbers (10 000 000 000 or higher), negative numbers large enough in absolute value (-10 000 000 000 or lower), or numbers close enough to 0 (less than .001 and greater than -.001)
+The other possible settings are
+Sci
+(which always uses scientific notation), or
+Eng
+(which uses a specific form of scientific notation based on powers of 1000)
+Related Commands
+Sci
+Eng
+Float
+Fix
+.

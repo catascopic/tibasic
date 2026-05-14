@@ -1,0 +1,67 @@
+Command Summary
+Calculates the inverse of the cumulative
+Student's t-distribution
+function with degrees of freedom ν.
+Command Syntax
+invT(
+probability
+,
+ν
+)
+Menu Location
+Press:
+2ND DISTR to access the distribution menu
+4 to select invT(, or use arrows.
+Calculator Compatibility
+TI-84+/SE (OS 2.30 or greater)
+Token Size
+2 bytes
+invT(
+is the inverse of the cumulative Student t distribution function: given a probability
+p
+and a specified degrees of freedom
+v
+, it will return the number
+x
+such that
+tcdf(E-99,
+x
+,
+v
+)
+is equal to
+p
+:invT(.95,24
+    1.710882023
+Advanced
+invT(
+is meant for use with so-called "one-tailed' tests; for two-tailed tests, the proper expression to use (corresponding to the inverse of
+tcdf(-
+x
+,
+x
+,
+v
+)
+) is
+invT(.5(1+
+p
+),
+v
+)
+Formulas
+Unlike the
+tpdf(
+and
+tcdf(
+commands, the invT( command does not have a closed-form formula. However, it can be expressed in terms of the inverse incomplete beta function.
+For one degree of freedom,
+invT(
+is expressible in terms of simpler functions:
+(1)
+\begin{align} \operatorname{invT}(p,1)=\tan\left(\pi\left(p-\frac1{2}\right)\right) \end{align}
+Related Commands
+tpdf(
+tcdf(
+Shade_t(
+.

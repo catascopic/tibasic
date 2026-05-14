@@ -1,0 +1,47 @@
+Command Summary
+Returns an integer from 1 to 7, each representing a day of the week, given a date.
+Command Syntax
+dayOfWk(
+year
+,
+month
+,
+day
+)
+Menu Location
+Press:
+[2ND] + [0] for the CATALOG
+[X
+-1
+] to jump to the letter D
+[ENTER] to insert the command
+Calculator Compatibility
+TI-84+/SE
+Token Size
+2 bytes
+dayOfWk(
+year
+,
+month
+,
+day
+)
+returns an integer from 1 to 7, each representing a separate day of the week. 1 represents Sunday, 2 represents Monday, and so on, with 7 representing Saturday. The date format is different than the normal American format (month/day/year), so be careful to put the arguments in the right order. You can remember this by thinking of the descending lengths of time in each of the arguments.
+:dayOfWk(2007,12,30)
+The above code returns 1, because the 30
+th
+of December, 2007, is a Sunday.
+Error Conditions
+ERR:DOMAIN
+is thrown if any of the arguments are non-integers, or the date does not exist, such as the 42
+nd
+of February. However, the year does not matter (a date that takes place in the year 10000 is valid). However, there are exceptions, even if some dates do exist, this error may still occur. If you attempt to calculate the previous day of a week such as the previous day, the error may still occur.
+Related Commands
+dbd(
+setDate(
+getDate
+getDtFmt
+See Also
+Day of Week
+— routine to calculate the day of the week
+.

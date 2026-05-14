@@ -1,0 +1,2 @@
+Frac Answer changes the mode to display a fraction whenever possible. That is to say it will display 1/2 as a fraction but irrational numbers will not be displayed as fraction. Numbers such as Pi will still be displayed as decimals.
+.

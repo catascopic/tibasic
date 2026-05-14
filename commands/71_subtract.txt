@@ -1,0 +1,45 @@
+Command Summary
+Returns the difference between two numbers.
+Command Syntax
+value1
+-
+value2
+Menu Location
+Press [-]
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The - (subtract) operator takes two numbers, variables, or expressions and subtracts one from the other, thus returning the difference between them. The - operator appears lower in the order of operations than both
+*
+and
+/
+, so if those appear in an expression, they will be executed first. In addition, the
++
+operator has the same order of operations as -, so the calculator simply executes them left to right in the order that they appear.
+:1-1
+           0
+
+:5→X
+:2-3X
+           -13
+
+:2→A:3→B
+:A/B-B/A
+           -.8333333333
+Error Conditions
+ERR:SYNTAX
+is thrown if you try to use - (subtract) in place of
+‾
+(negative). Because they look very similar, it's easy to get this error; at the same time, it's an easy error to fix.
+Related Commands
++ (
+add
+)
+* (
+multiply
+)
+/ (
+divide
+)
+.

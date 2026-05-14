@@ -1,0 +1,50 @@
+Command Summary
+Returns the truth value of
+value1
+or
+value2
+, but not both, being true.
+Command Syntax
+value1
+xor
+value2
+Menu Location
+Press:
+2nd TEST to access the test menu.
+RIGHT to access the LOGIC submenu.
+3 to select xor, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The third and final
+binary
+operator is a little trickier, but it has the coolest name.
+xor
+takes two numbers of expressions and checks to see if
+exactly one
+is True. If both are True or both are False, it returns 0.
+1 xor 0
+           1
+
+:2 xor (3 xor 0)    (after evaluating 3 xor 0, it simplifies into True xor True.)
+           0
+
+:0 xor (1-1)^2
+           0
+Table of Results
+For reference, the following true/false table shows what gets returned when you use different combinations of 1 (true) and 0 (false):
+xor
+1 (true)
+0 (false)
+1 (true)
+0 (false)
+1 (true)
+0 (false)
+1 (true)
+0 (false)
+Related Commands
+and
+or
+not(
+.

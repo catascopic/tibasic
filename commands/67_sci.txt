@@ -1,0 +1,25 @@
+Command Summary
+Puts the calculator in scientific notation mode.
+Command Syntax
+Sci
+Menu Location
+While editing a program, press:
+MODE to access the mode menu.
+Use arrows and ENTER to select Sci.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The Sci command puts the calculator in scientific notation mode, so that all results are displayed in scientific notation: as a (possibly fractional) number between 1 and 10 (not including 10) multiplied by a power of 10.
+Sci
+        Done
+1000
+        1e3
+{1,2,3}
+        {1e0 2e0 3e0}
+Related Commands
+Normal
+Eng
+Float
+Fix
+.

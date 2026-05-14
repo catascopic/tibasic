@@ -1,0 +1,58 @@
+Command Summary
+Draws an expression in terms of X.
+Command Syntax
+DrawF
+expression
+Menu Location
+Press:
+2nd PRGM to access the draw menu.
+6 to select DrawF, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The
+DrawF
+commands draws a single expression on the graph screen in terms of X using
+Func
+graphing mode, regardless of what graphing mode the calculator is actually in. For example,
+DrawF X²
+will draw a
+parabola
+in the shape of a U on the screen. Of course, how it is displayed all depends on the window dimensions of the graph screen; you should use a
+friendly window
+to ensure it shows up as you intend.
+Advanced Uses
+DrawF
+will update X and Y for each coordinate drawn (like
+Tangent(
+and
+DrawInv
+), and exit with the last coordinate still stored.
+When evaluating the expression using
+DrawF
+, the calculator will ignore the following errors:
+ERR:DATA TYPE
+,
+ERR:DIVIDE BY 0
+,
+ERR:DOMAIN
+,
+ERR:INCREMENT
+,
+ERR:NONREAL ANS
+,
+ERR:OVERFLOW
+, and
+ERR:SINGULAR MAT
+. If one of these errors occurs, the data point will be omitted.
+For this reason,
+DrawF
+can sometimes behave in an unexpected fashion: for example, it doesn't throw an error for list or matrix expressions (it won't graph anything, either).
+You can use
+DrawF
+to draw an expression instead of having to store an expression to a Y# variable and then displaying it. At the same time, if you plan on manipulating the expression (either changing the value or changing the expression itself), it would be better to simply use the Y# variable.
+Related Commands
+DrawInv
+Tangent(
+.

@@ -1,0 +1,64 @@
+Command Summary
+Raises the constant
+e
+to the
+value
+power.
+Command Syntax
+e
+^(
+value
+)
+Menu Location
+Press [2nd] [
+e
+x
+] to paste
+e
+^(.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The
+e
+^(
+command raises the constant
+e
+to a power. Since it's possible to just type out
+e
+, ^, and (, the reason for having a separate function isn't immediately obvious but in fact most of the time you need to use
+e
+, it's to raise it to a power.
+The trigonometric and hyperbolic functions can be expressed, and in fact are usually defined, in terms of
+e
+^(
+.
+e
+^(
+accepts numbers and lists (but unfortunately not matrices) as arguments. It also works, and is often used for, complex numbers (in fact, one of the standard forms of complex numbers on TI-83 series calculators is
+re^θi
+, which uses the
+e
+^(
+function
+)
+e^(2)
+        7.389056099
+e^(πi)
+        -1
+e^({-1,0,1})
+        {.3678794412 1 2.718281828}
+Formulas
+The
+e
+^(
+is usually defined by an infinite series:
+(1)
+\begin{align} e^x=\sum_{n=0}^\infty{\frac{x^n}{n!}} \end{align}
+This is then used to define exponentiation in general (for all real and even complex numbers), rather than using some sort of definition of exponents that involves multiplying a number by itself many times (which only works for integers).
+Related Commands
+e
+ln(
+10^(
+.

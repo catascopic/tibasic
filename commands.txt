@@ -1,0 +1,40 @@
+real = int|float
+num = real|cpx
+vec = num|list
+any = vec|mat
+
+round(any, int
+
+pxl-Test(int,int
+coordinates must be in valid range
+
+augment(list,list
+augment(mat,mat
+
+rowSwap(mat,int,int
+
+row+(mat,int,int
+
+*row(real,mat,int
+
+*row+(real,mat,int,int
+
+max(list
+max(vec,vec
+// complex numbers can be compared, the one with the greatest abs( is returned
+
+min(list
+min(vec,vec
+
+R►Pr(vec,vec
+
+R►Pθ(vec,vec
+
+P►Rx(vec,vec
+
+P►Ry(vec,vec
+
+median(list
+median(list,list
+// second form takes a frequency list
+

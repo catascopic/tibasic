@@ -1,0 +1,84 @@
+Command Summary
+Allows you to find the log of a number using any base you want
+Command Syntax
+logBASE(
+value
+,
+base
+)
+Menu Location
+Press:
+ALPHA, then F2 (which is located over the WINDOW button)
+5 or arrow keys to move down to logBASE(
+or
+MATH
+A or arrow keys to move down to logBASE(
+Calculator Compatibility
+TI-84+SE with TI-OS 2.53 MP
+Token Size
+2 byte
+The
+logBASE(
+command is a visual upgrade to the
+log(
+command to compute logarithms in any base
+b
+. That is, the command finds the exponent that base
+b
+must be raised to obtain the given value.
+This command can be used on both the home screen and while programming. If you are using
+CLASSIC
+mode, the command appears as:
+logBASE(8,2)
+            3
+But in
+MATHPRINT
+mode, this is improved to:
+log
+2
+(8)
+3
+Formulas
+The log in base
+b
+can also be found using the
+ln(
+or
+log(
+commands. This can be done indirectly using the change-of-base formula:
+(1)
+\begin{align} \log_bx = {\ln x \over \ln b} = {\log x \over \log b} \end{align}
+Or directly, using the optional second argument of
+log(
+:
+logBASE(X,B
+
+can be
+
+log(X,B
+The
+logBASE(
+command costs one extra byte compared to
+log(
+, providing only a visual improvement over its counterpart in
+MATHPRINT
+mode. The
+log(
+command is also compatible with older OS's, although its second argument is not. Both
+logBASE(
+and the second argument of
+log(
+are disabled in exam mode.
+Error Conditions
+ERR:ARGUMENT
+when a base is not specified
+ERR:DOMAIN
+when trying to compute the logarithm of 0
+ERR:NONREAL ANS
+when trying to compute the logarithm of a negative number in
+Real
+mode
+Related Commands
+log(
+ln(
+.

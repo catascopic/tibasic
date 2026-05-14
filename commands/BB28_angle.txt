@@ -1,0 +1,75 @@
+Command Summary
+Returns the complex argument of a complex number.
+Command Syntax
+angle(
+z
+)
+Menu Location
+Press:
+MATH to access the
+math
+menu.
+RIGHT, RIGHT to access the CPX (complex) submenu
+4 to select angle(, or use arrows.
+Calculator Compatibility
+TI-83/84/+/SE/CSE/CE
+Token Size
+2 bytes
+angle(z)
+returns the
+complex argument
+(also known as the polar angle) of the complex number
+z
+. If
+z
+is represented as
+x
++i
+y
+where
+x
+and
+y
+are both real,
+angle(z)
+returns R►Pθ(
+x
+,
+y
+) (which is equivalent to tanֿ¹(
+y
+/x
+) if x is nonzero). Also works on a list of complex numbers.
+angle(3+4i)
+     .927295218
+R►Pθ(3,4)
+     .927295218
+When writing a complex number
+z
+in the form
+$re^{i\theta}$
+(or, equivalently,
+$r(\cos\theta+i\sin\theta)$
+), then
+$\theta$
+is equal to the value of
+angle(z)
+, suitably reduced so that the result returned is in the interval
+$-\pi<\theta\leq\pi$
+.
+The
+angle(
+command also works on
+matrices
+, though not in any useful way:
+angle(
+[A] will return a matrix of the same size as [A], but with all elements 0. If you plan to use this,
+don't
+: 0[A] does the same thing, but is smaller and not as questionable (because this behavior is clearly unintentional on TI's part, and may be changed in an OS update).
+Related Commands
+abs(
+conj(
+real(
+imag(
+R►Pθ(
+.

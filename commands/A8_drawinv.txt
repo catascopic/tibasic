@@ -1,0 +1,70 @@
+Command Summary
+Draws the inverse of a curve in terms of X.
+Command Syntax
+DrawInv
+curve
+Menu Location
+Press:
+2nd DRAW to access the draw menu.
+8 to select DrawInv, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The
+DrawInv
+command draws the inverse of a curve in terms of X. Its single argument is an expression in terms of X.
+For example,
+DrawInv X²
+will draw the inverse of the equation Y=X
+2
+. The inverse reverses the variables X and Y, so that the curve X=Y
+2
+will be graphed. In this case, the inverse of the function has a simple form: Y=√(X) and Y=-√(X); most functions, however, do not have an inverse expressible as Y= equation, making this command particularly useful.
+You can also think of this as graphing the expression but with X representing the vertical direction, and Y representing the horizontal.
+DrawInv
+requires the calculator to be in
+Func
+mode, and is affected by the
+Connected
+/
+Dot
+setting.
+Advanced Uses
+DrawInv
+will update X and Y for each coordinate drawn (like
+Tangent(
+and
+DrawF
+), and exit with the last coordinate still stored.
+When evaluating the expression using
+DrawInv
+, the calculator will ignore the following errors:
+ERR:DATA TYPE
+,
+ERR:DIVIDE BY 0
+,
+ERR:DOMAIN
+,
+ERR:INCREMENT
+,
+ERR:NONREAL ANS
+,
+ERR:OVERFLOW
+, and
+ERR:SINGULAR MAT
+. If one of these errors occurs, the data point will be omitted.
+For this reason,
+DrawInv
+can sometimes behave in an unexpected fashion: for example, it doesn't throw an error for list or matrix expressions (it won't graph anything, either).
+Error Conditions
+ERR:MODE
+is thrown if the calculator is not in
+Func
+mode when using
+DrawInv
+.
+Related Commands
+DrawF
+Tangent(
+.

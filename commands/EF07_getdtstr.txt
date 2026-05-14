@@ -1,0 +1,29 @@
+Command Summary
+Returns the current date of the clock on the TI-84+/SE/CE as a string.
+Command Syntax
+getDtStr(
+value
+)→
+variable
+Menu Location
+This command can only be found in the catalog. Press:
+2nd CATALOG to enter the command catalog
+g to skip to commands starting with G
+Scroll down to getDtStr( and select it
+Calculator Compatibility
+TI-84+/SE/CE
+Token Size
+2 bytes
+The
+getDtStr(
+command returns the current date of the clock on the TI-84+/SE/CE calculators as a string based on the date format that is specified. There are three different date formats available: 1 (M/D/Y), 2 (D/M/Y), or 3 (Y/M/D). You can store this value to a
+string
+variable for later use, or manipulate it the same way you do with other strings. Of course, this command only works if the date format has actually been set, so you should use the
+setDtFmt(
+command before using it.
+Related Commands
+getDate
+getDtFmt
+setDate(
+setDtFmt(
+.

@@ -1,0 +1,75 @@
+Command Summary
+Draws a line tangent to an expression at the specified value.
+Command Syntax
+Tangent(
+expression
+,
+value
+)
+Menu Location
+Press:
+2nd PRGM to access the draw menu.
+5 to select Tangent(, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The Tangent( command draws a graph of an expression and then draws a line tangent to that expression, with the line touching the graph at the point of the specified value. You can either use a
+equation variable
+(such as Y
+1
+) or an expression in terms of X (such as X²). Though you can use equation variables from any
+graphing mode
+, they will be treated as functions in terms of X. Tangent( also ignores the graphing mode currently selected.
+Here is a simple example, where we are graphing the
+parabola
+X
+2
+and then drawing a tangent line at the value X=2.
+:"X²→Y₁
+:Tangent(Y₁,2
+or
+:Tangent(X²,2
+Advanced Uses
+Whether the graph shows up or not is dependent on the window dimensions of the graph screen, and you should use a
+friendly window
+to ensure it shows up as you intended.
+Tangent( will update X and Y for each coordinate drawn (like
+DrawF
+and
+DrawInv
+), and exit with the last coordinate still stored.
+When evaluating the expression using Tangent(, the calculator will ignore the following errors:
+ERR:DATA TYPE
+,
+ERR:DIVIDE BY 0
+,
+ERR:DOMAIN
+,
+ERR:INCREMENT
+,
+ERR:NONREAL ANS
+,
+ERR:OVERFLOW
+, and
+ERR:SINGULAR MAT
+. If one of these errors occurs, the data point will be omitted. However, the errors will still be thrown if they occur when evaluating the function
+at
+the point of tangency.
+Using
+Ans
+as an optimization for storing to an equation will not work. For example, the following code returns
+ERR:DATA TYPE
+because Ans is a string, not an equation variable.
+:"X²
+:Tangent(Ans,2
+Of course, you
+can
+use Ans in the equation, if it's a real number, but that's usually not as useful.
+Error Conditions
+ERR:INVALID
+is thrown if you try to use an equation variable that is undefined.
+Related Commands
+DrawF
+DrawInv
+.

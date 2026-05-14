@@ -1,0 +1,86 @@
+A list is a collection of elements (made up of numbers, variables, or expressions). Although lists can have up to 999 elements (the only exception is the
+TI-83
+, which can only have 99 elements), they are limited by the amount of free RAM. Besides the six built-in lists (from L
+1
+to L
+6
+), which can be accessed by pressing [2nd] and [1] to [6] (for whichever list you want), you can also create custom lists. A custom list name can be one to five characters, comprised of any combination of capital letters and numbers and theta, but it must begin with a letter or theta.
+Lists are very versatile variables. They are used for storing
+highscores
+and
+map
+information, and just about anything else. Lists are also important because they are the only variable that can be assigned a name. This adds a certain security to using them. Other programs can still access your lists (and change or corrupt them), however, but there is a smaller likelihood of this happening simply because there are millions of possible names available.
+To use lists, you must become familiar with some specifics of their syntax:
+The little
+∟
+command, which belongs at the beginning of any list name, except the default lists L
+1
+…L
+6
+. Almost always, when using a list, you must include this: e.g., to access the list SCORE, you would enter ∟SCORE. When you choose a list from the [2nd][LIST] menu, this is added by default so you don't have to worry about it.
+The curly brackets: { and }. These allow you to manually enter a list. When manually writing a list, you begin with putting a single opening curly brace ({) that will enclose the list. You then type a number or variable or expression, and put a comma after it. You repeat this for however many elements you want. You then put a single closing curly brace (}) that will close the list.
+Parentheses: ( and ). These access a specific element of a list: for example, ∟NAME(5) would be the 5
+th
+element of ∟NAME. You can also use this to store to an individual element of the list.
+Commands
+List variables stand out from other advanced variable types because most commands you can use for numbers can be used for lists as well. In such a case, the command will be applied to each element of the list individually, and a list of the results will be returned. If two lists are used like this in the same command, their elements are "paired up" and the command will be applied to each pair. For example:
+:cos({30,60,90
+will be evaluated like
+:{cos(30),cos(60),cos(90
+:{3,4,5}={6,7,5
+will return
+:{0,0,1
+Before doing any list comparison operations, you should first check that both list dimensions are the same size using the
+dim(
+command. This check is necessary because if the lists are not the same size, it will cause an
+ERR:DIM MISMATCH
+error. Of course, if you can guarantee their sizes will be identical, you can leave off the size check.
+:If dim(L1)=dim(L2
+:Then
+:If min(L1=L2
+:Disp "EQUAL
+:End
+There are some special commands for lists; some can be used for normal commands as well, but have a special meaning when used for a list. These are typically accessed through the [2nd][LIST] menu, and include:
+augment(
+ClrAllLists
+ClrList
+cumSum(
+ΔList(
+dim(
+Fill(
+List►matr(
+Matr►list(
+max(
+min(
+prod(
+Select(
+SetUpEditor
+seq(
+SortA(
+SortD(
+sum(
+Some statistical commands are used with lists as well: see the
+Statistics
+page for details.
+Optimization
+Some optimization tricks are used specifically with lists. For example, you may sometimes omit the little ∟ symbol at the beginning of a list. The most common situation where this applies is when using the → (
+store
+) command to store to a list. For example:
+:{1,2,3→∟NUMS
+can be
+:{1,2,3→NUMS
+This is even possible with a single-letter name, such as ∟X: the calculator will realize that you did not intend to store to the real variable X because lists cannot be stored to a real variable. Certain commands, such as
+SetUpEditor
+, also allow for this optimization.
+Another optimization that is possible is storing to the element just past the end of the list. For example, if ∟X has 5 elements, storing to ∟X(6) is also allowed. This increases the size of ∟X to 6 elements, and then sets its 6
+th
+element as usual. The following is a standard construction to add an element to the end of a list:
+:(value)→∟X(1+dim(∟X
+You can even store to the first element of a list that doesn't exist. Because there are no elements in the list, the calculator will first create a new element at the beginning of the list, and then assign it the value. This optimization works especially well when looping with a
+For(
+loop, since you can use the loop variable as the list index.
+Advanced Uses
+Lists can be linked together in a way similar to an Excel spreadsheet using a quotation mark:
+:"2L₁→L₂
+After running this code, modifying a value in L1 will cause the corresponding element in L2 to be updated accordingly. Modifying a value in L2 will break the link. Connected lists are indicated by a ♦ symbol in the list editor on the TI-84+, and by a small lock on the TI-84+CE.
+.

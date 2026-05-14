@@ -1,0 +1,79 @@
+Command Summary
+Calculates the local maximum of a function.
+Command Syntax
+fMax(
+f
+(
+var
+),
+var
+,
+lo
+,
+hi
+[,
+tol
+])
+Menu Location
+While editing a program, press:
+MATH to open the
+math
+menu
+7 or use arrow keys to select
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+fMax(
+f
+(
+var
+),
+var
+,
+lo
+,
+hi
+[,
+tol
+])
+finds the value of
+var
+between
+lo
+and
+hi
+at which the maximum of
+f
+(
+var
+) occurs.
+tol
+controls the accuracy of the maximum value computed. The default value of
+tol
+is 10
+-5
+.
+fMax(
+only works for real numbers and expressions. Brent's method for optimization is used for approximating the maximum value.
+fMax(sin(X)cos(X),X,0,3)
+        .7853995667
+Keep in mind that the result is the value of
+var
+, and not the value of
+f(var)
+. In this example, .7853995667 is not the highest possible value of sin(X)cos(X), but rather the X-value at which sin(X)cos(X) is the highest.
+Error Conditions
+ERR:BOUND
+is thrown if the lower bound is greater than the upper bound.
+ERR:DOMAIN
+is thrown if
+tol
+is 0.
+ERR:TOL NOT MET
+is thrown if the tolerance is too small for this specific function.
+Related Commands
+fMin(
+fnInt(
+nDeriv(
+.

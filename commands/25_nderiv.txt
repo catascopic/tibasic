@@ -1,0 +1,105 @@
+Command Summary
+Calculates the approximate numerical derivative of a function, at a point.
+Command Syntax
+nDeriv(
+f
+(
+variable
+),
+variable
+,
+value
+[,
+h
+])
+Menu Location
+Press:
+MATH to access the
+math
+menu.
+8 to select nDeriv(, or use arrows.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+nDeriv(f(var),var,value[,h])
+computes an approximation to the value of the derivative of
+f
+(
+var
+) with respect to
+var
+at
+var
+=
+value
+.
+h
+is the step size used in the approximation of the derivative. The default value of
+h
+is 0.001.
+nDeriv(
+only works for real numbers and expressions.
+nDeriv(
+can be used only once inside another instance of
+nDeriv(
+.
+π→X
+     3.141592654
+nDeriv(sin(T),T,X)
+     -.9999998333
+nDeriv(sin(T),T,X,(abs(X)+E⁻6)E⁻6)
+     -1.000000015
+nDeriv(nDeriv(cos(U),U,T),T,X)
+     .999999665
+Advanced
+If the default setting for
+h
+doesn't produce a good enough result, it can be difficult to choose a correct substitute. Although larger values of
+h
+naturally produce a larger margin of error, it's not always helpful to make
+h
+very small. If the difference between
+f(x+h)
+and
+f(x-h)
+is much smaller than the actual values of
+f(x+h)
+or
+f(x-h)
+, then it will only be recorded in the last few significant digits, and therefore be imprecise.
+A suitable compromise is to choose a tolerance
+h
+that's based on X. As suggested
+here
+,
+(abs(X)+]E⁻6)E⁻6
+is a reasonably good value that often gives better results than the default.
+Formula
+The exact formula that the calculator uses to evaluate this function is:
+(1)
+\begin{align} \operatorname{nDeriv}(f(t),t,x,h)=\frac{f(x+h)-f(x-h)}{2h} \end{align}
+This formula is known as the
+symmetric derivative
+, and using it generally increases the accuracy of the calculation. However, in a few instances it can give erroneous answers. One case where it gives false answers is with the function,
+(2)
+\begin{align} f(x) = \dfrac{1}{x^2} \bigg\vert_{x=0} \end{align}
+This derivative is undefined when calculated algebraically, but due to the method of calculation, the derivative given by
+nDeriv(
+is zero. These problems can be avoided by ensuring that a function's derivative is defined at the point of interest.
+Error Conditions
+ERR:DOMAIN
+is thrown if
+h
+is 0 (since this would yield division by 0 in the formula)
+ERR:ILLEGAL NEST
+is thrown if
+nDeriv(
+commands are nested more than one level deep. Just having one
+nDeriv(
+command inside another is okay, though.
+Related Commands
+fMin(
+fMax(
+fnInt(
+.

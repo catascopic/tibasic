@@ -1,0 +1,77 @@
+Command Summary
+Returns the absolute value of a real number, and the complex absolute value of a complex number.
+Command Syntax
+abs(
+value
+)
+Menu Location
+Press:
+MATH to access the
+math
+menu.
+RIGHT to access the NUM submenu.
+ENTER to select abs(.
+Alternatively, press:
+MATH to access the
+math
+menu.
+RIGHT twice to access the CPX (complex) submenu.
+5 to select abs(, or use arrows.
+Calculator Compatibility
+TI-83/84/+/SE/CSE/CE
+Token Size
+1 byte
+abs(
+x
+)
+returns the absolute value of the real number
+x
+. Also works on a list or matrix of real numbers.
+abs(3)
+     3
+
+abs(‾3)
+     3
+For complex numbers,
+abs(z)
+returns the absolute value (also known as the complex modulus, norm, or a hundred other terms) of the complex number
+z
+. If
+z
+is represented as
+x
++i
+y
+where x and y are both real,
+abs(z)
+returns √(
+x
+²+
+y
+²). Also works on a list of complex numbers.
+abs(3+4i)
+     5
+Optimization
+The
+abs(
+command, used properly, may be a smaller method of testing if a variable is in some range. For example:
+:If 10<X and X<20
+can be
+:If 5>abs(X-15
+In general, the first number, A, in the expression
+A>abs(X-B)
+should be half the length of the range, half of 10 in this case, and the second number, B, should be the midpoint of the range (here, 15).
+This can be taken to extreme degrees. For example, the following code uses abs( three times to test if X is the
+getKey
+keycode of one of the keys 1, 2, 3, 4, 5, 6, 7, 8, or 9:
+:If 2>abs(5-abs(5-abs(X-83
+For complex numbers given by a separate real and complex part,
+abs(X+iY)
+can be optimized to R►Pr(X,Y).
+Related Commands
+angle(
+real(
+imag(
+conj(
+R►Pr(
+.

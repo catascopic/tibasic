@@ -1,0 +1,37 @@
+Command Summary
+Displays the fractional value of a number
+Command Syntax
+Decimal
+►Frac
+Menu Location
+While editing a program, press:
+MATH to open the
+math
+menu
+ENTER or 1 to select.
+Calculator Compatibility
+TI-83/84/+/SE/CE
+Token Size
+1 byte
+►Frac
+attempts to display the input in fraction form. It only works on the
+home screen
+outside a program, or with the
+Disp
+and
+Pause
+commands in a program. It takes up to 12 decimal places of a non-terminating decimal to find the corresponding fraction. The decimal input is returned if
+►Frac
+fails to find the fraction form.
+For a more versatile algorithm for finding fractions, see the
+Decimal to Fraction
+routine.
+.333►Frac
+        .333
+.333333333333►Frac
+         1/3
+Related Commands
+►Dec
+See Also
+Decimal to Fraction
+.

@@ -1,0 +1,23 @@
+Command Summary
+Mode command that sets Answers to DEC.
+Command Syntax
+DEC Answer
+Menu Location
+Press:
+MODE
+DOWN until you see Answers
+ENTER on DEC
+Alternatively, access the catalog.
+Calculator Compatibility
+TI-84 2.53MP only
+Token Size
+2 bytes
+The
+DEC Answer
+command is a mode command that changes the Answers mode to DEC. DEC mode is very similar to the AUTO mode in which the calculator will display all answers in decimal form unless the returned number is an integer. Fractions will only be displayed with use of the
+►Frac
+command.
+Related Commands
+AUTO Answer
+FRAC Answer
+.

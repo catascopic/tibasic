@@ -1,0 +1,40 @@
+Command Summary
+Runs an assembly program.
+Command Syntax
+Asm(prgm
+NAME
+)
+Menu Location
+This command is only found in the catalog. Press:
+2nd CATALOG to access the command catalog.
+DOWN six times.
+ENTER to select Asm(.
+Calculator Compatibility
+TI-83+/84+/SE
+(not available on the regular TI-83)
+Token Size
+2 bytes
+The
+Asm(
+command is used for running an assembly program. Unlike TI-Basic programs, assembly programs are written in the calculator's machine code directly, which makes them more powerful in both speed and functionality. However, it also means that if they crash, they crash hard — there is no built-in error menu to protect you.
+Keep in mind that many assembly programs these days are written for a
+shell
+such as Ion or MirageOS. If you're dealing with one of those programs, calling
+Asm(
+on it will do nothing; you need to get the appropriate shell and run that instead.
+With the
+AsmPrgm
+and
+AsmComp(
+commands, you can create small assembly programs yourself, directly on the calculator. If you are using at TI-84+CE with OS 5.3, the
+Asm(
+is unnecessary to run such programs.
+Error Conditions
+ERR:INVALID
+is thrown if the program isn't an assembly program.
+Related Commands
+AsmPrgm
+AsmComp(
+See Also
+Assembly Shells
+.

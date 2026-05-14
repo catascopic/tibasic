@@ -1,0 +1,58 @@
+Command Summary
+Calculates the complex conjugate of a complex number.
+Command Syntax
+conj(
+value
+)
+Menu Location
+Press:
+MATH to access the
+math
+menu.
+RIGHT, RIGHT to access the CPX (complex) submenu
+ENTER to select conj(.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+conj(
+z
+)
+returns the complex conjugate of the complex number
+z
+. If
+z
+is represented as
+x
++i
+y
+where
+x
+and
+y
+are both real,
+conj(
+z
+)
+returns
+x
+-i
+y
+. Also works on a list of complex numbers.
+conj(3+4i)
+     3-4i
+The conjugate of a number
+$z$
+is often written
+$\overline{z}$
+, and is useful because it has the property that
+$z\overline{z}$
+and
+$z+\overline{z}$
+are real numbers.
+Related Commands
+abs(
+angle(
+real(
+imag(
+.

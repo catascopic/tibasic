@@ -1,0 +1,34 @@
+Command Summary
+Sets the time of the clock on the TI-84+/SE.
+Command Syntax
+setTime(
+hour
+,
+minute
+,
+second
+)
+Menu Location
+This command can only be found in the catalog. Press:
+2nd CATALOG to enter the command catalog
+s to skip to commands starting with S
+Scroll down to setTime( and select it
+Calculator Compatibility
+TI-84+/SE
+Token Size
+2 bytes
+The setTime( command sets the time of the clock on the TI-84+/SE calculators. It takes three arguments: the hour, the minute, and the second. The hour must be in 24 hour format — where 13 is equal to 1 P.M. — and the minute and second need to be a valid number within the appropriate range (1-60). For example, this would set the time to 12:30:30:
+:setTime(12,30,30
+Once you have set the time, you can display it in two different formats on the
+mode screen
+using the
+setTmFmt(
+command: 12 (12 hour) or 24 (24 hour). Of course, the time will only show up if the clock is on; if you need to turn the clock on, use the
+ClockOn
+command, or scroll down to the 'TURN CLOCK ON' message that is displayed in place of the clock on the mode screen and press ENTER twice.
+Related Commands
+getTime
+getTmFmt
+getTmStr(
+setTmFmt(
+.

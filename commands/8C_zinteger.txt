@@ -1,0 +1,33 @@
+Command Summary
+Zooms to a square window with all-integer coordinates.
+Command Syntax
+ZInteger
+Menu Location
+Press:
+ZOOM to access the zoom menu.
+8 to select ZInteger, or use arrows and ENTER.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+When ZInteger is chosen as a menu option outside a program, it asks for a point on the graph screen. This point's coordinates are rounded to the nearest integer point. Then the
+window variables
+are changed so the window is centered at this point, and so that the coordinates of every pixel are integers. ΔX and ΔY, the distances between two pixels next to each other, are both 1.
+The above process modifies Xmin, Xmax, Ymin, and Ymax. Xscl and Yscl are also modified: both are set to 10. No other variables are modified (unless you count ΔX and ΔY, which are affected as they are defined).
+The ZInteger command (usable in a program only) has a slightly different effect: instead of allowing you to choose a point, it automatically uses the point that is the current center.
+Advanced Uses
+A graph window commonly used in programming can be created by using the
+ZStandard
+and ZInteger commands:
+:ZStandard
+:ZInteger
+Error Conditions
+ERR:INVALID
+occurs if this command is used outside a program.
+Related Commands
+ZDecimal
+ZStandard
+ZSquare
+See Also
+Friendly Graphing Windows
+.

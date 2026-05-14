@@ -1,0 +1,40 @@
+Command Summary
+Allows user to create a line of best fit and modify it
+Command Syntax
+Manual-Fit {
+Function
+}
+Menu Location
+Under Statistics or Catalog
+Press STAT
+Go to CALC
+Press ALPHA D (or scroll to bottom)
+Calculator Compatibility
+TI-84+/SE (OS 2.30 or greater)
+Token Size
+2 bytes
+This command will allow the user to create a line of best fit according to their judgment. Activate the command by just pasting it on the screen. Then, click on a point for the line to begin followed by an end point. The calculator will then draw your line and display its equation at the top left corner of the screen. You can modify it by selecting the equation part and pressing enter. Input your desired value for the calculator to change it. The equation is stored into Y₁. If you specify what equation you want to store it to, then it will store to that function.
+:Manual-Fit
+(this activates the command and stores to Y₁
+:Manual-Fit Y₃
+(this stores to Y₃ instead)
+One note about this is that it only graphs linear models. It is written in the form
+y=mx+b
+, and you can modify
+m
+or
+b
+.
+Exit out by 2nd QUIT.
+Advanced Uses
+This command is able to function in a program, but you cannot modify the values. This is a unique form of gathering user input that stores into the specified Y= function. Of course, this draws a line across the graph screen. You can then convert the function into a different form, like this:
+:Manual-Fit
+:Equ▶String(Y₁,Str1
+This will turn the equation the user drew into a string which can then be used for output or calculations.
+Related Commands
+LinReg(ax+b)
+LinReg(a+bx)
+LinRegTInt
+LinRegTTest
+Med-Med
+.

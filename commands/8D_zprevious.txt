@@ -1,0 +1,41 @@
+Command Summary
+Restores the basic window settings as they were before the last zoom command.
+Command Syntax
+ZPrevious
+Menu Location
+Press:
+ZOOM to access the zoom menu.
+RIGHT to access the MEMORY submenu.
+ENTER or 1 to select ZPrevious.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The ZPrevious command (and menu option) restore the
+window variables
+Xmin, Xmax, Xscl, Ymin, Ymax, and Yscl to the values they had before the last
+zoom
+command. This means, of course, that using ZPrevious a second time will cancel its effects.
+Since no variables that are specific to the current graphing mode are changed, ZPrevious doesn't always achieve the effect of reversing the previous zoom command. For example, in
+Polar
+graphing mode,
+ZStandard
+will set θmin and θmax to 0 and 2π respectively. However, even if they were different before ZStandard, ZPrevious will not restore these settings. Also, ZPrevious doesn't notice if you change the window settings directly (by storing to the window variables).
+Unlike
+ZoomSto
+and
+ZoomRcl
+, the values that ZPrevious uses aren't made available in any sort of variable.
+Optimization
+Using
+StoreGDB
+and
+RecallGDB
+is an excellent way to back up graph settings so a program doesn't modify them. However, if all you're doing is changing the window variables with one Zoom command, you can simply use ZPrevious at the end of the program instead.
+Error Conditions
+ERR:INVALID
+occurs if this command is used outside a program (but not if the menu option is used, of course).
+Related Commands
+ZoomSto
+ZoomRcl
+.

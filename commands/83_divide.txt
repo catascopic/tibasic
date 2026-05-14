@@ -1,0 +1,45 @@
+Command Summary
+Returns the division of two numbers.
+Command Syntax
+value1
+/
+value2
+Menu Location
+Press [/]
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+1 byte
+The / (divide) operator takes two numbers, variables, or expressions and divides them, thus returning a single new value. The / operator appears higher in the order of operations than both
++
+and
+-
+, so if those appear in an expression, / will be executed first. In addition, the
+*
+operator has the same order of operations as /, so the calculator simply executes them left to right in the order that they appear.
+:1/1
+           1
+
+:5→X
+:2/3X
+           3.333333333
+
+:2→A:3→B
+:A/B/B/A
+           .1111111111
+Related Commands
++ (
+add
+)
+- (
+subtract
+)
+* (
+multiply
+)
+Error Conditions
+ERR:DATA TYPE
+is thrown if you divide by a matrix.
+ERR:DIVIDE BY 0
+is thrown if you divide by 0 or a undefined variable.
+.
