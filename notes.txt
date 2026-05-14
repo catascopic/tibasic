@@ -1,2 +1,9 @@
 E10 by itself is valid, so E should be considered something more like a regular term that does implicit multiplication, except that on its right side, it does 10^x
-Another storable (rvalue) is dim(list) or dim(matrix)
+rename these fields
+call_fn -> func
+execute_fn -> cmd
+unary_op_fn -> unary_op
+binary_op_fn -> binary_op
+value_fn -> resolve
+variables also implement resolve
+new field: store(env)?

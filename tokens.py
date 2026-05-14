@@ -120,7 +120,7 @@ class Token:
 	# ── Token type predicates ──────────────────────────────────────────────────
 
 	def is_real_var(self) -> bool:
-		return 0x41 <= self.code[0] < 0x5b or self.code[0] == 0x5b
+		return 0x41 <= self.code[0] < 0x5c
 
 	def is_list_var(self) -> bool:
 		return self.code[0] == 0x5d
@@ -148,6 +148,9 @@ class Token:
 
 	def get_value(self, env: dict):
 		return self.value_fn(env)
+	
+	def is_name_char(self):
+		return self.is_real_var() or self.is_digit()
 
 	def can_start_atom(self) -> bool:
 		return (
@@ -158,7 +161,7 @@ class Token:
 		)
 
 
-EOF_TOKEN = Token(b'', None, '', 'eof', 'eof', frozenset(), b'')
+EOF_TOKEN = Token(b'\x00', None, '', 'eof', 'eof', frozenset(), b'')
 
 _SEEN: set[bytes] = set()
 
@@ -257,6 +260,8 @@ PRGM		= token(b'\x5f', "prgm", "", "Calls a named subprogram")
 ANS		 = token(b'\x72', "Ans",  "variable", "Contains the result of the last evaluated expression")
 NEG		 = token(b'\xb0', "−",	"prefix", "Negates a value (unary minus)", alt=('~', "neg"), key='~',
 					unary_op_fn=lambda x: -x)
+DIM      = token(b'\xb5', "dim(",		"func",	 "Returns the length of a list or the dimensions of a matrix",
+	call_fn=_wrap(lambda a: float(len(a)) if isinstance(a, list) and not isinstance(a[0], list) else [float(len(a)), float(len(a[0]))])),
 LIST_PREFIX = token(b'\xeb', "∟",	"", "Prefix token for user-defined lists (e.g., ∟NAME)", alt="list-prefix", key='#')
 
 # Postfix operators
@@ -308,16 +313,17 @@ NPR		 = token(b'\x94', "nPr", "operator", "Computes the number of permutations o
 					bp=(60, 61), binary_op_fn=_npr)
 NCR		 = token(b'\x95', "nCr", "operator", "Computes the number of combinations of n things taken r at a time",
 					bp=(60, 61), binary_op_fn=_ncr)
+RAND     = token(b'\xab', "rand",		"var",	 "Generates a uniformly random real number between 0 and 1",
+		  value_fn=lambda env: random.random())
 POW		 = token(b'\xf0', "^",   "operator", "Raises the left operand to the power of the right operand", key='^',
 					bp=(70, 69), binary_op_fn=lambda a, b: a ** b)
-XROOT	   = token(b'\xf1', "×√",  "operator", "Computes the x-th root of a value", alt="xroot",
+XROOT	 = token(b'\xf1', "×√",  "operator", "Computes the x-th root of a value", alt="xroot",
 					bp=(60, 61), binary_op_fn=lambda a, b: b ** (1 / a))
-
 
 # ── Special call functions (reference named token constants above) ──────────────
 
 def _call_seq(parser) -> list:
-	thunk = parser.grab_until_comma()
+	thunk = parser.capture()
 	parser.expect(COMMA)
 	var_tok = parser.advance()
 	if not var_tok.is_real_var():
@@ -343,7 +349,7 @@ def _call_seq(parser) -> list:
 	return result
 
 def _call_sigma(parser) -> float:
-	thunk = parser.grab_until_comma()
+	thunk = parser.capture()
 	parser.expect(COMMA)
 	var_tok = parser.advance()
 	if not var_tok.is_real_var():
@@ -364,7 +370,7 @@ def _call_sigma(parser) -> float:
 	return total
 
 def _call_nderiv(parser) -> float:
-	thunk = parser.grab_until_comma()
+	thunk = parser.capture()
 	parser.expect(COMMA)
 	var = parser.advance().text
 	parser.expect(COMMA)
@@ -381,7 +387,7 @@ def _call_nderiv(parser) -> float:
 	return (fwd - bwd) / (2 * h)
 
 def _call_fnint(parser) -> float:
-	thunk = parser.grab_until_comma()
+	thunk = parser.capture()
 	parser.expect(COMMA)
 	var = parser.advance().text
 	parser.expect(COMMA)
@@ -625,8 +631,7 @@ TOKENS: list[Token] = [
 	token(b'\xa7', "Tangent(",	"cmdfunc",	   "Draws the tangent line to a function at a specified x-value"),
 	token(b'\xa8', "DrawInv",	 "io",	   "Draws the inverse of a function on the graph screen"),
 	token(b'\xa9', "DrawF",	   "io",	   "Draws a function on the graph screen"),
-	token(b'\xab', "rand",		"var",	 "Generates a uniformly random real number between 0 and 1",
-		  value_fn=lambda env: random.random()),
+	RAND,
 	token(b'\xac', "π",		   "val",	 "The mathematical constant pi (≈3.14159...)", alt="pi",
 		  value_fn=lambda env: math.pi),
 	token(b'\xad', "getKey",	  "val",	   "Returns the keycode of the last key pressed, or 0 if none",
@@ -642,9 +647,7 @@ TOKENS: list[Token] = [
 		  call_fn=_wrap(lambda m: float(sum(m[i][i] for i in range(len(m)))))),
 	token(b'\xb4', "identity(",   "func",   "Returns an n×n identity matrix",
 		  call_fn=_wrap(lambda n: [[1.0 if r == c else 0.0 for c in range(int(n))] for r in range(int(n))])),
-	token(b'\xb5', "dim(",		"func",	 "Returns the length of a list or the dimensions of a matrix",
-		  call_fn=_wrap(lambda a: float(len(a)) if isinstance(a, list) and not isinstance(a[0], list)
-								  else [float(len(a)), float(len(a[0]))])),
+	DIM,
 	token(b'\xb6', "sum(",		"func",	 "Returns the sum of all elements in a list",
 		  call_fn=_wrap(lambda a: sum(a))),
 	token(b'\xb7', "prod(",	   "func",	 "Returns the product of all elements in a list",
