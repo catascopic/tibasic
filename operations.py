@@ -12,17 +12,13 @@ from __future__ import annotations
 import math, cmath, random, datetime as _dt
 from typing import Any, Callable
 
+from tokens import COMMA, R_PAREN, QUOTE
 from results import (
 	IfResult, WhileResult, RepeatResult, ForResult, EndResult,
 	LblResult, GotoResult, ReturnResult, StopResult, PauseResult,
 	DispResult, InputResult, PromptResult, OutputResult, MenuResult,
 	ClrHomeResult, DispGraphResult, AnsTarget,
 )
-
-# ── Token codes used internally ────────────────────────────────────────────────
-_COMMA  = b'\x2b'
-_RPAREN = b'\x11'
-_QUOT   = b'\x2a'
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -129,19 +125,19 @@ def _randint_call(parser):
 
 def _call_seq(parser) -> list:
 	thunk = parser.grab_until_comma()
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	var_tok   = parser.advance()
 	if not var_tok.is_real_var():
 		raise ValueError("seq: second arg must be a variable")
 	var = var_tok.text
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	start = parser.parse_expr()
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	end   = parser.parse_expr()
 	step  = 1.0
-	if parser.eat_if(_COMMA):
+	if parser.eat_if(COMMA):
 		step = parser.parse_expr()
-	parser.eat_if(_RPAREN)
+	parser.eat_if(R_PAREN)
 
 	saved = parser.env.get(var)
 	result = []
@@ -155,16 +151,16 @@ def _call_seq(parser) -> list:
 
 def _call_sigma(parser) -> float:
 	thunk = parser.grab_until_comma()
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	var_tok   = parser.advance()
 	if not var_tok.is_real_var():
 		raise ValueError("Σ: second arg must be a variable")
 	var = var_tok.text
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	start = int(parser.parse_expr())
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	end   = int(parser.parse_expr())
-	parser.eat_if(_RPAREN)
+	parser.eat_if(R_PAREN)
 
 	saved = parser.env.get(var)
 	total = 0.0
@@ -176,14 +172,14 @@ def _call_sigma(parser) -> float:
 
 def _call_nderiv(parser) -> float:
 	thunk = parser.grab_until_comma()
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	var = parser.advance().text
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	val = parser.parse_expr()
 	h   = 1e-5
-	if parser.eat_if(_COMMA):
+	if parser.eat_if(COMMA):
 		h = parser.parse_expr()
-	parser.eat_if(_RPAREN)
+	parser.eat_if(R_PAREN)
 
 	saved = parser.env.get(var)
 	parser.env[var] = val + h;  fwd = thunk.eval()
@@ -193,13 +189,13 @@ def _call_nderiv(parser) -> float:
 
 def _call_fnint(parser) -> float:
 	thunk = parser.grab_until_comma()
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	var = parser.advance().text
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	a = parser.parse_expr()
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	b = parser.parse_expr()
-	parser.eat_if(_RPAREN)
+	parser.eat_if(R_PAREN)
 
 	saved = parser.env.get(var)
 	n = 1000
@@ -322,14 +318,14 @@ def _exec_for(parser):
 	var_tok = parser.advance()
 	if not var_tok.is_real_var():
 		raise ValueError("For: first arg must be a variable")
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	start = parser.parse_expr()
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	end   = parser.parse_expr()
 	step  = 1.0
-	if parser.eat_if(_COMMA):
+	if parser.eat_if(COMMA):
 		step = parser.parse_expr()
-	parser.eat_if(_RPAREN)
+	parser.eat_if(R_PAREN)
 	return ForResult(var_tok.text, float(start), float(end), float(step))
 
 def _exec_lbl(parser):
@@ -346,15 +342,15 @@ def _exec_disp(parser):
 	values = []
 	if not parser.at_end():
 		values.append(parser.parse_expr())
-		while parser.eat_if(_COMMA):
+		while parser.eat_if(COMMA):
 			values.append(parser.parse_expr())
 	return DispResult(values)
 
 def _exec_input(parser):
-	if parser.peek().code == _QUOT:
+	if parser.peek() is QUOTE:
 		parser.advance()
 		prompt = parser.parse_string_literal()
-		parser.expect(_COMMA)
+		parser.expect(COMMA)
 	else:
 		prompt = None
 	target = parser.parse_store_target()
@@ -362,44 +358,44 @@ def _exec_input(parser):
 
 def _exec_prompt(parser):
 	targets = [parser.parse_store_target()]
-	while parser.eat_if(_COMMA):
+	while parser.eat_if(COMMA):
 		targets.append(parser.parse_store_target())
 	return PromptResult(targets)
 
 def _exec_output(parser):
 	row = parser.parse_expr()
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	col = parser.parse_expr()
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	val = parser.parse_expr()
-	parser.eat_if(_RPAREN)
+	parser.eat_if(R_PAREN)
 	return OutputResult(row, col, val)
 
 def _exec_menu(parser):
 	title = parser.parse_expr()
 	options = []
-	while parser.eat_if(_COMMA):
+	while parser.eat_if(COMMA):
 		name  = parser.parse_expr()
-		parser.expect(_COMMA)
+		parser.expect(COMMA)
 		label = parser.parse_label_name()
 		options.append((name, label))
-	parser.eat_if(_RPAREN)
+	parser.eat_if(R_PAREN)
 	return MenuResult(title, options)
 
 def _exec_is_gt(parser):
 	var_tok = parser.advance()
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	limit = parser.parse_expr()
-	parser.eat_if(_RPAREN)
+	parser.eat_if(R_PAREN)
 	name = var_tok.text
 	parser.env[name] = parser.env.get(name, 0.0) + 1
 	return IfResult(parser.env[name] > limit)
 
 def _exec_ds_lt(parser):
 	var_tok = parser.advance()
-	parser.expect(_COMMA)
+	parser.expect(COMMA)
 	limit = parser.parse_expr()
-	parser.eat_if(_RPAREN)
+	parser.eat_if(R_PAREN)
 	name = var_tok.text
 	parser.env[name] = parser.env.get(name, 0.0) - 1
 	return IfResult(parser.env[name] < limit)

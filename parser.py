@@ -1,7 +1,14 @@
 from __future__ import annotations
 import math, cmath, random
 from operations import EXEC_CALLS
-from tokens import Token, EOF_TOKEN
+from tokens import (
+	Token, EOF_TOKEN,
+	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
+	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, ANS, NEG, LIST_PREFIX,
+	RAD, DEG, INV, SQ, TRANSPOSE, CUBE, FACT,
+	SCI_E, OR, XOR, AND, EQ, LT, GT, LE, GE, NE,
+	ADD, SUB, MUL, DIV, NPR, NCR, POW, XROOT,
+)
 from results import (
 	ExprResult, StoreResult, Thunk,
 	RealVarTarget, ListVarTarget, UserListTarget, MatrixVarTarget,
@@ -31,16 +38,15 @@ class Parser:
 		self.pos += 1
 		return t
 
-	def eat_if(self, code: bytes) -> bool:
-		if self.peek().code == code:
+	def eat_if(self, tok: Token) -> bool:
+		if self.peek() is tok:
 			self.pos += 1
 			return True
 		return False
 
-	def expect(self, code: bytes) -> None:
-		t = self.peek()
-		if t.code != code:
-			raise ParseError(f"Expected {code!r}, got {t!r}")
+	def expect(self, tok: Token) -> None:
+		if self.peek() is not tok:
+			raise ParseError(f"Expected {tok.text!r}, got {self.peek().text!r}")
 		self.pos += 1
 
 	def at_end(self) -> bool:
@@ -50,7 +56,7 @@ class Parser:
 
 	def parse_num_literal(self) -> float:
 		num = []
-		while self.peek().is_digit() or self.peek().code == b'\x3a':
+		while self.peek().is_digit() or self.peek() is DOT:
 			num.append(self.advance().text)
 		try:
 			return float(''.join(num))
@@ -60,55 +66,55 @@ class Parser:
 	def parse_string_literal(self) -> str:
 		"""Opening \" already consumed. Reads until the next \" or end of line."""
 		chars = []
-		while not self.at_end() and self.peek().code != b'\x2a':
+		while not self.at_end() and self.peek() is not QUOTE:
 			chars.append(self.advance().text)
-		self.eat_if(b'\x2a')  # closing " is optional
+		self.eat_if(QUOTE)  # closing " is optional
 		return "".join(chars)
 
 	def parse_list_literal(self) -> list:
 		"""{ already consumed."""
 		items = []
-		if not self.eat_if(b'\x09'):  # }
+		if not self.eat_if(R_BRACE):
 			items.append(self.parse_expr())
-			while self.eat_if(b'\x2b'):  # ,
+			while self.eat_if(COMMA):
 				items.append(self.parse_expr())
-			self.eat_if(b'\x09')
+			self.eat_if(R_BRACE)
 		return items
 
 	def parse_matrix_literal(self) -> list[list]:
 		"""Opening [ already consumed; reads one or more [row] blocks."""
 		rows = []
-		while self.peek().code == b'\x06':  # [
+		while self.peek() is L_BRACKET:
 			self.advance()
 			row = [self.parse_expr()]
-			while self.eat_if(b'\x2b'):
+			while self.eat_if(COMMA):
 				row.append(self.parse_expr())
-			self.eat_if(b'\x07')  # ]
+			self.eat_if(R_BRACKET)
 			rows.append(row)
-		self.eat_if(b'\x07')
+		self.eat_if(R_BRACKET)
 		return rows
 
 	def parse_args(self) -> list:
 		"""Comma-separated expressions until ) or end of line. Consumes )."""
 		args = []
-		if not self.at_end() and self.peek().code != b'\x11':  # )
+		if not self.at_end() and self.peek() is not R_PAREN:
 			args.append(self.parse_expr())
-			while self.eat_if(b'\x2b'):  # ,
+			while self.eat_if(COMMA):
 				args.append(self.parse_expr())
-		self.eat_if(b'\x11')
+		self.eat_if(R_PAREN)
 		return args
 
 	def _grab_group(self, out: list) -> None:
 		"""Collect tokens into out until a top-level comma or unmatched ), recursing into sub-groups."""
 		while self.pos < len(self.tokens):
 			t = self.tokens[self.pos]
-			if t.code == b'\x2b' or t.code == b'\x11':  # , or )
+			if t is COMMA or t is R_PAREN:
 				break
 			out.append(t)
 			self.pos += 1
-			if t.is_function() or t.code == b'\x10':  # opens a sub-group
+			if t.is_function() or t is L_PAREN:
 				self._grab_group(out)
-				if self.pos < len(self.tokens) and self.tokens[self.pos].code == b'\x11':
+				if self.pos < len(self.tokens) and self.tokens[self.pos] is R_PAREN:
 					out.append(self.tokens[self.pos])
 					self.pos += 1
 
@@ -157,49 +163,46 @@ class Parser:
 			raise ParseError("Expected an expression")
 
 		# Numeric literal (multi-token — don't advance here)
-		if t.is_digit() or t.code == b'\x3a':  # digit or '.'
+		if t.is_digit() or t is DOT:
 			return self.parse_num_literal()
 
 		self.advance()
 
-		if t.code == b'\x2a':  # "
-			return self.parse_string_literal()
-		if t.code == b'\x08':  # {
-			return self.parse_list_literal()
-		if t.code == b'\x06':  # [
-			return self.parse_matrix_literal()
+		if t is QUOTE:       return self.parse_string_literal()
+		if t is L_BRACE:     return self.parse_list_literal()
+		if t is L_BRACKET:   return self.parse_matrix_literal()
 
-		if t.code == b'\x10':  # (
+		if t is L_PAREN:
 			val = self.parse_expr()
-			self.eat_if(b'\x11')
+			self.eat_if(R_PAREN)
 			return val
 
-		if t.code == b'\xb0':  # − (negation)
+		if t is NEG:
 			return t.unary_op(self.parse_expr(65))
 
 		# Ans — special: may be indexed when it holds a list
-		if t.code == b'\x72':
+		if t is ANS:
 			val = self.env.get('Ans', 0.0)
-			if isinstance(val, list) and self.peek().code == b'\x10':
+			if isinstance(val, list) and self.peek() is L_PAREN:
 				self.advance()
 				idx = self._check_int_index(self.parse_expr())
-				self.eat_if(b'\x11')
+				self.eat_if(R_PAREN)
 				return val[idx - 1]
 			return val
 
 		# ∟ user-defined list prefix
-		if t.code == b'\xeb':
+		if t is LIST_PREFIX:
 			name = self._read_name()
 			val  = self.env.get(f'∟{name}', [])
-			if self.peek().code == b'\x10':
+			if self.peek() is L_PAREN:
 				self.advance()
 				idx = self._check_int_index(self.parse_expr())
-				self.eat_if(b'\x11')
+				self.eat_if(R_PAREN)
 				return val[idx - 1]
 			return val
 
 		# prgm subprogram call
-		if t.code == b'\x5f':
+		if t is PRGM:
 			raise NotImplementedError(f"prgm{self._read_name()}")
 
 		# Function call (token.call drives arg parsing via parse_args / grab_until_comma)
@@ -216,21 +219,21 @@ class Parser:
 
 		if t.is_list_var():
 			val = self.env.get(t.text, [])
-			if self.peek().code == b'\x10':
+			if self.peek() is L_PAREN:
 				self.advance()
 				idx = self._check_int_index(self.parse_expr())
-				self.eat_if(b'\x11')
+				self.eat_if(R_PAREN)
 				return val[idx - 1]
 			return val
 
 		if t.is_matrix_var():
 			val = self.env.get(t.text, [[]])
-			if self.peek().code == b'\x10':
+			if self.peek() is L_PAREN:
 				self.advance()
 				row = self._check_int_index(self.parse_expr())
-				self.expect(b'\x2b')
+				self.expect(COMMA)
 				col = self._check_int_index(self.parse_expr())
-				self.eat_if(b'\x11')
+				self.eat_if(R_PAREN)
 				return val[row - 1][col - 1]
 			return val
 
@@ -241,27 +244,27 @@ class Parser:
 
 	# ── Pratt expression parser ────────────────────────────────────────────────
 
-	_POSTFIX = {b'\x0d', b'\x0f', b'\x0c', b'\x2d', b'\x0e', b'\x0b', b'\x0a'}
+	_POSTFIX = {SQ, CUBE, INV, FACT, TRANSPOSE, DEG, RAD}
 
-	_BP: dict[bytes, tuple[int, int]] = {
-		b'\x3c': (20, 21),  # or
-		b'\x3d': (20, 21),  # xor
-		b'\x40': (30, 31),  # and
-		b'\x6a': (40, 41),  # =
-		b'\x6b': (40, 41),  # <
-		b'\x6c': (40, 41),  # >
-		b'\x6d': (40, 41),  # ≤
-		b'\x6e': (40, 41),  # ≥
-		b'\x6f': (40, 41),  # ≠
-		b'\x70': (50, 51),  # +
-		b'\x71': (50, 51),  # -
-		b'\x82': (60, 61),  # *
-		b'\x83': (60, 61),  # /
-		b'\x94': (60, 61),  # nPr
-		b'\x95': (60, 61),  # nCr
-		b'\xf1': (60, 61),  # ×√
-		b'\x3b': (65, 66),  # ᴇ (scientific notation, above * below ^)
-		b'\xf0': (70, 69),  # ^ right-assoc
+	_BP: dict[Token, tuple[int, int]] = {
+		OR:    (20, 21),
+		XOR:   (20, 21),
+		AND:   (30, 31),
+		EQ:    (40, 41),
+		LT:    (40, 41),
+		GT:    (40, 41),
+		LE:    (40, 41),
+		GE:    (40, 41),
+		NE:    (40, 41),
+		ADD:   (50, 51),
+		SUB:   (50, 51),
+		MUL:   (60, 61),
+		DIV:   (60, 61),
+		NPR:   (60, 61),
+		NCR:   (60, 61),
+		XROOT: (60, 61),
+		SCI_E: (65, 66),  # above * below ^
+		POW:   (70, 69),  # right-associative
 	}
 	_IMPL_MUL_BP = (60, 61)
 	_POSTFIX_BP  = 80
@@ -273,7 +276,7 @@ class Parser:
 			t = self.peek()
 
 			# Postfix operators
-			if t.code in self._POSTFIX:
+			if t in self._POSTFIX:
 				if self._POSTFIX_BP <= min_bp:
 					break
 				self.advance()
@@ -307,35 +310,36 @@ class Parser:
 	def parse_store_target(self):
 		t = self.advance()
 
-		if t.code == b'\x72':
+		if t is ANS:
 			return AnsTarget()
 
 		if t.is_real_var():
 			return RealVarTarget(t.text)
 
 		if t.is_list_var():
-			if self.eat_if(b'\x10'):
-				idx = self.parse_expr();
-				self.eat_if(b'\x11')
+			if self.eat_if(L_PAREN):
+				idx = self.parse_expr()
+				self.eat_if(R_PAREN)
 				return ListElementTarget(t.code, idx)
 			return ListVarTarget(t.code)
 
 		if t.is_matrix_var():
-			if self.eat_if(b'\x10'):
-				row = self.parse_expr();
-				self.expect(b'\x2b')
-				col = self.parse_expr();
-				self.eat_if(b'\x11')
+			if self.eat_if(L_PAREN):
+				row = self.parse_expr()
+				self.expect(COMMA)
+				col = self.parse_expr()
+				self.eat_if(R_PAREN)
 				return MatrixElementTarget(t.code, row, col)
 			return MatrixVarTarget(t.code)
 
 		if t.is_string_var():
 			return StringVarTarget(t.code)
 
-		if t.code == b'\xeb':  # user list
+		if t is LIST_PREFIX:
 			name = self._read_name()
-			if self.eat_if(b'\x10'):
-				idx = self.parse_expr();  self.eat_if(b'\x11')
+			if self.eat_if(L_PAREN):
+				idx = self.parse_expr()
+				self.eat_if(R_PAREN)
 				return ListElementTarget(name, idx)
 			return UserListTarget(name)
 
@@ -356,7 +360,7 @@ class Parser:
 
 		# Expression statement, optionally followed by → target
 		value = self.parse_expr()
-		if self.eat_if(b'\x04'):  # →
+		if self.eat_if(STORE):
 			return StoreResult(value, self.parse_store_target())
 		return ExprResult(value)
 

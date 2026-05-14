@@ -98,7 +98,7 @@ def _encode_display(text: str) -> bytes:
 	return bytes(result)
 
 
-@dataclass
+@dataclass(eq=False)
 class Token:
 	code: bytes
 	key: str
@@ -148,15 +148,8 @@ class Token:
 			self.is_digit() or self.is_real_var() or self.is_list_var() or
 			self.is_matrix_var() or self.is_string_var() or self.is_function() or
 			self.is_nullary() or
-			self.code in (
-				b'\x3a',  # . (decimal point)
-				b'\x10',  # (
-				b'\x08',  # {
-				b'\x2a',  # "
-				b'\xb0',  # − (negation)
-				b'\x72',  # Ans
-				b'\xeb',  # ∟ (user list prefix)
-			)
+			self is DOT or self is L_PAREN or self is L_BRACE or
+			self is QUOTE or self is NEG or self is ANS or self is LIST_PREFIX
 		)
 
 	# ── Operation delegation (implementations live in operations.py) ───────────
@@ -196,13 +189,67 @@ class Token:
 
 EOF_TOKEN = Token(b'', None, '', 'eof', 'eof', frozenset(), b'')
 
-def token(code: bytes, text: str, category: str, desc: str, alt: str | set[str] | None = None, key: str | None = None):
+_SEEN: set[bytes] = set()
+
+def token(code: bytes, text: str, category: str, desc: str, alt: str | set[str] | None = None, key: str | None = None) -> Token:
+	if code in _SEEN:
+		raise ValueError(f"Duplicate token code: {code!r} ({text!r})")
+	_SEEN.add(code)
 	alias = {text.lower()}
 	if isinstance(alt, str):
 		alias.add(alt.lower())
 	elif alt is not None:
 		alias.update(a.lower() for a in alt)
 	return Token(code, key, text, category, desc, alias, _encode_display(text))
+
+# ── Named syntactic tokens (referenced by identity in the parser) ──────────────
+
+# Structural / delimiter
+STORE       = token(b'\x04', "→",    "", "Stores a value into a variable", key='`', alt=("->", 'store'))
+L_BRACKET   = token(b'\x06', "[",    "", "Opens a matrix literal", key='[')
+R_BRACKET   = token(b'\x07', "]",    "", "Closes a matrix literal", key=']')
+L_BRACE     = token(b'\x08', "{",    "", "Opens a list literal", key='{')
+R_BRACE     = token(b'\x09', "}",    "", "Closes a list literal", key='}')
+L_PAREN     = token(b'\x10', "(",    "", "Opens a parenthetical expression", key='(')
+R_PAREN     = token(b'\x11', ")",    "", "Closes a parenthetical expression", key=')')
+QUOTE       = token(b'\x2a', '"',    "", "Delimits a string literal", key='"')
+COMMA       = token(b'\x2b', ",",    "", "Separates arguments in a function call", key=',')
+DOT         = token(b'\x3a', ".",    "num", "Decimal point in numeric literals", key='.')
+COLON       = token(b'\x3e', ":",    "", "Command separator", key=':')
+NEWLINE     = token(b'\x3f', "↵",    "", "Program line separator (newline)", alt="newline")
+PRGM        = token(b'\x5f', "prgm", "", "Calls a named subprogram")
+ANS         = token(b'\x72', "Ans",  "variable", "Contains the result of the last evaluated expression")
+NEG         = token(b'\xb0', "−",    "prefix", "Negates a value (unary minus)", alt=('~', "neg"), key='~')
+LIST_PREFIX = token(b'\xeb', "∟",    "", "Prefix token for user-defined lists (e.g., ∟NAME)", alt="list-prefix", key='#')
+
+# Postfix operators
+RAD         = token(b'\x0a', "ʳ",   "postfix", "Radian angle-unit suffix", alt="rad")
+DEG         = token(b'\x0b', "°",   "postfix", "Degree angle-unit suffix", alt="deg")
+INV         = token(b'\x0c', "⁻¹",  "postfix", "Computes the multiplicative inverse (reciprocal)", alt=("inv", '^-1'))
+SQ          = token(b'\x0d', "²",   "postfix", "Squares a value or matrix", alt="^2")
+TRANSPOSE   = token(b'\x0e', "ᵀ",   "postfix", "Returns the transpose of a matrix", alt=("T", 'transpose'))
+CUBE        = token(b'\x0f', "³",   "postfix", "Cubes a value", alt="^3")
+FACT        = token(b'\x2d', "!",   "postfix", "Computes the factorial of a non-negative integer", key='!')
+
+# Binary operators
+SCI_E       = token(b'\x3b', "ᴇ",   "operator", "Scientific notation exponent (×10^n)", alt="E")
+OR          = token(b'\x3c', "or",  "operator", "Boolean OR operator")
+XOR         = token(b'\x3d', "xor", "operator", "Boolean XOR operator")
+AND         = token(b'\x40', "and", "operator", "Boolean AND operator")
+EQ          = token(b'\x6a', "=",   "operator", "Tests equality between two values", key='=')
+LT          = token(b'\x6b', "<",   "operator", "Tests whether the left operand is less than the right", key='<')
+GT          = token(b'\x6c', ">",   "operator", "Tests whether the left operand is greater than the right", key='>')
+LE          = token(b'\x6d', "≤",   "operator", "Less than or equal to", alt="<=")
+GE          = token(b'\x6e', "≥",   "operator", "Greater than or equal to", alt=">=")
+NE          = token(b'\x6f', "≠",   "operator", "Not equal to", alt="!=")
+ADD         = token(b'\x70', "+",   "operator", "Adds two numbers, matrices, or lists", key='+')
+SUB         = token(b'\x71', "-",   "operator", "Subtraction", key='-')
+MUL         = token(b'\x82', "*",   "operator", "Multiplies two numbers, scalars by matrices, or lists", key='*')
+DIV         = token(b'\x83', "/",   "operator", "Division", key='/')
+NPR         = token(b'\x94', "nPr", "operator", "Computes the number of permutations of n things taken r at a time")
+NCR         = token(b'\x95', "nCr", "operator", "Computes the number of combinations of n things taken r at a time")
+POW         = token(b'\xf0', "^",   "operator", "Raises the left operand to the power of the right operand", key='^')
+XROOT       = token(b'\xf1', "×√",  "operator", "Computes the x-th root of a value", alt="xroot")
 
 
 
@@ -211,20 +258,11 @@ TOKENS: list[Token] = [
 	token(b'\x01', "►DMS",        "converter",     "Converts a decimal angle to degree-minute-second display", alt='to-DMS'),
 	token(b'\x02', "►Dec",        "converter",     "Converts a fraction or expression to decimal form", alt='to-Dec'),
 	token(b'\x03', "►Frac",       "converter",     "Converts a decimal to the simplest fraction form", alt='to-Frac'),
-	token(b'\x04', "→",           "", "Stores a value into a variable", key='`',                   alt=("->", 'store')),
+	STORE,
 	token(b'\x05', "Boxplot",     "enum",     "Selects the standard box-and-whisker plot type for a stat plot"),
-	token(b'\x06', "[",           "", "Opens a matrix literal", key='['),
-	token(b'\x07', "]",           "", "Closes a matrix literal", key=']'),
-	token(b'\x08', "{",           "", "Opens a list literal", key='{'),
-	token(b'\x09', "}",           "", "Closes a list literal", key='}'),
-	token(b'\x0a', "ʳ",           "postfix",     "Radian angle-unit suffix",                                  alt="rad"),
-	token(b'\x0b', "°",           "postfix",     "Degree angle-unit suffix",                                  alt="deg"),
-	token(b'\x0c', "⁻¹",          "postfix",     "Computes the multiplicative inverse (reciprocal)",           alt=("inv", '^-1')),
-	token(b'\x0d', "²",           "postfix",     "Squares a value or matrix",                                 alt="^2"),
-	token(b'\x0e', "ᵀ",           "postfix",   "Returns the transpose of a matrix",                         alt=("T", 'transpose')),
-	token(b'\x0f', "³",           "postfix",     "Cubes a value",                                             alt="^3"),
-	token(b'\x10', "(",           "", "Opens a parenthetical expression", key='('),
-	token(b'\x11', ")",           "", "Closes a parenthetical expression", key=')'),
+	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE,
+	RAD, DEG, INV, SQ, TRANSPOSE, CUBE,
+	L_PAREN, R_PAREN,
 	token(b'\x12', "round(",      "func",     "Rounds a number to a specified number of decimal places"),
 	token(b'\x13', "pxl-Test(",   "func",       "Returns 1 if the specified screen pixel is on, 0 otherwise"),
 	token(b'\x14', "augment(",    "func",   "Concatenates two matrices or two lists horizontally"),
@@ -248,39 +286,26 @@ TOKENS: list[Token] = [
 	token(b'\x27', "fMin(",       "func",     "Finds the x-value at the minimum of a function on an interval"),
 	token(b'\x28', "fMax(",       "func",     "Finds the x-value at the maximum of a function on an interval"),
 	token(b'\x29', " ",           "str", "Space character used in strings and output", key=' '),
-	token(b'\x2a', '"',           "",   "Delimits a string literal", key='"'),
-	token(b'\x2b', ",",           "", "Separates arguments in a function call", key=','),
+	QUOTE, COMMA,
 	token(b'\x2c', "𝑖",           "val",     "The imaginary unit, equal to √(−1)",                        alt="imaginary"),  # maybe-key
-	token(b'\x2d', "!",           "postfix",     "Computes the factorial of a non-negative integer", key='!'),
+	FACT,
 	token(b'\x2e', "CubicReg ",    "cmd",     "Fits a cubic regression model to data"),
 	token(b'\x2f', "QuartReg ",    "cmd",     "Fits a quartic regression model to data"),
 	*[token(bytes([0x30 + i]), chr(0x30 + i), "num", f"Digit {chr(0x30 + i)}", key=chr(0x30 + i)) for i in range(10)],
-	token(b'\x3a', ".",           "num",   "Decimal point in numeric literals", key='.'),
-	token(b'\x3b', "ᴇ",           "operator",     "Scientific notation exponent (×10^n)",                      alt="E"),
-	token(b'\x3c', "or",          "operator", "Boolean OR operator"),
-	token(b'\x3d', "xor",         "operator", "Boolean XOR operator"),
-	token(b'\x3e', ":",           "",  "cmd separator", key=':'),
-	token(b'\x3f', "↵",     "", "Program line separator (newline)", alt="newline"),
-	token(b'\x40', "and",         "operator", "Boolean AND operator"),
+	DOT, SCI_E, OR, XOR, COLON, NEWLINE, AND,
 	# Variables A–Z (0x41–0x5A)
 	*[token(bytes([0x41 + i]), chr(0x41 + i), "var", f"Real variable {chr(0x41 + i)}", key=chr(0x41 + i)) for i in range(26)],
 	token(b'\x5b', "θ",           "var", "Variable theta",                                            alt="theta"),  # maybe-key
-	token(b'\x5f', "prgm",        "",  "Calls a named subprogram"),
+	PRGM,
 	token(b'\x64', "Radian",      "mode",  "Sets angle mode to radians"),
 	token(b'\x65', "Degree",      "mode",  "Sets angle mode to degrees"),
 	token(b'\x66', "Normal",      "mode",  "Sets display notation to normal (non-scientific)"),
 	token(b'\x67', "Sci",         "mode",  "Sets display notation to scientific notation"),
 	token(b'\x68', "Eng",         "mode",  "Sets display notation to engineering notation"),
 	token(b'\x69', "Float",       "mode",  "Sets the display to floating-point (full) decimal mode"),
-	token(b'\x6a', "=",           "operator", "Tests equality between two values", key='='),
-	token(b'\x6b', "<",           "operator", "Tests whether the left operand is less than the right", key='<'),
-	token(b'\x6c', ">",           "operator", "Tests whether the left operand is greater than the right", key='>'),
-	token(b'\x6d', "≤",           "operator", "Less than or equal to",                                     alt="<="),
-	token(b'\x6e', "≥",           "operator", "Greater than or equal to",                                  alt=">="),
-	token(b'\x6f', "≠",           "operator", "Not equal to",                                              alt="!="),
-	token(b'\x70', "+",           "operator", "Adds two numbers, matrices, or lists", key='+'),
-	token(b'\x71', "-",           "operator", "Subtraction", key='-'),
-	token(b'\x72', "Ans",         "variable", "Contains the result of the last evaluated expression"),  # maybe-key
+	EQ, LT, GT, LE, GE, NE,
+	ADD, SUB,
+	ANS,
 	token(b'\x73', "Fix",         "control",  "Sets the display to a fixed number of decimal places"),
 	token(b'\x74', "Horiz",       "control",  "Sets the screen to horizontal split mode (graph + home)"),
 	token(b'\x75', "Full",        "control",  "Sets the screen to full (non-split) mode"),
@@ -295,8 +320,7 @@ TOKENS: list[Token] = [
 	token(b'\x7f', "<squaremark>",   "enum",  "", alt='square-mark'),
 	token(b'\x80', "<crossmark>",   "enum",  "", alt='cross-mark'),
 	token(b'\x81', "<dotmark>",   "enum",  "", alt='dot-mark'),
-	token(b'\x82', "*",           "operator", "Multiplies two numbers, scalars by matrices, or lists", key='*'),
-	token(b'\x83', "/",           "operator", "Division", key='/'),
+	MUL, DIV,
 	token(b'\x84', "Trace",       "mode",       "Activates trace mode on the graph screen"),
 	token(b'\x85', "ClrDraw",     "mode",       "Clears all drawn objects from the graph screen"),
 	token(b'\x86', "ZStandard",   "mode",       "Sets the graphing window to standard zoom (±10 on both axes)"),
@@ -313,8 +337,7 @@ TOKENS: list[Token] = [
 	token(b'\x91', "PrintScreen", "mode", "Prints the current screen to a connected printer (legacy)"),
 	token(b'\x92', "ZoomSto",     "mode",       "Saves the current graphing window settings"),
 	token(b'\x93', "Text(",       "cmdfunc",       "Draws text on the graph screen at specified pixel coordinates"),
-	token(b'\x94', "nPr",         "operator",     "Computes the number of permutations of n things taken r at a time"),
-	token(b'\x95', "nCr",         "operator",     "Computes the number of combinations of n things taken r at a time"),
+	NPR, NCR,
 	token(b'\x96', "FnOn ",        "cmd",  "Turns on one or more Y= functions for graphing"),
 	token(b'\x97', "FnOff ",       "cmd",  "Turns off one or more Y= functions for graphing"),
 	token(b'\x98', "StorePic ",    "cmd",       "Saves the current graph screen image to a Pic variable"),
@@ -340,7 +363,7 @@ TOKENS: list[Token] = [
 	token(b'\xad', "getKey",      "val",       "Returns the keycode of the last key pressed, or 0 if none"),
 	token(b'\xae', "'",           "str",   "Apostrophe / single-quote character",                        alt="apostrophe", key="'"),  # DMS MODE?
 	token(b'\xaf', "?",           "str",       "Displays a question-mark prompt to wait for user input (legacy)", key='?'),
-	token(b'\xb0', "−",           "prefix",     "Negates a value (unary minus)",                              alt=('~', "neg"), key='~'),
+	NEG,
 	token(b'\xb1', "int(",        "func",     "Returns the greatest integer less than or equal to a number (floor)"),
 	token(b'\xb2', "abs(",        "func",     "Returns the absolute value of a number"),
 	token(b'\xb3', "det(",        "func",   "Returns the determinant of a square matrix"),
@@ -398,12 +421,11 @@ TOKENS: list[Token] = [
 	token(b'\xe8', "Get(",        "cmdfunc",       "Retrieves a list from a connected CBL/CBR device"),
 	token(b'\xe9', "PlotsOn",     "cmd",     "Turns on one or all stat plots"),
 	token(b'\xea', "PlotsOff",    "cmd",     "Turns off one or all stat plots"),
-	token(b'\xeb', "∟",           "",     "Prefix token used to name user-defined lists (e.g., ∟NAME)",  alt="list-prefix", key='#'),
+	LIST_PREFIX,
 	token(b'\xec', "Plot1(",      "cmdfunc",     "Configures stat Plot 1 with a type and data sources"),
 	token(b'\xed', "Plot2(",      "cmdfunc",     "Configures stat Plot 2 with a type and data sources"),
 	token(b'\xee', "Plot3(",      "cmdfunc",     "Configures stat Plot 3 with a type and data sources"),
-	token(b'\xf0', "^",           "operator",     "Raises the left operand to the power of the right operand", key='^'),
-	token(b'\xf1', "×√",          "operator",     "Computes the x-th root of a value",                          alt="xroot"),
+	POW, XROOT,
 	token(b'\xf2', "1-Var Stats ", "cmd",     "Computes one-variable statistics for a dataset"),
 	token(b'\xf3', "2-Var Stats ", "cmd",     "Computes two-variable statistics for a paired dataset"),
 	token(b'\xf4', "LinReg(a+bx) ","cmd",     "Fits a linear regression of the form a+bx to data"),
