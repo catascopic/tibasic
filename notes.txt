@@ -1,19 +1,22 @@
-E10 by itself is valid, so E should be considered something more like a regular term that does implicit multiplication, except that on its right side, it does 10^x
-rename these fields
+Move all functions to Environment, make them instance methods
+VariableToken subclass of Token, implements store and resolve
+
+Remove token categories, we'll rely on other fields to determine this
+Remove token descriptions and move them to a JSON file that maps hex codes to the description
+
+What token does the calculator use to separate lines?
+
+Use @vectorized/@complex
+TiList/TiMatrix
+
+E10 by itself is valid (E is the scientific notation token), so E should be considered something more like a regular term that does implicit multiplication, except that on its right side, it does 10^x
+
+rename these fields:
 call_fn -> func
 execute_fn -> cmd
 unary_op_fn -> unary_op
 binary_op_fn -> binary_op
 value_fn -> resolve
-variables also implement resolve
-new field: store(env) for variables, also rand, but not dim since it takes an additional argument and makes more sense as a special case
 
-Move all functions to Environment
-
-Use @vectorized/@complex
-TiList/TiMatrix
-
-What token does the calculator use to separate lines?
-
-remove token categories
-remove token descriptions
+Variables shoould also implement resolve!
+New field: store(env) function for variables, also rand, but not dim since it takes an additional argument and makes more sense as a special case
