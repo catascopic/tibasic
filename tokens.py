@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Any
-import math, cmath, datetime as _dt, itertools
+import math, itertools
 from environment import Environment
 
 @dataclass(eq=False)
@@ -87,51 +87,6 @@ def token(
 	)
 
 
-# ── Math / operator helpers ────────────────────────────────────────────────────
-
-def _factorial(n: float) -> float:
-	if n < 0 or n != int(n):
-		raise ValueError("Argument to ! must be a non-negative integer")
-	return float(math.factorial(int(n)))
-
-def _ncr(n: float, r: float) -> float:
-	return float(math.comb(int(n), int(r)))
-
-def _npr(n: float, r: float) -> float:
-	return float(math.perm(int(n), int(r)))
-
-def _ti_int(x: float) -> float:
-	"""TI int(): floor for positive, ceiling for negative (truncation toward zero)."""
-	return math.floor(x) if x >= 0 else math.ceil(x)
-
-def _fpart(x: float) -> float:
-	return x - _ti_int(x)
-
-def _list_mul(a, b):
-	if isinstance(a, list) and not isinstance(a[0], list):
-		return [x * b for x in a]
-	if isinstance(b, list) and not isinstance(b[0], list):
-		return [a * x for x in b]
-	return a * b
-
-def _matrix_transpose(m):
-	return [[m[r][c] for r in range(len(m))] for c in range(len(m[0]))]
-
-def _wrap(fn):
-	"""Wrap a plain math function so it takes (parser,) and calls parse_args()."""
-	def call(parser):
-		args = parser.parse_args()
-		return fn(*args)
-	return call
-
-def _randint_call(parser):
-	args = parser.parse_args()
-	a, b = int(args[0]), int(args[1])
-	n = int(args[2]) if len(args) > 2 else 1
-	results = [float(random.randint(a, b)) for _ in range(n)]
-	return results[0] if n == 1 else results
-
-
 # ── Named syntactic tokens (referenced by identity in the parser) ──────────────
 
 # Structural / delimiter
@@ -150,7 +105,7 @@ NEWLINE	 = token(b'\x3f', "↵", alt="newline")
 PRGM		= token(b'\x5f', "prgm")
 ANS		 = token(b'\x72', "Ans", resolve=lambda env: env.ans, store=lambda env, value: setattr(env, 'ans', value))
 NEG		 = token(b'\xb0', "−", alt=('~', "neg"), key='~', unary_op=lambda x: -x)
-DIM      = token(b'\xb5', "dim(", func=_wrap(lambda a: float(len(a)) if isinstance(a, list) and not isinstance(a[0], list) else [float(len(a)), float(len(a[0]))]))
+DIM      = token(b'\xb5', "dim(", func=lambda parser: parser.env.dim(parser))
 LIST_PREFIX = token(b'\xeb', "∟", alt="list-prefix", key='#')
 
 # Postfix operators
@@ -158,9 +113,9 @@ RAD		 = token(b'\x0a', "ʳ", alt="rad", postfix=True, unary_op=lambda x: x)
 DEG		 = token(b'\x0b', "°", alt="deg", postfix=True, unary_op=math.radians)
 INV		 = token(b'\x0c', "⁻¹", alt=("inv", '^-1'), postfix=True, unary_op=lambda x: 1 / x)
 SQ		  = token(b'\x0d', "²", alt="^2", postfix=True, unary_op=lambda x: x ** 2)
-TRANSPOSE   = token(b'\x0e', "ᵀ", alt=("T", 'transpose'), postfix=True, unary_op=_matrix_transpose)
+TRANSPOSE   = token(b'\x0e', "ᵀ", alt=("T", 'transpose'), postfix=True, unary_op=Environment.matrix_transpose)
 CUBE		= token(b'\x0f', "³", alt="^3", postfix=True, unary_op=lambda x: x ** 3)
-FACT		= token(b'\x2d', "!", key='!', postfix=True, unary_op=_factorial)
+FACT		= token(b'\x2d', "!", key='!', postfix=True, unary_op=Environment.factorial)
 
 # Binary operators
 SCI_E	   = token(b'\x3b', "ᴇ", alt="E", bp=(65, 66), binary_op=lambda a, b: a * (10 ** b))
@@ -175,20 +130,13 @@ GE		  = token(b'\x6e', "≥", alt=">=", bp=(40, 41), binary_op=lambda a, b: 1.0 
 NE		  = token(b'\x6f', "≠", alt="!=", bp=(40, 41), binary_op=lambda a, b: 1.0 if a != b else 0.0)
 ADD		 = token(b'\x70', "+", key='+', bp=(50, 51), binary_op=lambda a, b: a + b)
 SUB		 = token(b'\x71', "-", key='-', bp=(50, 51), binary_op=lambda a, b: a - b)
-MUL		 = token(b'\x82', "*", key='*', bp=(60, 61), binary_op=_list_mul)
+MUL		 = token(b'\x82', "*", key='*', bp=(60, 61), binary_op=Environment.list_mul)
 DIV		 = token(b'\x83', "/", key='/', bp=(60, 61), binary_op=lambda a, b: a / b)
-NPR		 = token(b'\x94', "nPr", bp=(60, 61), binary_op=_npr)
-NCR		 = token(b'\x95', "nCr", bp=(60, 61), binary_op=_ncr)
+NPR		 = token(b'\x94', "nPr", bp=(60, 61), binary_op=Environment.npr)
+NCR		 = token(b'\x95', "nCr", bp=(60, 61), binary_op=Environment.ncr)
 RAND     = token(b'\xab', "rand", resolve=Environment.rand, store=lambda env, value: env.set_random_seed(value))
 POW		 = token(b'\xf0', "^", key='^', bp=(70, 69), binary_op=lambda a, b: a ** b)
 XROOT	 = token(b'\xf1', "×√", alt="xroot", bp=(60, 61), binary_op=lambda a, b: b ** (1 / a))
-
-# ── Special call functions (implemented as Environment methods) ─────────────────
-
-_call_seq    = lambda parser: parser.env.call_seq(parser)
-_call_sigma  = lambda parser: parser.env.call_sigma(parser)
-_call_nderiv = lambda parser: parser.env.call_nderiv(parser)
-_call_fnint  = lambda parser: parser.env.call_fnint(parser)
 
 # ── Token list ─────────────────────────────────────────────────────────────────
 
@@ -202,27 +150,26 @@ TOKENS: list[Token] = [
 	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE,
 	RAD, DEG, INV, SQ, TRANSPOSE, CUBE,
 	L_PAREN, R_PAREN,
-	token(b'\x12', "round(",
-		  func=_wrap(lambda a, b=0: round(a, int(b)))),
+	token(b'\x12', "round(",   func=lambda parser: parser.env.round(parser)),
 	token(b'\x13', "pxl-Test("),
 	token(b'\x14', "augment("),
 	token(b'\x15', "rowSwap("),
 	token(b'\x16', "row+("),
 	token(b'\x17', "*row("),
 	token(b'\x18', "*row+("),
-	token(b'\x19', "max(", func=_wrap(lambda *a: max(a) if len(a) > 1 else max(a[0]))),
-	token(b'\x1a', "min(", func=_wrap(lambda *a: min(a) if len(a) > 1 else min(a[0]))),
+	token(b'\x19', "max(",    func=lambda parser: parser.env.max(parser)),
+	token(b'\x1a', "min(",    func=lambda parser: parser.env.min(parser)),
 	token(b'\x1b', "R►Pr(", alt='R-to-Pr'),
 	token(b'\x1c', "R►Pθ(", alt='R-to-P-theta'),
 	token(b'\x1d', "P►Rx(", alt='R-to-Px'),
 	token(b'\x1e', "P►Ry(", alt='R-to-Py'),
-	token(b'\x1f', "median(", func=_wrap(lambda a, b=None: float(sorted(a)[len(a) // 2]))),
+	token(b'\x1f', "median(", func=lambda parser: parser.env.median(parser)),
 	token(b'\x20', "randM("),
-	token(b'\x21', "mean(", func=_wrap(lambda a, b=None: (sum(a) / len(a) if b is None else sum(x * w for x, w in zip(a, b)) / sum(b)))),
+	token(b'\x21', "mean(",   func=lambda parser: parser.env.mean(parser)),
 	token(b'\x22', "solve("),
-	token(b'\x23', "seq(", func=_call_seq),
-	token(b'\x24', "fnInt(", func=_call_fnint),
-	token(b'\x25', "nDeriv(", func=_call_nderiv),
+	token(b'\x23', "seq(",    func=lambda parser: parser.env.call_seq(parser)),
+	token(b'\x24', "fnInt(",  func=lambda parser: parser.env.call_fnint(parser)),
+	token(b'\x25', "nDeriv(", func=lambda parser: parser.env.call_nderiv(parser)),
 	token(b'\x27', "fMin("),
 	token(b'\x28', "fMax("),
 	token(b'\x29', " ", key=' '),
@@ -301,38 +248,38 @@ TOKENS: list[Token] = [
 	token(b'\xa9', "DrawF"),
 	RAND,
 	token(b'\xac', "π", alt="pi", resolve=lambda env: math.pi),
-	token(b'\xad', "getKey", resolve=lambda env: env.get('_getkey', 0.0)),
+	token(b'\xad', "getKey", resolve=Environment.get_key),
 	token(b'\xae', "'", alt="apostrophe", key="'"),
 	token(b'\xaf', "?", key='?'),
 	NEG,
-	token(b'\xb1', "int(", func=_wrap(_ti_int)),
-	token(b'\xb2', "abs(", func=_wrap(abs)),
-	token(b'\xb3', "det(", func=_wrap(lambda m: float(sum(m[i][i] for i in range(len(m)))))),
-	token(b'\xb4', "identity(", func=_wrap(lambda n: [[1.0 if r == c else 0.0 for c in range(int(n))] for r in range(int(n))])),
+	token(b'\xb1', "int(",    func=lambda parser: parser.env.int_(parser)),
+	token(b'\xb2', "abs(",    func=lambda parser: parser.env.abs(parser)),
+	token(b'\xb3', "det(",    func=lambda parser: parser.env.det(parser)),
+	token(b'\xb4', "identity(", func=lambda parser: parser.env.identity(parser)),
 	DIM,
-	token(b'\xb6', "sum(", func=_wrap(lambda a: sum(a))),
-	token(b'\xb7', "prod(", func=_wrap(math.prod)),
-	token(b'\xb8', "not(", func=_wrap(lambda a: float(not a))),
-	token(b'\xb9', "iPart(", func=_wrap(math.trunc)),
-	token(b'\xba', "fPart(", func=_wrap(_fpart)),
-	token(b'\xbc', "√(", alt=("sqrt(", 'squareroot'), func=_wrap(lambda a: cmath.sqrt(a) if a < 0 else math.sqrt(a))),
-	token(b'\xbd', "³√(", alt=("cbrt(", 'cuberoot'), func=_wrap(lambda a: -(-a) ** (1 / 3) if a < 0 else a ** (1 / 3))),
-	token(b'\xbe', "ln(", func=_wrap(cmath.log)),
-	token(b'\xbf', "e^(", func=_wrap(cmath.exp)),
-	token(b'\xc0', "log(", func=_wrap(cmath.log10)),
-	token(b'\xc1', "10^(", func=_wrap(lambda a: 10 ** a)),
-	token(b'\xc2', "sin(", func=_wrap(math.sin)),
-	token(b'\xc3', "sin⁻¹(", alt="arcsin(", func=_wrap(math.asin)),
-	token(b'\xc4', "cos(", func=_wrap(math.cos)),
-	token(b'\xc5', "cos⁻¹(", alt="arccos(", func=_wrap(math.acos)),
-	token(b'\xc6', "tan(", func=_wrap(math.tan)),
-	token(b'\xc7', "tan⁻¹(", alt="arctan(", func=_wrap(math.atan)),
-	token(b'\xc8', "sinh(", func=_wrap(math.sinh)),
-	token(b'\xc9', "sinh⁻¹(", alt="arcsinh(", func=_wrap(math.asinh)),
-	token(b'\xca', "cosh(", func=_wrap(math.cosh)),
-	token(b'\xcb', "cosh⁻¹(", alt="arccosh(", func=_wrap(math.acosh)),
-	token(b'\xcc', "tanh(", func=_wrap(math.tanh)),
-	token(b'\xcd', "tanh⁻¹(", alt="arctanh(", func=_wrap(math.atanh)),
+	token(b'\xb6', "sum(",    func=lambda parser: parser.env.sum(parser)),
+	token(b'\xb7', "prod(",   func=lambda parser: parser.env.prod(parser)),
+	token(b'\xb8', "not(",    func=lambda parser: parser.env.not_(parser)),
+	token(b'\xb9', "iPart(",  func=lambda parser: parser.env.ipart(parser)),
+	token(b'\xba', "fPart(",  func=lambda parser: parser.env.fpart(parser)),
+	token(b'\xbc', "√(",  alt=("sqrt(", 'squareroot'), func=lambda parser: parser.env.sqrt(parser)),
+	token(b'\xbd', "³√(", alt=("cbrt(", 'cuberoot'),   func=lambda parser: parser.env.cbrt(parser)),
+	token(b'\xbe', "ln(",     func=lambda parser: parser.env.ln(parser)),
+	token(b'\xbf', "e^(",     func=lambda parser: parser.env.exp(parser)),
+	token(b'\xc0', "log(",    func=lambda parser: parser.env.log(parser)),
+	token(b'\xc1', "10^(",    func=lambda parser: parser.env.pow10(parser)),
+	token(b'\xc2', "sin(",    func=lambda parser: parser.env.sin(parser)),
+	token(b'\xc3', "sin⁻¹(", alt="arcsin(",  func=lambda parser: parser.env.asin(parser)),
+	token(b'\xc4', "cos(",    func=lambda parser: parser.env.cos(parser)),
+	token(b'\xc5', "cos⁻¹(", alt="arccos(",  func=lambda parser: parser.env.acos(parser)),
+	token(b'\xc6', "tan(",    func=lambda parser: parser.env.tan(parser)),
+	token(b'\xc7', "tan⁻¹(", alt="arctan(",  func=lambda parser: parser.env.atan(parser)),
+	token(b'\xc8', "sinh(",   func=lambda parser: parser.env.sinh(parser)),
+	token(b'\xc9', "sinh⁻¹(", alt="arcsinh(", func=lambda parser: parser.env.asinh(parser)),
+	token(b'\xca', "cosh(",   func=lambda parser: parser.env.cosh(parser)),
+	token(b'\xcb', "cosh⁻¹(", alt="arccosh(", func=lambda parser: parser.env.acosh(parser)),
+	token(b'\xcc', "tanh(",   func=lambda parser: parser.env.tanh(parser)),
+	token(b'\xcd', "tanh⁻¹(", alt="arctanh(", func=lambda parser: parser.env.atanh(parser)),
 	token(b'\xce', "If "),
 	token(b'\xcf', "Then"),
 	token(b'\xd0', "Else"),
@@ -532,14 +479,14 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x05', "►Nom(", alt="to-Nom"),
 	token(b'\xbb\x06', "►Eff(", alt="to-Eff"),
 	token(b'\xbb\x07', "dbd("),
-	token(b'\xbb\x08', "lcm(", func=_wrap(math.lcm)),
-	token(b'\xbb\x09', "gcd(", func=_wrap(math.gcd)),
-	token(b'\xbb\x0a', "randInt(", func=_randint_call),
+	token(b'\xbb\x08', "lcm(",      func=lambda parser: parser.env.lcm(parser)),
+	token(b'\xbb\x09', "gcd(",      func=lambda parser: parser.env.gcd(parser)),
+	token(b'\xbb\x0a', "randInt(",  func=lambda parser: parser.env.randint(parser)),
 	token(b'\xbb\x0b', "randBin("),
-	token(b'\xbb\x0c', "sub(", func=_wrap(lambda s, start, length: s[int(start) - 1 : int(start) - 1 + int(length)])),
+	token(b'\xbb\x0c', "sub(",      func=lambda parser: parser.env.sub(parser)),
 	token(b'\xbb\x0d', "stdDev("),
 	token(b'\xbb\x0e', "variance("),
-	token(b'\xbb\x0f', "inString(", func=_wrap(lambda s, sub: float(s.find(sub) + 1) if sub in s else 0.0)),
+	token(b'\xbb\x0f', "inString(", func=lambda parser: parser.env.instring(parser)),
 	token(b'\xbb\x10', "normalcdf("),
 	token(b'\xbb\x11', "invNorm("),
 	token(b'\xbb\x12', "tcdf("),
@@ -555,20 +502,20 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x1c', "tpdf("),
 	token(b'\xbb\x1d', "χ²pdf(", alt="chi2pdf"),
 	token(b'\xbb\x1e', "Fpdf("),
-	token(b'\xbb\x1f', "randNorm(", func=_wrap(lambda mu, sigma: random.gauss(mu, sigma))),
+	token(b'\xbb\x1f', "randNorm(", func=lambda parser: parser.env.randnorm(parser)),
 	token(b'\xbb\x20', "tvm_Pmt"),
 	token(b'\xbb\x21', "tvm_I%"),
 	token(b'\xbb\x22', "tvm_PV"),
 	token(b'\xbb\x23', "tvm_N"),
 	token(b'\xbb\x24', "tvm_FV"),
-	token(b'\xbb\x25', "conj(", func=_wrap(lambda a: complex(a.real, -a.imag))),
-	token(b'\xbb\x26', "real(", func=_wrap(lambda a: a.real)),
-	token(b'\xbb\x27', "imag(", func=_wrap(lambda a: a.imag)),
-	token(b'\xbb\x28', "angle(", func=_wrap(cmath.phase)),
-	token(b'\xbb\x29', "cumSum(", func=_wrap(lambda a: [sum(a[:i + 1]) for i in range(len(a))])),
+	token(b'\xbb\x25', "conj(",   func=lambda parser: parser.env.conj(parser)),
+	token(b'\xbb\x26', "real(",   func=lambda parser: parser.env.real(parser)),
+	token(b'\xbb\x27', "imag(",   func=lambda parser: parser.env.imag(parser)),
+	token(b'\xbb\x28', "angle(",  func=lambda parser: parser.env.angle(parser)),
+	token(b'\xbb\x29', "cumSum(", func=lambda parser: parser.env.cumsum(parser)),
 	token(b'\xbb\x2a', "expr("),
-	token(b'\xbb\x2b', "length(", func=_wrap(lambda s: float(len(s)))),
-	token(b'\xbb\x2c', "ΔList(", alt="dList(", func=_wrap(lambda a: [a[i + 1] - a[i] for i in range(len(a) - 1)])),
+	token(b'\xbb\x2b', "length(", func=lambda parser: parser.env.length(parser)),
+	token(b'\xbb\x2c', "ΔList(",  alt="dList(", func=lambda parser: parser.env.delta_list(parser)),
 	token(b'\xbb\x2d', "ref("),
 	token(b'\xbb\x2e', "rref("),
 	token(b'\xbb\x2f', "►Rect", alt="to-Rect"),
@@ -716,12 +663,12 @@ TOKENS: list[Token] = [
 	token(b'\xef\x06', "dayOfWk("),
 	token(b'\xef\x07', "getDtStr("),
 	token(b'\xef\x08', "getTmStr("),
-	token(b'\xef\x09', "getDate", resolve=lambda env: [float(_dt.date.today().year), float(_dt.date.today().month), float(_dt.date.today().day)]),
-	token(b'\xef\x0a', "getTime", resolve=lambda env: [float(_dt.datetime.now().hour), float(_dt.datetime.now().minute), float(_dt.datetime.now().second)]),
-	token(b'\xef\x0b', "startTmr", resolve=lambda env: float(int(_dt.datetime.now().timestamp()))),
-	token(b'\xef\x0c', "getDtFmt", resolve=lambda env: env.get('_dtfmt', 1.0)),
-	token(b'\xef\x0d', "getTmFmt", resolve=lambda env: env.get('_tmfmt', 12.0)),
-	token(b'\xef\x0e', "isClockOn", resolve=lambda env: 1.0),
+	token(b'\xef\x09', "getDate",   resolve=Environment.get_date),
+	token(b'\xef\x0a', "getTime",   resolve=Environment.get_time),
+	token(b'\xef\x0b', "startTmr",  resolve=Environment.start_tmr),
+	token(b'\xef\x0c', "getDtFmt",  resolve=Environment.get_dt_fmt),
+	token(b'\xef\x0d', "getTmFmt",  resolve=Environment.get_tm_fmt),
+	token(b'\xef\x0e', "isClockOn", resolve=Environment.is_clock_on),
 	token(b'\xef\x0f', "ClockOff"),
 	token(b'\xef\x10', "ClockOn"),
 	token(b'\xef\x11', "OpenLib("),
@@ -740,10 +687,10 @@ TOKENS: list[Token] = [
 	token(b'\xef\x1e', "<mathprintbox>"),
 	token(b'\xef\x30', "►n/d◄►Un/d"),
 	token(b'\xef\x31', "►F◄►D"),
-	token(b'\xef\x32', "remainder(", func=_wrap(lambda a, b: float(int(a) % int(b)))),
-	token(b'\xef\x33', "Σ(", alt='sigma(', func=_call_sigma),
-	token(b'\xef\x34', "logBASE(", func=_wrap(lambda a, b: math.log(a) / math.log(b))),
-	token(b'\xef\x35', "randIntNoRep(", func=_wrap(lambda a, b, n=None: random.sample(range(int(a), int(b) + 1), int(b - a + 1) if n is None else int(n)))),
+	token(b'\xef\x32', "remainder(",    func=lambda parser: parser.env.remainder(parser)),
+	token(b'\xef\x33', "Σ(",  alt='sigma(', func=lambda parser: parser.env.call_sigma(parser)),
+	token(b'\xef\x34', "logBASE(",      func=lambda parser: parser.env.logbase(parser)),
+	token(b'\xef\x35', "randIntNoRep(", func=lambda parser: parser.env.randintnotrep(parser)),
 	token(b'\xef\x36', "MATHPRINT"),
 	token(b'\xef\x37', "CLASSIC"),
 	token(b'\xef\x38', "n/d"),
