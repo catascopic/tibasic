@@ -13,7 +13,7 @@ class Token:
 	binary_op: Any = None		# (lhs, rhs) -> value
 	unary_op: Any = None		# (operand) -> value  (prefix or postfix)
 	postfix: bool = False		# True for postfix unary operators
-	func: Any = None			# (parser) -> value  for function tokens
+	call: Any = None			# (parser) -> value  for function tokens
 	cmd: Any = None				# (parser) -> None  for command tokens
 	resolve: Any = None			# (env) -> value  for variables and nullary tokens
 	store: Any = None			# (env, value) -> None  for writable variables
@@ -46,7 +46,7 @@ class Token:
 
 	def can_start_atom(self) -> bool:
 		return (
-			self.resolve is not None or self.func is not None or
+			self.resolve is not None or self.call is not None or
 			self.is_digit() or self.is_list_var() or self.is_matrix_var() or
 			self.is_string_var() or self.is_stat_var() or self.is_window_var() or
 			self in {DOT, L_PAREN, L_BRACE, QUOTE, NEG, ANS, LIST_PREFIX}
@@ -68,6 +68,7 @@ def token(
 	unary_op=None,
 	postfix: bool = False,
 	func=None,
+	call=None,
 	cmd=None,
 	resolve=None,
 	store=None,
@@ -81,9 +82,11 @@ def token(
 		alias.add(alt.lower())
 	elif alt is not None:
 		alias.update(a.lower() for a in alt)
+	if call is None and func is not None:
+		call = lambda parser, _f=func: _f(*parser.parse_args())
 	return Token(
 		code, text, key, alias,
-		bp, binary_op, unary_op, postfix, func, cmd, resolve, store,
+		bp, binary_op, unary_op, postfix, call, cmd, resolve, store,
 	)
 
 
@@ -167,9 +170,9 @@ TOKENS: list[Token] = [
 	token(b'\x20', "randM("),
 	token(b'\x21', "mean(",   func=Environment.mean),
 	token(b'\x22', "solve("),
-	token(b'\x23', "seq(",    func=Environment.call_seq),
-	token(b'\x24', "fnInt(",  func=Environment.call_fnint),
-	token(b'\x25', "nDeriv(", func=Environment.call_nderiv),
+	token(b'\x23', "seq(",    call=lambda parser: parser.env.call_seq(parser)),
+	token(b'\x24', "fnInt(",  call=lambda parser: parser.env.call_fnint(parser)),
+	token(b'\x25', "nDeriv(", call=lambda parser: parser.env.call_nderiv(parser)),
 	token(b'\x27', "fMin("),
 	token(b'\x28', "fMax("),
 	token(b'\x29', " ", key=' '),
@@ -688,7 +691,7 @@ TOKENS: list[Token] = [
 	token(b'\xef\x30', "►n/d◄►Un/d"),
 	token(b'\xef\x31', "►F◄►D"),
 	token(b'\xef\x32', "remainder(",    func=Environment.remainder),
-	token(b'\xef\x33', "Σ(",  alt='sigma(', func=Environment.call_sigma),
+	token(b'\xef\x33', "Σ(",  alt='sigma(', call=lambda parser: parser.env.call_sigma(parser)),
 	token(b'\xef\x34', "logBASE(",      func=Environment.logbase),
 	token(b'\xef\x35', "randIntNoRep(", func=Environment.randintnotrep),
 	token(b'\xef\x36', "MATHPRINT"),

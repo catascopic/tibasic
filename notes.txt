@@ -1,3 +1,6 @@
+You don't actually need an environment for most functions!
+token has an instance method parse_func
+
 Move all functions to Environment, make them instance methods
 VariableToken subclass of Token, implements store and resolve
 
