@@ -1,4 +1,5 @@
-﻿from dataclasses import dataclass
+﻿from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 import math, itertools
 from environment import Environment
@@ -67,11 +68,11 @@ def token(
 	binary_op=None,
 	unary_op=None,
 	postfix: bool = False,
-	func=None,
-	call=None,
-	cmd=None,
-	resolve=None,
-	store=None,
+	func: Callable[[Parser], Any] | None = None,
+	pure_func: Callable | None = None,
+	cmd: Callable[[Environment], None] | None = None,
+	resolve: Callable[[Environment], Any] | None = None,
+	store: Callable[[Environment], None] | None = None,
 ) -> Token:
 
 	if code in _SEEN:
@@ -194,8 +195,14 @@ TOKENS: list[Token] = [
 	token(b'\x67', "Sci"),
 	token(b'\x68', "Eng"),
 	token(b'\x69', "Float"),
-	EQ, LT, GT, LE, GE, NE,
-	ADD, SUB,
+	EQ,
+	LT,
+	GT,
+	LE,
+	GE,
+	NE,
+	ADD,
+	SUB,
 	ANS,
 	token(b'\x73', "Fix"),
 	token(b'\x74', "Horiz"),
@@ -211,7 +218,8 @@ TOKENS: list[Token] = [
 	token(b'\x7f', "<squaremark>", alt='square-mark'),
 	token(b'\x80', "<crossmark>",alt='cross-mark'),
 	token(b'\x81', "<dotmark>", alt='dot-mark'),
-	MUL, DIV,
+	MUL,
+	DIV,
 	token(b'\x84', "Trace"),
 	token(b'\x85', "ClrDraw"),
 	token(b'\x86', "ZStandard"),
@@ -228,7 +236,8 @@ TOKENS: list[Token] = [
 	token(b'\x91', "PrintScreen"),
 	token(b'\x92', "ZoomSto"),
 	token(b'\x93', "Text("),
-	NPR, NCR,
+	NPR,
+	NCR,
 	token(b'\x96', "FnOn "),
 	token(b'\x97', "FnOff "),
 	token(b'\x98', "StorePic "),

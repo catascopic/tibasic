@@ -1,3 +1,12 @@
+Three function types:
+pure_func: if the function takes pre-parsed arguments and doesn't need access to the environment. Function should be defined in a purefunctions module.
+env_func: same as pure_func, but does have access to the environment. Function should be a member of Environment class. Are there actually any functions like this? I think there are some that depend on the state of certain variables.
+func: the actual function called by the parser, takes the parser as input, because it does some special parsing of its arguments. Not sure where this should be kept. In the parser class?
+Alternatively, maybe these special functions don't actually get raw parser access, but instead receive all their arguments as Thunks, some of which may be evaluated immediately. This would be a little less efficient, though.
+
+Commands are similar to functions, except can't be nested (a command must be the first token in a line) and have no output. They typically modify the environment (drawing on the screen) or they manage program flow. Some commands use parentheses ("Line(") and some don't ("Horizontal ")
+
+
 You don't actually need an environment for most functions!
 token has an instance method parse_func
 
