@@ -149,13 +149,9 @@ DOT		 = token(b'\x3a', ".", key='.')
 COLON	   = token(b'\x3e', ":", key=':')
 NEWLINE	 = token(b'\x3f', "↵", alt="newline")
 PRGM		= token(b'\x5f', "prgm")
-ANS		 = token(b'\x72', "Ans",
-					resolve=lambda env: env.ans,
-					store=lambda env, value: setattr(env, 'ans', value))
-NEG		 = token(b'\xb0', "−", alt=('~', "neg"), key='~',
-					unary_op=lambda x: -x)
-DIM      = token(b'\xb5', "dim(",
-	func=_wrap(lambda a: float(len(a)) if isinstance(a, list) and not isinstance(a[0], list) else [float(len(a)), float(len(a[0]))]))
+ANS		 = token(b'\x72', "Ans", resolve=lambda env: env.ans, store=lambda env, value: setattr(env, 'ans', value))
+NEG		 = token(b'\xb0', "−", alt=('~', "neg"), key='~', unary_op=lambda x: -x)
+DIM      = token(b'\xb5', "dim(", func=_wrap(lambda a: float(len(a)) if isinstance(a, list) and not isinstance(a[0], list) else [float(len(a)), float(len(a[0]))]))
 LIST_PREFIX = token(b'\xeb', "∟", alt="list-prefix", key='#')
 
 # Postfix operators
