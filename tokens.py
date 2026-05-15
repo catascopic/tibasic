@@ -1,8 +1,7 @@
-from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
-import math, cmath, random, datetime as _dt, itertools
-
+import math, cmath, datetime as _dt, itertools
+from environment import Environment
 
 @dataclass(eq=False)
 class Token:
@@ -180,7 +179,7 @@ MUL		 = token(b'\x82', "*", key='*', bp=(60, 61), binary_op=_list_mul)
 DIV		 = token(b'\x83', "/", key='/', bp=(60, 61), binary_op=lambda a, b: a / b)
 NPR		 = token(b'\x94', "nPr", bp=(60, 61), binary_op=_npr)
 NCR		 = token(b'\x95', "nCr", bp=(60, 61), binary_op=_ncr)
-RAND     = token(b'\xab', "rand", resolve=lambda env: random.random(), store=lambda env, value: env.set_random_seed(value))
+RAND     = token(b'\xab', "rand", resolve=Environment.rand, store=lambda env, value: env.set_random_seed(value))
 POW		 = token(b'\xf0', "^", key='^', bp=(70, 69), binary_op=lambda a, b: a ** b)
 XROOT	 = token(b'\xf1', "×√", alt="xroot", bp=(60, 61), binary_op=lambda a, b: b ** (1 / a))
 

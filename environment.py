@@ -1,4 +1,9 @@
+import random
+
 class Environment:
+		
+	def rand(self):
+		return random.random()
 
 	def call_seq(self, parser) -> list:
 		from tokens import COMMA, R_PAREN
