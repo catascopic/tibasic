@@ -185,7 +185,7 @@ class Parser:
 
 		# Function call
 		if t.func is not None:
-			return t.func(self)
+			return t.func(self.env, self)
 
 		# Variables and nullary constants (π, e, rand, Ans, etc.)
 		if t.resolve is not None:

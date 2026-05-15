@@ -43,37 +43,30 @@ class Environment:
 	def matrix_transpose(m):
 		return [[m[r][c] for r in range(len(m))] for c in range(len(m[0]))]
 
-	# ── Static resolve helpers (used by resolve= fields in tokens) ──────────────
+	# ── Nullary resolve helpers (used by resolve= fields in tokens) ─────────────
 
-	@staticmethod
-	def get_date(env):
+	def get_date(self):
 		t = _dt.date.today()
 		return [float(t.year), float(t.month), float(t.day)]
 
-	@staticmethod
-	def get_time(env):
+	def get_time(self):
 		t = _dt.datetime.now()
 		return [float(t.hour), float(t.minute), float(t.second)]
 
-	@staticmethod
-	def start_tmr(env):
+	def start_tmr(self):
 		return float(int(_dt.datetime.now().timestamp()))
 
-	@staticmethod
-	def get_dt_fmt(env):
-		return getattr(env, '_dtfmt', 1.0)
+	def get_dt_fmt(self):
+		return getattr(self, '_dtfmt', 1.0)
 
-	@staticmethod
-	def get_tm_fmt(env):
-		return getattr(env, '_tmfmt', 12.0)
+	def get_tm_fmt(self):
+		return getattr(self, '_tmfmt', 12.0)
 
-	@staticmethod
-	def is_clock_on(env):
+	def is_clock_on(self):
 		return 1.0
 
-	@staticmethod
-	def get_key(env):
-		return getattr(env, '_getkey', 0.0)
+	def get_key(self):
+		return getattr(self, '_getkey', 0.0)
 
 	# ── Nullary / rand ──────────────────────────────────────────────────────────
 
@@ -103,7 +96,7 @@ class Environment:
 		return sum(a) / len(a) if b is None else sum(x * w for x, w in zip(a, b)) / sum(b)
 
 	@autoparse
-	def int(self, x):
+	def int_(self, x):
 		return Environment.ti_int(x)
 
 	@autoparse
