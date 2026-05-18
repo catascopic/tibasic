@@ -140,7 +140,7 @@ DIV		 = token(b'\x83', "/", key='/', bp=(60, 61), binary_op=purefunctions.div)
 NPR		 = token(b'\x94', "nPr", bp=(60, 61), binary_op=purefunctions.npr)
 NCR		 = token(b'\x95', "nCr", bp=(60, 61), binary_op=purefunctions.ncr)
 RAND     = token(b'\xab', "rand", resolve=Environment.rand, store=lambda env, value: env.set_random_seed(value))
-POW		 = token(b'\xf0', "^", key='^', bp=(70, 69), binary_op=purefunctions.pow_)
+POW		 = token(b'\xf0', "^", key='^', bp=(70, 69), binary_op=purefunctions.pow)
 XROOT	 = token(b'\xf1', "×√", alt="xroot", bp=(60, 61), binary_op=lambda a, b: purefunctions.xth_root(b, a))
 
 # ── Token list ─────────────────────────────────────────────────────────────────
@@ -645,16 +645,16 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xcd', "Í", alt="I-acute"),
 	token(b'\xbb\xce', "GarbageCollect"),
 	token(b'\xbb\xcf', "~", alt="tilde"),
-	token(b'\xbb\xd1', "@", alt="at-sign",   key='@'),
-	token(b'\xbb\xd2', "#", alt="hash",   key='#'),
-	token(b'\xbb\xd3', "$", alt="dollar",	key='$'),
+	token(b'\xbb\xd1', "@", alt="at-sign", key='@'),
+	token(b'\xbb\xd2', "#", alt="hash", key='#'),
+	token(b'\xbb\xd3', "$", alt="dollar", key='$'),
 	token(b'\xbb\xd4', "&", alt="ampersand", key='&'),
 	token(b'\xbb\xd5', "`",alt="backtick"),
 	token(b'\xbb\xd6', ";", alt="semicolon", key=';'),
 	token(b'\xbb\xd7', "\\", alt="backslash", key='\\'),
-	token(b'\xbb\xd8', "|", alt="pipe",  key='|'),
-	token(b'\xbb\xd9', "_", alt="underscore",key='_'),
-	token(b'\xbb\xda', "%", alt="percent",   key='%'),
+	token(b'\xbb\xd8', "|", alt="pipe", key='|'),
+	token(b'\xbb\xd9', "_", alt="underscore", key='_'),
+	token(b'\xbb\xda', "%", alt="percent", key='%'),
 	token(b'\xbb\xdb', "…", alt="ellipsis"),
 	token(b'\xbb\xdc', "∠", alt="angle"),
 	token(b'\xbb\xdd', "ß", alt="sharp-s"),
@@ -788,6 +788,3 @@ if __name__ == '__main__':
 
 	for token in sorted(TOKENS, key=lambda t: t.code):
 		print(token.code.hex(), token.display.decode('latin-1'))
-
-
-

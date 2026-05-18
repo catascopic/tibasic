@@ -146,9 +146,11 @@ class TiMatrix:
 		if self.cols != other.rows:
 			raise ValueError(f"Dimension mismatch: ({self.rows}×{self.cols}) @ ({other.rows}×{other.cols})")
 		return TiMatrix([
-			[builtins.sum(self.inner[r][k] * other.inner[k][c] for k in range(self.cols))
-			 for c in range(other.cols)]
-			for r in range(self.rows)
+			[
+				builtins.sum(
+					self.inner[r][k] * other.inner[k][c] for k in range(self.cols)
+				) for c in range(other.cols)
+			] for r in range(self.rows)
 		])
 
 	def __pow__(self, n):
@@ -297,7 +299,7 @@ def div(a, b):
 	return a / b
 
 
-def pow_(a, b):
+def pow(a, b):
 	if isinstance(a, TiMatrix):
 		return a ** b
 	return _vec_pow(a, b)
@@ -344,34 +346,28 @@ def dim(value):
 def not_(x):
 	return int(not _require_real(x))
 
-
 @vectorized_with_matrix
 @handle_complex
 def i_part(x):
 	return math.trunc(x)
-
 
 @vectorized_with_matrix
 @handle_complex
 def int_(x):
 	return math.floor(x)
 
-
 @vectorized_with_matrix
 @handle_complex
 def f_part(x):
 	return x - math.trunc(x)
 
-
 @vectorized
 def sqrt(x):
 	return cmath.sqrt(x) if isinstance(x, complex) or x < 0 else math.sqrt(x)
 
-
 @vectorized
 def cbrt(x):
 	return cmath.exp(cmath.log(x) / 3) if isinstance(x, complex) else math.cbrt(x)
-
 
 @vectorized
 def xth_root(x, n):
@@ -408,16 +404,13 @@ def augment(a, b):
 def real(x):
 	return x.real if isinstance(x, complex) else x
 
-
 @vectorized
 def imag(x):
 	return x.imag if isinstance(x, complex) else 0
 
-
 @vectorized
 def conj(a):
 	return complex(a.real, -a.imag) if isinstance(a, complex) else a
-
 
 @vectorized
 def angle(a):
@@ -454,7 +447,7 @@ def fill(lst, x):
 # ── String functions ────────────────────────────────────────────────────────────
 
 def in_string(value, substring):
-	return _require_str(value).find(substring) + 1
+	return _require_str(value).find(_require_str(substring)) + 1
 
 
 def length(value):
@@ -540,11 +533,11 @@ def median(lst, freqlist=None):
 	if total <= 0:
 		raise ValueError("median: total frequency must be positive")
 
-	def nth(k):
+	def nth(n):
 		count = 0
 		for value, freq in pairs:
 			count += int(freq)
-			if k < count:
+			if n < count:
 				return value
 
 	if total % 2:
@@ -632,7 +625,7 @@ def _make_dispatch(name, real_fn, cpx_fn):
 	fn.__name__ = fn.__qualname__ = name
 	return vectorized(fn)
 
-for _name, _mf, _cf in [
+for _name, _real_fn, _cpx_fn in [
 	('sin',   math.sin,   cmath.sin),
 	('asin',  math.asin,  cmath.asin),
 	('cos',   math.cos,   cmath.cos),
@@ -650,7 +643,7 @@ for _name, _mf, _cf in [
 	('log',   math.log10, cmath.log10),
 	('logbase',   math.log, cmath.log),
 ]:
-	globals()[_name] = _make_dispatch(_name, _mf, _cf)
+	globals()[_name] = _make_dispatch(_name, _real_fn, _cpx_fn)
 
 
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
@@ -704,8 +697,7 @@ def randintnotrep(a, b):
 
 def rowswap(mat, row1, row2):
 	_require_matrix(mat)
-	row1, row2 = _require_int(row1), _require_int(row2)
-	if not (1 <= row1 <= mat.rows) or not (1 <= row2 <= mat.rows):
+	if not (1 <= _require_int(row1) <= mat.rows) or not (1 <= _require_int(row2) <= mat.rows):
 		raise ValueError(f"rowSwap: row out of range")
 	result = mat.copy()
 	result.inner[row1 - 1], result.inner[row2 - 1] = result.inner[row2 - 1], result.inner[row1 - 1]
@@ -714,8 +706,7 @@ def rowswap(mat, row1, row2):
 
 def row_plus(mat, row1, row2):
 	_require_matrix(mat)
-	row1, row2 = _require_int(row1), _require_int(row2)
-	if not (1 <= row1 <= mat.rows) or not (1 <= row2 <= mat.rows):
+	if not (1 <= _require_int(row1) <= mat.rows) or not (1 <= _require_int(row2) <= mat.rows):
 		raise ValueError(f"row+: row out of range")
 	result = mat.copy()
 	result.inner[row2 - 1] = [result.inner[row2 - 1][c] + result.inner[row1 - 1][c] for c in range(mat.cols)]
@@ -724,8 +715,7 @@ def row_plus(mat, row1, row2):
 
 def times_row(factor, mat, row):
 	_require_matrix(mat)
-	row = _require_int(row)
-	if not (1 <= row <= mat.rows):
+	if not (1 <= _require_int(row) <= mat.rows):
 		raise ValueError(f"*row: row out of range")
 	result = mat.copy()
 	result.inner[row - 1] = [factor * x for x in result.inner[row - 1]]
@@ -734,8 +724,7 @@ def times_row(factor, mat, row):
 
 def times_row_plus(factor, mat, row1, row2):
 	_require_matrix(mat)
-	row1, row2 = _require_int(row1), _require_int(row2)
-	if not (1 <= row1 <= mat.rows) or not (1 <= row2 <= mat.rows):
+	if not (1 <= _require_int(row1) <= mat.rows) or not (1 <= _require_int(row2) <= mat.rows):
 		raise ValueError(f"*row+: row out of range")
 	result = mat.copy()
 	result.inner[row2 - 1] = [
@@ -800,30 +789,22 @@ def rref(mat):
 
 @vectorized
 def r_pr(x, y):
-	_require_real(x)
-	_require_real(y)
-	return math.hypot(x, y)
+	return math.hypot(_require_real(x), _require_real(y))
 
 
 @vectorized
 def r_ptheta(x, y):
-	_require_real(x)
-	_require_real(y)
-	return math.atan2(y, x)
+	return math.atan2(_require_real(y), _require_real(x))
 
 
 @vectorized
 def p_rx(r, theta):
-	_require_real(r)
-	_require_real(theta)
-	return r * math.cos(theta)
+	return _require_real(r) * math.cos(_require_real(theta))
 
 
 @vectorized
 def p_ry(r, theta):
-	_require_real(r)
-	_require_real(theta)
-	return r * math.sin(theta)
+	return _require_real(r) * math.sin(_require_real(theta))
 
 
 # ── Matrix/list conversions ──────────────────────────────────────────────────
@@ -848,15 +829,15 @@ def matr_list(mat, *args):
 		lst.inner = [mat.inner[r][i] for r in range(mat.rows)]
 
 
-def list_matr(mat_target, *lists):
-	"""list_matr(list1, list2, ..., mat_target) — the last arg is the matrix variable."""
+def list_matr(mat, *lists):
+	"""list_matr(list1, list2, ..., mat) — the last arg is the matrix variable."""
 	# Note: in TI-BASIC, List►matr(list1,...,mat) stores to mat
-	_require_matrix(mat_target)
+	_require_matrix(mat)
 	if not lists:
 		raise ValueError("list_matr: need at least one list")
 	cols = len(lists)
 	max_rows = builtins.max(len(_require_list(lst)) for lst in lists)
-	mat_target.inner = [
+	mat.inner = [
 		[lists[c].inner[r] if r < len(lists[c]) else 0.0 for c in range(cols)]
 		for r in range(max_rows)
 	]
@@ -865,8 +846,7 @@ def list_matr(mat_target, *lists):
 # ── randM / randBin ──────────────────────────────────────────────────────────
 
 def randm(rows, cols):
-	rows, cols = _require_int(rows), _require_int(cols)
-	if not (1 <= rows <= 99) or not (1 <= cols <= 99):
+	if not (1 <= _require_int(rows) <= 99) or not (1 <= _require_int(cols) <= 99):
 		raise ValueError("randM: dimensions must be 1-99")
 	# Per spec: entries are successive randInt(-9,9) calls filled bottom-right to top-left
 	flat = [random.randint(-9, 9) for _ in range(rows * cols)]
@@ -875,7 +855,7 @@ def randm(rows, cols):
 
 
 def randbin(n, p, simulations=None):
-	n = _require_int(n)
+	_require_int(n)
 	if not (0 <= p <= 1):
 		raise ValueError("randBin: p must be in [0, 1]")
 	if simulations is None:
@@ -976,20 +956,21 @@ def _inc_beta(a, b, x):
 
 
 def normalpdf(x, mu=0, sigma=1):
-	x = _require_real(x)
+	_require_real(x)
 	z = (x - mu) / sigma
 	return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2 * math.pi))
 
 
 def normalcdf(lower, upper, mu=0, sigma=1):
-	lower, upper = _require_real(lower), _require_real(upper)
+	_require_real(lower)
+	_require_real(upper)
 	def _cdf(z):
 		return 0.5 * (1 + math.erf(z / math.sqrt(2)))
 	return _cdf((upper - mu) / sigma) - _cdf((lower - mu) / sigma)
 
 
 def invnorm(p, mu=0, sigma=1):
-	p = _require_real(p)
+	_require_real(p)
 	if p <= 0:
 		return -1e99
 	if p >= 1:
@@ -1016,13 +997,16 @@ def invnorm(p, mu=0, sigma=1):
 
 
 def tpdf(t, df):
-	t, df = _require_real(t), _require_real(df)
+	_require_real(t)
+	_require_real(df)
 	log_coeff = math.lgamma((df + 1) / 2) - 0.5 * math.log(df * math.pi) - math.lgamma(df / 2)
 	return math.exp(log_coeff - (df + 1) / 2 * math.log(1 + t * t / df))
 
 
 def tcdf(lower, upper, df):
-	lower, upper, df = _require_real(lower), _require_real(upper), _require_real(df)
+	_require_real(lower)
+	_require_real(upper)
+	_require_real(df)
 	def _t_cdf(x, v):
 		if x == 0:
 			return 0.5
@@ -1036,7 +1020,8 @@ def tcdf(lower, upper, df):
 
 
 def invt(p, df):
-	p, df = _require_real(p), _require_real(df)
+	_require_real(p)
+	_require_real(df)
 	if p <= 0:
 		return -1e99
 	if p >= 1:
@@ -1056,7 +1041,8 @@ def invt(p, df):
 
 
 def chi2pdf(x, df):
-	x, df = _require_real(x), _require_real(df)
+	_require_real(x)
+	_require_real(df)
 	if x <= 0:
 		return 0.0
 	k = df
@@ -1064,7 +1050,9 @@ def chi2pdf(x, df):
 
 
 def chi2cdf(lower, upper, df):
-	lower, upper, df = _require_real(lower), _require_real(upper), _require_real(df)
+	_require_real(lower)
+	_require_real(upper)
+	_require_real(df)
 	def _cdf(x, k):
 		if x <= 0:
 			return 0.0
@@ -1073,7 +1061,9 @@ def chi2cdf(lower, upper, df):
 
 
 def fpdf(x, df1, df2):
-	x, df1, df2 = _require_real(x), _require_real(df1), _require_real(df2)
+	_require_real(x)
+	_require_real(df1)
+	_require_real(df2)
 	if x <= 0:
 		return 0.0
 	d1, d2 = df1, df2
@@ -1083,8 +1073,10 @@ def fpdf(x, df1, df2):
 
 
 def fcdf(lower, upper, df1, df2):
-	lower, upper = _require_real(lower), _require_real(upper)
-	df1, df2 = _require_real(df1), _require_real(df2)
+	_require_real(lower)
+	_require_real(upper)
+	_require_real(df1)
+	_require_real(df2)
 	def _cdf(x, d1, d2):
 		if x <= 0:
 			return 0.0
@@ -1094,8 +1086,8 @@ def fcdf(lower, upper, df1, df2):
 
 
 def binompdf(n, p, k=None):
-	n = _require_int(n)
-	p = _require_real(p)
+	_require_int(n)
+	_require_real(p)
 	if k is None:
 		return TiList([math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(n + 1)])
 	k = _require_int(k)
@@ -1103,8 +1095,8 @@ def binompdf(n, p, k=None):
 
 
 def binomcdf(n, p, k=None):
-	n = _require_int(n)
-	p = _require_real(p)
+	_require_int(n)
+	_require_real(p)
 	if k is None:
 		acc = 0.0
 		result = []
@@ -1117,20 +1109,24 @@ def binomcdf(n, p, k=None):
 
 
 def poissonpdf(lam, k):
-	lam, k = _require_real(lam), _require_int(k)
+	_require_real(lam)
+	_require_int(k)
 	return math.exp(-lam) * lam ** k / math.factorial(k)
 
 
 def poissoncdf(lam, k):
-	lam, k = _require_real(lam), _require_int(k)
+	_require_real(lam)
+	_require_int(k)
 	return builtins.sum(math.exp(-lam) * lam ** i / math.factorial(i) for i in range(k + 1))
 
 
 def geometpdf(p, n):
-	p, n = _require_real(p), _require_int(n)
+	_require_real(p)
+	_require_int(n)
 	return p * (1 - p) ** (n - 1)
 
 
 def geometcdf(p, n):
-	p, n = _require_real(p), _require_int(n)
+	_require_real(p)
+	_require_int(n)
 	return 1 - (1 - p) ** n

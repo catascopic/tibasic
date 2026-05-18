@@ -1,4 +1,23 @@
+tokens that start with "►" and don't use parentheses (like "►DMS") are a special type of command I'm calling a converter, and they're only valid as the last token in a line. Like the "store" arrow, they also implicitly close all parentheses/brackets/quotes
+Basically, lines can take these forms:
+<expression> (does nothing by itself other than side effects, updates Ans)
+<expression>[->]<variable>
+<expression><converter>
+<command>
+However, converters can also be applied to Disp/Output! I'm not sure there are any other instances of valid converters mixing with commands. Disp 1->X gives an error, though.
+Certain functions take a list variable basically as an output parameter, such as Matr►list. You've implemented this in purefunctions, and while it is a "pure function" in that it doesn't have side effects, it has to take as input one or more list variables, not expressions that evaluate to a list. In the current paradigm, these functions would have to take a parser as a parameter so they could do custom argument parsing.
+Here's another idea: by default, functions/commands take expressions as parameters, but in the "token" convenience method, maybe there could be an optional parameter that describes the parameters. For example, seq( would be [thunk,real_var,expr,expr,expr?]. This might get more complicated than just doing custom parsing, though. Especially since Matr►list would be [expr,list_var*], with a vararg parameter.
+Maybe the parser could at least have convenience methods for this? I'm not sure the best way to handle it because, due to the commas/ending parenthesis it seems like you'd still have to give it pretty explicit instructions -- you couldn't just say parser.parse_thunk_arg(); parser.parse_real_arg(); parser.parse_expr_arg(); unless the parser kept track of some kind of internal state to handle commas. Maybe it could spawn a child object that had state?
+Something I just tried:
+Prompt A,1
+This prompted me to store a value to A, then errored, since 1 isn't a variable. This means the calculator is evaluating very lazily. I probably do either want direct access to the parser, or the aforementioned arg-parser child object.
+
+
+stdDev/variance: put the actual code in variance, have stdDev call sqrt on it, that simplifies the code
 fix xth_root arg order
+
+
+
 
 Three function types:
 pure_func: if the function takes pre-parsed arguments and doesn't need access to the environment. Function should be defined in a purefunctions module.
