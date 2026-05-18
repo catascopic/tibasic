@@ -48,48 +48,6 @@ def _require_int(value):
 	return int(value)
 
 
-# ── Logical operators ────────────────────────────────────────────────────────────
-
-@vectorized
-def and_(a, b):
-	return int(bool(_require_real(a)) and bool(_require_real(b)))
-
-@vectorized
-def or_(a, b):
-	return int(bool(_require_real(a)) or bool(_require_real(b)))
-
-@vectorized
-def xor(a, b):
-	return int(bool(_require_real(a)) ^ bool(_require_real(b)))
-
-
-# ── Comparison operators ──────────────────────────────────────────────────────────
-
-@vectorized
-def eq(a, b):
-	return int(_require_real(a) == _require_real(b))
-	
-@vectorized
-def ne(a, b):
-	return int(_require_real(a) != _require_real(b))
-
-@vectorized
-def lt(a, b):
-	return int(_require_real(a) < _require_real(b))
-
-@vectorized
-def gt(a, b):
-	return int(_require_real(a) > _require_real(b))
-
-@vectorized
-def le(a, b):
-	return int(_require_real(a) <= _require_real(b))
-
-@vectorized
-def ge(a, b):
-	return int(_require_real(a) >= _require_real(b))
-
-
 # ── TiList ────────────────────────────────────────────────────────────────────────
 
 class TiList:
@@ -253,6 +211,48 @@ def vectorized_with_matrix(func):
 	return apply
 
 
+# ── Logical operators ────────────────────────────────────────────────────────────
+
+@vectorized
+def and_(a, b):
+	return int(bool(_require_real(a)) and bool(_require_real(b)))
+
+@vectorized
+def or_(a, b):
+	return int(bool(_require_real(a)) or bool(_require_real(b)))
+
+@vectorized
+def xor(a, b):
+	return int(bool(_require_real(a)) ^ bool(_require_real(b)))
+
+
+# ── Comparison operators ──────────────────────────────────────────────────────────
+
+@vectorized
+def eq(a, b):
+	return int(_require_real(a) == _require_real(b))
+
+@vectorized
+def ne(a, b):
+	return int(_require_real(a) != _require_real(b))
+
+@vectorized
+def lt(a, b):
+	return int(_require_real(a) < _require_real(b))
+
+@vectorized
+def gt(a, b):
+	return int(_require_real(a) > _require_real(b))
+
+@vectorized
+def le(a, b):
+	return int(_require_real(a) <= _require_real(b))
+
+@vectorized
+def ge(a, b):
+	return int(_require_real(a) >= _require_real(b))
+
+
 # ── Arithmetic operators ──────────────────────────────────────────────────────────
 
 @vectorized_with_matrix
@@ -370,15 +370,23 @@ def sqrt(x):
 
 @vectorized
 def cbrt(x):
-	return cmath.exp(cmath.log(x) / 3) if isinstance(a, complex) else math.cbrt(x)
+	return cmath.exp(cmath.log(x) / 3) if isinstance(x, complex) else math.cbrt(x)
 
 
 @vectorized
 def xth_root(x, n):
-	return cmath.exp(cmath.log(x) / n) if isinstance(x, complex) or x < 0 else math.log(x) / n
+	return cmath.exp(cmath.log(x) / n) if isinstance(x, complex) or x < 0 else x ** (1 / n)
 
 
 def cum_sum(lst):
+	if isinstance(lst, TiMatrix):
+		cols = lst.cols
+		rows = lst.rows
+		return TiMatrix([
+			[builtins.sum(lst.inner[rr][c] for rr in range(r + 1))
+			 for c in range(cols)]
+			for r in range(rows)
+		])
 	return TiList(list(accumulate(_require_list(lst))))
 
 
@@ -465,6 +473,29 @@ def sub(value, start, length):
 	return value[start - 1 : start - 1 + length]
 
 # ── Aggregate / statistics ───────────────────────────────────────────────────────
+
+def stddev(lst, freqlist=None):
+	_require_list(lst)
+	if freqlist is None:
+		n = len(lst)
+		if n < 2:
+			raise ValueError("stdDev: need at least 2 elements")
+		m = mean(lst)
+		return math.sqrt(builtins.sum((x - m) ** 2 for x in lst) / (n - 1))
+	_require_list(freqlist)
+	if len(lst) != len(freqlist):
+		raise ValueError("stdDev: dim mismatch")
+	m = mean(lst, freqlist)
+	total_w = builtins.sum(freqlist)
+	if total_w <= 1:
+		raise ValueError("stdDev: total frequency must be > 1")
+	return math.sqrt(builtins.sum(w * (x - m) ** 2 for x, w in zip(lst, freqlist)) / (total_w - 1))
+
+
+def variance(lst, freqlist=None):
+	s = stddev(lst, freqlist)
+	return s * s
+
 
 @vectorized_with_matrix
 def round(a, b=9):
@@ -566,12 +597,26 @@ def transpose(mat):
 	return TiMatrix([[mat.inner[r][c] for r in range(mat.rows)] for c in range(mat.cols)])
 
 
-def sum(lst):
-	return builtins.sum(_require_list(lst))
+def sum(lst, start=None, end=None):
+	inner = _require_list(lst).inner
+	if start is None:
+		return builtins.sum(inner)
+	start = _require_int(start)
+	end = _require_int(end) if end is not None else len(inner)
+	if not (1 <= start <= end <= len(inner)):
+		raise ValueError(f"sum: index out of range (start={start}, end={end}, dim={len(inner)})")
+	return builtins.sum(inner[start - 1 : end])
 
 
-def prod(lst):
-	return math.prod(_require_list(lst))
+def prod(lst, start=None, end=None):
+	inner = _require_list(lst).inner
+	if start is None:
+		return math.prod(inner)
+	start = _require_int(start)
+	end = _require_int(end) if end is not None else len(inner)
+	if not (1 <= start <= end <= len(inner)):
+		raise ValueError(f"prod: index out of range (start={start}, end={end}, dim={len(inner)})")
+	return math.prod(inner[start - 1 : end])
 
 
 # ── Transcendental functions ────────────────────────────────────────────────────
@@ -603,7 +648,7 @@ for _name, _mf, _cf in [
 	('ln',    math.log,   cmath.log),
 	('exp',   math.exp,   cmath.exp),
 	('log',   math.log10, cmath.log10),
-	('log_base',   math.log, cmath.log),
+	('logbase',   math.log, cmath.log),
 ]:
 	globals()[_name] = _make_dispatch(_name, _mf, _cf)
 
@@ -643,11 +688,449 @@ def randint(low, high, count=1):
 	return TiList([random.randint(low, high) for _ in range(_require_int(count))])
 
 
-def randnorm(mu, sigma):
-	return random.gauss(mu, sigma)
+def randnorm(mu, sigma, n=None):
+	if n is None:
+		return random.gauss(mu, sigma)
+	return TiList([random.gauss(mu, sigma) for _ in range(_require_int(n))])
 
 
 def randintnotrep(a, b):
 	lst = list(range(_require_int(a), _require_int(b) + 1))
-	random.suffle(lst)
-	return lst
+	random.shuffle(lst)
+	return TiList(lst)
+
+
+# ── Matrix row operations ────────────────────────────────────────────────────
+
+def rowswap(mat, row1, row2):
+	_require_matrix(mat)
+	row1, row2 = _require_int(row1), _require_int(row2)
+	if not (1 <= row1 <= mat.rows) or not (1 <= row2 <= mat.rows):
+		raise ValueError(f"rowSwap: row out of range")
+	result = mat.copy()
+	result.inner[row1 - 1], result.inner[row2 - 1] = result.inner[row2 - 1], result.inner[row1 - 1]
+	return result
+
+
+def row_plus(mat, row1, row2):
+	_require_matrix(mat)
+	row1, row2 = _require_int(row1), _require_int(row2)
+	if not (1 <= row1 <= mat.rows) or not (1 <= row2 <= mat.rows):
+		raise ValueError(f"row+: row out of range")
+	result = mat.copy()
+	result.inner[row2 - 1] = [result.inner[row2 - 1][c] + result.inner[row1 - 1][c] for c in range(mat.cols)]
+	return result
+
+
+def times_row(factor, mat, row):
+	_require_matrix(mat)
+	row = _require_int(row)
+	if not (1 <= row <= mat.rows):
+		raise ValueError(f"*row: row out of range")
+	result = mat.copy()
+	result.inner[row - 1] = [factor * x for x in result.inner[row - 1]]
+	return result
+
+
+def times_row_plus(factor, mat, row1, row2):
+	_require_matrix(mat)
+	row1, row2 = _require_int(row1), _require_int(row2)
+	if not (1 <= row1 <= mat.rows) or not (1 <= row2 <= mat.rows):
+		raise ValueError(f"*row+: row out of range")
+	result = mat.copy()
+	result.inner[row2 - 1] = [
+		result.inner[row2 - 1][c] + factor * result.inner[row1 - 1][c]
+		for c in range(mat.cols)
+	]
+	return result
+
+
+# ── ref / rref ───────────────────────────────────────────────────────────────
+
+def ref(mat):
+	_require_matrix(mat)
+	if mat.rows > mat.cols:
+		raise ValueError(f"ref: matrix must have at least as many columns as rows")
+	m = [row.copy() for row in mat.inner]
+	rows, cols = mat.rows, mat.cols
+	pivot_row = 0
+	for col in range(cols):
+		if pivot_row >= rows:
+			break
+		# Find pivot
+		pivot = next((r for r in range(pivot_row, rows) if m[r][col] != 0), None)
+		if pivot is None:
+			continue
+		m[pivot_row], m[pivot] = m[pivot], m[pivot_row]
+		p = m[pivot_row][col]
+		m[pivot_row] = [x / p for x in m[pivot_row]]
+		for r in range(pivot_row + 1, rows):
+			if m[r][col] != 0:
+				f = m[r][col]
+				m[r] = [m[r][k] - f * m[pivot_row][k] for k in range(cols)]
+		pivot_row += 1
+	return TiMatrix(m)
+
+
+def rref(mat):
+	_require_matrix(mat)
+	if mat.rows > mat.cols:
+		raise ValueError(f"rref: matrix must have at least as many columns as rows")
+	m = [row.copy() for row in mat.inner]
+	rows, cols = mat.rows, mat.cols
+	pivot_row = 0
+	for col in range(cols):
+		if pivot_row >= rows:
+			break
+		pivot = next((r for r in range(pivot_row, rows) if m[r][col] != 0), None)
+		if pivot is None:
+			continue
+		m[pivot_row], m[pivot] = m[pivot], m[pivot_row]
+		p = m[pivot_row][col]
+		m[pivot_row] = [x / p for x in m[pivot_row]]
+		for r in range(rows):
+			if r != pivot_row and m[r][col] != 0:
+				f = m[r][col]
+				m[r] = [m[r][k] - f * m[pivot_row][k] for k in range(cols)]
+		pivot_row += 1
+	return TiMatrix(m)
+
+
+# ── Coordinate conversions ───────────────────────────────────────────────────
+
+@vectorized
+def r_pr(x, y):
+	_require_real(x)
+	_require_real(y)
+	return math.hypot(x, y)
+
+
+@vectorized
+def r_ptheta(x, y):
+	_require_real(x)
+	_require_real(y)
+	return math.atan2(y, x)
+
+
+@vectorized
+def p_rx(r, theta):
+	_require_real(r)
+	_require_real(theta)
+	return r * math.cos(theta)
+
+
+@vectorized
+def p_ry(r, theta):
+	_require_real(r)
+	_require_real(theta)
+	return r * math.sin(theta)
+
+
+# ── Matrix/list conversions ──────────────────────────────────────────────────
+
+def matr_list(mat, *args):
+	"""matr_list(mat, list1, list2, ...) or matr_list(mat, col_num, list)"""
+	_require_matrix(mat)
+	if len(args) == 2 and isinstance(args[0], (int, float)):
+		# Single-column extraction: matr_list(mat, col#, list_var)
+		col = _require_int(args[0])
+		if not (1 <= col <= mat.cols):
+			raise ValueError(f"matr_list: column {col} out of range")
+		target = args[1]
+		_require_list(target)
+		target.inner = [mat.inner[r][col - 1] for r in range(mat.rows)]
+		return
+	# Store successive columns into the provided lists
+	for i, lst in enumerate(args):
+		if i >= mat.cols:
+			break
+		_require_list(lst)
+		lst.inner = [mat.inner[r][i] for r in range(mat.rows)]
+
+
+def list_matr(mat_target, *lists):
+	"""list_matr(list1, list2, ..., mat_target) — the last arg is the matrix variable."""
+	# Note: in TI-BASIC, List►matr(list1,...,mat) stores to mat
+	_require_matrix(mat_target)
+	if not lists:
+		raise ValueError("list_matr: need at least one list")
+	cols = len(lists)
+	max_rows = builtins.max(len(_require_list(lst)) for lst in lists)
+	mat_target.inner = [
+		[lists[c].inner[r] if r < len(lists[c]) else 0.0 for c in range(cols)]
+		for r in range(max_rows)
+	]
+
+
+# ── randM / randBin ──────────────────────────────────────────────────────────
+
+def randm(rows, cols):
+	rows, cols = _require_int(rows), _require_int(cols)
+	if not (1 <= rows <= 99) or not (1 <= cols <= 99):
+		raise ValueError("randM: dimensions must be 1-99")
+	# Per spec: entries are successive randInt(-9,9) calls filled bottom-right to top-left
+	flat = [random.randint(-9, 9) for _ in range(rows * cols)]
+	flat.reverse()
+	return TiMatrix([flat[r * cols:(r + 1) * cols] for r in range(rows)])
+
+
+def randbin(n, p, simulations=None):
+	n = _require_int(n)
+	if not (0 <= p <= 1):
+		raise ValueError("randBin: p must be in [0, 1]")
+	if simulations is None:
+		return builtins.sum(1 for _ in range(n) if random.random() < p)
+	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(_require_int(simulations))])
+
+
+# ── Probability distributions ────────────────────────────────────────────────
+
+def _regularized_inc_gamma(a, x):
+	"""Lower regularized incomplete gamma function P(a, x) via series."""
+	if x < 0:
+		raise ValueError("x must be >= 0")
+	if x == 0:
+		return 0.0
+	# Use series representation for x < a+1, continued fraction otherwise
+	if x < a + 1:
+		# Series
+		term = 1.0 / a
+		total = term
+		for k in range(1, 300):
+			term *= x / (a + k)
+			total += term
+			if builtins.abs(term) < builtins.abs(total) * 1e-15:
+				break
+		return total * math.exp(-x + a * math.log(x) - math.lgamma(a))
+	else:
+		# Continued fraction (Lentz)
+		FPMIN = 1e-300
+		b = x + 1 - a
+		c = 1 / FPMIN
+		d = 1 / b
+		h = d
+		for i in range(1, 300):
+			an = -i * (i - a)
+			b += 2
+			d = an * d + b
+			if builtins.abs(d) < FPMIN:
+				d = FPMIN
+			c = b + an / c
+			if builtins.abs(c) < FPMIN:
+				c = FPMIN
+			d = 1 / d
+			delta = d * c
+			h *= delta
+			if builtins.abs(delta - 1) < 1e-15:
+				break
+		return 1.0 - math.exp(-x + a * math.log(x) - math.lgamma(a)) * h
+
+
+def _inc_beta(a, b, x):
+	"""Regularized incomplete beta function I_x(a,b)."""
+	if x < 0 or x > 1:
+		raise ValueError("x must be in [0,1]")
+	if x == 0:
+		return 0.0
+	if x == 1:
+		return 1.0
+	lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
+	# Use symmetry relation if needed for convergence
+	if x > (a + 1) / (a + b + 2):
+		return 1.0 - _inc_beta(b, a, 1 - x)
+	# Continued fraction
+	FPMIN = 1e-300
+	qab = a + b
+	qap = a + 1
+	qam = a - 1
+	c = 1.0
+	d = 1.0 - qab * x / qap
+	if builtins.abs(d) < FPMIN:
+		d = FPMIN
+	d = 1 / d
+	h = d
+	for m in range(1, 300):
+		m2 = 2 * m
+		aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+		d = 1 + aa * d
+		if builtins.abs(d) < FPMIN:
+			d = FPMIN
+		c = 1 + aa / c
+		if builtins.abs(c) < FPMIN:
+			c = FPMIN
+		d = 1 / d
+		h *= d * c
+		aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+		d = 1 + aa * d
+		if builtins.abs(d) < FPMIN:
+			d = FPMIN
+		c = 1 + aa / c
+		if builtins.abs(c) < FPMIN:
+			c = FPMIN
+		d = 1 / d
+		delta = d * c
+		h *= delta
+		if builtins.abs(delta - 1) < 1e-15:
+			break
+	return math.exp(a * math.log(x) + b * math.log(1 - x) - lbeta) * h / a
+
+
+def normalpdf(x, mu=0, sigma=1):
+	x = _require_real(x)
+	z = (x - mu) / sigma
+	return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2 * math.pi))
+
+
+def normalcdf(lower, upper, mu=0, sigma=1):
+	lower, upper = _require_real(lower), _require_real(upper)
+	def _cdf(z):
+		return 0.5 * (1 + math.erf(z / math.sqrt(2)))
+	return _cdf((upper - mu) / sigma) - _cdf((lower - mu) / sigma)
+
+
+def invnorm(p, mu=0, sigma=1):
+	p = _require_real(p)
+	if p <= 0:
+		return -1e99
+	if p >= 1:
+		return 1e99
+	# Rational approximation (Abramowitz & Stegun / Beasley-Springer-Moro)
+	def _inv_std(q):
+		# Beasley-Springer-Moro algorithm
+		a = [2.50662823884, -18.61500062529, 41.39119773534, -25.44106049637]
+		b = [-8.47351093090, 23.08336743743, -21.06224101826, 3.13082909833]
+		c = [0.3374754822726147, 0.9761690190917186, 0.1607979714918209,
+			 0.0276438810333863, 0.0038405729373609, 0.0003951896511349,
+			 0.0000321767881768, 0.0000002888167364, 0.0000003960315187]
+		if 0.08 <= q <= 0.92:
+			r = q - 0.5
+			s = r * r
+			return r * (a[0] + s * (a[1] + s * (a[2] + s * a[3]))) / \
+			       (1 + s * (b[0] + s * (b[1] + s * (b[2] + s * b[3]))))
+		else:
+			r = math.sqrt(-math.log(q if q < 0.5 else 1 - q))
+			x = c[0] + r * (c[1] + r * (c[2] + r * (c[3] + r * (c[4] + r * (c[5] + r * (c[6] + r * (c[7] + r * c[8])))))))
+			return x if q >= 0.5 else -x
+	z = _inv_std(p)
+	return mu + sigma * z
+
+
+def tpdf(t, df):
+	t, df = _require_real(t), _require_real(df)
+	log_coeff = math.lgamma((df + 1) / 2) - 0.5 * math.log(df * math.pi) - math.lgamma(df / 2)
+	return math.exp(log_coeff - (df + 1) / 2 * math.log(1 + t * t / df))
+
+
+def tcdf(lower, upper, df):
+	lower, upper, df = _require_real(lower), _require_real(upper), _require_real(df)
+	def _t_cdf(x, v):
+		if x == 0:
+			return 0.5
+		z = v / (v + x * x)
+		ib = _inc_beta(v / 2, 0.5, z)
+		if x > 0:
+			return 1 - 0.5 * ib
+		else:
+			return 0.5 * ib
+	return _t_cdf(upper, df) - _t_cdf(lower, df)
+
+
+def invt(p, df):
+	p, df = _require_real(p), _require_real(df)
+	if p <= 0:
+		return -1e99
+	if p >= 1:
+		return 1e99
+	# Newton's method starting from normal approximation
+	x = invnorm(p)
+	for _ in range(50):
+		fx = tcdf(-1e99, x, df) - p
+		fpx = tpdf(x, df)
+		if builtins.abs(fpx) < 1e-300:
+			break
+		dx = fx / fpx
+		x -= dx
+		if builtins.abs(dx) < 1e-12:
+			break
+	return x
+
+
+def chi2pdf(x, df):
+	x, df = _require_real(x), _require_real(df)
+	if x <= 0:
+		return 0.0
+	k = df
+	return math.exp((k / 2 - 1) * math.log(x) - x / 2 - (k / 2) * math.log(2) - math.lgamma(k / 2))
+
+
+def chi2cdf(lower, upper, df):
+	lower, upper, df = _require_real(lower), _require_real(upper), _require_real(df)
+	def _cdf(x, k):
+		if x <= 0:
+			return 0.0
+		return _regularized_inc_gamma(k / 2, x / 2)
+	return _cdf(upper, df) - _cdf(lower, df)
+
+
+def fpdf(x, df1, df2):
+	x, df1, df2 = _require_real(x), _require_real(df1), _require_real(df2)
+	if x <= 0:
+		return 0.0
+	d1, d2 = df1, df2
+	log_num = (d1 / 2) * math.log(d1 * x) + (d2 / 2) * math.log(d2) - ((d1 + d2) / 2) * math.log(d1 * x + d2)
+	log_den = math.log(x) + math.lgamma(d1 / 2) + math.lgamma(d2 / 2) - math.lgamma((d1 + d2) / 2)
+	return math.exp(log_num - log_den)
+
+
+def fcdf(lower, upper, df1, df2):
+	lower, upper = _require_real(lower), _require_real(upper)
+	df1, df2 = _require_real(df1), _require_real(df2)
+	def _cdf(x, d1, d2):
+		if x <= 0:
+			return 0.0
+		z = d1 * x / (d1 * x + d2)
+		return _inc_beta(d1 / 2, d2 / 2, z)
+	return _cdf(upper, df1, df2) - _cdf(lower, df1, df2)
+
+
+def binompdf(n, p, k=None):
+	n = _require_int(n)
+	p = _require_real(p)
+	if k is None:
+		return TiList([math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(n + 1)])
+	k = _require_int(k)
+	return math.comb(n, k) * p ** k * (1 - p) ** (n - k)
+
+
+def binomcdf(n, p, k=None):
+	n = _require_int(n)
+	p = _require_real(p)
+	if k is None:
+		acc = 0.0
+		result = []
+		for i in range(n + 1):
+			acc += math.comb(n, i) * p ** i * (1 - p) ** (n - i)
+			result.append(acc)
+		return TiList(result)
+	k = _require_int(k)
+	return builtins.sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(k + 1))
+
+
+def poissonpdf(lam, k):
+	lam, k = _require_real(lam), _require_int(k)
+	return math.exp(-lam) * lam ** k / math.factorial(k)
+
+
+def poissoncdf(lam, k):
+	lam, k = _require_real(lam), _require_int(k)
+	return builtins.sum(math.exp(-lam) * lam ** i / math.factorial(i) for i in range(k + 1))
+
+
+def geometpdf(p, n):
+	p, n = _require_real(p), _require_int(n)
+	return p * (1 - p) ** (n - 1)
+
+
+def geometcdf(p, n):
+	p, n = _require_real(p), _require_int(n)
+	return 1 - (1 - p) ** n

@@ -1,0 +1,280 @@
+## Math (needs implementation in purefunctions.py — implemented, needs wiring in tokens.py)
+
+# These functions are now implemented in purefunctions.py but the corresponding
+# token() calls in tokens.py have no pure_func= argument yet.
+
+[BB0D] stdDev(list[,freqlist]) — sample standard deviation; implemented as stddev()
+[BB0E] variance(list[,freqlist]) — sample variance; implemented as variance()
+[BB10] normalcdf(lower,upper[,µ,σ]) — normal CDF; implemented as normalcdf()
+[BB11] invNorm(p[,µ,σ]) — inverse normal CDF; implemented as invnorm()
+[BB12] tcdf(lower,upper,df) — Student-t CDF; implemented as tcdf()
+[BB13] χ²cdf(lower,upper,df) — chi-squared CDF; implemented as chi2cdf()
+[BB14] Fcdf(lower,upper,df1,df2) — F-distribution CDF; implemented as fcdf()
+[BB15] binompdf(n,p[,k]) — binomial PDF (scalar or full list if k omitted); implemented as binompdf()
+[BB16] binomcdf(n,p[,k]) — binomial CDF (scalar or cumulative list if k omitted); implemented as binomcdf()
+[BB17] poissonpdf(λ,k) — Poisson PMF; implemented as poissonpdf()
+[BB18] poissoncdf(λ,k) — Poisson CDF; implemented as poissoncdf()
+[BB19] geometpdf(p,n) — geometric PMF; implemented as geometpdf()
+[BB1A] geometcdf(p,n) — geometric CDF = 1-(1-p)^n; implemented as geometcdf()
+[BB1B] normalpdf(x[,µ,σ]) — normal PDF; implemented as normalpdf()
+[BB1C] tpdf(t,df) — Student-t PDF; implemented as tpdf()
+[BB1D] χ²pdf(x,df) — chi-squared PDF; implemented as chi2pdf()
+[BB1E] Fpdf(x,df1,df2) — F-distribution PDF; implemented as fpdf()
+[EF13] invT(p,df) — inverse Student-t CDF; implemented as invt()
+[0x14] augment(a,b) — combine two lists or two matrices; implemented as augment() (already in purefunctions)
+[0x15] rowSwap(mat,r1,r2) — swap two rows; implemented as rowswap()
+[0x16] row+(mat,r1,r2) — add row r1 into row r2; implemented as row_plus()
+[0x17] *row(factor,mat,row) — multiply a row by scalar; implemented as times_row()
+[0x18] *row+(factor,mat,r1,r2) — add factor*r1 into r2; implemented as times_row_plus()
+[BB2D] ref(mat) — row-echelon form; implemented as ref()
+[BB2E] rref(mat) — reduced row-echelon form; implemented as rref()
+[0x1B] R►Pr(x,y) — Cartesian→polar radius = hypot(x,y); implemented as r_pr()
+[0x1C] R►Pθ(x,y) — Cartesian→polar angle = atan2(y,x); implemented as r_ptheta()
+[0x1D] P►Rx(r,θ) — polar→Cartesian x = r*cos(θ); implemented as p_rx()
+[0x1E] P►Ry(r,θ) — polar→Cartesian y = r*sin(θ); implemented as p_ry()
+[0x20] randM(rows,cols) — random integer matrix with entries in [-9,9]; implemented as randm()
+[BB0B] randBin(n,p[,sims]) — random binomial count (or list); implemented as randbin()
+
+
+## Math (side-effect store commands — need custom parser/cmd, not pure_func)
+
+[BB39] Matr►list(mat,list1[,list2,...]) or Matr►list(mat,col#,list) — extract matrix columns into list variables; stores in-place, needs cmd handler
+[BB3A] List►matr(list1[,...],mat) — build matrix from lists; stores in-place, needs cmd handler
+
+
+## Commands
+
+# Control flow
+[D0/CE] If condition — conditional execution
+[CF] Then — block start for If
+[D0] Else — else branch
+[D1] While condition — while loop
+[D2] Repeat condition — repeat-until loop
+[D3] For(var,start,end[,step]) — counted loop
+[D4] End — close block
+[D5] Return — return from subprogram
+[D6/D7] Lbl/Goto label — jump labels
+[D8] Pause [value] — pause and optionally display
+[D9] Stop — halt program
+[DA] IS>(var,value) — increment and skip if greater
+[DB] DS<(var,value) — decrement and skip if less
+[5F] prgm NAME — call subprogram
+
+# IO
+[DC] Input [prompt,]var — get user input
+[DD] Prompt var[,var,...] — prompt for multiple variables
+[DE] Disp [expr,...] — display values on home screen
+[DF] DispGraph — display graph screen
+[E0] Output(row,col,expr) — display at specific position
+[E1] ClrHome — clear home screen
+[E5] DispTable — display table screen
+[E6] Menu("title","opt1",lbl1,...) — interactive menu
+
+# Variable / memory management
+[BB54] DelVar var — delete a variable
+[BB52] ClrAllLists — set all list dims to 0
+[FA] ClrList list[,...] — set list dims to 0
+[FB] ClrTable — clear saved table calculations
+[BB57] Clear Entries — clear home-screen history
+[BB68] Archive var — move variable to archive
+[BB69] UnArchive var — move variable from archive to RAM
+[E2] Fill(value,list_or_mat) — fill list/matrix with a value (side-effect, already in purefunctions but needs cmd wiring for store)
+[E3] SortA(list[,deplist,...]) — sort ascending (in-place side-effect)
+[E4] SortD(list[,deplist,...]) — sort descending (in-place side-effect)
+
+# Graphics / drawing
+[85] ClrDraw — clear graph screen
+[93] Text(row,col,expr[,...]) — draw text on graph screen
+[9C] Line(x1,y1,x2,y2[,erase]) — draw line
+[9D] Vertical x — draw vertical line
+[A4] Shade(lower,upper[,Xleft,Xright,pattern,patres]) — shade area between curves
+[A5] Circle(x,y,r) — draw circle
+[A6] Horizontal y — draw horizontal line
+[A7] Tangent(expr,x) — draw tangent line
+[A8] DrawInv expr — draw inverse of a curve
+[A9] DrawF expr — draw a function expression
+[9E] Pt-On(x,y[,mark]) — turn on a point
+[9F] Pt-Off(x,y[,mark]) — turn off a point
+[A0] Pt-Change(x,y) — toggle a point
+[A1] Pxl-On(row,col) — turn on a pixel
+[A2] Pxl-Off(row,col) — turn off a pixel
+[A3] Pxl-Change(row,col) — toggle a pixel
+[13] pxl-Test(row,col) — test if pixel is on (returns 0/1; pure value but reads graphics state)
+
+# Mode-setting commands
+[64] Radian — set radian mode
+[65] Degree — set degree mode
+[66] Normal — set normal notation
+[67] Sci — set scientific notation
+[68] Eng — set engineering notation
+[69] Float — set float display
+[73] Fix n — set fixed decimal places
+[74] Horiz — split-screen horizontal mode
+[75] Full — full-screen mode
+[76] Func — function graphing mode
+[77] Param — parametric graphing mode
+[78] Polar — polar graphing mode
+[79] Seq — sequence graphing mode
+[7A] IndpntAuto — table independent variable auto
+[7B] IndpntAsk — table independent variable ask
+[7C] DependAuto — table dependent variable auto
+[7D] DependAsk — table dependent variable ask
+[BB4D] Real — real-number-only mode
+[BB4E] re^θi — polar complex mode
+[BB4F] a+bi — rectangular complex mode
+[BB50] ExprOn — show expression while tracing
+[BB51] ExprOff — hide expression while tracing
+[BB64] G-T — graph-table split mode
+[BB66] DiagnosticOn — show r/r² after regression
+[BB67] DiagnosticOff — hide r/r² after regression
+[EF36] MATHPRINT — MathPrint display mode
+[EF37] CLASSIC — Classic display mode
+[EF3A] AUTO — answer mode AUTO
+[EF3B] DEC — answer mode DEC
+[EF3C] FRAC — answer mode FRAC
+[BB4B] Pmt_End — TVM payments at end of period
+[BB4C] Pmt_Bgn — TVM payments at beginning of period
+
+# Graph / zoom / stat plot commands
+[84] Trace — interactive trace on graph screen
+[86] ZStandard — restore default window
+[87] ZTrig — trig-friendly window
+[88] ZBox — zoom box
+[89] Zoom In — zoom in
+[8A] Zoom Out — zoom out
+[8B] ZSquare — square window
+[8C] ZInteger — integer window
+[8D] ZPrevious — restore previous window
+[8E] ZDecimal — decimal-friendly window
+[8F] ZoomStat — auto-scale to stat plots
+[90] ZoomRcl — recall saved zoom
+[92] ZoomSto — save current zoom
+[BB65] ZoomFit — auto-scale to equations
+[EF17] ZQuadrant1 — zoom to quadrant 1
+[EF18] ZFrac1/2 ... ZFrac1/10 — fractional zoom presets
+[96] FnOn [#,...] — turn on Y= equations
+[97] FnOff [#,...] — turn off Y= equations
+[E9] PlotsOn [#,...] — turn on stat plots
+[EA] PlotsOff [#,...] — turn off stat plots
+[05/BB5A] Plot1(/Plot2(/Plot3( type,... — define stat plot
+[BB45] GraphStyle(eq#,style) — set graphing style
+
+# Picture / GDB commands
+[98] StorePic n — store graph screen to Pic variable
+[99] RecallPic n — recall picture to graph screen
+[9A] StoreGDB n — store graph settings to GDB
+[9B] RecallGDB n — recall graph settings from GDB
+
+# Link / IO
+[E7] Send(var) — send variable to CBL/linked device
+[E8] Get(var) — receive variable from CBL/linked device
+[BB53] GetCalc(var) — get variable from linked calculator
+
+# String conversions
+[BB2A] expr(string) — evaluate string as expression (needs parser integration)
+[BB55] Equ►String(eq,str) — store equation to string variable
+[BB56] String►Equ(str,eq) — store string to equation variable
+
+# Display format tokens (postfix display modifiers)
+[01] ►DMS — format number as degrees/minutes/seconds for display
+[02] ►Dec — display in decimal form
+[03] ►Frac — display as fraction
+[BB2F] ►Rect — display complex in rectangular form
+[BB30] ►Polar — display complex in polar form
+[EF30] ►n/d◄►Un/d — switch between improper/mixed fraction
+[EF31] ►F◄►D — switch between fraction and decimal
+
+# Finance / amortization
+[BB00] npv(rate,CF0,CFList[,CFFreq]) — net present value
+[BB01] irr(CF0,CFList[,CFFreq]) — internal rate of return
+[BB02] bal(n[,roundVal]) — remaining balance after n payments
+[BB03] Σprn(p1,p2[,roundVal]) — principal paid over payments p1..p2
+[BB04] ΣInt(p1,p2[,roundVal]) — interest paid over payments p1..p2
+[BB05] ►Nom(effectiveRate,n) — convert effective→nominal interest rate
+[BB06] ►Eff(nominalRate,n) — convert nominal→effective interest rate
+[BB07] dbd(date1,date2) — days between dates (DDMM.YY or MM.DDYY format)
+[BB20] tvm_Pmt([N,I%,PV,PMT,FV,P/Y,C/Y]) — TVM solver (compute payment)
+[BB21] tvm_I% — TVM solver (compute interest)
+[BB22] tvm_PV — TVM solver (compute present value)
+[BB23] tvm_N — TVM solver (compute periods)
+[BB24] tvm_FV — TVM solver (compute future value)
+
+# Clock / timer (TI-84+)
+[EF00] setDate(year,month,day) — set clock date
+[EF01] setTime(hour,min,sec) — set clock time
+[EF02] checkTmr(startVal) — seconds elapsed since startTmr value
+[EF03] setDtFmt(n) — set date display format
+[EF04] setTmFmt(n) — set time display format
+[EF05] timeCnv(seconds) — convert seconds → {days,hours,min,sec} list
+[EF06] dayOfWk(year,month,day) — day of week (1=Sun..7=Sat)
+[EF07] getDtStr(fmt) — current date as string
+[EF08] getTmStr(fmt) — current time as string
+[EF0F] ClockOff — turn off clock display
+[EF10] ClockOn — turn on clock display
+
+# Assembly
+[BB6A] Asm(prgmNAME) — run assembly program
+[BB6B] AsmComp(prgmSRC,prgmDST) — compile assembly program
+[BB6C] AsmPrgm — marker for assembly program start
+[BBCE] GarbageCollect — compact archived memory
+
+# Misc program flow
+[BB4A] SetUpEditor [list,...] — configure list editor
+[BB58] Select(xlist,ylist) — select subinterval of scatter/xyLine plot
+[EF11] OpenLib(libname) — open Flash library
+[EF12] ExecLib — call library routine
+[EF16] Manual-Fit expr — user-adjustable fit line
+[91] PrintScreen — (no-op token; feature not available in software)
+
+
+## Stats
+
+# 1-variable / 2-variable descriptive statistics
+[F2] 1-Var Stats [list[,freqlist]] — compute n,x̄,Σx,Σx²,Sx,σx,minX,Q1,Med,Q3,maxX; stores to stat vars
+[F3] 2-Var Stats [xlist[,ylist[,freqlist]]] — compute 2-var stats; stores to stat vars
+
+# Regressions (all store coefficients to stat vars and optionally to equation/list)
+[FF] LinReg(ax+b) [xlist,ylist[,freqlist[,regeq]]] — linear regression y=ax+b
+[F4] LinReg(a+bx) [xlist,ylist[,freqlist[,regeq]]] — linear regression y=a+bx
+[F9] QuadReg [xlist,ylist[,freqlist[,regeq]]] — quadratic regression
+[2E] CubicReg [xlist,ylist[,freqlist[,regeq]]] — cubic regression
+[2F] QuartReg [xlist,ylist[,freqlist[,regeq]]] — quartic regression
+[F5] ExpReg [xlist,ylist[,freqlist[,regeq]]] — exponential regression y=ab^x
+[F6] LnReg [xlist,ylist[,freqlist[,regeq]]] — logarithmic regression y=a+b*ln(x)
+[F7] PwrReg [xlist,ylist[,freqlist[,regeq]]] — power regression y=ax^b
+[F8] Med-Med [xlist,ylist[,freqlist[,regeq]]] — median-median line
+[BB32] SinReg [iters,xlist,ylist[,period[,regeq]]] — sinusoidal regression
+[BB33] Logistic [iters,xlist,ylist[,regeq]] — logistic regression
+
+# Significance tests (display results and store to stat vars)
+[BB3B] Z-Test(µ0,σ[,xlist,freqlist] or stats) — one-sample z-test
+[BB3C] T-Test [µ0,xlist[,freqlist] or stats] — one-sample t-test
+[BB3D] 2-SampZTest(σ1,σ2[,xlist1,xlist2,...] or stats) — two-sample z-test
+[BB46] 2-SampTTest [xlist1,xlist2[,...] or stats] — two-sample t-test
+[BB3E] 1-PropZTest(p0,x,n) — one-proportion z-test
+[BB3F] 2-PropZTest(x1,n1,x2,n2) — two-proportion z-test
+[BB40] χ²-Test(observed,expected) — chi-squared test of independence
+[EF14] χ²GOF-Test(observed,expected,df) — chi-squared goodness-of-fit test
+[BB47] 2-SampFTest [xlist1,xlist2[,...] or stats] — F-test for equal variance
+[BB34] LinRegTTest [xlist,ylist[,freqlist[,tail[,regeq]]]] — linear regression t-test
+[EF15] LinRegTInt [xlist,ylist[,freqlist[,conflevel[,regeq]]]] — linear regression confidence interval
+[BB59] ANOVA(list1,list2[,...]) — one-way ANOVA
+
+# Confidence intervals
+[BB41] ZInterval σ,[xlist[,freqlist]|x̄,n],conflevel — z confidence interval
+[BB42] 2-SampZInt(σ1,σ2,[xlist1,xlist2,...|stats],conflevel) — two-sample z interval
+[BB43] 1-PropZInt(x,n,conflevel) — one-proportion z interval
+[BB44] 2-PropZInt(x1,n1,x2,n2,conflevel) — two-proportion z interval
+[BB48] TInterval [xlist[,freqlist]|x̄,Sx,n],conflevel — t confidence interval
+[BB49] 2-SampTInt [xlist1,xlist2,...|stats],conflevel — two-sample t interval
+
+# Shading (draws distribution curve with shaded area; side-effects graphics)
+[BB35] ShadeNorm(lower,upper[,µ,σ]) — shade normal distribution area
+[BB36] Shade_t(lower,upper,df) — shade t-distribution area
+[BB37] Shadeχ²(lower,upper,df) — shade chi-squared area
+[BB38] ShadeF(lower,upper,df1,df2) — shade F-distribution area
+
+# Numerical solvers (not pure — take expression + variable token)
+[22] solve(expr,var,guess[,{lower,upper}]) — iterative root finder
+[27] fMin(expr,var,low,high[,tol]) — local minimum of a function
+[28] fMax(expr,var,low,high[,tol]) — local maximum of a function
