@@ -273,8 +273,8 @@ TOKENS: list[Token] = [
 	token(b'\xb6', "sum(",    pure_func=purefunctions.sum),
 	token(b'\xb7', "prod(",   pure_func=purefunctions.prod),
 	token(b'\xb8', "not(",    pure_func=purefunctions.not_),
-	token(b'\xb9', "iPart(",  pure_func=purefunctions.ipart),
-	token(b'\xba', "fPart(",  pure_func=purefunctions.fpart),
+	token(b'\xb9', "iPart(",  pure_func=purefunctions.i_part),
+	token(b'\xba', "fPart(",  pure_func=purefunctions.f_part),
 	token(b'\xbc', "√(",  alt=("sqrt(", 'squareroot'), pure_func=purefunctions.sqrt),
 	token(b'\xbd', "³√(", alt=("cbrt(", 'cuberoot'),   pure_func=purefunctions.cbrt),
 	token(b'\xbe', "ln(",     pure_func=purefunctions.ln),
@@ -499,7 +499,7 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x0c', "sub(",      pure_func=purefunctions.sub),
 	token(b'\xbb\x0d', "stdDev("),
 	token(b'\xbb\x0e', "variance("),
-	token(b'\xbb\x0f', "inString(", pure_func=purefunctions.instring),
+	token(b'\xbb\x0f', "inString(", pure_func=purefunctions.in_string),
 	token(b'\xbb\x10', "normalcdf("),
 	token(b'\xbb\x11', "invNorm("),
 	token(b'\xbb\x12', "tcdf("),
@@ -525,7 +525,7 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x26', "real(",   pure_func=purefunctions.real),
 	token(b'\xbb\x27', "imag(",   pure_func=purefunctions.imag),
 	token(b'\xbb\x28', "angle(",  pure_func=purefunctions.angle),
-	token(b'\xbb\x29', "cumSum(", pure_func=purefunctions.cumsum),
+	token(b'\xbb\x29', "cumSum(", pure_func=purefunctions.cum_sum),
 	token(b'\xbb\x2a', "expr("),
 	token(b'\xbb\x2b', "length(", pure_func=purefunctions.length),
 	token(b'\xbb\x2c', "ΔList(",  alt="dList(", pure_func=purefunctions.delta_list),
@@ -779,5 +779,6 @@ if __name__ == '__main__':
 
 	for token in sorted(TOKENS, key=lambda t: t.code):
 		print(token.code.hex(), token.display.decode('latin-1'))
+
 
 
