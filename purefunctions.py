@@ -52,31 +52,42 @@ def _require_int(value):
 
 @vectorized
 def and_(a, b):
-	return float(bool(_require_real(a)) and bool(_require_real(b)))
+	return int(bool(_require_real(a)) and bool(_require_real(b)))
 
 @vectorized
 def or_(a, b):
-	return float(bool(_require_real(a)) or bool(_require_real(b)))
+	return int(bool(_require_real(a)) or bool(_require_real(b)))
 
 @vectorized
 def xor(a, b):
-	return float(bool(_require_real(a)) ^ bool(_require_real(b)))
+	return int(bool(_require_real(a)) ^ bool(_require_real(b)))
 
 
 # ── Comparison operators ──────────────────────────────────────────────────────────
 
 @vectorized
-def eq(a, b): return float(_require_real(a) == _require_real(b))
+def eq(a, b):
+	return int(_require_real(a) == _require_real(b))
+	
 @vectorized
-def ne(a, b): return float(_require_real(a) != _require_real(b))
+def ne(a, b):
+	return int(_require_real(a) != _require_real(b))
+
 @vectorized
-def lt(a, b): return float(_require_real(a) < _require_real(b))
+def lt(a, b):
+	return int(_require_real(a) < _require_real(b))
+
 @vectorized
-def gt(a, b): return float(_require_real(a) > _require_real(b))
+def gt(a, b):
+	return int(_require_real(a) > _require_real(b))
+
 @vectorized
-def le(a, b): return float(_require_real(a) <= _require_real(b))
+def le(a, b):
+	return int(_require_real(a) <= _require_real(b))
+
 @vectorized
-def ge(a, b): return float(_require_real(a) >= _require_real(b))
+def ge(a, b):
+	return int(_require_real(a) >= _require_real(b))
 
 
 # ── TiList ────────────────────────────────────────────────────────────────────────
@@ -99,7 +110,6 @@ class TiList:
 		else:
 			self.inner[int(index) - 1] = value
 
-
 	def __len__(self):
 		return len(self.inner)
 
@@ -119,8 +129,6 @@ class TiList:
 
 	def copy(self):
 		return TiList(self.inner.copy())
-
-
 
 
 # ── TiMatrix ──────────────────────────────────────────────────────────────────────
@@ -202,8 +210,6 @@ class TiMatrix:
 
 	def copy(self):
 		return TiMatrix([row.copy() for row in self.inner])
-
-
 
 
 # ── Decorators ────────────────────────────────────────────────────────────────────
@@ -297,6 +303,31 @@ def pow_(a, b):
 	return _vec_pow(a, b)
 
 
+def _matrix_inv(m):
+	n = m.rows
+	if m.cols != n:
+		raise ValueError(f"inv: matrix must be square, got {m.rows}×{m.cols}")
+	aug = [m.inner[r].copy() + [1 if r == c else 0 for c in range(n)] for r in range(n)]
+	for col in range(n):
+		pivot = max(range(col, n), key=lambda r: abs(aug[r][col]))
+		aug[col], aug[pivot] = aug[pivot], aug[col]
+		p = aug[col][col]
+		if abs(p) < 1e-12:
+			raise ValueError("inv: matrix is singular")
+		aug[col] = [x / p for x in aug[col]]
+		for r in range(n):
+			if r != col:
+				f = aug[r][col]
+				aug[r] = [aug[r][k] - f * aug[col][k] for k in range(2 * n)]
+	return TiMatrix([row[n:] for row in aug])
+
+
+def inv(x):
+	if isinstance(x, TiMatrix):
+		return _matrix_inv(x)
+	return div(1, x)
+
+
 # ── dim ───────────────────────────────────────────────────────────────────────────
 
 def dim(value):
@@ -311,7 +342,7 @@ def dim(value):
 
 @vectorized
 def not_(x):
-	return float(not _require_real(x))
+	return int(not _require_real(x))
 
 
 @vectorized_with_matrix
@@ -414,13 +445,12 @@ def fill(lst, x):
 
 # ── String functions ────────────────────────────────────────────────────────────
 
-def in_string(value, needle):
-	pos = _require_str(value).find(needle)
-	return float(pos + 1) if pos >= 0 else 0.0
+def in_string(value, substring):
+	return _require_str(value).find(substring) + 1
 
 
 def length(value):
-	return float(len(_require_str(value)))
+	return len(_require_str(value))
 
 
 def sub(value, start, length):
@@ -438,7 +468,8 @@ def sub(value, start, length):
 
 @vectorized_with_matrix
 def round(a, b=9):
-	return builtins.round(a, int(b))
+	return builtins.round(a, _require_int(b))
+
 
 def _minmax(fn, a, b):
 	if b is None:
@@ -468,7 +499,7 @@ def median(lst, freqlist=None):
 		if n == 0:
 			raise ValueError("median: empty list")
 		mid = n // 2
-		return float(s[mid]) if n % 2 else (s[mid - 1] + s[mid]) / 2
+		return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
 
 	_require_list(freqlist)
 	if len(lst) != len(freqlist):
@@ -486,7 +517,7 @@ def median(lst, freqlist=None):
 				return value
 
 	if total % 2:
-		return float(nth(total // 2))
+		return nth(total // 2)
 	return (nth(total // 2 - 1) + nth(total // 2)) / 2
 
 
@@ -526,13 +557,13 @@ def det(mat):
 
 
 def identity(n):
-	n = int(n)
+	_requre_int(n)
 	return TiMatrix([[1 if r == c else 0 for c in range(n)] for r in range(n)])
 
 
-def transpose(m):
-	_require_matrix(m)
-	return TiMatrix([[m.inner[r][c] for r in range(m.rows)] for c in range(m.cols)])
+def transpose(mat):
+	_require_matrix(mat)
+	return TiMatrix([[mat.inner[r][c] for r in range(mat.rows)] for c in range(mat.cols)])
 
 
 def sum(lst):
@@ -548,10 +579,6 @@ def prod(lst):
 @vectorized
 def pow10(a):
 	return 10 ** a
-
-@vectorized
-def logbase(a, b):
-	return cmath.log(a, b) if isinstance(a, complex) else math.log(a, b)
 
 
 def _make_dispatch(name, real_fn, cpx_fn):
@@ -576,6 +603,7 @@ for _name, _mf, _cf in [
 	('ln',    math.log,   cmath.log),
 	('exp',   math.exp,   cmath.exp),
 	('log',   math.log10, cmath.log10),
+	('log_base',   math.log, cmath.log),
 ]:
 	globals()[_name] = _make_dispatch(_name, _mf, _cf)
 
@@ -586,40 +614,40 @@ def factorial(n):
 	n = _require_int(n)
 	if n < 0:
 		raise ValueError("Argument to ! must be a non-negative integer")
-	return float(math.factorial(n))
+	return math.factorial(n)
 
 def ncr(n, r):
-	return float(math.comb(_require_int(n), _require_int(r)))
+	return math.comb(_require_int(n), _require_int(r))
 
 def npr(n, r):
-	return float(math.perm(_require_int(n), _require_int(r)))
+	return math.perm(_require_int(n), _require_int(r))
 
 @vectorized
 def lcm(a, b):
-	return float(math.lcm(_require_int(a), _require_int(b)))
+	return math.lcm(_require_int(a), _require_int(b))
 
 @vectorized
 def gcd(a, b):
-	return float(math.gcd(_require_int(a), _require_int(b)))
+	return math.gcd(_require_int(a), _require_int(b))
 
 @vectorized
 def remainder(a, b):
-	return float(_require_int(a) % _require_int(b))
+	return _require_int(a) % _require_int(b)
 
 # ── Random ──────────────────────────────────────────────────────────────────────
 
 def randint(low, high, count=1):
 	low, high = _require_int(low), _require_int(high)
 	if count == 1:
-		return float(random.randint(low, high))
-	return TiList([float(random.randint(low, high)) for _ in range(_require_int(count))])
+		return random.randint(low, high)
+	return TiList([random.randint(low, high) for _ in range(_require_int(count))])
 
 
 def randnorm(mu, sigma):
 	return random.gauss(mu, sigma)
 
 
-def randintnotrep(a, b, n=None):
-	a, b = _require_int(a), _require_int(b)
-	count = b - a + 1 if n is None else _require_int(n)
-	return TiList([float(x) for x in random.sample(range(a, b + 1), count)])
+def randintnotrep(a, b):
+	lst = list(range(_require_int(a), _require_int(b) + 1))
+	random.suffle(lst)
+	return lst

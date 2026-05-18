@@ -116,7 +116,7 @@ LIST_PREFIX = token(b'\xeb', "∟", alt="list-prefix", key='#')
 # Postfix operators
 RAD		 = token(b'\x0a', "ʳ", alt="rad", postfix=True, unary_op=lambda x: x)
 DEG		 = token(b'\x0b', "°", alt="deg", postfix=True, unary_op=math.radians)
-INV		 = token(b'\x0c', "⁻¹", alt=("inv", '^-1'), postfix=True, unary_op=lambda x: purefunctions.div(1, x))
+INV		 = token(b'\x0c', "⁻¹", alt=("inv", '^-1'), postfix=True, unary_op=purefunctions.inv)
 SQ		  = token(b'\x0d', "²", alt="^2", postfix=True, unary_op=lambda x: purefunctions.pow_(x, 2))
 TRANSPOSE   = token(b'\x0e', "ᵀ", alt=("T", 'transpose'), postfix=True, unary_op=purefunctions.transpose)
 CUBE		= token(b'\x0f', "³", alt="^3", postfix=True, unary_op=lambda x: purefunctions.pow_(x, 3))
@@ -152,9 +152,18 @@ TOKENS: list[Token] = [
 	token(b'\x03', "►Frac", alt='to-Frac'),
 	STORE,
 	token(b'\x05', "Boxplot"),
-	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE,
-	RAD, DEG, INV, SQ, TRANSPOSE, CUBE,
-	L_PAREN, R_PAREN,
+	L_BRACKET,
+	R_BRACKET,
+	L_BRACE,
+	R_BRACE,
+	RAD,
+	DEG,
+	INV,
+	SQ,
+	TRANSPOSE,
+	CUBE,
+	L_PAREN,
+	R_PAREN,
 	token(b'\x12', "round(",   pure_func=purefunctions.round),
 	token(b'\x13', "pxl-Test("),
 	token(b'\x14', "augment("),
