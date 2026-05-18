@@ -109,7 +109,7 @@ COLON	   = token(b'\x3e', ":", key=':')
 NEWLINE	 = token(b'\x3f', "↵", alt="newline")
 PRGM		= token(b'\x5f', "prgm")
 ANS		 = token(b'\x72', "Ans", resolve=lambda env: env.ans, store=lambda env, value: setattr(env, 'ans', value))
-NEG		 = token(b'\xb0', "−", alt=('~', "neg"), key='~', unary_op=lambda x: -x)
+NEG		 = token(b'\xb0', "−", alt=('~', "neg"), key='~', unary_op=purefunctions.neg)
 DIM      = token(b'\xb5', "dim(", pure_func=purefunctions.dim)
 LIST_PREFIX = token(b'\xeb', "∟", alt="list-prefix", key='#')
 

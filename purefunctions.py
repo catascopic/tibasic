@@ -99,8 +99,6 @@ class TiList:
 		else:
 			self.inner[int(index) - 1] = value
 
-	def __neg__(self):
-		return TiList([-x for x in self])
 
 	def __len__(self):
 		return len(self.inner)
@@ -176,9 +174,6 @@ class TiMatrix:
 	def transform(self, func):
 		return TiMatrix([[func(x) for x in row] for row in self.inner])
 
-	def __neg__(self):
-		return self.transform(operator.neg)
-
 	def __matmul__(self, other):
 		if not isinstance(other, TiMatrix):
 			raise ValueError(f"Cannot multiply matrix by {type(other).__name__}")
@@ -253,6 +248,11 @@ def vectorized_with_matrix(func):
 
 
 # ── Arithmetic operators ──────────────────────────────────────────────────────────
+
+@vectorized_with_matrix
+def neg(x):
+	return -x
+
 
 _vec_add = vectorized(operator.add)
 _vec_sub = vectorized(operator.sub)
