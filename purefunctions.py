@@ -50,23 +50,32 @@ def _require_int(value):
 
 # ── Logical operators ────────────────────────────────────────────────────────────
 
+@vectorized
 def and_(a, b):
 	return float(bool(_require_real(a)) and bool(_require_real(b)))
 
+@vectorized
 def or_(a, b):
 	return float(bool(_require_real(a)) or bool(_require_real(b)))
 
+@vectorized
 def xor(a, b):
 	return float(bool(_require_real(a)) ^ bool(_require_real(b)))
 
 
 # ── Comparison operators ──────────────────────────────────────────────────────────
 
+@vectorized
 def eq(a, b): return float(_require_real(a) == _require_real(b))
+@vectorized
 def ne(a, b): return float(_require_real(a) != _require_real(b))
+@vectorized
 def lt(a, b): return float(_require_real(a) < _require_real(b))
+@vectorized
 def gt(a, b): return float(_require_real(a) > _require_real(b))
+@vectorized
 def le(a, b): return float(_require_real(a) <= _require_real(b))
+@vectorized
 def ge(a, b): return float(_require_real(a) >= _require_real(b))
 
 
@@ -114,33 +123,6 @@ class TiList:
 		return TiList(self.inner.copy())
 
 
-def make_binary_list_op(op):
-	def list_op(self, other):
-		if isinstance(other, TiList):
-			return TiList([op(a, b) for a, b in zip(self, other, strict=True)])
-		return TiList([op(a, other) for a in self])
-	return list_op
-
-
-for _name, _op in [
-	('__add__', operator.add),
-	('__radd__', operator.add),
-	('__sub__', operator.sub),
-	('__rsub__', lambda a, b: b - a),
-	('__mul__', operator.mul),
-	('__rmul__', operator.mul),
-	('__truediv__', operator.truediv),
-	('__rtruediv__', lambda a, b: b / a),
-	('__pow__', pow),
-	('__rpow__', lambda a, b: b ** a),
-	('__eq__', lambda a, b: float(a == b)),
-	('__ne__', lambda a, b: float(a != b)),
-	('__lt__', lambda a, b: float(a < b)),
-	('__gt__', lambda a, b: float(a > b)),
-	('__le__', lambda a, b: float(a <= b)),
-	('__ge__', lambda a, b: float(a >= b)),
-]:
-	setattr(TiList, _name, make_binary_list_op(_op))
 
 
 # ── TiMatrix ──────────────────────────────────────────────────────────────────────
@@ -223,34 +205,10 @@ class TiMatrix:
 			n >>= 1
 		return result
 
-	def __mul__(self, other):
-		if isinstance(other, TiMatrix):
-			return self @ other
-		return self.transform(lambda x: x * other)
-
-	def __rmul__(self, other):
-		if isinstance(other, TiMatrix):
-			return other @ self
-		return self.transform(lambda x: other * x)
-
 	def copy(self):
 		return TiMatrix([row.copy() for row in self.inner])
 
 
-def make_matrix_binary_op(op):
-	def mat_op(self, other):
-		_require_matrix(other)
-		if (self.rows, self.cols) != (other.rows, other.cols):
-			raise ValueError(f"Dim mismatch: {self.rows}×{self.cols} vs {other.rows}×{other.cols}")
-		return TiMatrix([[op(self.inner[r][c], other.inner[r][c]) for c in range(self.cols)] for r in range(self.rows)])
-	return mat_op
-
-
-for _name, _op in [
-	('__add__', operator.add),
-	('__sub__', operator.sub),
-]:
-	setattr(TiMatrix, _name, make_matrix_binary_op(_op))
 
 
 # ── Decorators ────────────────────────────────────────────────────────────────────
@@ -292,6 +250,51 @@ def vectorized_with_matrix(func):
 			return a.transform(lambda x: func(x, *args))
 		return vec(a, *args)
 	return apply
+
+
+# ── Arithmetic operators ──────────────────────────────────────────────────────────
+
+_vec_add = vectorized(operator.add)
+_vec_sub = vectorized(operator.sub)
+_vec_mul = vectorized(operator.mul)
+_vec_pow = vectorized(operator.pow)
+
+
+def add(a, b):
+	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix):
+		if (a.rows, a.cols) != (b.rows, b.cols):
+			raise ValueError(f"add: dim mismatch {a.rows}×{a.cols} vs {b.rows}×{b.cols}")
+		return TiMatrix([[a.inner[r][c] + b.inner[r][c] for c in range(a.cols)] for r in range(a.rows)])
+	if isinstance(a, str) or isinstance(b, str):
+		return a + b
+	return _vec_add(a, b)
+
+
+def sub(a, b):
+	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix):
+		if (a.rows, a.cols) != (b.rows, b.cols):
+			raise ValueError(f"sub: dim mismatch {a.rows}×{a.cols} vs {b.rows}×{b.cols}")
+		return TiMatrix([[a.inner[r][c] - b.inner[r][c] for c in range(a.cols)] for r in range(a.rows)])
+	return _vec_sub(a, b)
+
+
+def mul(a, b):
+	if isinstance(a, TiMatrix):
+		return a @ b if isinstance(b, TiMatrix) else a.transform(lambda x: x * b)
+	if isinstance(b, TiMatrix):
+		return b.transform(lambda x: a * x)
+	return _vec_mul(a, b)
+
+
+@vectorized
+def div(a, b):
+	return a / b
+
+
+def pow_(a, b):
+	if isinstance(a, TiMatrix):
+		return a ** b
+	return _vec_pow(a, b)
 
 
 # ── dim ───────────────────────────────────────────────────────────────────────────

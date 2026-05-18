@@ -1,4 +1,4 @@
-all comparison operators should fail on complex numbers
+fix xth_root arg order
 
 Three function types:
 pure_func: if the function takes pre-parsed arguments and doesn't need access to the environment. Function should be defined in a purefunctions module.
