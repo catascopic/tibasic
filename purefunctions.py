@@ -137,6 +137,16 @@ class TiMatrix:
 			for r in range(new_rows)
 		]
 
+	def get_row(self, r) -> list:
+		if not (1 <= _require_int(r) <= self.rows):
+			raise IndexError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
+		return self.inner[int(r) - 1].copy()
+
+	def set_row(self, r, row: list) -> None:
+		if not (1 <= _require_int(r) <= self.rows):
+			raise IndexError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
+		self.inner[int(r) - 1] = row
+
 	def transform(self, func):
 		return TiMatrix([[func(x) for x in row] for row in self.inner])
 
@@ -697,40 +707,31 @@ def randintnotrep(a, b):
 
 def rowswap(mat, row1, row2):
 	_require_matrix(mat)
-	if not (1 <= _require_int(row1) <= mat.rows) or not (1 <= _require_int(row2) <= mat.rows):
-		raise ValueError(f"rowSwap: row out of range")
 	result = mat.copy()
-	result.inner[row1 - 1], result.inner[row2 - 1] = result.inner[row2 - 1], result.inner[row1 - 1]
+	r1, r2 = result.get_row(row1), result.get_row(row2)
+	result.set_row(row1, r2)
+	result.set_row(row2, r1)
 	return result
 
 
 def row_plus(mat, row1, row2):
 	_require_matrix(mat)
-	if not (1 <= _require_int(row1) <= mat.rows) or not (1 <= _require_int(row2) <= mat.rows):
-		raise ValueError(f"row+: row out of range")
 	result = mat.copy()
-	result.inner[row2 - 1] = [result.inner[row2 - 1][c] + result.inner[row1 - 1][c] for c in range(mat.cols)]
+	result.set_row(row2, [a + b for a, b in zip(result.get_row(row2), result.get_row(row1))])
 	return result
 
 
 def times_row(factor, mat, row):
 	_require_matrix(mat)
-	if not (1 <= _require_int(row) <= mat.rows):
-		raise ValueError(f"*row: row out of range")
 	result = mat.copy()
-	result.inner[row - 1] = [factor * x for x in result.inner[row - 1]]
+	result.set_row(row, [factor * x for x in result.get_row(row)])
 	return result
 
 
 def times_row_plus(factor, mat, row1, row2):
 	_require_matrix(mat)
-	if not (1 <= _require_int(row1) <= mat.rows) or not (1 <= _require_int(row2) <= mat.rows):
-		raise ValueError(f"*row+: row out of range")
 	result = mat.copy()
-	result.inner[row2 - 1] = [
-		result.inner[row2 - 1][c] + factor * result.inner[row1 - 1][c]
-		for c in range(mat.cols)
-	]
+	result.set_row(row2, [a + factor * b for a, b in zip(result.get_row(row2), result.get_row(row1))])
 	return result
 
 
