@@ -412,6 +412,7 @@ def imag(x):
 def conj(a):
 	return complex(a.real, -a.imag) if isinstance(a, complex) else a
 
+# Technically works on matrices, but since matrices can't store complex numbers, the result is all 0s
 @vectorized
 def angle(a):
 	return cmath.phase(a)
