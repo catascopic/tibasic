@@ -468,14 +468,14 @@ def sub(value, start, length):
 
 # ── Aggregate / statistics ───────────────────────────────────────────────────────
 
-def stddev(lst, freqlist=None):
+def variance(lst, freqlist=None):
 	_require_list(lst)
 	if freqlist is None:
 		n = len(lst)
 		if n < 2:
 			raise ValueError("stdDev: need at least 2 elements")
 		m = mean(lst)
-		return math.sqrt(builtins.sum((x - m) ** 2 for x in lst) / (n - 1))
+		return builtins.sum((x - m) ** 2 for x in lst) / (n - 1)
 	_require_list(freqlist)
 	if len(lst) != len(freqlist):
 		raise ValueError("stdDev: dim mismatch")
@@ -483,12 +483,11 @@ def stddev(lst, freqlist=None):
 	total_w = builtins.sum(freqlist)
 	if total_w <= 1:
 		raise ValueError("stdDev: total frequency must be > 1")
-	return math.sqrt(builtins.sum(w * (x - m) ** 2 for x, w in zip(lst, freqlist)) / (total_w - 1))
+	return builtins.sum(w * (x - m) ** 2 for x, w in zip(lst, freqlist)) / (total_w - 1)
 
 
-def variance(lst, freqlist=None):
-	s = stddev(lst, freqlist)
-	return s * s
+def stddev(lst, freqlist=None):
+	return math.sqrt(variance(lst, freqlist))
 
 
 @vectorized_with_matrix

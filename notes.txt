@@ -14,7 +14,6 @@ This prompted me to store a value to A, then errored, since 1 isn't a variable. 
 
 Refactor TiMatrix so it has 1-indexed getters/setters. When possible, use these in commands.
 
-stdDev/variance: put the actual code in variance, have stdDev call sqrt on it, that simplifies the code
 fix xth_root arg order
 
 
