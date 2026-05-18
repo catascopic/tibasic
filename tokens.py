@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 import math, itertools
 from environment import Environment
+import purefunctions
 
 @dataclass(eq=False)
 class Token:
@@ -14,7 +15,7 @@ class Token:
 	binary_op: Any = None		# (lhs, rhs) -> value
 	unary_op: Any = None		# (operand) -> value  (prefix or postfix)
 	postfix: bool = False		# True for postfix unary operators
-	call: Any = None			# (parser) -> value  for function tokens
+	func: Any = None			# (parser) -> value  for function tokens
 	cmd: Any = None				# (parser) -> None  for command tokens
 	resolve: Any = None			# (env) -> value  for variables and nullary tokens
 	store: Any = None			# (env, value) -> None  for writable variables
@@ -47,7 +48,7 @@ class Token:
 
 	def can_start_atom(self) -> bool:
 		return (
-			self.resolve is not None or self.call is not None or
+			self.resolve is not None or self.func is not None or
 			self.is_digit() or self.is_list_var() or self.is_matrix_var() or
 			self.is_string_var() or self.is_stat_var() or self.is_window_var() or
 			self in {DOT, L_PAREN, L_BRACE, QUOTE, NEG, ANS, LIST_PREFIX}
@@ -68,7 +69,7 @@ def token(
 	binary_op=None,
 	unary_op=None,
 	postfix: bool = False,
-	func: Callable[[Parser], Any] | None = None,
+	func: Callable | None = None,
 	pure_func: Callable | None = None,
 	cmd: Callable[[Environment], None] | None = None,
 	resolve: Callable[[Environment], Any] | None = None,
@@ -83,11 +84,11 @@ def token(
 		alias.add(alt.lower())
 	elif alt is not None:
 		alias.update(a.lower() for a in alt)
-	if call is None and func is not None:
-		call = lambda parser, _f=func: _f(*parser.parse_args())
+	if func is None and pure_func is not None:
+		func = lambda parser, _f=pure_func: _f(*parser.parse_args())
 	return Token(
 		code, text, key, alias,
-		bp, binary_op, unary_op, postfix, call, cmd, resolve, store,
+		bp, binary_op, unary_op, postfix, func, cmd, resolve, store,
 	)
 
 
@@ -109,7 +110,7 @@ NEWLINE	 = token(b'\x3f', "↵", alt="newline")
 PRGM		= token(b'\x5f', "prgm")
 ANS		 = token(b'\x72', "Ans", resolve=lambda env: env.ans, store=lambda env, value: setattr(env, 'ans', value))
 NEG		 = token(b'\xb0', "−", alt=('~', "neg"), key='~', unary_op=lambda x: -x)
-DIM      = token(b'\xb5', "dim(", func=Environment.dim)
+DIM      = token(b'\xb5', "dim(", pure_func=purefunctions.dim)
 LIST_PREFIX = token(b'\xeb', "∟", alt="list-prefix", key='#')
 
 # Postfix operators
@@ -154,26 +155,26 @@ TOKENS: list[Token] = [
 	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE,
 	RAD, DEG, INV, SQ, TRANSPOSE, CUBE,
 	L_PAREN, R_PAREN,
-	token(b'\x12', "round(",   func=Environment.round),
+	token(b'\x12', "round(",   pure_func=purefunctions.round),
 	token(b'\x13', "pxl-Test("),
 	token(b'\x14', "augment("),
 	token(b'\x15', "rowSwap("),
 	token(b'\x16', "row+("),
 	token(b'\x17', "*row("),
 	token(b'\x18', "*row+("),
-	token(b'\x19', "max(",    func=Environment.max),
-	token(b'\x1a', "min(",    func=Environment.min),
+	token(b'\x19', "max(",    pure_func=purefunctions.max),
+	token(b'\x1a', "min(",    pure_func=purefunctions.min),
 	token(b'\x1b', "R►Pr(", alt='R-to-Pr'),
 	token(b'\x1c', "R►Pθ(", alt='R-to-P-theta'),
 	token(b'\x1d', "P►Rx(", alt='R-to-Px'),
 	token(b'\x1e', "P►Ry(", alt='R-to-Py'),
-	token(b'\x1f', "median(", func=Environment.median),
+	token(b'\x1f', "median(", pure_func=purefunctions.median),
 	token(b'\x20', "randM("),
-	token(b'\x21', "mean(",   func=Environment.mean),
+	token(b'\x21', "mean(",   pure_func=purefunctions.mean),
 	token(b'\x22', "solve("),
-	token(b'\x23', "seq(",    call=lambda parser: parser.env.call_seq(parser)),
-	token(b'\x24', "fnInt(",  call=lambda parser: parser.env.call_fnint(parser)),
-	token(b'\x25', "nDeriv(", call=lambda parser: parser.env.call_nderiv(parser)),
+	token(b'\x23', "seq(",    func=lambda parser: parser.env.call_seq(parser)),
+	token(b'\x24', "fnInt(",  func=lambda parser: parser.env.call_fnint(parser)),
+	token(b'\x25', "nDeriv(", func=lambda parser: parser.env.call_nderiv(parser)),
 	token(b'\x27', "fMin("),
 	token(b'\x28', "fMax("),
 	token(b'\x29', " ", key=' '),
@@ -264,34 +265,34 @@ TOKENS: list[Token] = [
 	token(b'\xae', "'", alt="apostrophe", key="'"),
 	token(b'\xaf', "?", key='?'),
 	NEG,
-	token(b'\xb1', "int(",    func=Environment.int_),
-	token(b'\xb2', "abs(",    func=Environment.abs),
-	token(b'\xb3', "det(",    func=Environment.det),
-	token(b'\xb4', "identity(", func=Environment.identity),
+	token(b'\xb1', "int(",    pure_func=purefunctions.int_),
+	token(b'\xb2', "abs(",    pure_func=purefunctions.abs),
+	token(b'\xb3', "det(",    pure_func=purefunctions.det),
+	token(b'\xb4', "identity(", pure_func=purefunctions.identity),
 	DIM,
-	token(b'\xb6', "sum(",    func=Environment.sum),
-	token(b'\xb7', "prod(",   func=Environment.prod),
-	token(b'\xb8', "not(",    func=Environment.not_),
-	token(b'\xb9', "iPart(",  func=Environment.ipart),
-	token(b'\xba', "fPart(",  func=Environment.fpart),
-	token(b'\xbc', "√(",  alt=("sqrt(", 'squareroot'), func=Environment.sqrt),
-	token(b'\xbd', "³√(", alt=("cbrt(", 'cuberoot'),   func=Environment.cbrt),
-	token(b'\xbe', "ln(",     func=Environment.ln),
-	token(b'\xbf', "e^(",     func=Environment.exp),
-	token(b'\xc0', "log(",    func=Environment.log),
-	token(b'\xc1', "10^(",    func=Environment.pow10),
-	token(b'\xc2', "sin(",    func=Environment.sin),
-	token(b'\xc3', "sin⁻¹(", alt="arcsin(",  func=Environment.asin),
-	token(b'\xc4', "cos(",    func=Environment.cos),
-	token(b'\xc5', "cos⁻¹(", alt="arccos(",  func=Environment.acos),
-	token(b'\xc6', "tan(",    func=Environment.tan),
-	token(b'\xc7', "tan⁻¹(", alt="arctan(",  func=Environment.atan),
-	token(b'\xc8', "sinh(",   func=Environment.sinh),
-	token(b'\xc9', "sinh⁻¹(", alt="arcsinh(", func=Environment.asinh),
-	token(b'\xca', "cosh(",   func=Environment.cosh),
-	token(b'\xcb', "cosh⁻¹(", alt="arccosh(", func=Environment.acosh),
-	token(b'\xcc', "tanh(",   func=Environment.tanh),
-	token(b'\xcd', "tanh⁻¹(", alt="arctanh(", func=Environment.atanh),
+	token(b'\xb6', "sum(",    pure_func=purefunctions.sum),
+	token(b'\xb7', "prod(",   pure_func=purefunctions.prod),
+	token(b'\xb8', "not(",    pure_func=purefunctions.not_),
+	token(b'\xb9', "iPart(",  pure_func=purefunctions.ipart),
+	token(b'\xba', "fPart(",  pure_func=purefunctions.fpart),
+	token(b'\xbc', "√(",  alt=("sqrt(", 'squareroot'), pure_func=purefunctions.sqrt),
+	token(b'\xbd', "³√(", alt=("cbrt(", 'cuberoot'),   pure_func=purefunctions.cbrt),
+	token(b'\xbe', "ln(",     pure_func=purefunctions.ln),
+	token(b'\xbf', "e^(",     pure_func=purefunctions.exp),
+	token(b'\xc0', "log(",    pure_func=purefunctions.log),
+	token(b'\xc1', "10^(",    pure_func=purefunctions.pow10),
+	token(b'\xc2', "sin(",    pure_func=purefunctions.sin),
+	token(b'\xc3', "sin⁻¹(", alt="arcsin(",  pure_func=purefunctions.asin),
+	token(b'\xc4', "cos(",    pure_func=purefunctions.cos),
+	token(b'\xc5', "cos⁻¹(", alt="arccos(",  pure_func=purefunctions.acos),
+	token(b'\xc6', "tan(",    pure_func=purefunctions.tan),
+	token(b'\xc7', "tan⁻¹(", alt="arctan(",  pure_func=purefunctions.atan),
+	token(b'\xc8', "sinh(",   pure_func=purefunctions.sinh),
+	token(b'\xc9', "sinh⁻¹(", alt="arcsinh(", pure_func=purefunctions.asinh),
+	token(b'\xca', "cosh(",   pure_func=purefunctions.cosh),
+	token(b'\xcb', "cosh⁻¹(", alt="arccosh(", pure_func=purefunctions.acosh),
+	token(b'\xcc', "tanh(",   pure_func=purefunctions.tanh),
+	token(b'\xcd', "tanh⁻¹(", alt="arctanh(", pure_func=purefunctions.atanh),
 	token(b'\xce', "If "),
 	token(b'\xcf', "Then"),
 	token(b'\xd0', "Else"),
@@ -491,14 +492,14 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x05', "►Nom(", alt="to-Nom"),
 	token(b'\xbb\x06', "►Eff(", alt="to-Eff"),
 	token(b'\xbb\x07', "dbd("),
-	token(b'\xbb\x08', "lcm(",      func=Environment.lcm),
-	token(b'\xbb\x09', "gcd(",      func=Environment.gcd),
-	token(b'\xbb\x0a', "randInt(",  func=Environment.randint),
+	token(b'\xbb\x08', "lcm(",      pure_func=purefunctions.lcm),
+	token(b'\xbb\x09', "gcd(",      pure_func=purefunctions.gcd),
+	token(b'\xbb\x0a', "randInt(",  pure_func=purefunctions.randint),
 	token(b'\xbb\x0b', "randBin("),
-	token(b'\xbb\x0c', "sub(",      func=Environment.sub),
+	token(b'\xbb\x0c', "sub(",      pure_func=purefunctions.sub),
 	token(b'\xbb\x0d', "stdDev("),
 	token(b'\xbb\x0e', "variance("),
-	token(b'\xbb\x0f', "inString(", func=Environment.instring),
+	token(b'\xbb\x0f', "inString(", pure_func=purefunctions.instring),
 	token(b'\xbb\x10', "normalcdf("),
 	token(b'\xbb\x11', "invNorm("),
 	token(b'\xbb\x12', "tcdf("),
@@ -514,20 +515,20 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x1c', "tpdf("),
 	token(b'\xbb\x1d', "χ²pdf(", alt="chi2pdf"),
 	token(b'\xbb\x1e', "Fpdf("),
-	token(b'\xbb\x1f', "randNorm(", func=Environment.randnorm),
+	token(b'\xbb\x1f', "randNorm(", pure_func=purefunctions.randnorm),
 	token(b'\xbb\x20', "tvm_Pmt"),
 	token(b'\xbb\x21', "tvm_I%"),
 	token(b'\xbb\x22', "tvm_PV"),
 	token(b'\xbb\x23', "tvm_N"),
 	token(b'\xbb\x24', "tvm_FV"),
-	token(b'\xbb\x25', "conj(",   func=Environment.conj),
-	token(b'\xbb\x26', "real(",   func=Environment.real),
-	token(b'\xbb\x27', "imag(",   func=Environment.imag),
-	token(b'\xbb\x28', "angle(",  func=Environment.angle),
-	token(b'\xbb\x29', "cumSum(", func=Environment.cumsum),
+	token(b'\xbb\x25', "conj(",   pure_func=purefunctions.conj),
+	token(b'\xbb\x26', "real(",   pure_func=purefunctions.real),
+	token(b'\xbb\x27', "imag(",   pure_func=purefunctions.imag),
+	token(b'\xbb\x28', "angle(",  pure_func=purefunctions.angle),
+	token(b'\xbb\x29', "cumSum(", pure_func=purefunctions.cumsum),
 	token(b'\xbb\x2a', "expr("),
-	token(b'\xbb\x2b', "length(", func=Environment.length),
-	token(b'\xbb\x2c', "ΔList(",  alt="dList(", func=Environment.delta_list),
+	token(b'\xbb\x2b', "length(", pure_func=purefunctions.length),
+	token(b'\xbb\x2c', "ΔList(",  alt="dList(", pure_func=purefunctions.delta_list),
 	token(b'\xbb\x2d', "ref("),
 	token(b'\xbb\x2e', "rref("),
 	token(b'\xbb\x2f', "►Rect", alt="to-Rect"),
@@ -699,10 +700,10 @@ TOKENS: list[Token] = [
 	token(b'\xef\x1e', "<mathprintbox>"),
 	token(b'\xef\x30', "►n/d◄►Un/d"),
 	token(b'\xef\x31', "►F◄►D"),
-	token(b'\xef\x32', "remainder(",    func=Environment.remainder),
-	token(b'\xef\x33', "Σ(",  alt='sigma(', call=lambda parser: parser.env.call_sigma(parser)),
-	token(b'\xef\x34', "logBASE(",      func=Environment.logbase),
-	token(b'\xef\x35', "randIntNoRep(", func=Environment.randintnotrep),
+	token(b'\xef\x32', "remainder(",    pure_func=purefunctions.remainder),
+	token(b'\xef\x33', "Σ(",  alt='sigma(', func=lambda parser: parser.env.call_sigma(parser)),
+	token(b'\xef\x34', "logBASE(",      pure_func=purefunctions.logbase),
+	token(b'\xef\x35', "randIntNoRep(", pure_func=purefunctions.randintnotrep),
 	token(b'\xef\x36', "MATHPRINT"),
 	token(b'\xef\x37', "CLASSIC"),
 	token(b'\xef\x38', "n/d"),
@@ -778,4 +779,5 @@ if __name__ == '__main__':
 
 	for token in sorted(TOKENS, key=lambda t: t.code):
 		print(token.code.hex(), token.display.decode('latin-1'))
+
 

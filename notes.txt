@@ -1,3 +1,7 @@
+
+Don't worry about making everything a float
+
+
 Three function types:
 pure_func: if the function takes pre-parsed arguments and doesn't need access to the environment. Function should be defined in a purefunctions module.
 env_func: same as pure_func, but does have access to the environment. Function should be a member of Environment class. Are there actually any functions like this? I think there are some that depend on the state of certain variables.

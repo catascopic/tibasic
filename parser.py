@@ -184,8 +184,8 @@ class Parser:
 			return self.parse_list_atom(val)
 
 		# Function call
-		if t.call is not None:
-			return t.call(self)
+		if t.func is not None:
+			return t.func(self)
 
 		# Variables and nullary constants (π, e, rand, Ans, etc.)
 		if t.resolve is not None:

@@ -3,7 +3,7 @@ import math, cmath, random, datetime as _dt
 
 class Environment:
 
-	# ── Static helpers (used by binary_op / unary_op fields in tokens) ─────────
+	# ── Static helpers (used as binary_op / unary_op by tokens) ────────────────
 
 	@staticmethod
 	def factorial(n: float) -> float:
@@ -18,11 +18,6 @@ class Environment:
 	@staticmethod
 	def npr(n: float, r: float) -> float:
 		return float(math.perm(int(n), int(r)))
-
-	@staticmethod
-	def ti_int(x: float) -> float:
-		"""Truncation toward zero — TI's int() behaviour."""
-		return math.floor(x) if x >= 0 else math.ceil(x)
 
 	@staticmethod
 	def list_mul(a, b):
@@ -61,199 +56,8 @@ class Environment:
 	def get_key(self):
 		return getattr(self, '_getkey', 0.0)
 
-	# ── Nullary / rand ──────────────────────────────────────────────────────────
-
 	def rand(self):
 		return random.random()
-
-	# ── Function implementations ────────────────────────────────────────────────
-
-	@staticmethod
-	def round(a, b=9):
-		return round(a)
-
-	@staticmethod
-	def max(*a):
-		return max(a) if len(a) > 1 else max(a[0])
-
-	@staticmethod
-	def min(*a):
-		return min(a) if len(a) > 1 else min(a[0])
-
-	@staticmethod
-	def median(a, b=None):
-		return float(sorted(a)[len(a) // 2])
-
-	@staticmethod
-	def mean(a, b=None):
-		return sum(a) / len(a) if b is None else sum(x * w for x, w in zip(a, b)) / sum(b)
-
-	@staticmethod
-	def int_(x):
-		return Environment.ti_int(x)
-
-	@staticmethod
-	def abs(a):
-		return abs(a)
-
-	@staticmethod
-	def det(m):
-		return float(sum(m[i][i] for i in range(len(m))))
-
-	@staticmethod
-	def identity(n):
-		n = int(n)
-		return [[1.0 if r == c else 0.0 for c in range(n)] for r in range(n)]
-
-	@staticmethod
-	def dim(a):
-		if isinstance(a, list) and not isinstance(a[0], list):
-			return float(len(a))
-		return [float(len(a)), float(len(a[0]))]
-
-	@staticmethod
-	def sum(a):
-		return sum(a)
-
-	@staticmethod
-	def prod(a):
-		return math.prod(a)
-
-	@staticmethod
-	def not_(a):
-		return float(not a)
-
-	@staticmethod
-	def ipart(x):
-		return math.trunc(x)
-
-	@staticmethod
-	def fpart(x):
-		return x - Environment.ti_int(x)
-
-	@staticmethod
-	def sqrt(a):
-		return cmath.sqrt(a) if a < 0 else math.sqrt(a)
-
-	@staticmethod
-	def cbrt(a):
-		return -(-a) ** (1/3) if a < 0 else a ** (1/3)
-
-	@staticmethod
-	def ln(a):
-		return cmath.log(a)
-
-	@staticmethod
-	def exp(a):
-		return cmath.exp(a)
-
-	@staticmethod
-	def log(a):
-		return cmath.log10(a)
-
-	@staticmethod
-	def pow10(a):
-		return 10 ** a
-
-	@staticmethod
-	def sin(x): return math.sin(x)
-
-	@staticmethod
-	def asin(x): return math.asin(x)
-
-	@staticmethod
-	def cos(x): return math.cos(x)
-
-	@staticmethod
-	def acos(x): return math.acos(x)
-
-	@staticmethod
-	def tan(x): return math.tan(x)
-
-	@staticmethod
-	def atan(x): return math.atan(x)
-
-	@staticmethod
-	def sinh(x): return math.sinh(x)
-
-	@staticmethod
-	def asinh(x): return math.asinh(x)
-
-	@staticmethod
-	def cosh(x): return math.cosh(x)
-
-	@staticmethod
-	def acosh(x): return math.acosh(x)
-
-	@staticmethod
-	def tanh(x): return math.tanh(x)
-
-	@staticmethod
-	def atanh(x): return math.atanh(x)
-
-	@staticmethod
-	def lcm(a, b):
-		return math.lcm(int(a), int(b))
-
-	@staticmethod
-	def gcd(a, b):
-		return math.gcd(int(a), int(b))
-
-	@staticmethod
-	def randint(low, high, count=1):
-		if count == 1:
-			return random.randint(low, high)
-		return [random.randint(low, high) for _ in range(count)]
-
-	@staticmethod
-	def sub(s, start, length):
-		return s[int(start) - 1 : int(start) - 1 + int(length)]
-
-	@staticmethod
-	def instring(s, sub):
-		return float(s.find(sub) + 1) if sub in s else 0.0
-
-	@staticmethod
-	def randnorm(mu, sigma):
-		return random.gauss(mu, sigma)
-
-	@staticmethod
-	def conj(a):
-		return complex(a.real, -a.imag)
-
-	@staticmethod
-	def real(a): return a.real
-
-	@staticmethod
-	def imag(a): return a.imag
-
-	@staticmethod
-	def angle(a):
-		return cmath.phase(a)
-
-	@staticmethod
-	def cumsum(a):
-		return [sum(a[:i+1]) for i in range(len(a))]
-
-	@staticmethod
-	def length(s):
-		return float(len(s))
-
-	@staticmethod
-	def delta_list(a):
-		return [a[i+1] - a[i] for i in range(len(a) - 1)]
-
-	@staticmethod
-	def remainder(a, b):
-		return float(int(a) % int(b))
-
-	@staticmethod
-	def logbase(a, b):
-		return math.log(a) / math.log(b)
-
-	@staticmethod
-	def randintnotrep(a, b, n=None):
-		return random.sample(range(int(a), int(b) + 1), int(b - a + 1) if n is None else int(n))
 
 	# ── Custom-parse functions ──────────────────────────────────────────────────
 

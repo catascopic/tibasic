@@ -1,6 +1,8 @@
+import cmath
 import builtins
 import math
 import operator
+import random
 import sys
 from functools import wraps
 from itertools import accumulate, pairwise, chain, repeat, batched
@@ -184,7 +186,7 @@ def vectorized(func):
 				len_check.add(len(a))
 				vec.append(a)
 			else:
-				vec.append(repeat(a))
+				vec.append(repeat(_require_num(a)))
 		if not len_check:
 			return func(*args)
 		if len(len_check) == 1:
@@ -227,6 +229,12 @@ def f_part(num):
 @handle_complex
 def sqrt(num):
 	return math.sqrt(num)
+
+
+@vectorized
+@handle_complex
+def cbrt(a):
+	return math.cbrt(a)
 
 
 def cum_sum(lst):
@@ -297,3 +305,154 @@ def sub(value, start, length):
 			raise ValueError(value, start, length)
 		return value[start - 1 : start - 1 + length]
 	raise ValueError(f"Invalid type: {value}; requred: string or number")
+
+@vectorized
+def round(a, b=9):
+	return builtins.round(a)
+
+@vectorized
+def max(a, b):
+	return builtins.max(a, b)
+
+
+@vectorized
+def min(*a):
+	return builtins.min(a, b)
+
+
+def median(lst, freqlist=None):
+	_require_list(lst)
+	if freqlist is None:
+		return sorted(a)[len(a) // 2]
+	_require_list(freqlist)
+	# TODO
+
+
+def mean(lst, freqlist=None):
+	_require_list(lst)
+	if freqlist is None:
+		return builtins.sum(lst) / len(lst)
+	_require_list(freqlist)
+	return builtins.sum(x * w for x, w in zip(lst, freqlist)) / builtins.sum(freqlist)
+
+
+@vectorized
+def abs(a):
+	return builtins.abs(a)
+
+
+def det(mat):
+	_require_matrix(mat)
+	# TODO
+
+
+def identity(n):
+	n = _int(n)
+	return TiMatrix([[1 if r == c else 0 for c in range(n)] for r in range(n)])
+
+
+def sum(a):
+	return builtins.sum(a)
+
+
+def prod(a):
+	return math.prod(a)
+
+
+@vectorized
+def ln(a):
+	return cmath.log(a)
+
+@vectorized
+def exp(a):
+	return cmath.exp(a)
+
+@vectorized
+def log(a):
+	return cmath.log10(a)
+
+@vectorized
+def pow10(a):
+	return 10 ** a
+
+@vectorized
+def sin(x): 
+	return math.sin(x)
+
+@vectorized
+def asin(x):
+	return math.asin(x)
+
+@vectorized
+def cos(x):
+	return math.cos(x)
+
+@vectorized
+def acos(x):
+	return math.acos(x)
+
+@vectorized
+def tan(x):
+	return math.tan(x)
+
+@vectorized
+def atan(x):
+	return math.atan(x)
+
+@vectorized
+def sinh(x):
+	return math.sinh(x)
+
+@vectorized
+def asinh(x):
+	return math.asinh(x)
+
+@vectorized
+def cosh(x):
+	return math.cosh(x)
+
+@vectorized
+def acosh(x):
+	return math.acosh(x)
+
+@vectorized
+def tanh(x):
+	return math.tanh(x)
+
+@vectorized
+def atanh(x):
+	return math.atanh(x)
+
+@vectorized
+def lcm(a, b):
+	return math.lcm(_require_int(a), _require_int(b))
+
+@vectorized
+def gcd(a, b):
+	return math.gcd(_require_int(a), _require_int(b))
+
+def randint(low, high, count=1):
+	if count == 1:
+		return random.randint(low, high)
+	return [random.randint(low, high) for _ in range(_int(count))]
+
+def randnorm(mu, sigma):
+	return random.gauss(mu, sigma)
+
+@vectorized
+def conj(a):
+	return complex(a.real, -a.imag)
+
+def angle(a):
+	return cmath.phase(a)
+
+@vectorized
+def remainder(a, b):
+	return float(_int(a) % _int(b))
+
+@vectorized
+def logbase(a, b):
+	return math.log(a) / math.log(b)
+
+def randintnotrep(a, b, n=None):
+	return random.sample(range(_int(a), _int(b) + 1), _int(b - a + 1) if n is None else _int(n))
