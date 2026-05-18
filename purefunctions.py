@@ -64,8 +64,8 @@ def xor(a, b):
 
 class TiList:
 
-	def __init__(self, data=()):
-		self.inner = list(data)
+	def __init__(self, data=None):
+		self.inner = [] if data is None else data
 
 	def __getitem__(self, index):
 		if index != int(index) or not (1 <= index <= len(self)):
@@ -104,8 +104,8 @@ class TiList:
 def make_binary_list_op(op):
 	def list_op(self, other):
 		if isinstance(other, TiList):
-			return TiList(op(a, b) for a, b in zip(self, other, strict=True))
-		return TiList(op(a, other) for a in self)
+			return TiList([op(a, b) for a, b in zip(self, other, strict=True)])
+		return TiList([op(a, other) for a in self])
 	return list_op
 
 
@@ -120,19 +120,19 @@ for _name, _op in [
 	('__rtruediv__', lambda a, b: b / a),
 	('__pow__', pow),
 	('__rpow__', lambda a, b: b ** a),
-	('__eq__', operator.eq),
-	('__ne__', operator.ne),
-	('__lt__', operator.lt),
-	('__gt__', operator.gt),
-	('__le__', operator.le),
-	('__ge__', operator.ge),
+	('__eq__', lambda a, b: float(a == b)),
+	('__ne__', lambda a, b: float(a != b)),
+	('__lt__', lambda a, b: float(a < b)),
+	('__gt__', lambda a, b: float(a > b)),
+	('__le__', lambda a, b: float(a <= b)),
+	('__ge__', lambda a, b: float(a >= b)),
 ]:
 	setattr(TiList, _name, make_binary_list_op(_op))
 
 
 def make_unary_list_op(op):
 	def list_op(self, op=op):
-		return TiList(op(a) for a in self)
+		return TiList([op(a) for a in self])
 	return list_op
 
 
@@ -149,7 +149,7 @@ for _name, _op in [
 class TiMatrix:
 
 	def __init__(self, data=None):
-		self.inner = [] if data is None else [list(row) for row in data]
+		self.inner = [] if data is None else data
 
 	@property
 	def rows(self):
@@ -245,7 +245,7 @@ def vectorized(func):
 		if not len_check:
 			return func(*args)
 		if len(len_check) == 1:
-			return TiList(func(*v) for v in zip(*vec))
+			return TiList([func(*v) for v in zip(*vec)])
 		raise ValueError(f"Dim mismatch: {len_check}")
 	return apply
 
@@ -254,9 +254,9 @@ def vectorized(func):
 
 def dim(value):
 	if isinstance(value, TiList):
-		return float(len(value))
+		return len(value)
 	if isinstance(value, TiMatrix):
-		return TiList([float(value.rows), float(value.cols)])
+		return TiList([value.rows, value.cols])
 	raise ValueError(f"Invalid type: {type(value).__name__}; required: list or matrix")
 
 
@@ -296,20 +296,20 @@ def cbrt(a):
 
 
 def cum_sum(lst):
-	return TiList(accumulate(_require_list(lst)))
+	return TiList(list(accumulate(_require_list(lst))))
 
 
 def delta_list(lst):
-	return TiList(b - a for a, b in pairwise(_require_list(lst)))
+	return TiList([b - a for a, b in pairwise(_require_list(lst))])
 
 
-def augment(lst1, lst2):
-	if isinstance(lst1, TiList) and isinstance(lst2, TiList):
-		return TiList(chain(lst1, lst2))
-	if isinstance(lst1, TiMatrix) and isinstance(lst2, TiMatrix):
-		if lst1.rows != lst2.rows:
-			raise ValueError(f"Row count mismatch: {lst1.rows} vs {lst2.rows}")
-		return TiMatrix([r1 + r2 for r1, r2 in zip(lst1.inner, lst2.inner)])
+def augment(a, b):
+	if isinstance(a, TiList) and isinstance(b, TiList):
+		return TiList(a.inner + b.inner)
+	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix):
+		if a.rows != b.rows:
+			raise ValueError(f"Row count mismatch: {a.rows} vs {b.rows}")
+		return TiMatrix([r1 + r2 for r1, r2 in zip(a.inner, b.inner)])
 	raise ValueError("augment: both args must be lists or both must be matrices")
 
 
@@ -374,13 +374,13 @@ def length(value):
 def sub(value, start, length):
 	if isinstance(value, Number):
 		return value / 100
-	if isinstance(lst, str):
-		if length < 1:
-			raise ValueError(f"sub: length must be ≥ 1, got {length}")
-		if not (1 <= start <= len(value) - length + 1):
-			raise ValueError(f"sub: index out of range")
-		return value[start - 1 : start - 1 + length]
-	raise ValueError(f"Invalid type: {value}; requred: string or number")
+	_require_str(value)
+	start, length = int(start), int(length)
+	if length < 1:
+		raise ValueError(f"sub: length must be ≥ 1, got {length}")
+	if not (1 <= start <= len(value) - length + 1):
+		raise ValueError(f"sub: index out of range")
+	return value[start - 1 : start - 1 + length]
 
 # ── Aggregate / statistics ───────────────────────────────────────────────────────
 
@@ -388,14 +388,28 @@ def sub(value, start, length):
 def round(a, b=9):
 	return builtins.round(a, int(b))
 
-@vectorized
-def max(a, b):
-	return builtins.max(a, b)
+def max(a, b=None):
+	if b is None:
+		return builtins.max(_require_list(a))
+	if isinstance(a, TiList) and isinstance(b, TiList):
+		if len(a) != len(b):
+			raise ValueError(f"max: dim mismatch ({len(a)} vs {len(b)})")
+		return TiList([builtins.max(x, y) for x, y in zip(a, b)])
+	if isinstance(a, Number) and isinstance(b, Number):
+		return builtins.max(a, b)
+	raise ValueError("max: both args must be the same type (both numeric or both list)")
 
 
-@vectorized
-def min(*a):
-	return builtins.min(a, b)
+def min(a, b=None):
+	if b is None:
+		return builtins.min(_require_list(a))
+	if isinstance(a, TiList) and isinstance(b, TiList):
+		if len(a) != len(b):
+			raise ValueError(f"min: dim mismatch ({len(a)} vs {len(b)})")
+		return TiList([builtins.min(x, y) for x, y in zip(a, b)])
+	if isinstance(a, Number) and isinstance(b, Number):
+		return builtins.min(a, b)
+	raise ValueError("min: both args must be the same type (both numeric or both list)")
 
 
 def median(lst, freqlist=None):
@@ -430,7 +444,7 @@ def det(mat):
 	n = mat.rows
 	if n == 0 or n != mat.cols:
 		raise ValueError(f"det requires a non-empty square matrix, got {mat.rows}×{mat.cols}")
-	m = [row[:] for row in mat.inner]
+	m = [row.copy() for row in mat.inner]
 	sign = 1.0
 	for col in range(n):
 		pivot = next((r for r in range(col, n) if m[r][col] != 0), None)
@@ -483,41 +497,15 @@ def log(a):
 def pow10(a):
 	return 10 ** a
 
-@vectorized
-def sin(x): return cmath.sin(x) if isinstance(x, complex) else math.sin(x)
+def _make_trig(name):
+	mf, cf = getattr(math, name), getattr(cmath, name)
+	def fn(x):
+		return cf(x) if isinstance(x, complex) else mf(x)
+	fn.__name__ = fn.__qualname__ = name
+	return vectorized(fn)
 
-@vectorized
-def asin(x): return cmath.asin(x) if isinstance(x, complex) else math.asin(x)
-
-@vectorized
-def cos(x): return cmath.cos(x) if isinstance(x, complex) else math.cos(x)
-
-@vectorized
-def acos(x): return cmath.acos(x) if isinstance(x, complex) else math.acos(x)
-
-@vectorized
-def tan(x): return cmath.tan(x) if isinstance(x, complex) else math.tan(x)
-
-@vectorized
-def atan(x): return cmath.atan(x) if isinstance(x, complex) else math.atan(x)
-
-@vectorized
-def sinh(x): return cmath.sinh(x) if isinstance(x, complex) else math.sinh(x)
-
-@vectorized
-def asinh(x): return cmath.asinh(x) if isinstance(x, complex) else math.asinh(x)
-
-@vectorized
-def cosh(x): return cmath.cosh(x) if isinstance(x, complex) else math.cosh(x)
-
-@vectorized
-def acosh(x): return cmath.acosh(x) if isinstance(x, complex) else math.acosh(x)
-
-@vectorized
-def tanh(x): return cmath.tanh(x) if isinstance(x, complex) else math.tanh(x)
-
-@vectorized
-def atanh(x): return cmath.atanh(x) if isinstance(x, complex) else math.atanh(x)
+for _name in ['sin', 'asin', 'cos', 'acos', 'tan', 'atan', 'sinh', 'asinh', 'cosh', 'acosh', 'tanh', 'atanh']:
+	globals()[_name] = _make_trig(_name)
 
 
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
@@ -545,7 +533,7 @@ def randint(low, high, count=1):
 	low, high = _require_int(low), _require_int(high)
 	if count == 1:
 		return float(random.randint(low, high))
-	return TiList(float(random.randint(low, high)) for _ in range(_require_int(count)))
+	return TiList([float(random.randint(low, high)) for _ in range(_require_int(count))])
 
 
 def randnorm(mu, sigma):
@@ -555,4 +543,4 @@ def randnorm(mu, sigma):
 def randintnotrep(a, b, n=None):
 	a, b = _require_int(a), _require_int(b)
 	count = b - a + 1 if n is None else _require_int(n)
-	return TiList(float(x) for x in random.sample(range(a, b + 1), count))
+	return TiList([float(x) for x in random.sample(range(a, b + 1), count)])
