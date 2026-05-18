@@ -80,6 +80,9 @@ class TiList:
 		else:
 			self.inner[int(index) - 1] = value
 
+	def __neg__(self):
+		return TiList([-x for x in self])
+
 	def __len__(self):
 		return len(self.inner)
 
@@ -128,20 +131,6 @@ for _name, _op in [
 	('__ge__', lambda a, b: float(a >= b)),
 ]:
 	setattr(TiList, _name, make_binary_list_op(_op))
-
-
-def make_unary_list_op(op):
-	def list_op(self, op=op):
-		return TiList([op(a) for a in self])
-	return list_op
-
-
-for _name, _op in [
-	('__neg__', operator.neg),
-	('__abs__', builtins.abs),
-	('__trunc__', math.trunc),
-]:
-	setattr(TiList, _name, make_unary_list_op(_op))
 
 
 # ── TiMatrix ──────────────────────────────────────────────────────────────────────
@@ -195,6 +184,9 @@ class TiMatrix:
 	def transform(self, func):
 		return TiMatrix([[func(x) for x in row] for row in self.inner])
 
+	def __neg__(self):
+		return self.transform(operator.neg)
+
 	def __matmul__(self, other):
 		if not isinstance(other, TiMatrix):
 			raise ValueError(f"Cannot multiply matrix by {type(other).__name__}")
@@ -237,23 +229,18 @@ class TiMatrix:
 
 def make_matrix_binary_op(op):
 	def mat_op(self, other):
-		if isinstance(other, TiMatrix):
-			if (self.rows, self.cols) != (other.rows, other.cols):
-				raise ValueError(f"Dim mismatch: {self.rows}×{self.cols} vs {other.rows}×{other.cols}")
-			return TiMatrix([[op(self.inner[r][c], other.inner[r][c]) for c in range(self.cols)] for r in range(self.rows)])
-		return self.transform(lambda x: op(x, other))
+		_require_matrix(other)
+		if (self.rows, self.cols) != (other.rows, other.cols):
+			raise ValueError(f"Dim mismatch: {self.rows}×{self.cols} vs {other.rows}×{other.cols}")
+		return TiMatrix([[op(self.inner[r][c], other.inner[r][c]) for c in range(self.cols)] for r in range(self.rows)])
 	return mat_op
 
 
 for _name, _op in [
 	('__add__', operator.add),
-	('__radd__', lambda a, b: b + a),
 	('__sub__', operator.sub),
-	('__rsub__', lambda a, b: b - a),
 ]:
 	setattr(TiMatrix, _name, make_matrix_binary_op(_op))
-
-setattr(TiMatrix, '__neg__', lambda self: self.transform(operator.neg))
 
 
 # ── Decorators ────────────────────────────────────────────────────────────────────
@@ -310,38 +297,41 @@ def dim(value):
 # ── Numeric functions ────────────────────────────────────────────────────────────
 
 @vectorized
-def not_(num):
-	return int(num == 0)
+def not_(x):
+	return int(not x)
 
 
 @vectorized_with_matrix
 @handle_complex
-def i_part(num):
-	return math.trunc(num)
+def i_part(x):
+	return math.trunc(x)
 
 
 @vectorized_with_matrix
 @handle_complex
-def int_(num):
-	return math.floor(num)
+def int_(x):
+	return math.floor(x)
 
 
 @vectorized_with_matrix
 @handle_complex
-def f_part(num):
-	return num - math.trunc(num)
+def f_part(x):
+	return x - math.trunc(x)
 
 
 @vectorized
-def sqrt(num):
-	return cmath.sqrt(num) if isinstance(num, complex) or num < 0 else math.sqrt(num)
+def sqrt(x):
+	return cmath.sqrt(x) if isinstance(x, complex) or x < 0 else math.sqrt(x)
 
 
 @vectorized
-def cbrt(a):
-	if isinstance(a, complex):
-		return cmath.exp(cmath.log(a) / 3)
-	return math.cbrt(a)
+def cbrt(x):
+	return cmath.exp(cmath.log(x) / 3) if isinstance(a, complex) else math.cbrt(x)
+
+
+@vectorized
+def xth_root(x, n):
+	return cmath.exp(cmath.log(x) / n) if isinstance(x, complex) or x < 0 else math.log(x) / n
 
 
 def cum_sum(lst):
@@ -363,13 +353,13 @@ def augment(a, b):
 
 
 @vectorized
-def real(num):
-	return num.real if isinstance(num, complex) else num
+def real(x):
+	return x.real if isinstance(x, complex) else x
 
 
 @vectorized
-def imag(num):
-	return num.imag if isinstance(num, complex) else 0
+def imag(x):
+	return x.imag if isinstance(x, complex) else 0
 
 
 @vectorized
@@ -396,15 +386,15 @@ def sort_d(lst, *dep):
 	sort_a(lst, *dep, reverse=True)
 
 
-def fill(lst, num):
-	_require_num(num)
+def fill(lst, x):
+	_require_num(x)
 	if isinstance(lst, TiList):
 		for i in range(len(lst.inner)):
-			lst.inner[i] = num
+			lst.inner[i] = x
 	elif isinstance(lst, TiMatrix):
 		for row in lst.inner:
 			for i in range(len(row)):
-				row[i] = num
+				row[i] = x
 	else:
 		raise ValueError(f"fill: expected list or matrix, got {type(lst).__name__}")
 
@@ -543,30 +533,38 @@ def prod(lst):
 # ── Transcendental functions ────────────────────────────────────────────────────
 
 @vectorized
-def ln(a):
-	return cmath.log(a) if isinstance(a, complex) else math.log(a)
-
-@vectorized
-def exp(a):
-	return cmath.exp(a) if isinstance(a, complex) else math.exp(a)
-
-@vectorized
-def log(a):
-	return cmath.log10(a) if isinstance(a, complex) else math.log10(a)
-
-@vectorized
 def pow10(a):
 	return 10 ** a
 
-def _make_trig(name):
-	mf, cf = getattr(math, name), getattr(cmath, name)
+@vectorized
+def logbase(a, b):
+	return cmath.log(a, b) if isinstance(a, complex) else math.log(a, b)
+
+
+def _make_dispatch(name, real_fn, cpx_fn):
 	def fn(x):
-		return cf(x) if isinstance(x, complex) else mf(x)
+		return cpx_fn(x) if isinstance(x, complex) else real_fn(x)
 	fn.__name__ = fn.__qualname__ = name
 	return vectorized(fn)
 
-for _name in ['sin', 'asin', 'cos', 'acos', 'tan', 'atan', 'sinh', 'asinh', 'cosh', 'acosh', 'tanh', 'atanh']:
-	globals()[_name] = _make_trig(_name)
+for _name, _mf, _cf in [
+	('sin',   math.sin,   cmath.sin),
+	('asin',  math.asin,  cmath.asin),
+	('cos',   math.cos,   cmath.cos),
+	('acos',  math.acos,  cmath.acos),
+	('tan',   math.tan,   cmath.tan),
+	('atan',  math.atan,  cmath.atan),
+	('sinh',  math.sinh,  cmath.sinh),
+	('asinh', math.asinh, cmath.asinh),
+	('cosh',  math.cosh,  cmath.cosh),
+	('acosh', math.acosh, cmath.acosh),
+	('tanh',  math.tanh,  cmath.tanh),
+	('atanh', math.atanh, cmath.atanh),
+	('ln',    math.log,   cmath.log),
+	('exp',   math.exp,   cmath.exp),
+	('log',   math.log10, cmath.log10),
+]:
+	globals()[_name] = _make_dispatch(_name, _mf, _cf)
 
 
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
@@ -582,11 +580,6 @@ def gcd(a, b):
 @vectorized
 def remainder(a, b):
 	return float(_require_int(a) % _require_int(b))
-
-@vectorized
-def logbase(a, b):
-	return cmath.log(a, b) if isinstance(a, complex) else math.log(a, b)
-
 
 # ── Random ──────────────────────────────────────────────────────────────────────
 
