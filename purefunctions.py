@@ -206,6 +206,21 @@ class TiMatrix:
 			for r in range(self.rows)
 		])
 
+	def __pow__(self, n):
+		n = _require_int(n)
+		if self.rows != self.cols:
+			raise ValueError(f"Matrix power requires a square matrix, got {self.rows}×{self.cols}")
+		if n < 0:
+			raise ValueError("Negative matrix power not supported")
+		result = identity(self.rows)
+		base = self.copy()
+		while n > 0:
+			if n & 1:
+				result = result @ base
+			base = base @ base
+			n >>= 1
+		return result
+
 	def __mul__(self, other):
 		if isinstance(other, TiMatrix):
 			return self @ other
@@ -218,6 +233,27 @@ class TiMatrix:
 
 	def copy(self):
 		return TiMatrix([row.copy() for row in self.inner])
+
+
+def make_matrix_binary_op(op):
+	def mat_op(self, other):
+		if isinstance(other, TiMatrix):
+			if (self.rows, self.cols) != (other.rows, other.cols):
+				raise ValueError(f"Dim mismatch: {self.rows}×{self.cols} vs {other.rows}×{other.cols}")
+			return TiMatrix([[op(self.inner[r][c], other.inner[r][c]) for c in range(self.cols)] for r in range(self.rows)])
+		return self.transform(lambda x: op(x, other))
+	return mat_op
+
+
+for _name, _op in [
+	('__add__', operator.add),
+	('__radd__', lambda a, b: b + a),
+	('__sub__', operator.sub),
+	('__rsub__', lambda a, b: b - a),
+]:
+	setattr(TiMatrix, _name, make_matrix_binary_op(_op))
+
+setattr(TiMatrix, '__neg__', lambda self: self.transform(operator.neg))
 
 
 # ── Decorators ────────────────────────────────────────────────────────────────────
@@ -250,6 +286,17 @@ def vectorized(func):
 	return apply
 
 
+def vectorized_with_matrix(func):
+	"""Like vectorized, but also applies element-wise to a TiMatrix first argument."""
+	vec = vectorized(func)
+	@wraps(func)
+	def apply(a, *args):
+		if isinstance(a, TiMatrix):
+			return a.transform(lambda x: func(x, *args))
+		return vec(a, *args)
+	return apply
+
+
 # ── dim ───────────────────────────────────────────────────────────────────────────
 
 def dim(value):
@@ -264,22 +311,22 @@ def dim(value):
 
 @vectorized
 def not_(num):
-	return float(num == 0)
+	return int(num == 0)
 
 
-@vectorized
+@vectorized_with_matrix
 @handle_complex
 def i_part(num):
 	return math.trunc(num)
 
 
-@vectorized
+@vectorized_with_matrix
 @handle_complex
 def int_(num):
 	return math.floor(num)
 
 
-@vectorized
+@vectorized_with_matrix
 @handle_complex
 def f_part(num):
 	return num - math.trunc(num)
@@ -292,7 +339,9 @@ def sqrt(num):
 
 @vectorized
 def cbrt(a):
-	return math.cbrt(_require_real(a))
+	if isinstance(a, complex):
+		return cmath.exp(cmath.log(a) / 3)
+	return math.cbrt(a)
 
 
 def cum_sum(lst):
@@ -384,7 +433,7 @@ def sub(value, start, length):
 
 # ── Aggregate / statistics ───────────────────────────────────────────────────────
 
-@vectorized
+@vectorized_with_matrix
 def round(a, b=9):
 	return builtins.round(a, int(b))
 
@@ -410,38 +459,31 @@ def min(a, b=None):
 
 def median(lst, freqlist=None):
 	_require_list(lst)
-	def median(values, freqs=None):
-	if not values:
-		raise ValueError("values must not be empty")
-
-	if freqs is None:
-		s = sorted(values)
+	if freqlist is None:
+		s = sorted(lst)
 		n = len(s)
+		if n == 0:
+			raise ValueError("median: empty list")
 		mid = n // 2
-		if n % 2:
-			return s[mid]
-		else:
-			return (s[mid - 1] + s[mid]) / 2
+		return float(s[mid]) if n % 2 else (s[mid - 1] + s[mid]) / 2
 
-	if len(values) != len(freqs):
-		raise ValueError("dim mismatch")
-
-	total = sum(freqs)
-	if total <= 0:
-		raise ValueError("total frequency must be positive")
-
+	_require_list(freqlist)
+	if len(lst) != len(freqlist):
+		raise ValueError("median: dim mismatch")
 	pairs = sorted(zip(lst, freqlist), key=lambda p: p[0])
+	total = builtins.sum(_require_int(f) for _, f in pairs)
+	if total <= 0:
+		raise ValueError("median: total frequency must be positive")
+
 	def nth(k):
 		count = 0
 		for value, freq in pairs:
-			count += freq
+			count += int(freq)
 			if k < count:
 				return value
 
-	# TODO: since we only call nth at most twice, can we simplify this?
 	if total % 2:
-		return nth(total // 2)
-	
+		return float(nth(total // 2))
 	return (nth(total // 2 - 1) + nth(total // 2)) / 2
 
 
@@ -453,7 +495,7 @@ def mean(lst, freqlist=None):
 	return builtins.sum(x * w for x, w in zip(lst, freqlist)) / builtins.sum(freqlist)
 
 
-@vectorized
+@vectorized_with_matrix
 def abs(a):
 	return builtins.abs(a)
 

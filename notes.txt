@@ -1,15 +1,3 @@
-Is that really the best way to do the freqlist version of median? Is there a way to do it without actually generating the values explicitly?
-Can you change min/max to call a private function that takes min/max as a callback?
-
-Can you add these operators to TiMatrix?
-adding/subtracting two matrices
-unary negation of matrix
-matrix raised to power
-int/iPart/fPart/round: for these, I'm not sure what to do. Which is better: make a @vectorized_with_matrix decorator, or add a flag to decorator so you can do @vectorized(matrix=True)? Please implement whichever you think is better.
-
-
-
-
 Three function types:
 pure_func: if the function takes pre-parsed arguments and doesn't need access to the environment. Function should be defined in a purefunctions module.
 env_func: same as pure_func, but does have access to the environment. Function should be a member of Environment class. Are there actually any functions like this? I think there are some that depend on the state of certain variables.
