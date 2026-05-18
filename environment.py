@@ -3,34 +3,6 @@ import math, cmath, random, datetime as _dt
 
 class Environment:
 
-	# ── Static helpers (used as binary_op / unary_op by tokens) ────────────────
-
-	@staticmethod
-	def factorial(n: float) -> float:
-		if n < 0 or n != int(n):
-			raise ValueError("Argument to ! must be a non-negative integer")
-		return float(math.factorial(int(n)))
-
-	@staticmethod
-	def ncr(n: float, r: float) -> float:
-		return float(math.comb(int(n), int(r)))
-
-	@staticmethod
-	def npr(n: float, r: float) -> float:
-		return float(math.perm(int(n), int(r)))
-
-	@staticmethod
-	def list_mul(a, b):
-		if isinstance(a, list) and not isinstance(a[0], list):
-			return [x * b for x in a]
-		if isinstance(b, list) and not isinstance(b[0], list):
-			return [a * x for x in b]
-		return a * b
-
-	@staticmethod
-	def matrix_transpose(m):
-		return [[m[r][c] for r in range(len(m))] for c in range(len(m[0]))]
-
 	# ── Nullary resolve helpers (used by resolve= fields in tokens) ─────────────
 
 	def get_date(self):

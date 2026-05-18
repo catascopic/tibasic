@@ -51,13 +51,23 @@ def _require_int(value):
 # ── Logical operators ────────────────────────────────────────────────────────────
 
 def and_(a, b):
-	return float(bool(a) & bool(b))
+	return float(bool(_require_real(a)) and bool(_require_real(b)))
 
 def or_(a, b):
-	return float(bool(a) | bool(b))
+	return float(bool(_require_real(a)) or bool(_require_real(b)))
 
 def xor(a, b):
-	return float(bool(a) ^ bool(b))
+	return float(bool(_require_real(a)) ^ bool(_require_real(b)))
+
+
+# ── Comparison operators ──────────────────────────────────────────────────────────
+
+def eq(a, b): return float(_require_real(a) == _require_real(b))
+def ne(a, b): return float(_require_real(a) != _require_real(b))
+def lt(a, b): return float(_require_real(a) < _require_real(b))
+def gt(a, b): return float(_require_real(a) > _require_real(b))
+def le(a, b): return float(_require_real(a) <= _require_real(b))
+def ge(a, b): return float(_require_real(a) >= _require_real(b))
 
 
 # ── TiList ────────────────────────────────────────────────────────────────────────
@@ -298,7 +308,7 @@ def dim(value):
 
 @vectorized
 def not_(x):
-	return int(not x)
+	return float(not _require_real(x))
 
 
 @vectorized_with_matrix
@@ -568,6 +578,18 @@ for _name, _mf, _cf in [
 
 
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
+
+def factorial(n):
+	n = _require_int(n)
+	if n < 0:
+		raise ValueError("Argument to ! must be a non-negative integer")
+	return float(math.factorial(n))
+
+def ncr(n, r):
+	return float(math.comb(_require_int(n), _require_int(r)))
+
+def npr(n, r):
+	return float(math.perm(_require_int(n), _require_int(r)))
 
 @vectorized
 def lcm(a, b):
