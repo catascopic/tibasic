@@ -388,42 +388,61 @@ def sub(value, start, length):
 def round(a, b=9):
 	return builtins.round(a, int(b))
 
-def max(a, b=None):
+def _minmax(fn, a, b):
 	if b is None:
-		return builtins.max(_require_list(a))
+		return fn(_require_list(a))
 	if isinstance(a, TiList) and isinstance(b, TiList):
 		if len(a) != len(b):
-			raise ValueError(f"max: dim mismatch ({len(a)} vs {len(b)})")
-		return TiList([builtins.max(x, y) for x, y in zip(a, b)])
+			raise ValueError(f"{fn.__name__}: dim mismatch ({len(a)} vs {len(b)})")
+		return TiList([fn(x, y) for x, y in zip(a, b)])
 	if isinstance(a, Number) and isinstance(b, Number):
-		return builtins.max(a, b)
-	raise ValueError("max: both args must be the same type (both numeric or both list)")
+		return fn(a, b)
+	raise ValueError(f"{fn.__name__}: both args must be the same type (both numeric or both list)")
+
+
+def max(a, b=None):
+	return _minmax(builtins.max, a, b)
 
 
 def min(a, b=None):
-	if b is None:
-		return builtins.min(_require_list(a))
-	if isinstance(a, TiList) and isinstance(b, TiList):
-		if len(a) != len(b):
-			raise ValueError(f"min: dim mismatch ({len(a)} vs {len(b)})")
-		return TiList([builtins.min(x, y) for x, y in zip(a, b)])
-	if isinstance(a, Number) and isinstance(b, Number):
-		return builtins.min(a, b)
-	raise ValueError("min: both args must be the same type (both numeric or both list)")
+	return _minmax(builtins.min, a, b)
 
 
 def median(lst, freqlist=None):
 	_require_list(lst)
-	if freqlist is None:
-		s = sorted(lst)
-	else:
-		_require_list(freqlist)
-		s = sorted(v for v, f in zip(lst, freqlist) for _ in range(_require_int(f)))
-	n = len(s)
-	if n == 0:
-		raise ValueError("median: empty list")
-	mid = n // 2
-	return float(s[mid]) if n % 2 else (s[mid - 1] + s[mid]) / 2
+	def median(values, freqs=None):
+	if not values:
+		raise ValueError("values must not be empty")
+
+	if freqs is None:
+		s = sorted(values)
+		n = len(s)
+		mid = n // 2
+		if n % 2:
+			return s[mid]
+		else:
+			return (s[mid - 1] + s[mid]) / 2
+
+	if len(values) != len(freqs):
+		raise ValueError("dim mismatch")
+
+	total = sum(freqs)
+	if total <= 0:
+		raise ValueError("total frequency must be positive")
+
+	pairs = sorted(zip(lst, freqlist), key=lambda p: p[0])
+	def nth(k):
+		count = 0
+		for value, freq in pairs:
+			count += freq
+			if k < count:
+				return value
+
+	# TODO: since we only call nth at most twice, can we simplify this?
+	if total % 2:
+		return nth(total // 2)
+	
+	return (nth(total // 2 - 1) + nth(total // 2)) / 2
 
 
 def mean(lst, freqlist=None):
