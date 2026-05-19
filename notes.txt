@@ -1,3 +1,7 @@
+Environment: clever way of doing var tables based on byte codes, most can be arrays
+
+
+
 tokens that start with "►" and don't use parentheses (like "►DMS") are a special type of command I'm calling a converter, and they're only valid as the last token in a line. Like the "store" arrow, they also implicitly close all parentheses/brackets/quotes
 Basically, lines can take these forms:
 <expression> (does nothing by itself other than side effects, updates Ans)

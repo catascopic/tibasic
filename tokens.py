@@ -19,6 +19,7 @@ class Token:
 	cmd: Any = None				# (parser) -> None  for command tokens
 	resolve: Any = None			# (env) -> value  for variables and nullary tokens
 	store: Any = None			# (env, value) -> None  for writable variables
+	converter: Any = None		# (value) -> value  for ►DMS, ►Dec, ►Frac etc.
 
 	# ── Token type predicates ──────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ def token(
 	cmd: Callable[[Environment], None] | None = None,
 	resolve: Callable[[Environment], Any] | None = None,
 	store: Callable[[Environment], None] | None = None,
+	converter: Callable | None = None,
 ) -> Token:
 
 	if code in _SEEN:
@@ -88,7 +90,7 @@ def token(
 		func = lambda parser, _f=pure_func: _f(*parser.parse_args())
 	return Token(
 		code, text, key, alias,
-		bp, binary_op, unary_op, postfix, func, cmd, resolve, store,
+		bp, binary_op, unary_op, postfix, func, cmd, resolve, store, converter,
 	)
 
 
@@ -147,9 +149,9 @@ XROOT	 = token(b'\xf1', "×√", alt="xroot", bp=(60, 61), binary_op=lambda a, b
 
 TOKENS: list[Token] = [
 	# One-byte tokens
-	token(b'\x01', "►DMS", alt='to-DMS'),
-	token(b'\x02', "►Dec", alt='to-Dec'),
-	token(b'\x03', "►Frac", alt='to-Frac'),
+	token(b'\x01', "►DMS",  alt='to-DMS',  converter=purefunctions.to_dms),
+	token(b'\x02', "►Dec",  alt='to-Dec',  converter=purefunctions.to_dec),
+	token(b'\x03', "►Frac", alt='to-Frac', converter=purefunctions.to_frac),
 	STORE,
 	token(b'\x05', "Boxplot"),
 	L_BRACKET,
@@ -181,9 +183,9 @@ TOKENS: list[Token] = [
 	token(b'\x20', "randM("),
 	token(b'\x21', "mean(",   pure_func=purefunctions.mean),
 	token(b'\x22', "solve("),
-	token(b'\x23', "seq(",    func=lambda parser: parser.env.call_seq(parser)),
-	token(b'\x24', "fnInt(",  func=lambda parser: parser.env.call_fnint(parser)),
-	token(b'\x25', "nDeriv(", func=lambda parser: parser.env.call_nderiv(parser)),
+	token(b'\x23', "seq(",    func=lambda parser: parser.call_seq()),
+	token(b'\x24', "fnInt(",  func=lambda parser: parser.call_fnint()),
+	token(b'\x25', "nDeriv(", func=lambda parser: parser.call_nderiv()),
 	token(b'\x27', "fMin("),
 	token(b'\x28', "fMax("),
 	token(b'\x29', " ", key=' '),
@@ -550,8 +552,8 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x36', "Shade_t("),
 	token(b'\xbb\x37', "Shadeχ²(", alt="shade-chi^2"),
 	token(b'\xbb\x38', "ShadeF("),
-	token(b'\xbb\x39', "Matr►list(", alt="Matr-to-list"),
-	token(b'\xbb\x3a', "List►matr(", alt="List-to-matr"),
+	token(b'\xbb\x39', "Matr►list(", alt="Matr-to-list", cmd=lambda parser: parser.call_matr_to_list()),
+	token(b'\xbb\x3a', "List►matr(", alt="List-to-matr", cmd=lambda parser: parser.call_list_to_matr()),
 	token(b'\xbb\x3b', "Z-Test("),
 	token(b'\xbb\x3c', "T-Test"),
 	token(b'\xbb\x3d', "2-SampZTest("),
@@ -710,7 +712,7 @@ TOKENS: list[Token] = [
 	token(b'\xef\x30', "►n/d◄►Un/d"),
 	token(b'\xef\x31', "►F◄►D"),
 	token(b'\xef\x32', "remainder(",    pure_func=purefunctions.remainder),
-	token(b'\xef\x33', "Σ(",  alt='sigma(', func=lambda parser: parser.env.call_sigma(parser)),
+	token(b'\xef\x33', "Σ(",  alt='sigma(', func=lambda parser: parser.call_sigma()),
 	token(b'\xef\x34', "logBASE(",      pure_func=purefunctions.logbase),
 	token(b'\xef\x35', "randIntNoRep(", pure_func=purefunctions.randintnotrep),
 	token(b'\xef\x36', "MATHPRINT"),

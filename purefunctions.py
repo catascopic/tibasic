@@ -455,6 +455,29 @@ def fill(lst, x):
 		raise ValueError(f"fill: expected list or matrix, got {type(lst).__name__}")
 
 
+# ── Converters (►DMS, ►Dec, ►Frac) ─────────────────────────────────────────────
+
+def to_dms(x):
+	x = _require_real(x)
+	neg = x < 0
+	x = abs(x)
+	deg = int(x)
+	rem = (x - deg) * 60
+	mins = int(rem)
+	secs = (rem - mins) * 60
+	sign = "-" if neg else ""
+	return f"{sign}{deg}°{mins}'{_repr_num(secs)}\""
+
+def to_dec(x):
+	return _require_real(x)
+
+def to_frac(x):
+	from fractions import Fraction
+	x = _require_real(x)
+	f = Fraction(x).limit_denominator(10000)
+	return float(f) if f.denominator == 1 else f"{f.numerator}/{f.denominator}"
+
+
 # ── String functions ────────────────────────────────────────────────────────────
 
 def in_string(value, substring):
