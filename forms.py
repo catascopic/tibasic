@@ -8,6 +8,12 @@ if TYPE_CHECKING:
 from purefunctions import TiList, TiMatrix
 
 
+def _parse_method(method):
+	def wrapper(self, optional=False, default=None):
+		return self._arg(lambda: method(self), optional, default)
+	return wrapper
+
+
 class ArgParser:
 	"""Stateful helper for parsing comma-separated function arguments."""
 
@@ -21,33 +27,41 @@ class ArgParser:
 		else:
 			self._parser.expect_comma()
 
-	def expr(self):
+	def _arg(self, parse_fn, optional=False, default=None):
+		if optional:
+			if self._first:
+				if self._parser.at_end() or self._parser.peek_is_rparen():
+					return default
+				self._first = False
+				return parse_fn()
+			if not self._parser.eat_if_comma():
+				return default
+			return parse_fn()
 		self._sep()
+		return parse_fn()
+
+	@_parse_method
+	def expr(self):
 		return self._parser.parse_expr()
 
+	@_parse_method
 	def thunk(self):
-		self._sep()
 		return self._parser.capture()
 
+	@_parse_method
 	def real_var(self) -> Token:
-		self._sep()
 		tok = self._parser.advance()
 		if not tok.is_real_var():
 			raise ValueError(f"Expected a real variable, got {tok.text!r}")
 		return tok
 
+	@_parse_method
 	def list_var(self):
-		self._sep()
 		return self._parser.parse_list_var_key()
 
+	@_parse_method
 	def matrix_var(self):
-		self._sep()
 		return self._parser.parse_matrix_var_key()
-
-	def opt_expr(self, default):
-		if self._parser.eat_if_comma():
-			return self._parser.parse_expr()
-		return default
 
 	def finish(self):
 		self._parser.eat_if_rparen()
@@ -78,7 +92,7 @@ def seq(a: ArgParser) -> TiList:
 	var = a.real_var()
 	start = a.expr()
 	end = a.expr()
-	step = a.opt_expr(1.0)
+	step = a.expr(optional=True, default=1)
 	a.finish()
 	env = a.env
 	saved = env.reals.get(var)
@@ -118,7 +132,7 @@ def nderiv(a: ArgParser) -> float:
 	thunk = a.thunk()
 	var = a.real_var()
 	val = a.expr()
-	h = a.opt_expr(1e-5)
+	h = a.expr(optional=True, default=1e-5)
 	a.finish()
 	env = a.env
 	saved = env.reals.get(var)
