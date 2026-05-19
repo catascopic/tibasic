@@ -172,13 +172,8 @@ def matr_to_list(a: ArgParser) -> None:
 	while a.has_next_arg():
 		keys.append(a.list_var())
 	a.finish()
-	env = a.env
-	for col, key in enumerate(keys):
-		lst = TiList([mat.inner[r][col] for r in range(mat.rows)])
-		if isinstance(key, str):
-			env.user_lists[key] = lst
-		else:
-			env.lists[key] = lst
+	for col, ref in enumerate(keys):
+		ref.set(TiList([mat.inner[r][col] for r in range(mat.rows)]))
 
 
 def list_to_matr(a: ArgParser) -> None:

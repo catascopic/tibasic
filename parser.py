@@ -6,7 +6,7 @@ from tokens import (
 	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, ANS, NEG, LIST_PREFIX,
 	RAND, DIM, SCI_E
 )
-from environment import Environment
+from environment import Environment, _ListRef
 from forms import ArgParser
 
 class ParseError(Exception):
@@ -188,8 +188,7 @@ class Parser:
 			return SCI_E.binary_op(1.0, self.parse_expr(SCI_E.bp[1]))
 
 		if t is LIST_PREFIX:
-			val = self.env.user_lists[self._read_name()]
-			return self.parse_list_atom(val)
+			return self.parse_list_atom(self.env.user_lists[self._read_name()])
 
 		# Function call
 		if t.func is not None:
@@ -262,15 +261,15 @@ class Parser:
 
 	def parse_store_target(self, value):
 		t = self.advance()
-
-		if t is LIST_PREFIX:
-			self.parse_store_list(self._read_name(), value)
-
+		
+		if t.is_list_var():
+			self.parse_store_list(self._list_ref(t))
+			
+		elif t is LIST_PREFIX:
+			self.parse_store_list(self._user_list_ref())
+		
 		elif t is DIM:
 			self.parse_store_dim(value)
-
-		elif t.is_list_var():
-			self.parse_store_list(t, value)
 
 		elif t.is_matrix_var():
 			if self.eat_if(L_PAREN):
@@ -284,34 +283,37 @@ class Parser:
 		else:
 			raise ParseError(f"Invalid store target: {t}")
 	
-	def parse_store_list(self, name, value):
-		lists, key = (self.env.user_lists, name) if isinstance(name, str) else (self.env.lists, name)
+	def _list_ref(self, token):
+		return _ListRef(self.env.lists, t)
+	
+	def _user_list_ref(self):
+		return _ListRef(self.env.user_lists, self._read_name())
+			
+	def parse_store_list(self, ref):
 		if self.eat_if(L_PAREN):
-			idx = self.parse_expr()
+			ref.get()[self.parse_expr()] = value
 			self.eat_if(R_PAREN)
-			lists[key][idx] = value
 		else:
-			lists[key] = value
+			ref.set(value)
 
 	def parse_store_dim(self, value):
-		t = self.advance()
-		if t.is_list_var():
-			self.env.lists[t].set_dim(value)
-		elif t is LIST_PREFIX:
-			self.env.user_lists[self._read_name()].set_dim(value)
+		t = self.peek()
+		if t.is_list_var() or t is LIST_PREFIX:
+			self.parse_list_var_key().get().set_dim(value)
 		elif t.is_matrix_var():
+			self.advance()
 			self.env.matrices[t].set_dim(value)
 		else:
 			raise ParseError(f"Invalid store-to-dim target: {t}")
 
 	# ── Variable key parsers ──────────────────────────────────────────────────────
 
-	def parse_list_var_key(self):
+	def parse_list_var_key(self) -> _ListRef:
 		t = self.advance()
-		if t is LIST_PREFIX:
-			return self._read_name()
 		if t.is_list_var():
-			return t
+			return self._list_ref()
+		if t is LIST_PREFIX:
+			return self._user_list_ref()
 		raise ParseError(f"Expected a list variable, got {t.text!r}")
 
 	def parse_matrix_var_key(self):

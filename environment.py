@@ -21,6 +21,21 @@ class _VarArray:
 		self._data[token.code[self._byte] - self._offset] = value
 
 
+class _ListRef:
+	"""Bound reference to a list variable — captures storage and key."""
+	__slots__ = ('_store', '_key')
+
+	def __init__(self, store, key):
+		self._store = store
+		self._key   = key
+
+	def get(self):
+		return self._store[self._key]
+
+	def set(self, value):
+		self._store[self._key] = value
+
+
 class Environment:
 
 	def __init__(self):
