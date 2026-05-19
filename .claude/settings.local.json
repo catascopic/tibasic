@@ -11,7 +11,9 @@
       "Bash(grep -E \"\\\\.py$\")",
       "Bash(git stash *)",
       "Bash(git checkout *)",
-      "Bash(python C:\\\\Users\\\\Max\\\\Documents\\\\code\\\\tibasic\\\\purefunctions.py)"
+      "Bash(python C:\\\\Users\\\\Max\\\\Documents\\\\code\\\\tibasic\\\\purefunctions.py)",
+      "Bash(python _strip_alt_key.py)",
+      "Bash(python -c \"import tokens; print\\('OK, tokens loaded, count:', len\\(tokens.TOKENS\\)\\)\")"
     ]
   }
 }
