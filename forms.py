@@ -5,7 +5,17 @@ if TYPE_CHECKING:
 	from parser import Parser, ParseError
 	from tokens import Token
 
+from contextlib import contextmanager
 from purefunctions import TiList, TiMatrix
+
+
+@contextmanager
+def _scoped_var(env, var):
+	saved = env.reals.get(var, 0.0)
+	try:
+		yield env.reals
+	finally:
+		env.reals[var] = saved
 
 
 def _parse_method(method):
@@ -95,17 +105,13 @@ def seq(a: ArgParser) -> TiList:
 	step = a.expr(optional=True, default=1)
 	a.finish()
 	env = a.env
-	saved = env.reals.get(var)
 	result = []
-	n = start
-	while (step > 0 and n <= end + 1e-10) or (step < 0 and n >= end - 1e-10):
-		env.reals[var] = n
-		result.append(thunk.eval())
-		n += step
-	if saved is not None:
-		env.reals[var] = saved
-	else:
-		env.reals.pop(var, None)
+	with _scoped_var(env, var) as reals:
+		n = start
+		while (step > 0 and n <= end + 1e-10) or (step < 0 and n >= end - 1e-10):
+			reals[var] = n
+			result.append(thunk.eval())
+			n += step
 	return TiList(result)
 
 
@@ -116,15 +122,11 @@ def sigma(a: ArgParser) -> float:
 	end = int(a.expr())
 	a.finish()
 	env = a.env
-	saved = env.reals.get(var)
 	total = 0.0
-	for i in range(start, end + 1):
-		env.reals[var] = float(i)
-		total += thunk.eval()
-	if saved is not None:
-		env.reals[var] = saved
-	else:
-		env.reals.pop(var, None)
+	with _scoped_var(env, var) as reals:
+		for i in range(start, end + 1):
+			reals[var] = float(i)
+			total += thunk.eval()
 	return total
 
 
@@ -135,15 +137,11 @@ def nderiv(a: ArgParser) -> float:
 	h = a.expr(optional=True, default=1e-5)
 	a.finish()
 	env = a.env
-	saved = env.reals.get(var)
-	env.reals[var] = val + h
-	fwd = thunk.eval()
-	env.reals[var] = val - h
-	bwd = thunk.eval()
-	if saved is not None:
-		env.reals[var] = saved
-	else:
-		env.reals.pop(var, None)
+	with _scoped_var(env, var) as reals:
+		reals[var] = val + h
+		fwd = thunk.eval()
+		reals[var] = val - h
+		bwd = thunk.eval()
 	return (fwd - bwd) / (2 * h)
 
 
@@ -154,19 +152,15 @@ def fnint(a: ArgParser) -> float:
 	hi = a.expr()
 	a.finish()
 	env = a.env
-	saved = env.reals.get(var)
 	n = 1000
 	h = (hi - lo) / n
-	def f(x):
-		env.reals[var] = x
-		return thunk.eval()
-	total = f(lo) + f(hi)
-	for i in range(1, n):
-		total += (4 if i % 2 else 2) * f(lo + i * h)
-	if saved is not None:
-		env.reals[var] = saved
-	else:
-		env.reals.pop(var, None)
+	with _scoped_var(env, var) as reals:
+		def f(x):
+			reals[var] = x
+			return thunk.eval()
+		total = f(lo) + f(hi)
+		for i in range(1, n):
+			total += (4 if i % 2 else 2) * f(lo + i * h)
 	return total * h / 3
 
 
