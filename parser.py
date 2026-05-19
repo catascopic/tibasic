@@ -188,7 +188,7 @@ class Parser:
 			return SCI_E.binary_op(1.0, self.parse_expr(SCI_E.bp[1]))
 
 		if t is LIST_PREFIX:
-			val = self.env.lists[self._read_name()]
+			val = self.env.user_lists[self._read_name()]
 			return self.parse_list_atom(val)
 
 		# Function call
@@ -285,25 +285,26 @@ class Parser:
 			raise ParseError(f"Invalid store target: {t}")
 	
 	def parse_store_list(self, name, value):
+		lists, key = (self.env.user_lists, name) if isinstance(name, str) else (self.env.lists, name)
 		if self.eat_if(L_PAREN):
 			idx = self.parse_expr()
 			self.eat_if(R_PAREN)
-			self.env.lists[name][idx] = value
+			lists[key][idx] = value
 		else:
-			self.env.lists[name] = value
-	
+			lists[key] = value
+
 	def parse_store_dim(self, value):
 		t = self.advance()
 		if t.is_list_var():
 			self.env.lists[t].set_dim(value)
 		elif t is LIST_PREFIX:
-			self.env.lists[self._read_name()].set_dim(value)
+			self.env.user_lists[self._read_name()].set_dim(value)
 		elif t.is_matrix_var():
 			self.env.matrices[t].set_dim(value)
 		else:
 			raise ParseError(f"Invalid store-to-dim target: {t}")
 
-	# ── Variable key parsers (return the dict key for env.lists / env.matrices) ──
+	# ── Variable key parsers ──────────────────────────────────────────────────────
 
 	def parse_list_var_key(self):
 		t = self.advance()

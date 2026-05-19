@@ -739,7 +739,7 @@ for _t in TOKENS:
 	if _t.resolve is not None or _t.store is not None:
 		continue  # already set on named constants (ANS, RAND, etc.)
 	if _t.is_real_var():
-		_t.resolve = lambda env, t=_t: env.reals.get(t, 0.0)
+		_t.resolve = lambda env, t=_t: env.reals[t]
 		_t.store   = lambda env, value, t=_t: env.reals.__setitem__(t, value)
 	elif _t.is_list_var():
 		_t.resolve = lambda env, t=_t: env.lists[t]

@@ -11,7 +11,7 @@ from purefunctions import TiList, TiMatrix
 
 @contextmanager
 def _scoped_var(env, var):
-	saved = env.reals.get(var, 0.0)
+	saved = env.reals[var]
 	try:
 		yield env.reals
 	finally:
@@ -122,7 +122,7 @@ def sigma(a: ArgParser) -> float:
 	end = int(a.expr())
 	a.finish()
 	env = a.env
-	total = 0.0
+	total = 0
 	with _scoped_var(env, var) as reals:
 		for i in range(start, end + 1):
 			reals[var] = float(i)
@@ -172,8 +172,13 @@ def matr_to_list(a: ArgParser) -> None:
 	while a.has_next_arg():
 		keys.append(a.list_var())
 	a.finish()
+	env = a.env
 	for col, key in enumerate(keys):
-		a.env.lists[key] = TiList([mat.inner[r][col] for r in range(mat.rows)])
+		lst = TiList([mat.inner[r][col] for r in range(mat.rows)])
+		if isinstance(key, str):
+			env.user_lists[key] = lst
+		else:
+			env.lists[key] = lst
 
 
 def list_to_matr(a: ArgParser) -> None:
