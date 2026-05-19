@@ -1,0 +1,20 @@
+Command Summary
+Disables labels on the X and Y coordinate axes.
+Command Syntax
+LabelOff
+Menu Location
+Press:
+2nd FORMAT to access the format menu.
+Use arrows and ENTER to select LabelOff.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+The LabelOff setting disables labels on the X and Y coordinate axes. This is unnecessary if you've disabled the axes themselves, since the labels are only displayed when the axes are. To enable the labels, use the reverse setting
+LabelOn
+.
+Related Commands
+LabelOn
+AxesOn
+AxesOff
+.

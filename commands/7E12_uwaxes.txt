@@ -1,0 +1,42 @@
+Command Summary
+Sets the u and w sequence equations to be graphed against each other.
+Command Syntax
+uwAxes
+Menu Location
+When
+Seq
+mode is enabled, press:
+2nd FORMAT to access the format menu.
+Use arrows to select uwAxes.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+When uwAxes is enabled, and the calculator is in
+Seq
+mode, the equations u and w will be graphed against each other (that is, the points (u(
+n
+),w(
+n
+)) are graphed for the values of
+n
+between
+n
+Min and
+n
+Max). With this setting, sequence mode graphs are a bit like
+parametric
+mode, except the parameter
+n
+is always an integer, and recursive definitions are possible.
+The equation v is ignored when in uwAxes mode.
+See "Related Commands" for other possibilities of graphing sequences.
+Error Conditions
+ERR:INVALID
+is thrown if either u or w is undefined.
+Related Commands
+Time
+Web
+uvAxes
+vwAxes
+.

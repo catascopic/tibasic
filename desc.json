@@ -2,7 +2,6 @@
   "04": {
     "desc": "Stores a value into a variable",
     "alias": [
-      "->",
       "store"
     ],
     "key": "`"
@@ -62,7 +61,6 @@
   "b0": {
     "desc": "Negates a value (unary minus)",
     "alias": [
-      "~",
       "neg"
     ],
     "key": "~"
@@ -92,27 +90,25 @@
   "0c": {
     "desc": "Computes the multiplicative inverse (reciprocal)",
     "alias": [
-      "inv",
-      "^-1"
+      "inv"
     ]
   },
   "0d": {
     "desc": "Squares a value or matrix",
     "alias": [
-      "^2"
+      "square"
     ]
   },
   "0e": {
     "desc": "Returns the transpose of a matrix",
     "alias": [
-      "T",
       "transpose"
     ]
   },
   "0f": {
     "desc": "Cubes a value",
     "alias": [
-      "^3"
+      "cube"
     ]
   },
   "2d": {
@@ -122,7 +118,7 @@
   "3b": {
     "desc": "Scientific notation exponent (×10^n)",
     "alias": [
-      "E"
+      "sci-e"
     ]
   },
   "3c": {
@@ -196,7 +192,7 @@
   "f1": {
     "desc": "Computes the x-th root of a value",
     "alias": [
-      "xroot"
+      "xth-root"
     ]
   },
   "01": {
@@ -531,16 +527,10 @@
     "desc": "Zooms in on a rectangular region you draw on the graph"
   },
   "89": {
-    "desc": "Zooms in on the graph centered at the cursor position",
-    "alias": [
-      "ZoomIn"
-    ]
+    "desc": "Zooms in on the graph centered at the cursor position"
   },
   "8a": {
-    "desc": "Zooms out on the graph centered at the cursor position",
-    "alias": [
-      "ZoomOut"
-    ]
+    "desc": "Zooms out on the graph centered at the cursor position"
   },
   "8b": {
     "desc": "Adjusts the window so pixels are square (equal aspect ratio)"
@@ -640,9 +630,6 @@
   },
   "ae": {
     "desc": "Apostrophe / single-quote character",
-    "alias": [
-      "apostrophe"
-    ],
     "key": "'"
   },
   "af": {
@@ -679,15 +666,13 @@
   "bc": {
     "desc": "Returns the square root of a non-negative number",
     "alias": [
-      "sqrt(",
-      "squareroot"
+      "sqrt("
     ]
   },
   "bd": {
     "desc": "Returns the cube root of a number",
     "alias": [
-      "cbrt(",
-      "cuberoot"
+      "cbrt("
     ]
   },
   "be": {
@@ -897,61 +882,61 @@
   "5c00": {
     "desc": "Matrix variable A",
     "alias": [
-      "matA"
+      "mat-A"
     ]
   },
   "5c01": {
     "desc": "Matrix variable B",
     "alias": [
-      "matB"
+      "mat-B"
     ]
   },
   "5c02": {
     "desc": "Matrix variable C",
     "alias": [
-      "matC"
+      "mat-C"
     ]
   },
   "5c03": {
     "desc": "Matrix variable D",
     "alias": [
-      "matD"
+      "mat-D"
     ]
   },
   "5c04": {
     "desc": "Matrix variable E",
     "alias": [
-      "matE"
+      "mat-E"
     ]
   },
   "5c05": {
     "desc": "Matrix variable F",
     "alias": [
-      "matF"
+      "mat-F"
     ]
   },
   "5c06": {
     "desc": "Matrix variable G",
     "alias": [
-      "matG"
+      "mat-G"
     ]
   },
   "5c07": {
     "desc": "Matrix variable H",
     "alias": [
-      "matH"
+      "mat-H"
     ]
   },
   "5c08": {
     "desc": "Matrix variable I",
     "alias": [
-      "matI"
+      "mat-I"
     ]
   },
   "5c09": {
     "desc": "Matrix variable J",
     "alias": [
-      "matJ"
+      "mat-J"
     ]
   },
   "5d00": {
@@ -1428,37 +1413,37 @@
   "6237": {
     "desc": "Degrees of freedom for the factor in one-way ANOVA",
     "alias": [
-      "FactorDF"
+      "Factor-df"
     ]
   },
   "6238": {
     "desc": "Sum of squares for the factor in one-way ANOVA",
     "alias": [
-      "FactorSS"
+      "Factor-ss"
     ]
   },
   "6239": {
     "desc": "Mean square for the factor in one-way ANOVA",
     "alias": [
-      "FactorMS"
+      "Factor-ms"
     ]
   },
   "623a": {
     "desc": "Degrees of freedom for the error in one-way ANOVA",
     "alias": [
-      "ErrorDF"
+      "Error-df"
     ]
   },
   "623b": {
     "desc": "Sum of squares for the error in one-way ANOVA",
     "alias": [
-      "ErrorSS"
+      "Error-ss"
     ]
   },
   "623c": {
     "desc": "Mean square for the error in one-way ANOVA",
     "alias": [
-      "ErrorMS"
+      "Error-ms"
     ]
   },
   "6302": {
@@ -1512,7 +1497,7 @@
   "6321": {
     "desc": "Table step (increment) for the function table",
     "alias": [
-      "dTbl"
+      "delta-Tbl"
     ]
   },
   "6322": {
@@ -1527,13 +1512,13 @@
   "6326": {
     "desc": "Width of one pixel in the current graphing window",
     "alias": [
-      "dX"
+      "delta-X"
     ]
   },
   "6327": {
     "desc": "Height of one pixel in the current graphing window",
     "alias": [
-      "dY"
+      "delta-Y"
     ]
   },
   "6328": {
@@ -1698,7 +1683,7 @@
   "bb13": {
     "desc": "Computes the chi-squared distribution CDF between two bounds",
     "alias": [
-      "chi2cdf"
+      "chi^2-cdf"
     ]
   },
   "bb14": {
@@ -1731,7 +1716,7 @@
   "bb1d": {
     "desc": "Computes the chi-squared probability density at a given value",
     "alias": [
-      "chi2pdf"
+      "chi^2-pdf"
     ]
   },
   "bb1e": {
@@ -1779,7 +1764,7 @@
   "bb2c": {
     "desc": "Returns a list of first differences of a list",
     "alias": [
-      "dList("
+      "delta-List("
     ]
   },
   "bb2d": {
@@ -1902,15 +1887,11 @@
   "bb4e": {
     "desc": "Sets the calculator to polar complex-number mode",
     "alias": [
-      "re^theta-i",
-      "polar_complex"
+      "re^theta-i"
     ]
   },
   "bb4f": {
-    "desc": "Sets the calculator to rectangular complex-number mode",
-    "alias": [
-      "rect_complex"
-    ]
+    "desc": "Sets the calculator to rectangular complex-number mode"
   },
   "bb50": {
     "desc": "Turns on expression display during tracing"
@@ -2350,78 +2331,45 @@
     "desc": "Defragments archive memory to recover space"
   },
   "bbcf": {
-    "desc": "Tilde character",
-    "alias": [
-      "tilde"
-    ]
+    "desc": "Tilde character"
   },
   "bbd1": {
     "desc": "At sign",
-    "alias": [
-      "at-sign"
-    ],
     "key": "@"
   },
   "bbd2": {
     "desc": "Number/hash sign",
-    "alias": [
-      "hash"
-    ],
     "key": "#"
   },
   "bbd3": {
     "desc": "Dollar sign",
-    "alias": [
-      "dollar"
-    ],
     "key": "$"
   },
   "bbd4": {
     "desc": "Ampersand",
-    "alias": [
-      "ampersand"
-    ],
     "key": "&"
   },
   "bbd5": {
-    "desc": "Grave/backtick",
-    "alias": [
-      "backtick"
-    ]
+    "desc": "Grave/backtick"
   },
   "bbd6": {
     "desc": "Semicolon",
-    "alias": [
-      "semicolon"
-    ],
     "key": ";"
   },
   "bbd7": {
     "desc": "Backslash",
-    "alias": [
-      "backslash"
-    ],
     "key": "\\"
   },
   "bbd8": {
     "desc": "Pipe/vertical bar",
-    "alias": [
-      "pipe"
-    ],
     "key": "|"
   },
   "bbd9": {
     "desc": "Underscore",
-    "alias": [
-      "underscore"
-    ],
     "key": "_"
   },
   "bbda": {
     "desc": "Percent sign",
-    "alias": [
-      "percent"
-    ],
     "key": "%"
   },
   "bbdb": {

@@ -1,3 +1,4 @@
+import operator
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
@@ -98,56 +99,65 @@ class ArgParser:
 
 
 def seq(a: ArgParser) -> TiList:
-	thunk = a.thunk()
+	formula = a.thunk()
 	var = a.real_var()
 	start = a.expr()
 	end = a.expr()
 	step = a.expr(optional=True, default=1)
 	a.end()
+	n = start
 	result = []
+	if step > 0:
+		op = operator.le
+		end += 1e-10
+	else:
+		op = operator.ge
+		end -= 1e-10
 	with _scoped_var(a.env, var) as reals:
-		n = start
-		while (step > 0 and n <= end + 1e-10) or (step < 0 and n >= end - 1e-10):
+		while op(n, stop):
 			reals[var] = n
-			result.append(thunk.eval())
+			result.append(formula.eval())
 			n += step
 	return TiList(result)
 
 
 def sigma(a: ArgParser) -> float:
-	thunk = a.thunk()
+	formula = a.thunk()
 	var = a.real_var()
-	start = int(a.expr())
-	end = int(a.expr())
+	start = a.expr()
+	end = a.expr()
 	a.end()
 	total = 0
+	n = start
 	with _scoped_var(a.env, var) as reals:
-		for i in range(start, end + 1):
-			reals[var] = float(i)
-			total += thunk.eval()
+		while n <= end
+			reals[var] = n
+			total += formula.eval()
+			n += 1
 	return total
 
 
 def nderiv(a: ArgParser) -> float:
-	thunk = a.thunk()
+	formula = a.thunk()
 	var = a.real_var()
 	val = a.expr()
-	h = a.expr(optional=True, default=1e-5)
+	h = a.expr(optional=True, default=0.001)
 	a.end()
 	env = a.env
 	with _scoped_var(env, var) as reals:
 		reals[var] = val + h
-		fwd = thunk.eval()
+		fwd = formula.eval()
 		reals[var] = val - h
-		bwd = thunk.eval()
+		bwd = formula.eval()
 	return (fwd - bwd) / (2 * h)
 
 
 def fnint(a: ArgParser) -> float:
-	thunk = a.thunk()
+	formula = a.thunk()
 	var = a.real_var()
 	lo = a.expr()
 	hi = a.expr()
+	# TODO: this has a tolerance value like nderiv
 	a.end()
 	env = a.env
 	n = 1000
@@ -155,7 +165,7 @@ def fnint(a: ArgParser) -> float:
 	with _scoped_var(env, var) as reals:
 		def f(x):
 			reals[var] = x
-			return thunk.eval()
+			return formula.eval()
 		total = f(lo) + f(hi)
 		for i in range(1, n):
 			total += (4 if i % 2 else 2) * f(lo + i * h)
@@ -166,6 +176,7 @@ def matr_to_list(a: ArgParser) -> None:
 	mat = a.expr()
 	if not isinstance(mat, TiMatrix):
 		raise ValueError("Matr►list: first argument must be a matrix")
+	# TODO: second argument can also be a number, in which case we only get that column
 	list_refs = [a.list_var()]
 	while a.has_next_arg():
 		list_refs.append(a.list_var())
@@ -180,12 +191,15 @@ def list_to_matr(a: ArgParser) -> None:
 		list_vals.append(a.expr())
 		if not a.has_next_arg():
 			raise ValueError("List►matr: expected matrix variable as last argument")
+		# TODO:
+		# if a.peek().is_matrix_var():
 		if a.next_is_matrix_var():
 			mat_key = a.matrix_var()
 			break
 	a.end()
 	cols = len(list_vals)
 	rows = max(len(lst) for lst in list_vals)
+	# TODO: can we use zip with a default value?
 	a.env.matrices[mat_key] = TiMatrix([
 		[list_vals[c].inner[r] if r < len(list_vals[c]) else 0.0 for c in range(cols)]
 		for r in range(rows)

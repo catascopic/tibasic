@@ -1,0 +1,27 @@
+Command Summary
+Turns off the cursor coordinate display on the graph screen.
+Command Syntax
+CoordOff
+Menu Location
+Press:
+2nd FORMAT to access the graph format menu
+Use arrows and ENTER to select CoordOff
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+When moving a cursor on a screen, it's possible for the calculator to display the coordinates of the current point (either polar or rectangular coordinates, depending on which of
+RectGC
+or
+PolarGC
+is set). The
+CoordOff
+command turns off this option.
+To turn it on, use the
+CoordOn
+command.
+Related Commands
+CoordOn
+RectGC
+PolarGC
+.

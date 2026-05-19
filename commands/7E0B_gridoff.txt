@@ -1,0 +1,22 @@
+Command Summary
+Disables the grid on the graph screen.
+Command Syntax
+GridOff
+Menu Location
+Press:
+2nd FORMAT to access the graph format menu.
+Use arrows and ENTER to select GridOff.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+The
+GridOff
+command disables the grid on the graph screen. This is the default setting. Use
+GridOn
+to enable the grid.
+Related Commands
+GridOn
+AxesOn
+AxesOff
+.

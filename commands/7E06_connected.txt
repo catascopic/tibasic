@@ -1,0 +1,44 @@
+Command Summary
+Sets all equations to use the connected graphing style, and makes it the default setting.
+Command Syntax
+Connected
+Menu Location
+Press:
+MODE to access the mode menu.
+Use arrows to select Connected.
+Calculator Compatibility
+TI-83/84/+/SE (Not available on TI-84+CE calculators)
+Token Size
+2 bytes
+The
+Connected
+command sets all equations to use the usual graph style - a connected line. In addition, this graph style is made the default, so that when a variable is deleted it will revert to this graph style. The other possible setting for this option is
+Dot
+.
+Compare this to the
+GraphStyle(
+command, which puts a single equation into a specified graph style.
+The
+Connected
+and
+Dot
+commands don't depend on
+graphing mode
+, and will always affect all functions, even in other graphing modes. The exception to this is that
+sequence
+mode's default is always the dotted-line style, even when
+Connected
+mode is set. The
+Connected
+command will still change their graphing style, it just won't change the default they revert to.
+In addition to graphing equations, this setting also affects the output of
+DrawF
+,
+DrawInv
+, and
+Tangent(
+.
+Related Commands
+Dot
+GraphStyle(
+.

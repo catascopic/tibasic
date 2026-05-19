@@ -268,10 +268,10 @@ class Parser:
 		t = self.advance()
 		
 		if t.is_list_var():
-			self.parse_store_list(self._list_ref(t))
+			self.parse_store_list(self._list_ref(t), value)
 			
 		elif t is LIST_PREFIX:
-			self.parse_store_list(self._user_list_ref())
+			self.parse_store_list(self._user_list_ref(), value)
 		
 		elif t is DIM:
 			self.parse_store_dim(value)
@@ -289,12 +289,12 @@ class Parser:
 			raise ParseError(f"Invalid store target: {t}")
 	
 	def _list_ref(self, token):
-		return _ListRef(self.env.lists, t)
+		return _ListRef(self.env.lists, token)
 	
 	def _user_list_ref(self):
 		return _ListRef(self.env.user_lists, self._read_name())
 			
-	def parse_store_list(self, ref):
+	def parse_store_list(self, ref, value):
 		if self.eat_if(L_PAREN):
 			ref.get()[self.parse_expr()] = value
 			self.eat_if(R_PAREN)
@@ -365,10 +365,15 @@ def parse_line(tokens: list[Token], env: dict):
 
 
 if __name__ == '__main__':
-	from tokens import TOKENS, ADD, MUL
+	from tokens import *
 
-	digits = TOKENS[0x2E:0x37]
+	d = TOKENS[0x2E:0x37]
+	lookup = {t.code: t for t in TOKENS}
+	def tok(hi, low=None):
+		return lookup[bytes([hi] if low is None else [hi, low])]
 
 	env = Environment()
-	print(parse_line([L_PAREN, digits[2], ADD, NEG, RAND, digits[3], R_PAREN, MUL, digits[2]], env))
-	print(env.ans)
+	parse_line([L_BRACE, d[3], COMMA, d[1], d[0], STORE, tok(0x5d, 0)], env)
+	# parse_line([d[3], STORE, tok(0x5d, 0)], env)
+	# parse_line([d[3], STORE, tok(0x5d, 0), L_PAREN, d[1]], env)
+	print(env.lists)

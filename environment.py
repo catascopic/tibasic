@@ -19,6 +19,9 @@ class _VarArray:
 
 	def __setitem__(self, token, value):
 		self._data[token.code[self._byte] - self._offset] = value
+	
+	def __repr__(self):
+		return repr(self._data)
 
 
 class _ListRef:

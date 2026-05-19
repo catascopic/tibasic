@@ -1,0 +1,52 @@
+Command Summary
+Sets all equations to use the dotted-line graphing style, and makes it the default setting.
+Command Syntax
+Dot
+Menu Location
+Press:
+MODE to access the mode menu.
+Use arrows to select Dot.
+Calculator Compatibility
+TI-83/84/+/SE
+Token Size
+2 bytes
+The
+Dot
+command sets all equations to use the disconnected "dotted-line" graph style: it calculates and draws points on the graph, but doesn't connect them. In addition, this graph style is made the default, so that when a variable is deleted it will revert to this graph style. The other possible setting for this option is
+Connected
+.
+Compare this to the
+GraphStyle(
+command, which puts a single equation into a specified graph style.
+The
+Connected
+and
+Dot
+commands don't depend on
+graphing mode
+, and will always affect all functions, even in other graphing modes. The exception to this is that
+sequence
+mode's default is always the dotted-line style, even when
+Connected
+mode is set. The
+Connected
+command will still change their graphing style, it just won't change the default they revert to.
+In addition to graphing equations, this setting also affects the output of
+DrawF
+,
+DrawInv
+, and
+Tangent(
+.
+Advanced Uses
+Functions graphed using the dotted-line graph style are very strongly affected by the
+Xres
+setting (which determines how many points on a graph are chosen to be graphed). If
+Xres
+is a high setting (which means many pixels are skipped), functions in dotted-line mode will be made up of fewer points (in connected mode, this will also be the case, but because the points are connected this isn't as noticeable). You should probably set
+Xres
+to 1 if you're going to be using the dotted-line graph style — even 2 is pushing it.
+Related Commands
+Connected
+GraphStyle(
+.

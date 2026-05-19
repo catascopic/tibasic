@@ -788,5 +788,24 @@ if __name__ == '__main__':
 		if token is None:
 			print('MISSING:', hex(0xBB00 + i))
 
-	for token in sorted(TOKENS):
-		print(token.code.hex(), token.display.decode('latin-1'))
+	import json
+	with open('desc.json', encoding='utf-8') as f:
+		desc_lookup = json.load(f)
+
+	def token_data(token):
+		code = token.code.hex()
+		desc = desc_lookup.get(code, {})
+		data = dict(
+			code=code.upper(),
+			text=token.text,
+			desc=desc.get('desc', 'MISSING'),
+		)
+		if desc and 'alias' in desc:
+			data['alias'] = desc['alias'][0]
+		
+		return data
+
+	new_data = [token_data(t) for t in sorted(TOKENS, key=lambda t: t.code)]
+	with open('tokens.json', 'w', encoding='utf-8') as f:
+		json.dump(new_data, f, indent='\t', ensure_ascii=False)
+	print(len(new_data))
