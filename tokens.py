@@ -4,6 +4,7 @@ from typing import Any
 import math, itertools
 from environment import Environment
 import purefunctions
+import forms
 
 @dataclass(eq=False)
 class Token:
@@ -60,6 +61,11 @@ EOF_TOKEN = Token(b'\x00', '')
 
 _SEEN: set[bytes] = set()
 
+def _make_pure_func(f):
+	def wrapper(a):
+		return f(*a.parse_args())
+	return wrapper
+
 def token(
 	code: bytes,
 	text: str,
@@ -86,8 +92,11 @@ def token(
 		alias.add(alt.lower())
 	elif alt is not None:
 		alias.update(a.lower() for a in alt)
-	if func is None and pure_func is not None:
-		func = lambda parser, _f=pure_func: _f(*parser.parse_args())
+	if pure_func is not None:
+		if func is not None:
+			raise ValueError(f"Token {text!r}: cannot set both func and pure_func")
+		func = _make_pure_func(pure_func)
+
 	return Token(
 		code, text, key, alias,
 		bp, binary_op, unary_op, postfix, func, cmd, resolve, store, converter,
@@ -183,9 +192,9 @@ TOKENS: list[Token] = [
 	token(b'\x20', "randM("),
 	token(b'\x21', "mean(",   pure_func=purefunctions.mean),
 	token(b'\x22', "solve("),
-	token(b'\x23', "seq(",    func=lambda parser: parser.call_seq()),
-	token(b'\x24', "fnInt(",  func=lambda parser: parser.call_fnint()),
-	token(b'\x25', "nDeriv(", func=lambda parser: parser.call_nderiv()),
+	token(b'\x23', "seq(",    func=forms.seq),
+	token(b'\x24', "fnInt(",  func=forms.fnint),
+	token(b'\x25', "nDeriv(", func=forms.nderiv),
 	token(b'\x27', "fMin("),
 	token(b'\x28', "fMax("),
 	token(b'\x29', " ", key=' '),
@@ -416,7 +425,7 @@ TOKENS: list[Token] = [
 	token(b'\x62\x22', "p"),
 	token(b'\x62\x23', "z"),
 	token(b'\x62\x24', "t"),
-	token(b'\x62\x25', "χ²", alt="chi2"),
+	token(b'\x62\x25', "χ²", alt="chi^2"),
 	token(b'\x62\x26', "F"),
 	token(b'\x62\x27', "df"),
 	token(b'\x62\x28', "p̂", alt="p-hat"),
@@ -552,8 +561,8 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x36', "Shade_t("),
 	token(b'\xbb\x37', "Shadeχ²(", alt="shade-chi^2"),
 	token(b'\xbb\x38', "ShadeF("),
-	token(b'\xbb\x39', "Matr►list(", alt="Matr-to-list", cmd=lambda parser: parser.call_matr_to_list()),
-	token(b'\xbb\x3a', "List►matr(", alt="List-to-matr", cmd=lambda parser: parser.call_list_to_matr()),
+	token(b'\xbb\x39', "Matr►list(", alt="Matr-to-list", cmd=forms.matr_to_list),
+	token(b'\xbb\x3a', "List►matr(", alt="List-to-matr", cmd=forms.list_to_matr),
 	token(b'\xbb\x3b', "Z-Test("),
 	token(b'\xbb\x3c', "T-Test"),
 	token(b'\xbb\x3d', "2-SampZTest("),
@@ -712,7 +721,7 @@ TOKENS: list[Token] = [
 	token(b'\xef\x30', "►n/d◄►Un/d"),
 	token(b'\xef\x31', "►F◄►D"),
 	token(b'\xef\x32', "remainder(",    pure_func=purefunctions.remainder),
-	token(b'\xef\x33', "Σ(",  alt='sigma(', func=lambda parser: parser.call_sigma()),
+	token(b'\xef\x33', "Σ(",  alt='sigma(', func=forms.sigma),
 	token(b'\xef\x34', "logBASE(",      pure_func=purefunctions.logbase),
 	token(b'\xef\x35', "randIntNoRep(", pure_func=purefunctions.randintnotrep),
 	token(b'\xef\x36', "MATHPRINT"),

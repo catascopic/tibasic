@@ -1,4 +1,5 @@
 Environment: clever way of doing var tables based on byte codes, most can be arrays
+Is there any concern of a circular import with TiList/TiMatrix? If so, you can move those to a separate file.
 
 
 

@@ -7,8 +7,7 @@ from tokens import (
 	RAND, DIM, SCI_E
 )
 from environment import Environment
-from purefunctions import TiList, TiMatrix
-
+from forms import ArgParser
 
 class ParseError(Exception):
 	pass
@@ -22,50 +21,6 @@ class Thunk:
 	def eval(self):
 		return Parser(self.tokens, self.env).parse_expr()
 
-
-class ArgParser:
-	"""Stateful helper for parsing comma-separated function arguments."""
-
-	def __init__(self, parser: 'Parser'):
-		self._p = parser
-		self._first = True
-
-	def _sep(self):
-		if self._first:
-			self._first = False
-		else:
-			self._p.expect(COMMA)
-
-	def expr(self):
-		self._sep()
-		return self._p.parse_expr()
-
-	def thunk(self):
-		self._sep()
-		return self._p.capture()
-
-	def real_var(self) -> Token:
-		self._sep()
-		tok = self._p.advance()
-		if not tok.is_real_var():
-			raise ParseError(f"Expected a real variable, got {tok.text!r}")
-		return tok
-
-	def list_var(self):
-		self._sep()
-		return self._p.parse_list_var_key()
-
-	def matrix_var(self):
-		self._sep()
-		return self._p.parse_matrix_var_key()
-
-	def opt_expr(self, default):
-		if self._p.eat_if(COMMA):
-			return self._p.parse_expr()
-		return default
-
-	def finish(self):
-		self._p.eat_if(R_PAREN)
 
 
 class Parser:
@@ -100,6 +55,13 @@ class Parser:
 
 	def at_end(self) -> bool:
 		return self.peek() is EOF_TOKEN
+
+	# Wrappers used by ArgParser so it doesn't need to import token objects
+	def expect_comma(self):          self.expect(COMMA)
+	def eat_if_comma(self) -> bool:  return self.eat_if(COMMA)
+	def eat_if_rparen(self):         self.eat_if(R_PAREN)
+	def peek_is_comma(self) -> bool: return self.peek() is COMMA
+	def peek_is_rparen(self) -> bool: return self.peek() is R_PAREN
 
 	# ── Sub-parsers ────────────────────────────────────────────────────────────
 
@@ -231,7 +193,7 @@ class Parser:
 
 		# Function call
 		if t.func is not None:
-			return t.func(self)
+			return t.func(ArgParser(self))
 
 		# Variables and nullary constants (π, e, rand, Ans, etc.)
 		if t.resolve is not None:
@@ -357,118 +319,6 @@ class Parser:
 			return t
 		raise ParseError(f"Expected a matrix variable, got {t.text!r}")
 
-	# ── Custom-parsed functions ────────────────────────────────────────────────
-
-	def call_seq(self) -> TiList:
-		a = ArgParser(self)
-		thunk = a.thunk()
-		var = a.real_var()
-		start = a.expr()
-		end = a.expr()
-		step = a.opt_expr(1.0)
-		a.finish()
-		saved = self.env.reals.get(var)
-		result = []
-		n = start
-		while (step > 0 and n <= end + 1e-10) or (step < 0 and n >= end - 1e-10):
-			self.env.reals[var] = n
-			result.append(thunk.eval())
-			n += step
-		if saved is not None:
-			self.env.reals[var] = saved
-		else:
-			self.env.reals.pop(var, None)
-		return TiList(result)
-
-	def call_sigma(self) -> float:
-		a = ArgParser(self)
-		thunk = a.thunk()
-		var = a.real_var()
-		start = int(a.expr())
-		end = int(a.expr())
-		a.finish()
-		saved = self.env.reals.get(var)
-		total = 0.0
-		for i in range(start, end + 1):
-			self.env.reals[var] = float(i)
-			total += thunk.eval()
-		if saved is not None:
-			self.env.reals[var] = saved
-		else:
-			self.env.reals.pop(var, None)
-		return total
-
-	def call_nderiv(self) -> float:
-		a = ArgParser(self)
-		thunk = a.thunk()
-		var = a.real_var()
-		val = a.expr()
-		h = a.opt_expr(1e-5)
-		a.finish()
-		saved = self.env.reals.get(var)
-		self.env.reals[var] = val + h
-		fwd = thunk.eval()
-		self.env.reals[var] = val - h
-		bwd = thunk.eval()
-		if saved is not None:
-			self.env.reals[var] = saved
-		else:
-			self.env.reals.pop(var, None)
-		return (fwd - bwd) / (2 * h)
-
-	def call_fnint(self) -> float:
-		a = ArgParser(self)
-		thunk = a.thunk()
-		var = a.real_var()
-		lo = a.expr()
-		hi = a.expr()
-		a.finish()
-		saved = self.env.reals.get(var)
-		n = 1000
-		h = (hi - lo) / n
-		def f(x):
-			self.env.reals[var] = x
-			return thunk.eval()
-		total = f(lo) + f(hi)
-		for i in range(1, n):
-			total += (4 if i % 2 else 2) * f(lo + i * h)
-		if saved is not None:
-			self.env.reals[var] = saved
-		else:
-			self.env.reals.pop(var, None)
-		return total * h / 3
-
-	def call_matr_to_list(self) -> None:
-		a = ArgParser(self)
-		mat = a.expr()
-		if not isinstance(mat, TiMatrix):
-			raise ParseError("Matr►list: first argument must be a matrix")
-		keys = [a.list_var()]
-		while self.peek() is COMMA:
-			keys.append(a.list_var())
-		a.finish()
-		for col, key in enumerate(keys):
-			self.env.lists[key] = TiList([mat.inner[r][col] for r in range(mat.rows)])
-
-	def call_list_to_matr(self) -> None:
-		a = ArgParser(self)
-		list_vals = []
-		while True:
-			list_vals.append(a.expr())
-			if self.peek() is not COMMA:
-				raise ParseError("List►matr: expected matrix variable as last argument")
-			next_tok = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else EOF_TOKEN
-			if next_tok.is_matrix_var():
-				mat_key = a.matrix_var()
-				break
-		a.finish()
-		cols = len(list_vals)
-		rows = max(len(lst) for lst in list_vals)
-		self.env.matrices[mat_key] = TiMatrix([
-			[list_vals[c].inner[r] if r < len(list_vals[c]) else 0.0 for c in range(cols)]
-			for r in range(rows)
-		])
-
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 
 	def parse_statement(self):
@@ -486,7 +336,7 @@ class Parser:
 		# Command tokens dispatch via token.cmd
 		elif t.cmd is not None:
 			self.advance()
-			t.cmd(self)
+			t.cmd(ArgParser(self))
 			
 		# Expression statement, optionally followed by → target or converter
 		else:
