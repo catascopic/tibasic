@@ -1,5 +1,5 @@
-import operator
 from __future__ import annotations
+import operator
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -7,7 +7,8 @@ if TYPE_CHECKING:
 	from tokens import Token
 
 from contextlib import contextmanager
-from purefunctions import TiList, TiMatrix
+from tiobjects import TiList, TiMatrix
+from environment import Variable
 
 
 @contextmanager
@@ -67,11 +68,11 @@ class ArgParser:
 		return tok
 
 	@_parse_method
-	def list_var(self):
+	def list_var(self) -> Variable:
 		return self._parser.parse_list_var_key()
 
 	@_parse_method
-	def matrix_var(self):
+	def matrix_var(self) -> Variable:
 		return self._parser.parse_matrix_var_key()
 
 	def end(self):

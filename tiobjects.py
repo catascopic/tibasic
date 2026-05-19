@@ -1,0 +1,151 @@
+import builtins
+from itertools import repeat
+
+
+class TiTypeError(Exception):
+	pass
+
+
+def _repr_num(value):
+	int_value = int(value)
+	return repr(int_value if int_value == value else value)
+
+
+def _check_int(value):
+	if isinstance(value, complex):
+		value = value.real
+	if value != int(value):
+		raise ValueError(f"Expected integer, got {value}")
+	return int(value)
+
+
+class TiList:
+
+	def __init__(self, data=None):
+		self.inner = [] if data is None else data
+
+	def __getitem__(self, index):
+		if index != int(index) or not (1 <= index <= len(self)):
+			raise IndexError(f"{index=}")
+		return self.inner[int(index) - 1]
+
+	def __setitem__(self, index, value):
+		if index == len(self) + 1:
+			self.inner.append(value)
+		elif index != int(index) or not (1 <= index <= len(self)):
+			raise ValueError(f"out of bounds: {index}; dim: {len(self)}")
+		else:
+			self.inner[int(index) - 1] = value
+
+	def __len__(self):
+		return len(self.inner)
+
+	def __iter__(self):
+		return iter(self.inner)
+
+	def __repr__(self):
+		return f"{{{','.join(_repr_num(i) for i in self)}}}"
+
+	def set_dim(self, value):
+		new_dim = int(value)
+		dim = len(self)
+		if new_dim < dim:
+			del self.inner[new_dim:]
+		elif new_dim > dim:
+			self.inner.extend(repeat(0, new_dim - dim))
+
+	def copy(self):
+		return TiList(self.inner.copy())
+
+
+class TiMatrix:
+
+	def __init__(self, data=None):
+		self.inner = [] if data is None else data
+
+	@property
+	def rows(self):
+		return len(self.inner)
+
+	@property
+	def cols(self):
+		return len(self.inner[0]) if self.inner else 0
+
+	def __getitem__(self, index):
+		row_index, col_index = index
+		if row_index != int(row_index) or not (1 <= row_index <= self.rows):
+			raise IndexError(f"{row_index=}")
+		if col_index != int(col_index) or not (1 <= col_index <= self.cols):
+			raise IndexError(f"{col_index=}")
+		return self.inner[int(row_index) - 1][int(col_index) - 1]
+
+	def __setitem__(self, index, value):
+		row_index, col_index = index
+		if row_index != int(row_index) or not (1 <= row_index <= self.rows):
+			raise IndexError(f"{row_index=}")
+		if col_index != int(col_index) or not (1 <= col_index <= self.cols):
+			raise IndexError(f"{col_index=}")
+		self.inner[int(row_index) - 1][int(col_index) - 1] = value
+
+	def __len__(self):
+		return self.rows
+
+	def __iter__(self):
+		return iter(self.inner)
+
+	def __repr__(self):
+		return '[' + ''.join('[' + ' '.join(_repr_num(x) for x in row) + ']' for row in self.inner) + ']'
+
+	def set_dim(self, dim_list):
+		new_rows, new_cols = int(dim_list[0]), int(dim_list[1])
+		self.inner = [
+			[self.inner[r][c] if r < self.rows and c < self.cols else 0.0
+			 for c in range(new_cols)]
+			for r in range(new_rows)
+		]
+
+	def get_row(self, r) -> list:
+		n = _check_int(r)
+		if not (1 <= n <= self.rows):
+			raise IndexError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
+		return self.inner[n - 1].copy()
+
+	def set_row(self, r, row: list) -> None:
+		n = _check_int(r)
+		if not (1 <= n <= self.rows):
+			raise IndexError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
+		self.inner[n - 1] = row
+
+	def transform(self, func):
+		return TiMatrix([[func(x) for x in row] for row in self.inner])
+
+	def __matmul__(self, other):
+		if not isinstance(other, TiMatrix):
+			raise ValueError(f"Cannot multiply matrix by {type(other).__name__}")
+		if self.cols != other.rows:
+			raise ValueError(f"Dimension mismatch: ({self.rows}×{self.cols}) @ ({other.rows}×{other.cols})")
+		return TiMatrix([
+			[
+				builtins.sum(self.inner[r][k] * other.inner[k][c] for k in range(self.cols))
+				for c in range(other.cols)
+			] for r in range(self.rows)
+		])
+
+	def __pow__(self, n):
+		n = _check_int(n)
+		if self.rows != self.cols:
+			raise ValueError(f"Matrix power requires a square matrix, got {self.rows}×{self.cols}")
+		if n < 0:
+			raise ValueError("Negative matrix power not supported")
+		size = self.rows
+		result = TiMatrix([[1.0 if r == c else 0.0 for c in range(size)] for r in range(size)])
+		base = self.copy()
+		while n > 0:
+			if n & 1:
+				result = result @ base
+			base = base @ base
+			n >>= 1
+		return result
+
+	def copy(self):
+		return TiMatrix([row.copy() for row in self.inner])

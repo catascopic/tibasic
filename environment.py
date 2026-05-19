@@ -1,8 +1,8 @@
-import cmath
 import math
 import random
 
 from datetime import datetime, date
+from tiobjects import TiList, TiMatrix, TiTypeError
 
 
 class _VarArray:
@@ -19,24 +19,131 @@ class _VarArray:
 
 	def __setitem__(self, token, value):
 		self._data[token.code[self._byte] - self._offset] = value
-	
+
 	def __repr__(self):
 		return repr(self._data)
 
 
-class _ListRef:
-	"""Bound reference to a list variable — captures storage and key."""
-	__slots__ = ('_store', '_key')
+# ── Variable hierarchy ────────────────────────────────────────────────────────────
 
-	def __init__(self, store, key):
-		self._store = store
-		self._key   = key
+class Variable:
+	"""Base class for typed, storable token variables."""
+	def get(self, env): ...
+	def set(self, env, value): ...
 
-	def get(self):
-		return self._store[self._key]
 
-	def set(self, value):
-		self._store[self._key] = value
+class RealVar(Variable):
+	__slots__ = ('_token',)
+
+	def __init__(self, token):
+		self._token = token
+
+	def get(self, env):
+		return env.reals[self._token]
+
+	def set(self, env, value):
+		if isinstance(value, complex):
+			raise TiTypeError("Cannot store complex number in real variable")
+		env.reals[self._token] = float(value)
+
+
+class ListVar(Variable):
+	__slots__ = ('_token',)
+
+	def __init__(self, token):
+		self._token = token
+
+	def get(self, env):
+		return env.lists[self._token]
+
+	def set(self, env, value):
+		if not isinstance(value, TiList):
+			raise TiTypeError(f"Expected a list, got {type(value).__name__}")
+		env.lists[self._token] = value
+
+
+class UserListVar(Variable):
+	__slots__ = ('_name',)
+
+	def __init__(self, name: str):
+		self._name = name
+
+	def get(self, env):
+		return env.user_lists[self._name]
+
+	def set(self, env, value):
+		if not isinstance(value, TiList):
+			raise TiTypeError(f"Expected a list, got {type(value).__name__}")
+		env.user_lists[self._name] = value
+
+
+class MatrixVar(Variable):
+	__slots__ = ('_token',)
+
+	def __init__(self, token):
+		self._token = token
+
+	def get(self, env):
+		return env.matrices[self._token]
+
+	def set(self, env, value):
+		if not isinstance(value, TiMatrix):
+			raise TiTypeError(f"Expected a matrix, got {type(value).__name__}")
+		env.matrices[self._token] = value
+
+
+class StringVar(Variable):
+	__slots__ = ('_token',)
+
+	def __init__(self, token):
+		self._token = token
+
+	def get(self, env):
+		return env.strings[self._token]
+
+	def set(self, env, value):
+		if not isinstance(value, str):
+			raise TiTypeError(f"Expected a string, got {type(value).__name__}")
+		env.strings[self._token] = value
+
+
+class StatVar(Variable):
+	__slots__ = ('_token',)
+
+	def __init__(self, token):
+		self._token = token
+
+	def get(self, env):
+		return env.stat[self._token]
+
+	def set(self, env, value):
+		raise TiTypeError("Stat variables are read-only")
+
+
+class WindowVar(Variable):
+	__slots__ = ('_token',)
+
+	def __init__(self, token):
+		self._token = token
+
+	def get(self, env):
+		return env.window[self._token]
+
+	def set(self, env, value):
+		if isinstance(value, complex):
+			raise TiTypeError("Cannot store complex number in window variable")
+		env.window[self._token] = float(value)
+
+
+class AnsVar(Variable):
+	def get(self, env):
+		return env.ans
+
+	def set(self, env, value):
+		env.ans = value
+
+
+ANS_VAR = AnsVar()
 
 
 class Environment:
@@ -55,30 +162,33 @@ class Environment:
 		self.clock_on   = True
 		self.key_code   = 0
 
-	# ── Nullary resolve helpers (used by resolve= fields in tokens) ─────────────
+	def set_random_seed(self, value):
+		random.seed(float(value))
+
+	# ── Nullary helpers (used by nullary= fields in tokens) ──────────────────────
 
 	def get_date(self):
 		t = date.today()
-		return [float(t.year), float(t.month), float(t.day)]
+		return TiList([float(t.year), float(t.month), float(t.day)])
 
 	def get_time(self):
 		t = datetime.now()
-		return [float(t.hour), float(t.minute), float(t.second)]
+		return TiList([float(t.hour), float(t.minute), float(t.second)])
 
 	def start_tmr(self):
 		return float(int(datetime.now().timestamp()))
 
 	def get_dt_fmt(self):
-		return self.dt_fmt
+		return float(self.dt_fmt)
 
 	def get_tm_fmt(self):
-		return self.tm_fmt
+		return float(self.tm_fmt)
 
 	def is_clock_on(self):
-		return 1 if self.clock_on else 0
+		return 1.0 if self.clock_on else 0.0
 
 	def get_key(self):
-		return self.key_code
+		return float(self.key_code)
 
 	def rand(self):
 		return random.random()

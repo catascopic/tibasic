@@ -2,7 +2,9 @@
 from dataclasses import dataclass
 from typing import Any
 import math, itertools
-from environment import Environment
+from environment import (
+	Environment, Variable, RealVar, ListVar, MatrixVar, StringVar, StatVar, WindowVar, ANS_VAR,
+)
 import purefunctions
 import forms
 
@@ -14,10 +16,10 @@ class Token:
 	binary_op: Any = None		# (lhs, rhs) -> value
 	unary_op: Any = None		# (operand) -> value  (prefix or postfix)
 	postfix: bool = False		# True for postfix unary operators
-	func: Any = None			# (parser) -> value  for function tokens
-	cmd: Any = None				# (parser) -> None  for command tokens
-	resolve: Any = None			# (env) -> value  for variables and nullary tokens
-	store: Any = None			# (env, value) -> None  for writable variables
+	func: Any = None			# (ArgParser) -> value  for function tokens
+	cmd: Any = None				# (ArgParser) -> None  for command tokens
+	variable: Any = None		# Variable instance for storable typed variables
+	nullary: Any = None			# (env) -> value  for read-only computed constants
 	converter: Any = None		# (value) -> value  for ►DMS, ►Dec, ►Frac etc.
 
 	# ── Token type predicates ──────────────────────────────────────────────────
@@ -48,10 +50,9 @@ class Token:
 
 	def can_start_atom(self) -> bool:
 		return (
-			self.resolve is not None or self.func is not None or
-			self.is_digit() or self.is_list_var() or self.is_matrix_var() or
-			self.is_string_var() or self.is_stat_var() or self.is_window_var() or
-			self in {DOT, L_PAREN, L_BRACE, QUOTE, NEG, ANS, LIST_PREFIX}
+			self.variable is not None or self.nullary is not None or self.func is not None or
+			self.is_digit() or
+			self in {DOT, L_PAREN, L_BRACE, QUOTE, NEG, LIST_PREFIX}
 		)
 
 
@@ -74,9 +75,8 @@ def token(
 	postfix: bool = False,
 	func: Callable | None = None,
 	pure_func: Callable | None = None,
-	cmd: Callable[[Environment], None] | None = None,
-	resolve: Callable[[Environment], Any] | None = None,
-	store: Callable[[Environment], None] | None = None,
+	cmd: Callable | None = None,
+	nullary: Callable | None = None,
 	converter: Callable | None = None,
 ) -> Token:
 
@@ -90,7 +90,7 @@ def token(
 
 	return Token(
 		code, text,
-		bp, binary_op, unary_op, postfix, func, cmd, resolve, store, converter,
+		bp, binary_op, unary_op, postfix, func, cmd, None, nullary, converter,
 	)
 
 
@@ -110,7 +110,7 @@ DOT		 = token(b'\x3a', ".")
 COLON	   = token(b'\x3e', ":")
 NEWLINE	 = token(b'\x3f', "↵")
 PRGM		= token(b'\x5f', "prgm")
-ANS		 = token(b'\x72', "Ans", resolve=lambda env: env.ans, store=lambda env, value: setattr(env, 'ans', value))
+ANS		 = token(b'\x72', "Ans")
 NEG		 = token(b'\xb0', "−", unary_op=purefunctions.neg)
 DIM      = token(b'\xb5', "dim(", pure_func=purefunctions.dim)
 LIST_PREFIX = token(b'\xeb', "∟")
@@ -141,7 +141,7 @@ MUL		 = token(b'\x82', "*", bp=(60, 61), binary_op=purefunctions.mul)
 DIV		 = token(b'\x83', "/", bp=(60, 61), binary_op=purefunctions.div)
 NPR		 = token(b'\x94', "nPr", bp=(60, 61), binary_op=purefunctions.npr)
 NCR		 = token(b'\x95', "nCr", bp=(60, 61), binary_op=purefunctions.ncr)
-RAND     = token(b'\xab', "rand", resolve=Environment.rand, store=lambda env, value: env.set_random_seed(value))
+RAND     = token(b'\xab', "rand", nullary=Environment.rand)
 POW		 = token(b'\xf0', "^", bp=(70, 69), binary_op=purefunctions.pow)
 XROOT	 = token(b'\xf1', "×√", bp=(60, 61), binary_op=lambda a, b: purefunctions.xth_root(b, a))
 
@@ -191,7 +191,7 @@ TOKENS: list[Token] = [
 	token(b'\x29', " "),
 	QUOTE,
 	COMMA,
-	token(b'\x2c', "𝑖", resolve=lambda env: 1j),
+	token(b'\x2c', "𝑖", nullary=lambda env: 1j),
 	FACT,
 	token(b'\x2e', "CubicReg "),
 	token(b'\x2f', "QuartReg "),
@@ -271,8 +271,8 @@ TOKENS: list[Token] = [
 	token(b'\xa8', "DrawInv"),
 	token(b'\xa9', "DrawF"),
 	RAND,
-	token(b'\xac', "π", resolve=lambda env: math.pi),
-	token(b'\xad', "getKey", resolve=Environment.get_key),
+	token(b'\xac', "π", nullary=lambda env: math.pi),
+	token(b'\xad', "getKey", nullary=Environment.get_key),
 	token(b'\xae', "'"),
 	token(b'\xaf', "?"),
 	NEG,
@@ -544,7 +544,7 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x2e', "rref("),
 	token(b'\xbb\x2f', "►Rect"),
 	token(b'\xbb\x30', "►Polar"),
-	token(b'\xbb\x31', "𝑒", resolve=lambda env: math.e),
+	token(b'\xbb\x31', "𝑒", nullary=lambda env: math.e),
 	token(b'\xbb\x32', "SinReg "),
 	token(b'\xbb\x33', "Logistic "),
 	token(b'\xbb\x34', "LinRegTTest "),
@@ -687,12 +687,12 @@ TOKENS: list[Token] = [
 	token(b'\xef\x06', "dayOfWk("),
 	token(b'\xef\x07', "getDtStr("),
 	token(b'\xef\x08', "getTmStr("),
-	token(b'\xef\x09', "getDate",   resolve=Environment.get_date),
-	token(b'\xef\x0a', "getTime",   resolve=Environment.get_time),
-	token(b'\xef\x0b', "startTmr",  resolve=Environment.start_tmr),
-	token(b'\xef\x0c', "getDtFmt",  resolve=Environment.get_dt_fmt),
-	token(b'\xef\x0d', "getTmFmt",  resolve=Environment.get_tm_fmt),
-	token(b'\xef\x0e', "isClockOn", resolve=Environment.is_clock_on),
+	token(b'\xef\x09', "getDate",   nullary=Environment.get_date),
+	token(b'\xef\x0a', "getTime",   nullary=Environment.get_time),
+	token(b'\xef\x0b', "startTmr",  nullary=Environment.start_tmr),
+	token(b'\xef\x0c', "getDtFmt",  nullary=Environment.get_dt_fmt),
+	token(b'\xef\x0d', "getTmFmt",  nullary=Environment.get_tm_fmt),
+	token(b'\xef\x0e', "isClockOn", nullary=Environment.is_clock_on),
 	token(b'\xef\x0f', "ClockOff"),
 	token(b'\xef\x10', "ClockOn"),
 	token(b'\xef\x11', "OpenLib("),
@@ -725,27 +725,23 @@ TOKENS: list[Token] = [
 	token(b'\xef\x3d', "FRAC-APPROX"),
 ]
 
-# Assign resolve/store for variable tokens (done post-creation to capture token identity)
+# Assign ANS_VAR and Variable instances (done post-creation to capture token identity)
+ANS.variable = ANS_VAR
 for _t in TOKENS:
-	if _t.resolve is not None or _t.store is not None:
-		continue  # already set on named constants (ANS, RAND, etc.)
+	if _t.variable is not None or _t.nullary is not None:
+		continue  # already set on named constants (ANS, RAND, nullary tokens, etc.)
 	if _t.is_real_var():
-		_t.resolve = lambda env, t=_t: env.reals[t]
-		_t.store   = lambda env, value, t=_t: env.reals.__setitem__(t, value)
+		_t.variable = RealVar(_t)
 	elif _t.is_list_var():
-		_t.resolve = lambda env, t=_t: env.lists[t]
-		_t.store   = lambda env, value, t=_t: env.lists.__setitem__(t, value)
+		_t.variable = ListVar(_t)
 	elif _t.is_matrix_var():
-		_t.resolve = lambda env, t=_t: env.matrices[t]
-		_t.store   = lambda env, value, t=_t: env.matrices.__setitem__(t, value)
+		_t.variable = MatrixVar(_t)
 	elif _t.is_string_var():
-		_t.resolve = lambda env, t=_t: env.strings[t]
-		_t.store   = lambda env, value, t=_t: env.strings.__setitem__(t, value)
+		_t.variable = StringVar(_t)
 	elif _t.is_stat_var():
-		_t.resolve = lambda env, t=_t: env.stat[t]
+		_t.variable = StatVar(_t)
 	elif _t.is_window_var():
-		_t.resolve = lambda env, t=_t: env.window[t]
-		_t.store   = lambda env, value, t=_t: env.window.__setitem__(t, value)
+		_t.variable = WindowVar(_t)
 
 
 if __name__ == '__main__':

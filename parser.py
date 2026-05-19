@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 
+from tiobjects import TiList, TiMatrix
 from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
 	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, ANS, NEG, LIST_PREFIX,
 	RAND, DIM, SCI_E
 )
-from environment import Environment, _ListRef
+from environment import Environment, Variable, UserListVar
 from forms import ArgParser
 
 class ParseError(Exception):
@@ -90,7 +91,7 @@ class Parser:
 		self.eat_if(QUOTE)  # closing " is optional
 		return "".join(chars)
 
-	def parse_list_literal(self) -> list:
+	def parse_list_literal(self) -> TiList:
 		"""{ already consumed."""
 		items = []
 		if not self.eat_if(R_BRACE):
@@ -98,9 +99,9 @@ class Parser:
 			while self.eat_if(COMMA):
 				items.append(self.parse_expr())
 			self.eat_if(R_BRACE)
-		return items
+		return TiList(items)
 
-	def parse_matrix_literal(self) -> list[list]:
+	def parse_matrix_literal(self) -> TiMatrix:
 		"""Opening [ already consumed; reads one or more [row] blocks."""
 		rows = []
 		while self.peek() is L_BRACKET:
@@ -111,7 +112,7 @@ class Parser:
 			self.eat_if(R_BRACKET)
 			rows.append(row)
 		self.eat_if(R_BRACKET)
-		return rows
+		return TiMatrix(rows)
 
 	def parse_args(self) -> list:
 		"""Comma-separated expressions until ) or end of line. Consumes )."""
@@ -193,15 +194,19 @@ class Parser:
 			return SCI_E.binary_op(1.0, self.parse_expr(SCI_E.bp[1]))
 
 		if t is LIST_PREFIX:
-			return self.parse_list_atom(self.env.user_lists[self._read_name()])
+			return self.parse_list_atom(UserListVar(self._read_name()).get(self.env))
 
 		# Function call
 		if t.func is not None:
 			return t.func(ArgParser(self))
 
-		# Variables and nullary constants (π, e, rand, Ans, etc.)
-		if t.resolve is not None:
-			val = t.resolve(self.env)
+		# Nullary constants (π, e, rand, Ans, getDate, etc.)
+		if t.nullary is not None:
+			return t.nullary(self.env)
+
+		# Typed variables
+		if t.variable is not None:
+			val = t.variable.get(self.env)
 			if t.is_list_var():
 				return self.parse_list_atom(val)
 			if t.is_matrix_var() and self.peek() is L_PAREN:
@@ -215,7 +220,7 @@ class Parser:
 			self.advance()
 			idx = self.parse_expr()
 			self.eat_if(R_PAREN)
-			return val[int(idx) - 1]
+			return val[idx]  # TiList uses 1-based indexing
 		return val
 
 	def parse_row_col(self):
@@ -266,65 +271,62 @@ class Parser:
 
 	def parse_store_target(self, value):
 		t = self.advance()
-		
+
 		if t.is_list_var():
-			self.parse_store_list(self._list_ref(t), value)
-			
+			self.parse_store_list(t.variable, value)
+
 		elif t is LIST_PREFIX:
-			self.parse_store_list(self._user_list_ref(), value)
-		
+			self.parse_store_list(UserListVar(self._read_name()), value)
+
 		elif t is DIM:
 			self.parse_store_dim(value)
 
 		elif t.is_matrix_var():
 			if self.eat_if(L_PAREN):
-				self.env.matrices[t][self.parse_row_col()] = value
+				t.variable.get(self.env)[self.parse_row_col()] = value
 			else:
-				t.store(self.env, value)
+				t.variable.set(self.env, value)
 
-		elif t.store is not None:
-			t.store(self.env, value)
+		elif t is RAND:
+			self.env.set_random_seed(value)
+
+		elif t.variable is not None:
+			t.variable.set(self.env, value)
 
 		else:
 			raise ParseError(f"Invalid store target: {t}")
-	
-	def _list_ref(self, token):
-		return _ListRef(self.env.lists, token)
-	
-	def _user_list_ref(self):
-		return _ListRef(self.env.user_lists, self._read_name())
-			
-	def parse_store_list(self, ref, value):
+
+	def parse_store_list(self, var: Variable, value):
 		if self.eat_if(L_PAREN):
-			ref.get()[self.parse_expr()] = value
+			var.get(self.env)[self.parse_expr()] = value
 			self.eat_if(R_PAREN)
 		else:
-			ref.set(value)
+			var.set(self.env, value)
 
 	def parse_store_dim(self, value):
 		t = self.peek()
 		if t.is_list_var() or t is LIST_PREFIX:
-			self.parse_list_var_key().get().set_dim(value)
+			self.parse_list_var_key().get(self.env).set_dim(value)
 		elif t.is_matrix_var():
 			self.advance()
-			self.env.matrices[t].set_dim(value)
+			t.variable.get(self.env).set_dim(value)
 		else:
 			raise ParseError(f"Invalid store-to-dim target: {t}")
 
 	# ── Variable key parsers ──────────────────────────────────────────────────────
 
-	def parse_list_var_key(self) -> _ListRef:
+	def parse_list_var_key(self) -> Variable:
 		t = self.advance()
 		if t.is_list_var():
-			return self._list_ref(t)
+			return t.variable
 		if t is LIST_PREFIX:
-			return self._user_list_ref()
+			return UserListVar(self._read_name())
 		raise ParseError(f"Expected a list variable, got {t.text!r}")
 
-	def parse_matrix_var_key(self):
+	def parse_matrix_var_key(self) -> Variable:
 		t = self.advance()
 		if t.is_matrix_var():
-			return t
+			return t.variable
 		raise ParseError(f"Expected a matrix variable, got {t.text!r}")
 
 	# ── Statement dispatcher ───────────────────────────────────────────────────
