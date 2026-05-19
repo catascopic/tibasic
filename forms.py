@@ -73,7 +73,7 @@ class ArgParser:
 	def matrix_var(self):
 		return self._parser.parse_matrix_var_key()
 
-	def finish(self):
+	def end(self):
 		self._parser.eat_if_rparen()
 
 	@property
@@ -89,7 +89,7 @@ class ArgParser:
 			args.append(self.expr())
 			while self.has_next_arg():
 				args.append(self.expr())
-		self.finish()
+		self.end()
 		return args
 
 	def next_is_matrix_var(self) -> bool:
@@ -103,10 +103,9 @@ def seq(a: ArgParser) -> TiList:
 	start = a.expr()
 	end = a.expr()
 	step = a.expr(optional=True, default=1)
-	a.finish()
-	env = a.env
+	a.end()
 	result = []
-	with _scoped_var(env, var) as reals:
+	with _scoped_var(a.env, var) as reals:
 		n = start
 		while (step > 0 and n <= end + 1e-10) or (step < 0 and n >= end - 1e-10):
 			reals[var] = n
@@ -120,10 +119,9 @@ def sigma(a: ArgParser) -> float:
 	var = a.real_var()
 	start = int(a.expr())
 	end = int(a.expr())
-	a.finish()
-	env = a.env
+	a.end()
 	total = 0
-	with _scoped_var(env, var) as reals:
+	with _scoped_var(a.env, var) as reals:
 		for i in range(start, end + 1):
 			reals[var] = float(i)
 			total += thunk.eval()
@@ -135,7 +133,7 @@ def nderiv(a: ArgParser) -> float:
 	var = a.real_var()
 	val = a.expr()
 	h = a.expr(optional=True, default=1e-5)
-	a.finish()
+	a.end()
 	env = a.env
 	with _scoped_var(env, var) as reals:
 		reals[var] = val + h
@@ -150,7 +148,7 @@ def fnint(a: ArgParser) -> float:
 	var = a.real_var()
 	lo = a.expr()
 	hi = a.expr()
-	a.finish()
+	a.end()
 	env = a.env
 	n = 1000
 	h = (hi - lo) / n
@@ -168,11 +166,11 @@ def matr_to_list(a: ArgParser) -> None:
 	mat = a.expr()
 	if not isinstance(mat, TiMatrix):
 		raise ValueError("Matr►list: first argument must be a matrix")
-	keys = [a.list_var()]
+	list_refs = [a.list_var()]
 	while a.has_next_arg():
-		keys.append(a.list_var())
-	a.finish()
-	for col, ref in enumerate(keys):
+		list_refs.append(a.list_var())
+	a.end()
+	for col, ref in enumerate(list_refs):
 		ref.set(TiList([mat.inner[r][col] for r in range(mat.rows)]))
 
 
@@ -185,7 +183,7 @@ def list_to_matr(a: ArgParser) -> None:
 		if a.next_is_matrix_var():
 			mat_key = a.matrix_var()
 			break
-	a.finish()
+	a.end()
 	cols = len(list_vals)
 	rows = max(len(lst) for lst in list_vals)
 	a.env.matrices[mat_key] = TiMatrix([

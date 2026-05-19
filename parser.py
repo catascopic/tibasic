@@ -57,11 +57,16 @@ class Parser:
 		return self.peek() is EOF_TOKEN
 
 	# Wrappers used by ArgParser so it doesn't need to import token objects
-	def expect_comma(self):          self.expect(COMMA)
-	def eat_if_comma(self) -> bool:  return self.eat_if(COMMA)
-	def eat_if_rparen(self):         self.eat_if(R_PAREN)
-	def peek_is_comma(self) -> bool: return self.peek() is COMMA
-	def peek_is_rparen(self) -> bool: return self.peek() is R_PAREN
+	def expect_comma(self):
+		self.expect(COMMA)
+	def eat_if_comma(self) -> bool:
+		return self.eat_if(COMMA)
+	def eat_if_rparen(self):
+		self.eat_if(R_PAREN)
+	def peek_is_comma(self) -> bool:
+		return self.peek() is COMMA
+	def peek_is_rparen(self) -> bool:
+		return self.peek() is R_PAREN
 
 	# ── Sub-parsers ────────────────────────────────────────────────────────────
 
@@ -142,7 +147,7 @@ class Parser:
 		"""Read up to 2 alphanumeric characters as a label name."""
 		t = self.advance()
 		if not t.is_name_char():
-			raise ParseError("Expected a label name")
+			raise ParseError("Expected a label")
 		label = t.text
 		if self.peek().is_name_char():
 			label += self.advance().text
@@ -153,7 +158,7 @@ class Parser:
 		"""Read alphanumeric tokens as an identifier (prgm, user list, etc.)."""
 		t = self.advance()
 		if not t.is_real_var():
-			raise ParseError("Expected a label name")
+			raise ParseError("Expected a name")
 		name = [t.text]
 		while self.peek().is_name_char():
 			name.append(self.advance().text)
@@ -311,7 +316,7 @@ class Parser:
 	def parse_list_var_key(self) -> _ListRef:
 		t = self.advance()
 		if t.is_list_var():
-			return self._list_ref()
+			return self._list_ref(t)
 		if t is LIST_PREFIX:
 			return self._user_list_ref()
 		raise ParseError(f"Expected a list variable, got {t.text!r}")

@@ -1,6 +1,7 @@
 Environment: clever way of doing var tables based on byte codes, most can be arrays
 Is there any concern of a circular import with TiList/TiMatrix? If so, you can move those to a separate file.
 
+Get rid of all refs on tokens! environment is responsible for making lookup table of functions
 
 
 tokens that start with "►" and don't use parentheses (like "►DMS") are a special type of command I'm calling a converter, and they're only valid as the last token in a line. Like the "store" arrow, they also implicitly close all parentheses/brackets/quotes
