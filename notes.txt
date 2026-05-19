@@ -7,6 +7,11 @@ Maybe there should be a special file for guard statements, though it would have 
 I think variable type enforcement should be done by making a Variable class in environment.py, which implements get(env) and set(env, value).
 Then Token can have a "variable" field, instead of having resolve/store methods. That does mean we'll need to handle nullary functions a little differently, and they should probably get their own method. Also, I think rand is the only non-variable that would get a store method, so just make that another special case in the parser, like how it handles dim(.
 
+according to the nDeriv( page, nDeriv( can be nested up to one time.
+See the file in "webref/Error Conditions - TI-Basic Developer.htm"
+
+File format info: https://gist.github.com/SimonEast/244a0fd04526ea1acbec2e2ceb2e7924
+
 add a peek method for ArgParser that just callers _parser.peek()
 See TODOs in forms.py
 

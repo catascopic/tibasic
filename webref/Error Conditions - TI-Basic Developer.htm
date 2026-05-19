@@ -1,0 +1,1169 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+    <title>Error Conditions - TI-Basic Developer</title>
+    
+    
+    
+    <script type="text/javascript" async="" src="Error%20Conditions%20-%20TI-Basic%20Developer_files/dc.js"></script><script type="text/javascript" src="Error%20Conditions%20-%20TI-Basic%20Developer_files/init.combined.js"></script>
+    <script type="text/javascript">
+        var URL_HOST = 'www.wikidot.com';
+        var URL_DOMAIN = 'wikidot.com';
+        var USE_SSL =  true ;
+        var URL_STATIC = 'http://d3g0gp89917ko0.cloudfront.net/v--7690939296dc';
+        // global request information
+        
+        var WIKIREQUEST = {};
+        WIKIREQUEST.info = {};
+        
+        WIKIREQUEST.info.domain = "tibasicdev.wikidot.com";
+        WIKIREQUEST.info.siteId = 405;
+        WIKIREQUEST.info.siteUnixName = "tibasicdev";
+        WIKIREQUEST.info.categoryId = 2265;
+        WIKIREQUEST.info.themeId = 109979;
+        WIKIREQUEST.info.requestPageName = "errors";
+        OZONE.request.timestamp = 1779218299;
+        OZONE.request.date = new Date();
+        WIKIREQUEST.info.lang = 'en';
+                WIKIREQUEST.info.pageUnixName = "errors";
+        WIKIREQUEST.info.pageId = 9135;
+                        WIKIREQUEST.info.lang = "en";
+        OZONE.lang = "en";
+        var isUAMobile = !!/Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    </script>
+    
+    
+
+
+    
+        <script type="text/javascript">
+    
+        require.config({
+            baseUrl: URL_STATIC + '/common--javascript',
+            paths: {
+                'jquery.ui': 'jquery-ui.min',
+                'jquery.form': 'jquery.form'
+            }
+        });
+    
+    </script>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+            
+    
+    
+    
+    
+    <meta http-equiv="content-language" content="en">
+    <script type="text/javascript" src="Error%20Conditions%20-%20TI-Basic%20Developer_files/WIKIDOT.combined.js"></script>
+        
+    
+    <style type="text/css" id="internal-style">
+        
+        /* modules */
+        
+                
+        /* theme */
+                    @import url(http://d3g0gp89917ko0.cloudfront.net/v--7690939296dc/common--theme/base/css/style.css);
+                    @import url(http://d3g0gp89917ko0.cloudfront.net/v--7690939296dc/common--theme/co/css/style.css);
+                    @import url(http://tibasicdev.wdfiles.com/local--theme/new-default-2013/style.css);
+            </style>
+    
+        
+        
+        
+    <link rel="shortcut icon" href="http://tibasicdev.wikidot.com/local--favicon/favicon.gif">
+    <link rel="icon" type="image/gif" href="http://tibasicdev.wikidot.com/local--favicon/favicon.gif">
+    
+            <link rel="apple-touch-icon" href="http://tibasicdev.wikidot.com/local--iosicon/iosicon_57.png">
+        <link rel="apple-touch-icon" sizes="72x72" href="http://tibasicdev.wikidot.com/local--iosicon/iosicon_72.png">
+        <link rel="apple-touch-icon" sizes="114x114" href="http://tibasicdev.wikidot.com/local--iosicon/iosicon.png">    
+        
+            <meta name="msapplication-TileImage" content="/local--wp8icon/wp8icon.png">
+                
+            <link rel="alternate" type="application/wiki" title="Edit this page" href="javascript:WIKIDOT.page.listeners.editClick()">
+    
+        <script type="text/javascript">
+        var _gaq = _gaq || [];
+        _gaq.push(['_setAccount', 'UA-18234656-1']);
+        _gaq.push(['_setDomainName', 'none']);
+        _gaq.push(['_setAllowLinker', true]);
+        _gaq.push(['_trackPageview']);
+
+        _gaq.push(['old._setAccount', 'UA-68540-5']);
+        _gaq.push(['old._setDomainName', 'none']);
+        _gaq.push(['old._setAllowLinker', true]);
+        _gaq.push(['old._trackPageview']);
+
+                _gaq.push(['userTracker._setAccount', 'UA-5568715-1']);
+        _gaq.push(['userTracker._trackPageview']);
+            </script>
+    
+    <script type="text/javascript">
+        window.google_analytics_uacct = 'UA-18234656-1';
+        window.google_analytics_domain_name = 'none';
+    </script>
+    
+        <link rel="manifest" href="http://tibasicdev.wikidot.com/onesignal/manifest.json">
+    <script src="Error%20Conditions%20-%20TI-Basic%20Developer_files/OneSignalSDK.js" acync=""></script>
+    <script>
+        var OneSignal = window.OneSignal || [];
+        OneSignal.push(function() {
+          OneSignal.init({
+            appId: null,
+          });
+        });
+    </script>
+        
+<style>
+#main-content2 {
+    padding-right: 200px !important;
+}
+.chat2 {
+    position: fixed;
+    top: 200px;
+    right: 10px;
+    width: 200px;
+    background-color: #c7c9b8;
+}
+.chat2 .collapsible-block-content {
+    padding: 0 !important;
+}
+.chat2 .collapsible-block-unfolded-link {
+    padding: 0.5em !important;
+}
+</style>
+<script data-cfasync="false">window.nitroAds=window.nitroAds||{createAd:function(){return new Promise(e=>{window.nitroAds.queue.push(["createAd",arguments,e])})},addUserToken:function(){window.nitroAds.queue.push(["addUserToken",arguments])},queue:[]};</script>
+<script data-cfasync="false" async="" src="Error%20Conditions%20-%20TI-Basic%20Developer_files/nitropay_ads.js"></script>
+<script type="text/javascript" src="Error%20Conditions%20-%20TI-Basic%20Developer_files/ListPagesModule.js"></script>
+</head>
+<body id="html-body">
+<div id="skrollr-body">
+<a name="page-top"></a>
+
+
+
+
+
+<div id="container-wrap-wrap">
+    <div id="container-wrap">
+        <div id="container">
+            <div id="header">
+              <h1><a href="http://tibasicdev.wikidot.com/"><span>TI-Basic Developer</span></a></h1>
+                
+                    <h2><span>The TI-Basic Information Repository</span></h2>
+                
+                
+                <!-- google_ad_section_start(weight=ignore) -->
+                
+                <div id="search-top-box" class="form-search">
+    <form id="search-top-box-form" action="dummy" class="input-append">
+        <input id="search-top-box-input" class="text empty search-query" type="text" size="15" name="query" value="Search this site" onfocus="if(YAHOO.util.Dom.hasClass(this, 'empty')){YAHOO.util.Dom.removeClass(this,'empty'); this.value='';}"><input class="button btn" type="submit" name="search" value="Search">
+    </form>
+</div>
+                
+                
+                    <div id="top-bar">
+                        
+
+<ul>
+<li><a href="javascript:;">Membership
+</a><ul>
+<li><a href="http://tibasicdev.wikidot.com/rules">Rules and Code of Conduct</a></li>
+</ul>
+</li>
+<li><a href="javascript:;">Editing Pages
+</a><ul>
+<li><a href="http://tibasicdev.wikidot.com/conventions">Wiki Conventions</a></li>
+<li><a href="http://www.wikidot.com/doc:wiki-syntax">Wiki Syntax</a></li>
+<li><a class="wiki-standalone-button" href="javascript:;" onclick="WIKIDOT.page.listeners.viewSourceClick(event)">View Page Source</a></li>
+<li><a href="http://tibasicdev.wikidot.com/system:recent-changes">Recent Changes</a></li>
+<li><a href="http://tibasicdev.wikidot.com/admin:manage">Site Manager</a></li>
+</ul>
+</li>
+<li><a href="javascript:;">Site Information
+</a><ul>
+<li><a href="http://tibasicdev.wikidot.com/history">Site History</a></li>
+<li><a href="http://tibasicdev.wikidot.com/logo">Site Logo</a></li>
+<li><a href="http://tibasicdev.wikidot.com/all-news">News Archive</a></li>
+<li><a href="http://tibasicdev.wikidot.com/news">83 News</a></li>
+<li><a href="http://tibasicdev.wikidot.com/68k:news">68k News</a></li>
+<li><a href="http://tibasicdev.wikidot.com/nspire:news">Nspire News</a></li>
+<li><a href="http://tibasicdev.wikidot.com/announcements">Announcements</a></li>
+</ul>
+</li>
+<li><a href="javascript:;">Related Sites
+</a><ul>
+<li><a href="http://www.omnimaga.org/" target="_blank">Omnimaga</a></li>
+<li><a href="http://codewalr.us/" target="_blank">CodeWalrus</a></li>
+<li><a href="http://www.cemetech.net/" target="_blank">Cemetech</a></li>
+<li><a href="http://tiplanet.org/" target="_blank">TI-Planet</a></li>
+<li><a href="http://tistory.wikidot.com/" target="_blank">TI Story</a></li>
+<li><a href="http://www.ticalc.org/" target="_blank">ticalc.org</a></li>
+</ul>
+</li>
+</ul>
+
+                    </div>
+                
+                <div id="login-status"><a href="javascript:;" onclick="WIKIDOT.page.listeners.createAccount(event)" class="login-status-create-account btn">Create account</a> <span>or</span> <a href="javascript:;" onclick="WIKIDOT.page.listeners.loginClick(event)" class="login-status-sign-in btn btn-primary">Sign in</a> </div>
+                <div id="header-extra-div-1"><span></span></div><div id="header-extra-div-2"><span></span></div><div id="header-extra-div-3"><span></span></div>
+            </div>
+            
+            <div id="content-wrap">
+                
+                    <div id="side-bar">
+                        
+
+
+                        
+
+<div class="top">
+<ul>
+<li><strong><a href="http://tibasicdev.wikidot.com/home">TI-83 Basic Home</a></strong></li>
+<li><a href="http://tibasicdev.wikidot.com/68k:home">68k TI-Basic Home</a></li>
+<li><a href="http://tibasicdev.wikidot.com/nspire:home">TI-Nspire Home</a></li>
+<li><a href="http://tibasicdev.wikidot.com/archives">Program Archives</a></li>
+<li><a href="http://tibasicdev.wikidot.com/forum:home">Discussion Forums</a></li>
+<li><a href="http://tibasicdev.wikidot.com/admin-forum">Staff Forum</a></li>
+</ul>
+</div>
+<p><span style="font-size:large;">Preparation</span></p>
+<ul>
+<li><a href="http://tibasicdev.wikidot.com/thecalcs">The Calculators</a></li>
+<li><a href="http://tibasicdev.wikidot.com/whytibasic">Why TI-Basic?</a></li>
+<li><a href="http://tibasicdev.wikidot.com/using-this-guide">Using This Guide</a></li>
+<li><a href="http://tibasicdev.wikidot.com/starter-kit">TI-Basic Starter Kit</a></li>
+<li><a href="http://tibasicdev.wikidot.com/faq">TI-Basic FAQ</a></li>
+</ul>
+<p><span style="font-size:large;">Main Content</span></p>
+<div class="special-collapsible">
+<div class="collapsible-block">
+<div class="collapsible-block-folded"><a class="collapsible-block-link" href="javascript:;">Commands</a></div>
+<div class="collapsible-block-unfolded" style="display:none">
+<div class="collapsible-block-unfolded-link"><a class="collapsible-block-link" href="javascript:;">Commands</a></div>
+<div class="collapsible-block-content"><div class="list-pages-box">    
+
+<ul>
+<li><a href="http://tibasicdev.wikidot.com/commands">Overview</a></li>
+<li><a href="http://tibasicdev.wikidot.com/command-index">Command Index</a></li>
+<li><a href="http://tibasicdev.wikidot.com/z-test">Random command!</a></li>
+</ul>
+
+    
+    
+    
+    </div>
+<ul>
+<li><a href="http://tibasicdev.wikidot.com/homescreen">Home Screen</a></li>
+<li><a href="http://tibasicdev.wikidot.com/graphscreen">Graph Screen</a></li>
+<li><a href="http://tibasicdev.wikidot.com/math">Math Functions</a></li>
+<li><a href="http://tibasicdev.wikidot.com/variables">Variables</a></li>
+<li><a href="http://tibasicdev.wikidot.com/userinput">User Input</a></li>
+<li><a href="http://tibasicdev.wikidot.com/operators">Operators</a></li>
+<li><a href="http://tibasicdev.wikidot.com/linking">Calculator Linking</a></li>
+<li><a href="http://tibasicdev.wikidot.com/controlflow">Controlling Flow</a></li>
+<li><a href="http://tibasicdev.wikidot.com/settings">User Settings</a></li>
+<li><a href="http://tibasicdev.wikidot.com/memory-management">Memory Management</a></li>
+<li><a href="http://tibasicdev.wikidot.com/time-and-date">Time and Date</a></li>
+</ul>
+</div>
+</div>
+</div>
+<div class="collapsible-block">
+<div class="collapsible-block-folded"><a class="collapsible-block-link" href="javascript:;">Development</a></div>
+<div class="collapsible-block-unfolded" style="display:none">
+<div class="collapsible-block-unfolded-link"><a class="collapsible-block-link" href="javascript:;">Development</a></div>
+<div class="collapsible-block-content">
+<ul>
+<li><a href="http://tibasicdev.wikidot.com/development">Overview</a></li>
+<li><a href="http://tibasicdev.wikidot.com/plan">Planning</a></li>
+<li><a href="http://tibasicdev.wikidot.com/portability">Portability</a></li>
+<li><a href="http://tibasicdev.wikidot.com/usability">Usability</a></li>
+<li><a href="http://tibasicdev.wikidot.com/setup">Program Setup</a></li>
+<li><a href="http://tibasicdev.wikidot.com/code-conventions">Code Conventions</a></li>
+<li><a href="http://tibasicdev.wikidot.com/techniques">Techniques</a></li>
+<li><a href="http://tibasicdev.wikidot.com/comments">Commenting Code</a></li>
+<li><a href="http://tibasicdev.wikidot.com/subprograms">Subprograms</a></li>
+<li><a href="http://tibasicdev.wikidot.com/cleanup">Program Cleanup</a></li>
+<li><a href="http://tibasicdev.wikidot.com/debug">Debugging</a></li>
+<li><a href="http://tibasicdev.wikidot.com/optimize">Optimization</a></li>
+<li><a href="http://tibasicdev.wikidot.com/timings">Code Timings</a></li>
+<li><a href="http://tibasicdev.wikidot.com/documentation">Writing Program Documentation</a></li>
+<li><a href="http://tibasicdev.wikidot.com/marketing">Marketing</a></li>
+<li><a href="http://tibasicdev.wikidot.com/releasing-your-program">Releasing Programs</a></li>
+<li><a href="http://tibasicdev.wikidot.com/creating-new-program-versions">Creating New Program Versions</a></li>
+</ul>
+</div>
+</div>
+</div>
+<div class="collapsible-block">
+<div class="collapsible-block-folded"><a class="collapsible-block-link" href="javascript:;">Techniques</a></div>
+<div class="collapsible-block-unfolded" style="display:none">
+<div class="collapsible-block-unfolded-link"><a class="collapsible-block-link" href="javascript:;">Techniques</a></div>
+<div class="collapsible-block-content">
+<ul>
+<li><a href="http://tibasicdev.wikidot.com/techniques">Overview</a></li>
+<li><a href="http://tibasicdev.wikidot.com/animation">Animation</a></li>
+<li><a href="http://tibasicdev.wikidot.com/assembly">Assembly</a></li>
+<li><a href="http://tibasicdev.wikidot.com/compression">Compression Techniques</a></li>
+<li><a href="http://tibasicdev.wikidot.com/cryptography">Cryptography</a></li>
+<li><a href="http://tibasicdev.wikidot.com/custommenus">Custom Menus</a></li>
+<li><a href="http://tibasicdev.wikidot.com/custominput">Custom Text Input</a></li>
+<li><a href="http://tibasicdev.wikidot.com/easy-map-making">Easy Map Making</a></li>
+<li><a href="http://tibasicdev.wikidot.com/friendly-window">Friendly Graphing Window</a></li>
+<li><a href="http://tibasicdev.wikidot.com/graphics">Graphics</a></li>
+<li><a href="http://tibasicdev.wikidot.com/grouping">Grouping A Program</a></li>
+<li><a href="http://tibasicdev.wikidot.com/highscores">Highscores</a></li>
+<li><a href="http://tibasicdev.wikidot.com/lookuptables">Look-Up Tables</a></li>
+<li><a href="http://tibasicdev.wikidot.com/maps">Making Maps</a></li>
+<li><a href="http://tibasicdev.wikidot.com/movement">Movement in Maps</a></li>
+<li><a href="http://tibasicdev.wikidot.com/multiplayer">Multiplayer</a></li>
+<li><a href="http://tibasicdev.wikidot.com/piecewise-expressions">Piecewise Expressions</a></li>
+<li><a href="http://tibasicdev.wikidot.com/protection">Program Protection</a></li>
+<li><a href="http://tibasicdev.wikidot.com/recursion">Recursion</a></li>
+<li><a href="http://tibasicdev.wikidot.com/saving">Saving</a></li>
+<li><a href="http://tibasicdev.wikidot.com/selfmodify">Self-Modifying Code (SMC)</a></li>
+<li><a href="http://tibasicdev.wikidot.com/subprograms">Subprograms</a></li>
+<li><a href="http://tibasicdev.wikidot.com/validation">Validation of User Input</a></li>
+</ul>
+</div>
+</div>
+</div>
+<div class="collapsible-block">
+<div class="collapsible-block-folded"><a class="collapsible-block-link" href="javascript:;">Miscellaneous</a></div>
+<div class="collapsible-block-unfolded" style="display:none">
+<div class="collapsible-block-unfolded-link"><a class="collapsible-block-link" href="javascript:;">Miscellaneous</a></div>
+<div class="collapsible-block-content">
+<ul>
+<li><a href="http://tibasicdev.wikidot.com/experiment">Experiment</a></li>
+<li><a href="http://tibasicdev.wikidot.com/programs-h">Programs</a></li>
+<li><a href="http://tibasicdev.wikidot.com/sitemap">Sitemap</a></li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div style="height: 5px;"></div>
+<p><span style="font-size:large;">References</span></p>
+<ul>
+<li><a href="http://tibasicdev.wikidot.com/resources">Resources</a></li>
+<li><a href="http://tibasicdev.wikidot.com/downloads">Downloads</a></li>
+<li><a href="http://tibasicdev.wikidot.com/showcases">Showcases</a></li>
+<li><a href="http://tibasicdev.wikidot.com/sidebar">Sidebar</a></li>
+<li><a href="http://tibasicdev.wikidot.com/tokens">Token Size</a></li>
+<li><a href="http://tibasicdev.wikidot.com/textsprites">Text Sprites</a></li>
+<li><a href="http://tibasicdev.wikidot.com/binandhex">Binary &amp; Hex</a></li>
+<li><a href="http://tibasicdev.wikidot.com/83lgfont">TI-83+ Font</a></li>
+<li><a href="http://tibasicdev.wikidot.com/errors" class="active">Error Conditions</a></li>
+<li><a href="http://tibasicdev.wikidot.com/file-extensions">File Extensions</a></li>
+<li><a href="http://tibasicdev.wikidot.com/key-codes">Key Codes</a></li>
+<li><a href="http://tibasicdev.wikidot.com/abbreviations">Abbreviations</a></li>
+<li><a href="http://tibasicdev.wikidot.com/glossary">Glossary</a></li>
+<li><a href="http://tibasicdev.wikidot.com/changelog">OS Changelog</a></li>
+</ul>
+<div style="text-align:center;">
+<p><script type="text/javascript">
+//<![CDATA[
+var sc_project=2373092; 
+var sc_invisible=0; 
+var sc_partition=22; 
+var sc_security="d8087415"; 
+//]]>
+</script> <script type="text/javascript" src="Error%20Conditions%20-%20TI-Basic%20Developer_files/counter_xhtml.js">
+</script><noscript>
+<div class="statcounter"><a class="statcounter" href="http://www.statcounter.com/"><img class="statcounter" src="http://c23.statcounter.com/2373092/0/d8087415/0/" alt="counter free hit unique web" /></a></div>
+</noscript></p>
+</div>
+<div class="foldable-list-container chars">
+<ul>
+<li class="folded"><a href="javascript:;"><span style="font-size:110%;"><strong>CHAR</strong></span></a>
+<ul style="display: none;">
+<li>→ ⸤ ⁻</li>
+<li>× ÷ ±</li>
+<li>√ Σ ≠</li>
+<li>≥ ≤ π</li>
+<li>Δ χ ▶</li>
+<li>ֿ¹ ² ³</li>
+<li>L₁ L₂ L₃</li>
+<li>L₄ L₅ L₆</li>
+<li>≅ ℕ º</li>
+<li>θ ∠ ∞</li>
+<li>♦ ⇧ ∫</li>
+<li>∏ ©</li>
+</ul>
+</li>
+</ul>
+</div>
+<div style="position:fixed; top:0;right:0;">
+<table style="border:1px solid #999; border-collapse:collapse; width:4.2em; background:#FFF;">
+<tbody><tr>
+<td style="border-bottom:1px solid #D2D3C6; height:8px;"></td>
+</tr>
+<tr>
+<td class="hidden-collapsible" style="text-align:center; font-weight:bold; text-decoration:none; font-family:Trebuchet MS, Trebuchet, Verdana, Arial, Helvetica; font-size:110%;">
+<div class="collapsible-block">
+<div class="collapsible-block-folded"><a class="collapsible-block-link" href="javascript:;">CHAR</a></div>
+<div class="collapsible-block-unfolded" style="display:none">
+<div class="collapsible-block-unfolded-link"><a class="collapsible-block-link" href="javascript:;">CHAR</a></div>
+<div class="collapsible-block-content">
+<div style="font-weight:normal; font-size:100%; border-top: 1px solid #BBBEAB;">
+<p>→ ⸤ ⁻<br>
+× ÷ ±<br>
+√ Σ ≠<br>
+≥ ≤ π<br>
+Δ χ ▶<br>
+ֿ¹ ² ³<br>
+L₁ L₂ L₃<br>
+L₄ L₅ L₆<br>
+≅ ℕ º<br>
+θ ∠ ∞<br>
+♦ ⇧ ∫<br>
+∏ ©</p>
+</div>
+</div>
+</div>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-top:1px solid #BBBEAB; height:8px"></td>
+</tr>
+</tbody></table>
+</div>
+<div class="chars2">
+<table style="border:1px solid #999; border-collapse:collapse; width:4.2em; background:#FFF;">
+<tbody><tr>
+<td style="border-bottom:1px solid #D2D3C6; height:8px;"></td>
+</tr>
+<tr>
+<td class="hidden-collapsible" style="text-align:center; font-weight:bold; text-decoration:none; font-family:Trebuchet MS, Trebuchet, Verdana, Arial, Helvetica; font-size:110%;">
+<div class="collapsible-block">
+<div class="collapsible-block-folded"><a class="collapsible-block-link" href="javascript:;">CHAR</a></div>
+<div class="collapsible-block-unfolded" style="display:none">
+<div class="collapsible-block-unfolded-link"><a class="collapsible-block-link" href="javascript:;">CHAR</a></div>
+<div class="collapsible-block-content">
+<div style="font-weight:normal; font-size:100%; border-top: 1px solid #BBBEAB;">
+<p>→ ⸤ ⁻<br>
+× ÷ ±<br>
+√ Σ ≠<br>
+≥ ≤ π<br>
+Δ χ ▶<br>
+ֿ¹ ² ³<br>
+L₁ L₂ L₃<br>
+L₄ L₅ L₆<br>
+≅ ℕ º<br>
+θ ∠ ∞<br>
+♦ ⇧ ∫<br>
+∏ ©</p>
+</div>
+</div>
+</div>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-top:1px solid #BBBEAB; height:8px"></td>
+</tr>
+</tbody></table>
+</div>
+
+
+
+                        
+
+
+                    </div>
+                
+                
+                <!-- google_ad_section_end -->
+                
+                <div id="main-content">
+                    <div id="action-area-top"></div>
+                    
+                    
+                        <div id="page-title">
+                            Error Conditions
+                        </div>
+                    
+
+                    
+
+                            
+    
+            <!-- wikidot_top_728x90 -->
+<div id="wad-tibasicdev-above-content" class="wd-adunit wd-ad-np wd-adunit-above_content"></div>
+<script>
+window['nitroAds'].createAd('wad-tibasicdev-above-content', {
+  "refreshTime": 30,
+  "renderVisibleOnly": false,
+  "refreshVisibleOnly": true,
+  "sizes": [ [ 728, 90 ] ],
+  "report": {
+    "enabled": true,
+    "wording": "Report Ad",
+    "position": "bottom-right"
+  },
+  "mediaQuery": "(min-width: 768px)"
+  });
+</script>
+<div id="wad-tibasicdev-above-content-mobile" class="wd-adunit wd-ad-np wd-adunit-above_content"></div>
+<script>
+window['nitroAds'].createAd('wad-tibasicdev-above-content-mobile', {
+  "refreshTime": 30,
+  "renderVisibleOnly": false,
+  "refreshVisibleOnly": true,
+  "sizes": [ [ 320, 50 ], [320, 100] ],
+  "report": {
+    "enabled": true,
+    "icon": true,
+    "wording": "Report Ad",
+    "position": "top-right"
+  },
+  "mediaQuery": "(min-width: 320px) and (max-width: 767px)"
+  });
+</script>
+        
+    
+
+
+                    <div id="page-content">
+                        
+
+<table style="width: 100%; margin: auto auto 1rem auto; background: #fdfcf6; border: 1px solid #eb4034;">
+<tbody><tr>
+<td style="width: auto; padding: 10px; font-size: 125%;">
+<p>We're glad you came by, but you might find what you're looking for elsewhere.</p>
+<p>TI-Basic Developer is not the site it once was. While its information
+ on commands and other calculator features remains almost 
+second-to-none, its forum, archives, and even hosting service, Wikidot, 
+have been decaying for years. The calculator community would love to see
+ what you're working on, or help you in your next coding adventure, but 
+TI-Basic Developer is no longer the place to do it.</p>
+<p>Instead, you should head over to <a href="https://www.cemetech.net/">Cemetech</a> (primarily American) or <a href="https://tiplanet.org/forum/portal.php">TI-Planet</a>
+ (primarily international). Both are active, well-established forums 
+with their own archives, chatrooms, reference material, and abundant 
+coding tools and resources. We'll see you there, we hope.</p>
+</td>
+</tr>
+</tbody></table>
+<div style="font-size:105%; font-weight:bold;margin-bottom:30px;">
+<p><a href="#A">A</a> | <a href="#B">B</a> | <a href="#D">D</a> | <a href="#E">E</a> | <a href="#I">I</a> | <a href="#L">L</a> | <a href="#M">M</a> | <a href="#N">N</a> | <a href="#O">O</a> | <a href="#R">R</a> | <a href="#S">S</a> | <a href="#T">T</a> | <a href="#U">U</a> | <a href="#V">V</a> | <a href="#W">W</a> | <a href="#Z">Z</a></p>
+</div>
+<p><a name="note"></a></p>
+<div style="border: 1px dashed #999;padding: 0 1em;background: #f4f4f4;margin: 35px 0 30px">
+<p>In the Error Conditions section on a command page, descriptions will 
+be given of the errors that can result when using a command. These do 
+not include errors that can occur with virtually any command, such as <strong><a href="#argument">ERR:ARGUMENT</a></strong> or <strong><a href="#syntax">ERR:SYNTAX</a></strong>. However, if one of these errors is triggered in an unusual way, it will be listed.</p>
+<p>Be aware that certain errors don't occur when graphing or using one of the commands <a href="http://tibasicdev.wikidot.com/drawf">DrawF</a>, <a href="http://tibasicdev.wikidot.com/drawinv">DrawInv</a>, <a href="http://tibasicdev.wikidot.com/tangent">Tangent(</a>, or <a href="http://tibasicdev.wikidot.com/shade">Shade(</a>.
+ Instead, the graph point is skipped and treated as an undefined value. 
+Tangent( is a minor exception, actually: if there's an error at the 
+tangent point, it will be treated normally. The errors that are ignored 
+in graphs are:</p>
+<ul>
+<li><strong><a href="#datatype">ERR:DATA TYPE</a></strong></li>
+<li><strong><a href="#divideby0">ERR:DIVIDE BY 0</a></strong></li>
+<li><strong><a href="#domain">ERR:DOMAIN</a></strong></li>
+<li><strong><a href="#increment">ERR:INCREMENT</a></strong></li>
+<li><strong><a href="#nonrealans">ERR:NONREAL ANS</a></strong></li>
+<li><strong><a href="#overflow">ERR:OVERFLOW</a></strong></li>
+<li><strong><a href="#singularmat">ERR:SINGULAR MAT</a></strong></li>
+</ul>
+<p>There are are also several error messages that don't actually occur 
+(as far as anyone knows) from normal use of the calculator — however, 
+the messages are stored in the OS along with the normal messages. It's 
+conceivable that an assembly program, especially an official TI 
+application, would use these error messages for its own purposes. These 
+messages are ERR:SOLVER, ERR:SCALE, ERR:NO MODE, ERR:LENGTH, and 
+ERR:APPLICATION.</p>
+</div>
+<h1 id="toc0"><span>A<a name="A"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="archived"></a></p>
+<h2 id="toc1"><span>ARCHIVED</span></h2>
+<ul>
+<li>You have attempted to use, edit, or delete an archived variable. For example, dim(L1) is an error if L1 is archived.</li>
+<li>Use <a href="http://tibasicdev.wikidot.com/unarchive">UnArchive</a> <em>variable name</em> to unarchive the variable before using it. For lists, <a href="http://tibasicdev.wikidot.com/setupeditor">SetUpEditor</a>
+ is recommended instead since it does the same thing, but works on the 
+TI-83 (which has no archive) as well, and does not crash when the list 
+is undefined.</li>
+<li>There is no way to archive or unarchive programs using pure Basic, although several <a href="http://tibasicdev.wikidot.com/assembly">assembly</a> utilities are available for doing so.</li>
+<li>When you attempt to edit a archived Matrix,List,Variable, or program, the option 2:GOTO doesn't show up.</li>
+<li>Use Unarchive or the memory manager to unarchive a variable,matrix,list, program, etc.</li>
+</ul>
+<p><a name="archivefull"></a></p>
+<h2 id="toc2"><span>ARCHIVE FULL</span></h2>
+<ul>
+<li>You have attempted to archive a variable and there is not enough space in archive to receive it.</li>
+<li>Sometimes, if the calculator displays a message from memory 
+management saying "Garbage Collect?", choosing the option No gives this 
+error.</li>
+</ul>
+<p><a name="argument"></a></p>
+<h2 id="toc3"><span>ARGUMENT</span></h2>
+<ul>
+<li>A function or instruction does not have the correct number of arguments. See the appropriate <a href="http://tibasicdev.wikidot.com/command-index">command</a> page.</li>
+<li>A function or instruction that can have any number of arguments has 256 or more.</li>
+<li>In general, if a function has more than one non-SYNTAX error in it, 
+this is the error that will be generated first (if it applies, of 
+course).</li>
+<li>Generally, on graphing calculators and such, most functions ex: <a href="http://tibasicdev.wikidot.com/randint">randInt(</a> require that you use commas to make a list.</li>
+</ul>
+</div>
+<h1 id="toc4"><span>B<a name="B"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="badaddress"></a></p>
+<h2 id="toc5"><span>BAD ADDRESS</span></h2>
+<ul>
+<li>You have attempted to send or receive an application and an error 
+(e.g., electrical interference) has occurred in the transmission.</li>
+</ul>
+<p><a name="badguess"></a></p>
+<h2 id="toc6"><span>BAD GUESS</span></h2>
+<ul>
+<li>With the <a href="http://tibasicdev.wikidot.com/solve">solve(</a> 
+function, the equation solver, or an operation from the CALC menu, your 
+guess wasn't within the lower and upper bound, or else the function is 
+undefined at that point. Change the guess.</li>
+</ul>
+<p><a name="bound"></a></p>
+<h2 id="toc7"><span>BOUND</span></h2>
+<ul>
+<li>In a CALC operation or with <a href="http://tibasicdev.wikidot.com/select">Select(</a>, you defined Left Bound &gt; Right Bound.</li>
+<li>In <a href="http://tibasicdev.wikidot.com/fmin">fMin(</a>, <a href="http://tibasicdev.wikidot.com/fmax">fMax(</a>, <a href="http://tibasicdev.wikidot.com/solve">solve(</a>, or the equation solver, the lower bound must be less than the upper bound.</li>
+</ul>
+<p><a name="break"></a></p>
+<h2 id="toc8"><span>BREAK</span></h2>
+<ul>
+<li>You pressed the [ON] key to break execution of a program, to halt a DRAW instruction, or to stop evaluation of an expression.</li>
+</ul>
+</div>
+<h1 id="toc9"><span>D<a name="D"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="datatype"></a></p>
+<h2 id="toc10"><span>DATA TYPE</span></h2>
+<ul>
+<li>You entered a value or variable that is the wrong data type.</li>
+<li>For a function (including implied multiplication) or an instruction,
+ you entered an argument that is an invalid data type, such as a complex
+ number where a real number is required.</li>
+<li>In an editor, you entered a type that is not allowed, such as a matrix entered as an element in the stat list editor.</li>
+<li>You attempted to store an incorrect data type, such as a matrix to a list.</li>
+<li>You attempted to divide matrices, which should be done by matrix inversion and multiplication instead.</li>
+<li>This error is not returned when graphing (see the <a href="#note">note</a> at the top of the page).</li>
+</ul>
+<p><a name="date"></a></p>
+<h2 id="toc11"><span>DATE</span></h2>
+<ul>
+<li>Only on the TI-84+ or TI-84+ SE, this error occurs when an invalid date is entered.</li>
+<li>Below the error menu, an explanation of what's wrong is given: e.g., "Invalid day for month selected."</li>
+</ul>
+<p><a name="dimmismatch"></a></p>
+<h2 id="toc12"><span>DIM MISMATCH</span></h2>
+<ul>
+<li>You attempted to perform an operation that references more than one list or matrix, but the dimensions do not match.</li>
+<li>In most cases, the dimensions are required to be equal, with the following exceptions:
+<ul>
+<li>When multiplying two matrices, the number of columns of the first must match the number of rows of the second.</li>
+<li>When using <a href="http://tibasicdev.wikidot.com/augment">augment(</a> to combine two matrices, only the number of rows must match.</li>
+<li>With the <a href="http://tibasicdev.wikidot.com/list-matr">List►matr(</a> command, the lists don't have to match sizes - shorter lists will be padded with zeroes.</li>
+</ul>
+</li>
+</ul>
+<p><a name="divideby0"></a></p>
+<h2 id="toc13"><span>DIVIDE BY 0</span></h2>
+<ul>
+<li>You attempted to divide by zero.</li>
+<li>You attempted a linear regression on data that fit a vertical line.</li>
+<li>This error is not returned when graphing (see the <a href="#note">note</a> at the top of the page).</li>
+</ul>
+<p><a name="domain"></a></p>
+<h2 id="toc14"><span>DOMAIN</span></h2>
+<ul>
+<li>You specified an argument to a function or instruction outside the 
+valid range. This error is not returned during graphing. The TI-83+ 
+allows for undefined values on a graph.</li>
+<li>You attempted a logarithmic or power regression with a negative X or an exponential or power regression with a negative Y.</li>
+<li>You attempted to compute <a href="http://tibasicdev.wikidot.com/sigmaprn">ΣPrn(</a> or <a href="http://tibasicdev.wikidot.com/sigmaint">ΣInt(</a> with pmt2 &lt; pmt1.</li>
+<li>You've assigned a value to <em>n</em> (the sequential graph variable), <em>n</em>Min or <em>n</em>Max that isn't an integer, or that is less than 0.</li>
+<li>This error is not returned when graphing (see the <a href="#note">note</a> at the top of the page).</li>
+</ul>
+<p><a name="duplicate"></a></p>
+<h2 id="toc15"><span>DUPLICATE</span></h2>
+<ul>
+<li>You attempted to create a duplicate group name.</li>
+<li>You attempted to create a duplicate program using <a href="http://tibasicdev.wikidot.com/asmcomp">AsmComp(</a>.</li>
+</ul>
+<p><a name="duplicatename"></a></p>
+<h2 id="toc16"><span>Duplicate Name</span></h2>
+<ul>
+<li>A variable you attempted to transmit cannot be transmitted because a
+ variable with that name already exists in the receiving unit.</li>
+<li>Also appears when you unpack a group and a variable in the group is 
+already defined. In both cases, it will give you several options for 
+correcting the error, including Omit, Rename, and Overwrite.</li>
+</ul>
+</div>
+<h1 id="toc17"><span>E<a name="E"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="expired"></a></p>
+<h2 id="toc18"><span>EXPIRED</span></h2>
+<ul>
+<li>You have attempted to run a Flash application with a limited trial period which has expired.</li>
+</ul>
+<p><a name="errorinxmit"></a></p>
+<h2 id="toc19"><span>Error in Xmit</span></h2>
+<ul>
+<li>The TI-83+ was unable to transmit an item. Check to see that the 
+cable is firmly connected to both units and that the receiving unit is 
+in receive mode.</li>
+<li>You pressed [ON] to break during transmission.</li>
+<li>You attempted to perform a backup from a TI-82 to a TI-83+.</li>
+<li>You attempted to transfer data (other than L1 through L6) from a TI-83+ to a TI-82.</li>
+<li>You attempted to transfer L1 through L6 from a TI-83+ to a TI-82 without using 5:Lists to TI-82 on the LINK SEND menu.</li>
+<li>You attempted to use SendOS with no other calculator connected.</li>
+<li>When this error occurs, the option 2:Goto doesn't show up, but will redirect you to the LINK screen instead of the main screen.</li>
+</ul>
+</div>
+<h1 id="toc20"><span>I<a name="I"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="idnotfound"></a></p>
+<h2 id="toc21"><span>ID NOT FOUND</span></h2>
+<ul>
+<li>This error occurs when the SendID command is executed, but the proper calculator ID cannot be found.</li>
+<li>When this error occurs, the option 2:Goto does not show up.</li>
+</ul>
+<p><a name="illegalnest"></a></p>
+<h2 id="toc22"><span>ILLEGAL NEST</span></h2>
+<ul>
+<li>You attempted to use an invalid function in an argument to a function.</li>
+<li>This happens when using <a href="http://tibasicdev.wikidot.com/seq-list">seq(</a> in the expression for seq(, <a href="http://tibasicdev.wikidot.com/fnint">fnInt(</a> within the first argument of fnInt(, <a href="http://tibasicdev.wikidot.com/expr">expr(</a> inside the string argument of expr(, or <a href="http://tibasicdev.wikidot.com/summationsigma">Σ(</a> within the argument for Σ(.</li>
+</ul>
+<p><a name="increment"></a></p>
+<h2 id="toc23"><span>INCREMENT</span></h2>
+<ul>
+<li>The increment in <a href="http://tibasicdev.wikidot.com/seq-list">seq(</a> is 0 or has the wrong sign.</li>
+<li>The increment in a <a href="http://tibasicdev.wikidot.com/for">For(</a> loop is 0.</li>
+<li>This error is not returned when graphing (see the <a href="#note">note</a> at the top of the page).</li>
+</ul>
+<p><a name="invalid"></a></p>
+<h2 id="toc24"><span>INVALID</span></h2>
+<ul>
+<li>You attempted to reference a variable or use a function where it is 
+not valid. For example, Yn cannot reference Y, Xmin, ΔX, or TblStart.</li>
+<li>You attempted to reference a variable or function that was 
+transferred from the TI-82 and is not valid for the TI-83+. For example,
+ you may have transferred UnN1 to the TI-83+ from the TI-82 and then 
+tried to reference it.</li>
+<li>In Seq mode, you attempted to graph a phase plot (<a href="http://tibasicdev.wikidot.com/uvaxes">uvAxes</a>, <a href="http://tibasicdev.wikidot.com/uwaxes">uwAxes</a>, or <a href="http://tibasicdev.wikidot.com/vwaxes">vwAxes</a>) without defining both equations of the phase plot.</li>
+<li>In Seq mode, you attempted to graph a recursive sequence without having input the correct number of initial conditions.</li>
+<li>In Seq mode, you attempted to reference terms other than (n-1) or (n-2).</li>
+<li>You attempted to designate a graph style that is invalid within the current graph mode.</li>
+<li>You attempted to use <a href="http://tibasicdev.wikidot.com/select">Select(</a> without having selected (turned on) at least one xyLine or scatter plot.</li>
+<li>You attempted to use certain functions (e.g. <a href="http://tibasicdev.wikidot.com/if">If</a>, <a href="http://tibasicdev.wikidot.com/then">Then</a>, <a href="http://tibasicdev.wikidot.com/else">Else</a>) outside a program.</li>
+</ul>
+<p><a name="invaliddim"></a></p>
+<h2 id="toc25"><span>INVALID DIM</span></h2>
+<ul>
+<li>You tried to access an element past the end of a list or matrix 
+(there is an exception: it's allowed to store to the element one past 
+the end of a list, adding the element).</li>
+<li>You specified dimensions for an argument that are not appropriate for the operation.</li>
+<li>You specified a <a href="http://tibasicdev.wikidot.com/lists">list</a> dimension as something other than an integer between 1 and 999.</li>
+<li>You specified a <a href="http://tibasicdev.wikidot.com/matrices">matrix</a> dimension as something other than an integer between 1 and 99.</li>
+<li>You attempted to invert a matrix that is not square.</li>
+</ul>
+<p><a name="iterations"></a></p>
+<h2 id="toc26"><span>ITERATIONS</span></h2>
+<ul>
+<li>The <a href="http://tibasicdev.wikidot.com/solve">solve(</a> 
+function or the equation solver has exceeded the maximum number of 
+permitted iterations. Examine a graph of the function. If the equation 
+has a solution, change the bounds, or the initial guess, or both.</li>
+<li><a href="http://tibasicdev.wikidot.com/irr">irr(</a> has exceeded the maximum number of permitted iterations.</li>
+<li>When computing I%, the maximum number of iterations was exceeded.</li>
+</ul>
+</div>
+<h1 id="toc27"><span>L<a name="L"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="label"></a></p>
+<h2 id="toc28"><span>LABEL</span></h2>
+<ul>
+<li>The label in the <a href="http://tibasicdev.wikidot.com/goto">Goto</a> instruction is not defined with a <a href="http://tibasicdev.wikidot.com/lbl">Lbl</a> instruction in the program.</li>
+<li>When this error occurs, the option 2:Goto doesn't show up.</li>
+</ul>
+<p><a name="link"></a></p>
+<h2 id="toc29"><span>Link</span></h2>
+<ul>
+<li>Something in the flash application was invalid while running.</li>
+<li>When this error occurs, the option 2:Goto doesn't show up.</li>
+</ul>
+</div>
+<h1 id="toc30"><span>M<a name="M"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="memory"></a></p>
+<h2 id="toc31"><span>MEMORY</span></h2>
+<ul>
+<li>Memory is insufficient to perform the instruction or function. You 
+must delete items from memory before executing the instruction or 
+function.</li>
+<li>You might also want to try archiving some variables,matrixes,lists,etc if you have nothing in RAM that you don't need.</li>
+<li>Recursive problems return this error; for example, graphing the 
+equation Y1=Y1. (but Y1=X, Y2=Y1, for example, will NOT cause an error.)</li>
+<li>Branching out of an <a href="http://tibasicdev.wikidot.com/if">If:Then</a>, <a href="http://tibasicdev.wikidot.com/for">For(</a>, <a href="http://tibasicdev.wikidot.com/while">While</a>, or <a href="http://tibasicdev.wikidot.com/repeat">Repeat</a> loop with a <a href="http://tibasicdev.wikidot.com/goto">Goto</a> will waste memory until the program finishes running, because the <a href="http://tibasicdev.wikidot.com/end">End</a>
+ statement that terminates the loop is never reached. Unless a program 
+is very large, this is one of the likeliest causes of ERR:MEMORY. Refer 
+to <a href="http://tibasicdev.wikidot.com/memory-leaks">memory-leaks</a>.</li>
+</ul>
+<p><a name="memoryfull"></a></p>
+<h2 id="toc32"><span>MemoryFull</span></h2>
+<ul>
+<li>You are unable to transmit an item because the receiving unit’s 
+available memory is insufficient. You may skip the item or exit receive 
+mode.</li>
+<li>During a memory backup, the receiving unit’s available memory is 
+insufficient to receive all items in the sending unit’s memory. A 
+message indicates the number of bytes the sending unit must delete to do
+ the memory backup. Delete items and try again.</li>
+<li>You may also try to archive some variables to free up some memory that you do not plan to transmit.</li>
+</ul>
+<p><a name="mode"></a></p>
+<h2 id="toc33"><span>MODE</span></h2>
+<ul>
+<li>You attempted to store to a <a href="http://tibasicdev.wikidot.com/system-variables#window">window variable</a> in another graphing mode or to perform an instruction while in the wrong mode; for example, <a href="http://tibasicdev.wikidot.com/drawinv">DrawInv</a> in a graphing mode other than <a href="http://tibasicdev.wikidot.com/func">Func</a>.</li>
+</ul>
+</div>
+<h1 id="toc34"><span>N<a name="N"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="nosignchng"></a></p>
+<h2 id="toc35"><span>NO SIGN CHNG</span></h2>
+<ul>
+<li>The <a href="http://tibasicdev.wikidot.com/solve">solve(</a> function or the equation solver did not detect a sign change.</li>
+<li>You attempted to compute I% when FV, (N*PMT), and PV all share the same sign.</li>
+<li>You attempted to compute <a href="http://tibasicdev.wikidot.com/irr">irr(</a> when CFList and CFO share the same sign.</li>
+</ul>
+<p><a name="nonrealans"></a></p>
+<h2 id="toc36"><span>NONREAL ANS</span></h2>
+<ul>
+<li>In <a href="http://tibasicdev.wikidot.com/real-mode">Real</a> mode, the result of a calculation yielded a complex result.</li>
+<li>This error is not returned when graphing (see the <a href="#note">note</a> at the top of the page).</li>
+<li>This error can appear if you use a negative number for some operations, such as <a href="http://tibasicdev.wikidot.com/ln">ln</a></li>
+</ul>
+</div>
+<h1 id="toc37"><span>O<a name="O"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="overflow"></a></p>
+<h2 id="toc38"><span>OVERFLOW</span></h2>
+<ul>
+<li>You attempted to enter, or you have calculated, a number that is beyond the range of the calculator (-1<sub>E</sub>100 to 1<sub>E</sub>100, non-inclusive).</li>
+<li>Sometimes you can fix this error by re-ordering operations. For 
+example, 60!*30!/20! will return an overflow error, but 60!/20!*30! will
+ not.</li>
+<li>This error is not returned when graphing (see the <a href="#note">note</a> at the top of the page).</li>
+</ul>
+</div>
+<h1 id="toc39"><span>R<a name="R"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="reserved"></a></p>
+<h2 id="toc40"><span>RESERVED</span></h2>
+<ul>
+<li>You attempted to use a <a href="http://tibasicdev.wikidot.com/system-variables">system variable</a> inappropriately (for example, performing <a href="http://tibasicdev.wikidot.com/1-var-stats">1-Var Stats</a> on the reserved list ∟RESID).</li>
+</ul>
+</div>
+<h1 id="toc41"><span>S<a name="S"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="singularmat"></a></p>
+<h2 id="toc42"><span>SINGULAR MAT</span></h2>
+<ul>
+<li>A singular matrix (determinant = 0) is not valid as the argument for <sup>-1</sup>.</li>
+<li>A <a href="http://tibasicdev.wikidot.com/regression-models">regression</a> generated a singular matrix (determinant = 0) because it could not find a solution, or a solution does not exist.</li>
+<li>This error is not returned when graphing (see the <a href="#note">note</a> at the top of the page).</li>
+</ul>
+<p><a name="singularity"></a></p>
+<h2 id="toc43"><span>SINGULARTY</span></h2>
+<ul>
+<li>The expression in the <a href="http://tibasicdev.wikidot.com/solve">solve(</a>
+ function or the equation solver contains a singularity (a point at 
+which the function is not defined). Examine a graph of the function. If 
+the equation has a solution, change the bounds or the initial guess or 
+both.</li>
+<li>Although the correct spelling is "singularity", the error message shown has "singularty" on all calculators and OS versions.</li>
+</ul>
+<p><a name="stat"></a></p>
+<h2 id="toc44"><span>STAT</span></h2>
+<ul>
+<li>You attempted a stat calculation with lists that are not appropriate.</li>
+<li>Statistical analyses must have at least two data points.</li>
+<li>Med-Med must have at least three points in each partition.</li>
+<li>When you use a frequency list, its elements must be at least 0.</li>
+<li>(Xmax - Xmin) / Xscl must equal 47 for a histogram.</li>
+</ul>
+<p><a name="statplot"></a></p>
+<h2 id="toc45"><span>STAT PLOT</span></h2>
+<ul>
+<li>You attempted to display a graph when a stat plot that uses an undefined list is turned on.</li>
+<li>To fix this error, use the command <a href="http://tibasicdev.wikidot.com/plotsoff">PlotsOff</a> to turn off plots when you're using the graph screen.</li>
+</ul>
+<p><a name="syntax"></a></p>
+<h2 id="toc46"><span>SYNTAX</span></h2>
+<ul>
+<li>The command contains a syntax error. Look for misplaced functions, arguments, parentheses, or commas. See the appropriate <a href="http://tibasicdev.wikidot.com/command-index">command</a> page.</li>
+<li>This error will also occur in place of a DATA TYPE error if the variable type in question is a variable name (with <a href="http://tibasicdev.wikidot.com/seq">seq(</a>, <a href="http://tibasicdev.wikidot.com/solve">solve(</a>, <a href="http://tibasicdev.wikidot.com/for">For(</a>, and other commands)</li>
+<li>The command was attempting to get <a href="http://tibasicdev.wikidot.com/expr">expr(</a> of a non-value string, i.e., trying to evaluate a space, equals sign, etc.</li>
+</ul>
+</div>
+<h1 id="toc47"><span>T<a name="T"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="tolnotmet"></a></p>
+<h2 id="toc48"><span>TOL NOT MET</span></h2>
+<ul>
+<li>You requested a tolerance to which the algorithm cannot return an accurate result.</li>
+</ul>
+</div>
+<h1 id="toc49"><span>U<a name="U"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="undefined"></a></p>
+<h2 id="toc50"><span>UNDEFINED</span></h2>
+<ul>
+<li>You referenced a variable that is not currently defined. This error 
+doesn't occur with number variables (A-Z,θ), which have a default value 
+of 0.</li>
+<li>Lists, matrices,strings,pictures, and GDBs have to be stored to first, in order to be used.</li>
+<li>Most <a href="http://tibasicdev.wikidot.com/system-variables">system variables</a> always have a value, so this error doesn't apply to them.</li>
+<li>However, <a href="http://tibasicdev.wikidot.com/statistics">statistical</a> variables are undefined except for those used by the last relevant command.</li>
+<li>Undefined equation variables (such as Parametric and Polar variables) return ERR:INVALID instead of ERR:UNDEFINED.</li>
+</ul>
+</div>
+<h1 id="toc51"><span>V<a name="V"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="validation"></a></p>
+<h2 id="toc52"><span>VALIDATION</span></h2>
+<ul>
+<li>Electrical interference caused a link to fail or this calculator is 
+not authorized to run the application and/or Operating System.</li>
+</ul>
+<p><a name="variable"></a></p>
+<h2 id="toc53"><span>VARIABLE</span></h2>
+<ul>
+<li>You have tried to archive a variable that cannot be archived or you have have tried to unarchive an application or group.</li>
+<li>Variables that cannot be archived include:
+<ul>
+<li>The number variables R, T, X, Y, and θ (because they are used for graphing)</li>
+<li>The list ∟RESID (because it's reserved for residuals from <a href="http://tibasicdev.wikidot.com/regression-models">regression models</a>)</li>
+<li><a href="http://tibasicdev.wikidot.com/system-variables">System variables</a> (including <a href="http://tibasicdev.wikidot.com/statistics">statistical</a> variables, <a href="http://tibasicdev.wikidot.com/finance">finance</a> variables, equations, plots, and window variables)</li>
+<li>The AppIdList.</li>
+</ul>
+</li>
+</ul>
+<p><a name="version"></a></p>
+<h2 id="toc54"><span>VERSION</span></h2>
+<ul>
+<li>You have attempted to receive an incompatible variable version from another calculator.</li>
+<li>You have attempted to use or display certain corrupted tokens that the calculator will not allow.</li>
+</ul>
+</div>
+<h1 id="toc55"><span>W<a name="W"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="windowrange"></a></p>
+<h2 id="toc56"><span>WINDOW RANGE</span></h2>
+<ul>
+<li>A problem exists with the window variables.
+<ul>
+<li>You defined Xmin&gt;Xmax or Ymin&gt;Ymax.</li>
+<li>Xmin and Xmax (or Ymin and Ymax) are equal or so close that numerical precision can't allow for enough values between them.</li>
+<li>The values for θmin, θmax, and θstep create an empty or never-ending loop for θ.</li>
+<li>The values for Tmin, Tmax, and Tstep create an empty or never-ending loop for T.</li>
+</ul>
+</li>
+<li>When this error occurs, the option 2:Goto doesn't show up.</li>
+</ul>
+</div>
+<h1 id="toc57"><span>Z<a name="Z"></a></span></h1>
+<div style="margin-left: 35px;">
+<p><a name="zoom"></a></p>
+<h2 id="toc58"><span>ZOOM</span></h2>
+<ul>
+<li>A point or a line, instead of a box, is defined in ZBox.</li>
+<li>A ZOOM operation returned a math error.</li>
+<li>When this error occurs, the option 2:Goto doesn't show up.</li>
+</ul>
+</div>
+<h1 id="toc59"><span>Other</span></h1>
+<div style="margin-left: 35px;">
+<h2 id="toc60"><span>?</span></h2>
+<ul>
+<li>An unknown error has occurred.</li>
+</ul>
+</div>
+<div style="display : none;">
+<p>.</p>
+</div>
+
+                    </div>
+
+                            
+    
+                        <!-- wikidot_bottom_300x250 -->
+<div id="wad-tibasicdev-below-content" class="wd-adunit wd-ad-np wd-adunit-below_content"></div>
+<script>
+window['nitroAds'].createAd('wad-tibasicdev-below-content', {
+  "refreshTime": 30,
+  "renderVisibleOnly": false,
+  "refreshVisibleOnly": true,
+  "sizes": [ [ 300, 250 ] ],
+  "report": {
+    "enabled": true,
+    "wording": "Report Ad",
+    "position": "bottom-right"
+  }
+  });
+</script>
+                    
+    
+
+                    
+
+
+                    
+
+
+
+                    
+                        <div class="page-tags">
+                            <span>
+                                <a href="http://tibasicdev.wikidot.com/system:page-tags/tag/_reference#pages">_reference</a><a href="http://tibasicdev.wikidot.com/system:page-tags/tag/commands#pages">commands</a><a href="http://tibasicdev.wikidot.com/system:page-tags/tag/errors#pages">errors</a><a href="http://tibasicdev.wikidot.com/system:page-tags/tag/settings#pages">settings</a><a href="http://tibasicdev.wikidot.com/system:page-tags/tag/variables#pages">variables</a>
+                            </span>
+                        </div>
+                    
+
+                    <div id="page-info-break"></div>
+                    
+                        <div id="page-options-container">
+                            
+                        </div>
+                    
+                    <div id="action-area" style="display: none;"></div>
+                </div>
+            </div>
+            
+            
+            
+            <div id="footer" style="display: block; visibility: visible;">
+                <div class="options" style="display: block; visibility: visible;">
+    <a href="http://www.wikidot.com/doc" id="wikidot-help-button">Help</a>
+    &nbsp;|
+    <a href="http://www.wikidot.com/legal:terms-of-service" id="wikidot-tos-button">Terms of Service</a>
+    &nbsp;|
+    <a href="http://www.wikidot.com/legal:privacy-policy" id="wikidot-privacy-button">Privacy</a>
+    &nbsp;|
+    <a href="javascript:;" id="bug-report-button" onclick="WIKIDOT.page.listeners.pageBugReport(event)">Report a bug</a>
+    &nbsp;|
+    <a href="javascript:;" id="abuse-report-button" onclick="WIKIDOT.page.listeners.flagPageObjectionable(event)">Flag as objectionable</a>
+    <span id="consent-box" style="display:none">
+        &nbsp;|
+        <a href="javascript:;" onclick="window.__cmp('showModal');">Update cookie settings</a>
+    </span>
+
+    <script>
+    if (window["nitroAds"] && window["nitroAds"].loaded) {
+        document.getElementById("consent-box").style.display = window["__tcfapi"] ? "" : "none";
+        } else {
+        document.addEventListener(
+                "nitroAds.loaded",
+                () =>
+                (document.getElementById("consent-box").style.display = window["__tcfapi"] ? "" : "none")
+                );
+    }
+    </script>
+</div>
+Powered by <a href="http://www.wikidot.com/">Wikidot.com</a>
+            </div>
+            
+                <div id="license-area" class="license-area">
+                    Unless otherwise stated, the content of this page is licensed under
+
+<!--Creative Commons License--> <a rel="license" href="http://creativecommons.org/licenses/by-nc/2.5/">Creative Commons Attribution-Noncommercial 2.5 License</a>.<!--/Creative Commons License--><!-- <rdf:RDF xmlns="http://web.resource.org/cc/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+        <Work rdf:about="">
+                <license rdf:resource="http://creativecommons.org/licenses/by-nc/2.5/" />
+        </Work>
+        <License rdf:about="http://creativecommons.org/licenses/by-nc/2.5/"><permits rdf:resource="http://web.resource.org/cc/Reproduction"/><permits rdf:resource="http://web.resource.org/cc/Distribution"/><requires rdf:resource="http://web.resource.org/cc/Notice"/><requires rdf:resource="http://web.resource.org/cc/Attribution"/><prohibits rdf:resource="http://web.resource.org/cc/CommercialUse"/><permits rdf:resource="http://web.resource.org/cc/DerivativeWorks"/></License></rdf:RDF> -->
+
+                </div>
+            
+            
+            
+
+
+
+            <div id="extrac-div-1"><span></span></div><div id="extrac-div-2"><span></span></div><div id="extrac-div-3"><span></span></div>
+            
+            
+            
+            
+                
+            
+        </div>
+        
+    </div>
+<!-- These extra divs/spans may be used as catch-alls to add extra imagery. -->
+<div id="extra-div-1"><span></span></div><div id="extra-div-2"><span></span></div><div id="extra-div-3"><span></span></div>
+<div id="extra-div-4"><span></span></div><div id="extra-div-5"><span></span></div><div id="extra-div-6"><span></span></div>
+</div>
+
+
+
+
+</div>
+<div id="dummy-ondomready-block" style="display: none;"></div>
+    <!-- Google Analytics load -->
+    <script type="text/javascript">
+        (function() {
+            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+            ga.src = ('https:' == document.location.protocol ? 'https://' : 'http://') + 'stats.g.doubleclick.net/dc.js';
+            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+        })();
+    </script>
+
+
+
+
+<div id="page-options-bottom-tips" style="display: none;">
+    <div id="edit-button-hovertip">
+        Click here to edit contents of this page.    </div>
+</div>
+<div id="page-options-bottom-2-tips" style="display: none;">
+    <div id="edit-sections-button-hovertip">
+        Click here to toggle editing of individual sections of the page 
+(if possible).         Watch headings for an "edit" link when available.
+    </div>
+    <div id="edit-append-button-hovertip">
+        Append content without editing the whole page source.    </div>
+    <div id="history-button-hovertip">
+        Check out how this page has evolved in the past.    </div>
+    <div id="discuss-button-hovertip">
+        If you want to discuss contents of this page - this is the easiest way to do it.    </div>
+    <div id="files-button-hovertip">
+        View and manage file attachments for this page.    </div>
+    <div id="site-tools-button-hovertip">
+        A few useful tools to manage this Site.    </div>
+    <div id="backlinks-button-hovertip">
+        See pages that link to and include this page.    </div>
+    <div id="rename-move-button-hovertip">
+        Change the name (also URL address, possibly the category) of the page.    </div>
+    <div id="view-source-button-hovertip">
+        View wiki source for this page without editing.    </div>
+    <div id="parent-page-button-hovertip">  
+        View/set parent page (used for creating breadcrumbs and structured layout).    </div>
+            
+        
+        
+        
+        
+    </div>
+
+<div id="odialog-hovertips" style="position: absolute; z-index: 100; top: 0px; width: 100%;"><div id="abuse-report-button-hovertip" class="hovertip " style="position: absolute; display: none; border: 1px solid black;"><div class="content">
+            Notify administrators if there is objectionable content in this page.        </div></div><div id="bug-report-button-hovertip" class="hovertip " style="position: absolute; display: none; border: 1px solid black;"><div class="content">
+            Something does not work as expected? Find out what you can do.        </div></div><div id="wikidot-help-button-hovertip" class="hovertip " style="position: absolute; display: none; border: 1px solid black;"><div class="content">
+            General Wikidot.com documentation and help section.        </div></div><div id="wikidot-tos-button-hovertip" class="hovertip " style="position: absolute; display: none; border: 1px solid black;"><div class="content">
+            Wikidot.com Terms of Service - what you can, what you should not etc.        </div></div><div id="wikidot-privacy-button-hovertip" class="hovertip " style="position: absolute; display: none; border: 1px solid black;"><div class="content">
+            Wikidot.com Privacy Policy.          
+        </div></div></div></body></html>

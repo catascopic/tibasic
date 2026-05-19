@@ -114,7 +114,7 @@ def seq(a: ArgParser) -> TiList:
 		op = operator.ge
 		end -= 1e-10
 	with _scoped_var(a.env, var) as reals:
-		while op(n, stop):
+		while op(n, end):
 			reals[var] = n
 			result.append(formula.eval())
 			n += step
@@ -143,8 +143,7 @@ def nderiv(a: ArgParser) -> float:
 	val = a.expr()
 	h = a.expr(optional=True, default=0.001)
 	a.end()
-	env = a.env
-	with _scoped_var(env, var) as reals:
+	with _scoped_var(a.env, var) as reals:
 		reals[var] = val + h
 		fwd = formula.eval()
 		reals[var] = val - h
@@ -157,12 +156,12 @@ def fnint(a: ArgParser) -> float:
 	var = a.real_var()
 	lo = a.expr()
 	hi = a.expr()
-	# TODO: this has a tolerance value like nderiv
+	tol = a.expr(optional=True, default=1e-5)
+	# TODO: use tol
 	a.end()
-	env = a.env
 	n = 1000
 	h = (hi - lo) / n
-	with _scoped_var(env, var) as reals:
+	with _scoped_var(a.env, var) as reals:
 		def f(x):
 			reals[var] = x
 			return formula.eval()
