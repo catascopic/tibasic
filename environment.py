@@ -144,6 +144,9 @@ class Environment:
 
 	# ── Nullary helpers (used by nullary= fields in tokens) ──────────────────────
 
+	def get_ans(self):
+		return self.ans
+
 	def get_date(self):
 		t = date.today()
 		return TiList([t.year, t.month, t.day])

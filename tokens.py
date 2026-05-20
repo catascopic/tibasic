@@ -138,7 +138,7 @@ DOT         = token(b'\x3a', '.')
 COLON       = token(b'\x3e', ':')
 NEWLINE     = token(b'\x3f', '\n')
 PRGM        = token(b'\x5f', 'prgm')
-ANS         = token(b'\x72', 'Ans')
+ANS         = token(b'\x72', 'Ans', nullary=Environment.get_ans)
 NEG         = token(b'\xb0', '−', unary_op=purefunctions.neg)
 DIM         = token(b'\xb5', 'dim(', pure_func=purefunctions.dim)
 LIST_PREFIX = token(b'\xeb', '∟')
@@ -224,7 +224,13 @@ TOKENS: list[Token] = [
     token(b'\x2e', 'CubicReg '),
     token(b'\x2f', 'QuartReg '),
     *[token(bytes([0x30 + i]), chr(0x30 + i)) for i in range(10)],
-    DOT, SCI_E, OR, XOR, COLON, NEWLINE, AND,
+    DOT, 
+	SCI_E, 
+	OR, 
+	XOR, 
+	COLON, 
+	NEWLINE, 
+	AND,
     # Variables A–Z (0x41–0x5A)
     *[token(bytes([0x41 + i]), chr(0x41 + i)) for i in range(26)],
     token(b'\x5b', 'θ'),

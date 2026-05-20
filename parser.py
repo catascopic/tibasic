@@ -320,10 +320,19 @@ class Parser:
 	def parse_store_dim(self, value):
 		t = self.peek()
 		if t.is_list_var() or t is LIST_PREFIX:
-			self.parse_list_var_key().get(self.env).set_dim(value)
+			var = self.parse_list_var_key()
+			lst = var.get(self.env)
+			if lst is None:
+				lst = TiList([])
+				var.set(env, lst)
+			lst.set_dim(value)
 		elif t.is_matrix_var():
 			self.advance()
-			t.variable.get(self.env).set_dim(value)
+			mat = t.variable.get(self.env)
+			if mat is None:
+				mat = TiMatrix([])
+				t.variable.set(env, mat)
+			mat.set_dim(value)
 		else:
 			raise ParseError(f"Invalid store-to-dim target: {t}")
 
@@ -408,13 +417,11 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print(env.ans)
 
+	test('{5,5',STORE,'&dim(',(0x5C,0))
+	# test(0,STORE,'&dim(',(0x5D,0))
 	# test('[[1,2,[',STORE,(0x5C,0))
 	# test('[[1,2.5],[π,4]]')
-	test('&randM(','3,4')
+	# test('&randM(','3,4')
 	# test('&Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
 	print(env.matrices)
-
-	for token in TOKENS:
-		c = token.code
-		print(f"token(b'{''.join('\\x{:02x}'.format(letter) for letter in c)}', {token.text!r}),")
