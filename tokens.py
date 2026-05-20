@@ -30,6 +30,9 @@ class Token:
 	def is_list_var(self) -> bool:
 		return self.code[0] == 0x5d
 
+	def is_list_var_start(self) -> bool:
+		return self.code[0] in {0x5d, 0xeb}
+
 	def is_matrix_var(self) -> bool:
 		return self.code[0] == 0x5c
 

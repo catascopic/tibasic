@@ -298,7 +298,11 @@ class Parser:
 
 	def parse_store_list(self, var: Variable, value):
 		if self.eat_if(L_PAREN):
-			var.get(self.env)[self.parse_expr()] = value
+			lst = var.get(self.env)
+			if lst is None:
+				lst = TiList()
+				var.set(self.env, lst)
+			lst[self.parse_expr()] = value
 			self.eat_if(R_PAREN)
 		else:
 			var.set(self.env, value)

@@ -12,12 +12,12 @@ from environment import Variable
 
 
 @contextmanager
-def _scoped_var(env, var):
-	saved = env.numerics[var]
+def _scoped_var(env, variable):
+	saved = variable.get(env)
 	try:
-		yield env.numerics
+		yield
 	finally:
-		env.numerics[var] = saved
+		variable.set(env, saved)
 
 
 def _parse_method(method):
@@ -98,6 +98,10 @@ class ArgParser:
 		pos = self._parser.pos + 1
 		return pos < len(self._parser.tokens) and self._parser.tokens[pos].is_matrix_var()
 
+	def next_is_list_var(self) -> bool:
+		pos = self._parser.pos + 1
+		return pos < len(self._parser.tokens) and self._parser.tokens[pos].is_list_var_start()
+
 
 def seq(a: ArgParser) -> TiList:
 	formula = a.thunk()
@@ -114,9 +118,10 @@ def seq(a: ArgParser) -> TiList:
 	else:
 		op = operator.ge
 		end -= 1e-10
-	with _scoped_var(a.env, var) as reals:
+	variable = var.variable
+	with _scoped_var(a.env, variable):
 		while op(n, end):
-			reals[var] = n
+			variable.set(a.env, n)
 			result.append(formula.eval())
 			n += step
 	return TiList(result)
@@ -130,9 +135,10 @@ def sigma(a: ArgParser) -> float:
 	a.end()
 	total = 0
 	n = start
-	with _scoped_var(a.env, var) as reals:
+	variable = var.variable
+	with _scoped_var(a.env, variable):
 		while n <= end:
-			reals[var] = n
+			variable.set(a.env, n)
 			total += formula.eval()
 			n += 1
 	return total
@@ -144,12 +150,54 @@ def nderiv(a: ArgParser) -> float:
 	val = a.expr()
 	h = a.expr(optional=True, default=0.001)
 	a.end()
-	with _scoped_var(a.env, var) as reals:
-		reals[var] = val + h
+	variable = var.variable
+	with _scoped_var(a.env, variable):
+		variable.set(a.env, val + h)
 		fwd = formula.eval()
-		reals[var] = val - h
+		variable.set(a.env, val - h)
 		bwd = formula.eval()
 	return (fwd - bwd) / (2 * h)
+
+
+# G7K15 nodes (positive half + 0) and weights on [-1, 1]
+_K15_NODES = [
+	0.0, 0.2077849550078985, 0.4058451513773972, 0.5860872354676911,
+	0.7415311855993945, 0.8648644233597691, 0.9491079123427585, 0.9914553711208126
+]
+_K15_WEIGHTS = [
+	0.2094821410847278, 0.2044329400752989, 0.1903505780647854, 0.1690047266392679,
+	0.1406532597155259, 0.1047900103222502, 0.0630920926299786, 0.0229353220105292
+]
+# G7 uses nodes at indices 0, 2, 4, 6 (every other Kronrod node)
+_G7_WEIGHTS  = [
+	0.4179591836734694, None, 0.3818300505051189, None, 
+	0.2797053914892767, None, 0.1294849661688697, None
+]
+
+def _gk15(f, lo, hi):
+	"""Apply G7K15 to [lo, hi]; return (k15_estimate, error)."""
+	mid = (lo + hi) / 2
+	half = (hi - lo) / 2
+	k15 = g7 = 0
+	for i, x in enumerate(_K15_NODES):
+		for sign in ([1] if x == 0 else [1, -1]):
+			fx = f(mid + sign * x * half)
+			k15 += _K15_WEIGHTS[i] * fx
+			if _G7_WEIGHTS[i] is not None:
+				g7 += _G7_WEIGHTS[i] * fx
+	k15 *= half
+	g7  *= half
+	return k15, abs(k15 - g7)
+
+def _adaptive_gk15(f, lo, hi, tol, depth=0):
+	k15, err = _gk15(f, lo, hi)
+	if err <= tol or depth >= 50:
+		return k15
+	mid = (lo + hi) / 2
+	return (
+		_adaptive_gk15(f, lo, mid, tol / 2, depth + 1) + 
+		_adaptive_gk15(f, mid, hi, tol / 2, depth + 1)
+	)
 
 
 def fnint(a: ArgParser) -> float:
@@ -158,30 +206,30 @@ def fnint(a: ArgParser) -> float:
 	lo = a.expr()
 	hi = a.expr()
 	tol = a.expr(optional=True, default=1e-5)
-	# TODO: use tol
 	a.end()
-	n = 1000
-	h = (hi - lo) / n
-	with _scoped_var(a.env, var) as reals:
+	variable = var.variable
+	with _scoped_var(a.env, variable):
 		def f(x):
-			reals[var] = x
+			variable.set(a.env, x)
 			return formula.eval()
-		total = f(lo) + f(hi)
-		for i in range(1, n):
-			total += (4 if i % 2 else 2) * f(lo + i * h)
-	return total * h / 3
+		return _adaptive_gk15(f, lo, hi, tol)
 
 
 def matr_to_list(a: ArgParser) -> None:
 	mat = a.expr()
 	if not isinstance(mat, TiMatrix):
 		raise ValueError("Matr►list: first argument must be a matrix")
-	# TODO: second argument can also be a number, in which case we only get that column
-	list_refs = [a.list_var()]
-	while a.has_next_arg():
-		list_refs.append(a.list_var())
-	a.end()
-	for col, ref in enumerate(list_refs):
+	if a.next_is_list_var():
+		list_refs = [a.list_var()]
+		while a.has_next_arg():
+			list_refs.append(a.list_var())
+		a.end()
+		for col, ref in enumerate(list_refs):
+			ref.set(a.env, TiList([mat.inner[r][col] for r in range(mat.rows)]))
+	else:
+		col = int(a.expr()) - 1
+		ref = a.list_var()
+		a.end()
 		ref.set(a.env, TiList([mat.inner[r][col] for r in range(mat.rows)]))
 
 
@@ -191,7 +239,7 @@ def list_to_matr(a: ArgParser) -> None:
 		list_vals.append(a.expr())
 		if not a.has_next_arg():
 			raise ValueError("List►matr: expected matrix variable as last argument")
-		# TODO:
+		# TODO: let ArgParser peek?
 		# if a.peek().is_matrix_var():
 		if a.next_is_matrix_var():
 			mat_var = a.matrix_var()
@@ -201,6 +249,6 @@ def list_to_matr(a: ArgParser) -> None:
 	rows = max(len(lst) for lst in list_vals)
 	# TODO: can we use zip with a default value?
 	mat_var.set(a.env, TiMatrix([
-		[list_vals[c].inner[r] if r < len(list_vals[c]) else 0.0 for c in range(cols)]
+		[list_vals[c].inner[r] if r < len(list_vals[c]) else 0 for c in range(cols)]
 		for r in range(rows)
 	]))
