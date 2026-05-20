@@ -32,7 +32,7 @@ def _decode(program: bytes) -> list:
 		try:
 			yield _LOOKUP[code]
 		except KeyError as e:
-			raise ValueError(f"Unknown token code: {code.hex()!r} at offset {i}") from e
+			raise ValueError(f"Unknown token code: {code.hex()}") from e
 
 
 def read(path) -> TiProgram:
@@ -101,8 +101,7 @@ if __name__ == '__main__':
 
 	for path in sys.argv[1:]:
 		prog = read(path)
-		print(f'{path}: program {prog.name!r}'
-		      + (' [locked]'   if prog.locked   else '')
-		      + (' [archived]' if prog.archived  else '')
-		      + (f' comment={prog.comment!r}' if prog.comment else ''))
+		print(f"PRGM:{prog.name} (locked={prog.locked}, archived={prog.archived})")
+		if prog.comment:
+			print(prog.comment)
 		print(''.join(t.text for t in prog.tokens).encode(sys.stdout.encoding, errors='replace').decode(sys.stdout.encoding))
