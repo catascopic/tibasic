@@ -299,6 +299,9 @@ class Parser:
 
 		elif t is RAND:
 			self.env.set_random_seed(value)
+		
+		elif t.is_numeric_var() and isinstance(value, TiList):
+			# TODO
 
 		elif t.variable is not None:
 			t.variable.set(self.env, value)
@@ -417,11 +420,12 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print(env.ans)
 
-	test('{5,5',STORE,'&dim(',(0x5C,0))
+	# test('{5,5',STORE,'&dim(',(0x5C,0))
+	test('{5',STORE,'A')
 	# test(0,STORE,'&dim(',(0x5D,0))
 	# test('[[1,2,[',STORE,(0x5C,0))
 	# test('[[1,2.5],[π,4]]')
 	# test('&randM(','3,4')
 	# test('&Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
-	print(env.matrices)
+	print(env.user_lists)
