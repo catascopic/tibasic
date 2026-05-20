@@ -9,8 +9,8 @@ from itertools import accumulate, pairwise, chain, repeat, batched
 from math import prod
 from tiobjects import (
 	TiList, TiMatrix,
-	_require_type, _require_num, _require_real,
-	_require_list, _require_matrix, _require_str, _require_int,
+	require_num, require_real,
+	require_list, require_matrix, require_str, require_int,
 )
 
 
@@ -36,7 +36,7 @@ def vectorized(func):
 				len_check.add(len(a))
 				vec.append(a)
 			else:
-				vec.append(repeat(_require_num(a)))
+				vec.append(repeat(require_num(a)))
 		if not len_check:
 			return func(*args)
 		if len(len_check) == 1:
@@ -60,42 +60,42 @@ def vectorized_with_matrix(func):
 
 @vectorized
 def and_(a, b):
-	return int(bool(_require_real(a)) and bool(_require_real(b)))
+	return int(bool(require_real(a)) and bool(require_real(b)))
 
 @vectorized
 def or_(a, b):
-	return int(bool(_require_real(a)) or bool(_require_real(b)))
+	return int(bool(require_real(a)) or bool(require_real(b)))
 
 @vectorized
 def xor(a, b):
-	return int(bool(_require_real(a)) ^ bool(_require_real(b)))
+	return int(bool(require_real(a)) ^ bool(require_real(b)))
 
 
 # ── Comparison operators ──────────────────────────────────────────────────────────
 
 @vectorized
 def eq(a, b):
-	return int(_require_real(a) == _require_real(b))
+	return int(require_real(a) == require_real(b))
 
 @vectorized
 def ne(a, b):
-	return int(_require_real(a) != _require_real(b))
+	return int(require_real(a) != require_real(b))
 
 @vectorized
 def lt(a, b):
-	return int(_require_real(a) < _require_real(b))
+	return int(require_real(a) < require_real(b))
 
 @vectorized
 def gt(a, b):
-	return int(_require_real(a) > _require_real(b))
+	return int(require_real(a) > require_real(b))
 
 @vectorized
 def le(a, b):
-	return int(_require_real(a) <= _require_real(b))
+	return int(require_real(a) <= require_real(b))
 
 @vectorized
 def ge(a, b):
-	return int(_require_real(a) >= _require_real(b))
+	return int(require_real(a) >= require_real(b))
 
 
 # ── Arithmetic operators ──────────────────────────────────────────────────────────
@@ -187,7 +187,7 @@ def dim(value):
 
 @vectorized
 def not_(x):
-	return int(not _require_real(x))
+	return int(not require_real(x))
 
 @vectorized_with_matrix
 @handle_complex
@@ -226,11 +226,11 @@ def cum_sum(lst):
 			 for c in range(cols)]
 			for r in range(rows)
 		])
-	return TiList(list(accumulate(_require_list(lst))))
+	return TiList(list(accumulate(require_list(lst))))
 
 
 def delta_list(lst):
-	return TiList([b - a for a, b in pairwise(_require_list(lst))])
+	return TiList([b - a for a, b in pairwise(require_list(lst))])
 
 
 def augment(a, b):
@@ -264,7 +264,7 @@ def angle(a):
 # ── Sorting / filling ────────────────────────────────────────────────────────────
 
 def sort_a(lst, *dep, reverse=False):
-	inner = _require_list(lst).inner
+	inner = require_list(lst).inner
 	indices = sorted(range(len(inner)), key=lambda i: inner[i], reverse=reverse)
 	lst.inner = [inner[i] for i in indices]
 	for d in dep:
@@ -276,7 +276,7 @@ def sort_d(lst, *dep):
 
 
 def fill(lst, x):
-	_require_num(x)
+	require_num(x)
 	if isinstance(lst, TiList):
 		for i in range(len(lst.inner)):
 			lst.inner[i] = x
@@ -291,7 +291,7 @@ def fill(lst, x):
 # ── Converters (►DMS, ►Dec, ►Frac) ─────────────────────────────────────────────
 
 def to_dms(x):
-	x = _require_real(x)
+	x = require_real(x)
 	neg = x < 0
 	x = abs(x)
 	deg = int(x)
@@ -302,11 +302,11 @@ def to_dms(x):
 	return f"{sign}{deg}°{mins}'{_repr_num(secs)}\""
 
 def to_dec(x):
-	return _require_real(x)
+	return require_real(x)
 
 def to_frac(x):
 	from fractions import Fraction
-	x = _require_real(x)
+	x = require_real(x)
 	f = Fraction(x).limit_denominator(10000)
 	return float(f) if f.denominator == 1 else f"{f.numerator}/{f.denominator}"
 
@@ -314,17 +314,17 @@ def to_frac(x):
 # ── String functions ────────────────────────────────────────────────────────────
 
 def in_string(value, substring):
-	return _require_str(value).find(_require_str(substring)) + 1
+	return require_str(value).find(require_str(substring)) + 1
 
 
 def length(value):
-	return len(_require_str(value))
+	return len(require_str(value))
 
 
 def sub(value, start, length):
 	if isinstance(value, Number):
 		return value / 100
-	_require_str(value)
+	require_str(value)
 	start, length = int(start), int(length)
 	if length < 1:
 		raise ValueError(f"sub: length must be ≥ 1, got {length}")
@@ -335,14 +335,14 @@ def sub(value, start, length):
 # ── Aggregate / statistics ───────────────────────────────────────────────────────
 
 def variance(lst, freqlist=None):
-	_require_list(lst)
+	require_list(lst)
 	if freqlist is None:
 		n = len(lst)
 		if n < 2:
 			raise ValueError("stdDev: need at least 2 elements")
 		m = mean(lst)
 		return builtins.sum((x - m) ** 2 for x in lst) / (n - 1)
-	_require_list(freqlist)
+	require_list(freqlist)
 	if len(lst) != len(freqlist):
 		raise ValueError("stdDev: dim mismatch")
 	m = mean(lst, freqlist)
@@ -358,12 +358,12 @@ def stddev(lst, freqlist=None):
 
 @vectorized_with_matrix
 def round(a, b=9):
-	return builtins.round(a, _require_int(b))
+	return builtins.round(a, require_int(b))
 
 
 def _minmax(fn, a, b):
 	if b is None:
-		return fn(_require_list(a))
+		return fn(require_list(a))
 	if isinstance(a, TiList) and isinstance(b, TiList):
 		if len(a) != len(b):
 			raise ValueError(f"{fn.__name__}: dim mismatch ({len(a)} vs {len(b)})")
@@ -382,7 +382,7 @@ def min(a, b=None):
 
 
 def median(lst, freqlist=None):
-	_require_list(lst)
+	require_list(lst)
 	if freqlist is None:
 		s = sorted(lst)
 		n = len(s)
@@ -391,11 +391,11 @@ def median(lst, freqlist=None):
 		mid = n // 2
 		return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
 
-	_require_list(freqlist)
+	require_list(freqlist)
 	if len(lst) != len(freqlist):
 		raise ValueError("median: dim mismatch")
 	pairs = sorted(zip(lst, freqlist), key=lambda p: p[0])
-	total = builtins.sum(_require_int(f) for _, f in pairs)
+	total = builtins.sum(require_int(f) for _, f in pairs)
 	if total <= 0:
 		raise ValueError("median: total frequency must be positive")
 
@@ -412,10 +412,10 @@ def median(lst, freqlist=None):
 
 
 def mean(lst, freqlist=None):
-	_require_list(lst)
+	require_list(lst)
 	if freqlist is None:
 		return builtins.sum(lst) / len(lst)
-	_require_list(freqlist)
+	require_list(freqlist)
 	return builtins.sum(x * w for x, w in zip(lst, freqlist)) / builtins.sum(freqlist)
 
 
@@ -425,7 +425,7 @@ def abs(a):
 
 
 def det(mat):
-	_require_matrix(mat)
+	require_matrix(mat)
 	n = mat.rows
 	if n == 0 or n != mat.cols:
 		raise ValueError(f"det requires a non-empty square matrix, got {mat.rows}×{mat.cols}")
@@ -447,32 +447,32 @@ def det(mat):
 
 
 def identity(n):
-	_requre_int(n)
+	n = require_int(n)
 	return TiMatrix([[1 if r == c else 0 for c in range(n)] for r in range(n)])
 
 
 def transpose(mat):
-	_require_matrix(mat)
+	require_matrix(mat)
 	return TiMatrix([[mat.inner[r][c] for r in range(mat.rows)] for c in range(mat.cols)])
 
 
 def sum(lst, start=None, end=None):
-	inner = _require_list(lst).inner
+	inner = require_list(lst).inner
 	if start is None:
 		return builtins.sum(inner)
-	start = _require_int(start)
-	end = _require_int(end) if end is not None else len(inner)
+	start = require_int(start)
+	end = require_int(end) if end is not None else len(inner)
 	if not (1 <= start <= end <= len(inner)):
 		raise ValueError(f"sum: index out of range (start={start}, end={end}, dim={len(inner)})")
 	return builtins.sum(inner[start - 1 : end])
 
 
 def prod(lst, start=None, end=None):
-	inner = _require_list(lst).inner
+	inner = require_list(lst).inner
 	if start is None:
 		return math.prod(inner)
-	start = _require_int(start)
-	end = _require_int(end) if end is not None else len(inner)
+	start = require_int(start)
+	end = require_int(end) if end is not None else len(inner)
 	if not (1 <= start <= end <= len(inner)):
 		raise ValueError(f"prod: index out of range (start={start}, end={end}, dim={len(inner)})")
 	return math.prod(inner[start - 1 : end])
@@ -515,46 +515,46 @@ for _name, _real_fn, _cpx_fn in [
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
 
 def factorial(n):
-	n = _require_int(n)
+	n = require_int(n)
 	if n < 0:
 		raise ValueError("Argument to ! must be a non-negative integer")
 	return math.factorial(n)
 
 def ncr(n, r):
-	return math.comb(_require_int(n), _require_int(r))
+	return math.comb(require_int(n), require_int(r))
 
 def npr(n, r):
-	return math.perm(_require_int(n), _require_int(r))
+	return math.perm(require_int(n), require_int(r))
 
 @vectorized
 def lcm(a, b):
-	return math.lcm(_require_int(a), _require_int(b))
+	return math.lcm(require_int(a), require_int(b))
 
 @vectorized
 def gcd(a, b):
-	return math.gcd(_require_int(a), _require_int(b))
+	return math.gcd(require_int(a), require_int(b))
 
 @vectorized
 def remainder(a, b):
-	return _require_int(a) % _require_int(b)
+	return require_int(a) % require_int(b)
 
 # ── Random ──────────────────────────────────────────────────────────────────────
 
 def randint(low, high, count=1):
-	low, high = _require_int(low), _require_int(high)
+	low, high = require_int(low), require_int(high)
 	if count == 1:
 		return random.randint(low, high)
-	return TiList([random.randint(low, high) for _ in range(_require_int(count))])
+	return TiList([random.randint(low, high) for _ in range(require_int(count))])
 
 
 def randnorm(mu, sigma, n=None):
 	if n is None:
 		return random.gauss(mu, sigma)
-	return TiList([random.gauss(mu, sigma) for _ in range(_require_int(n))])
+	return TiList([random.gauss(mu, sigma) for _ in range(require_int(n))])
 
 
 def randintnotrep(a, b):
-	lst = list(range(_require_int(a), _require_int(b) + 1))
+	lst = list(range(require_int(a), require_int(b) + 1))
 	random.shuffle(lst)
 	return TiList(lst)
 
@@ -562,7 +562,7 @@ def randintnotrep(a, b):
 # ── Matrix row operations ────────────────────────────────────────────────────
 
 def rowswap(mat, row1, row2):
-	_require_matrix(mat)
+	require_matrix(mat)
 	result = mat.copy()
 	r1, r2 = result.get_row(row1), result.get_row(row2)
 	result.set_row(row1, r2)
@@ -571,21 +571,21 @@ def rowswap(mat, row1, row2):
 
 
 def row_plus(mat, row1, row2):
-	_require_matrix(mat)
+	require_matrix(mat)
 	result = mat.copy()
 	result.set_row(row2, [a + b for a, b in zip(result.get_row(row2), result.get_row(row1))])
 	return result
 
 
 def times_row(factor, mat, row):
-	_require_matrix(mat)
+	require_matrix(mat)
 	result = mat.copy()
 	result.set_row(row, [factor * x for x in result.get_row(row)])
 	return result
 
 
 def times_row_plus(factor, mat, row1, row2):
-	_require_matrix(mat)
+	require_matrix(mat)
 	result = mat.copy()
 	result.set_row(row2, [a + factor * b for a, b in zip(result.get_row(row2), result.get_row(row1))])
 	return result
@@ -594,7 +594,7 @@ def times_row_plus(factor, mat, row1, row2):
 # ── ref / rref ───────────────────────────────────────────────────────────────
 
 def ref(mat):
-	_require_matrix(mat)
+	require_matrix(mat)
 	if mat.rows > mat.cols:
 		raise ValueError(f"ref: matrix must have at least as many columns as rows")
 	m = [row.copy() for row in mat.inner]
@@ -619,7 +619,7 @@ def ref(mat):
 
 
 def rref(mat):
-	_require_matrix(mat)
+	require_matrix(mat)
 	if mat.rows > mat.cols:
 		raise ValueError(f"rref: matrix must have at least as many columns as rows")
 	m = [row.copy() for row in mat.inner]
@@ -646,54 +646,54 @@ def rref(mat):
 
 @vectorized
 def r_pr(x, y):
-	return math.hypot(_require_real(x), _require_real(y))
+	return math.hypot(require_real(x), require_real(y))
 
 
 @vectorized
 def r_ptheta(x, y):
-	return math.atan2(_require_real(y), _require_real(x))
+	return math.atan2(require_real(y), require_real(x))
 
 
 @vectorized
 def p_rx(r, theta):
-	return _require_real(r) * math.cos(_require_real(theta))
+	return require_real(r) * math.cos(require_real(theta))
 
 
 @vectorized
 def p_ry(r, theta):
-	return _require_real(r) * math.sin(_require_real(theta))
+	return require_real(r) * math.sin(require_real(theta))
 
 
 # ── Matrix/list conversions ──────────────────────────────────────────────────
 
 def matr_list(mat, *args):
 	"""matr_list(mat, list1, list2, ...) or matr_list(mat, col_num, list)"""
-	_require_matrix(mat)
+	require_matrix(mat)
 	if len(args) == 2 and isinstance(args[0], (int, float)):
 		# Single-column extraction: matr_list(mat, col#, list_var)
-		col = _require_int(args[0])
+		col = require_int(args[0])
 		if not (1 <= col <= mat.cols):
 			raise ValueError(f"matr_list: column {col} out of range")
 		target = args[1]
-		_require_list(target)
+		require_list(target)
 		target.inner = [mat.inner[r][col - 1] for r in range(mat.rows)]
 		return
 	# Store successive columns into the provided lists
 	for i, lst in enumerate(args):
 		if i >= mat.cols:
 			break
-		_require_list(lst)
+		require_list(lst)
 		lst.inner = [mat.inner[r][i] for r in range(mat.rows)]
 
 
 def list_matr(mat, *lists):
 	"""list_matr(list1, list2, ..., mat) — the last arg is the matrix variable."""
 	# Note: in TI-BASIC, List►matr(list1,...,mat) stores to mat
-	_require_matrix(mat)
+	require_matrix(mat)
 	if not lists:
 		raise ValueError("list_matr: need at least one list")
 	cols = len(lists)
-	max_rows = builtins.max(len(_require_list(lst)) for lst in lists)
+	max_rows = builtins.max(len(require_list(lst)) for lst in lists)
 	mat.inner = [
 		[lists[c].inner[r] if r < len(lists[c]) else 0.0 for c in range(cols)]
 		for r in range(max_rows)
@@ -703,7 +703,7 @@ def list_matr(mat, *lists):
 # ── randM / randBin ──────────────────────────────────────────────────────────
 
 def randm(rows, cols):
-	if not (1 <= _require_int(rows) <= 99) or not (1 <= _require_int(cols) <= 99):
+	if not (1 <= require_int(rows) <= 99) or not (1 <= require_int(cols) <= 99):
 		raise ValueError("randM: dimensions must be 1-99")
 	# Per spec: entries are successive randInt(-9,9) calls filled bottom-right to top-left
 	flat = [random.randint(-9, 9) for _ in range(rows * cols)]
@@ -712,12 +712,12 @@ def randm(rows, cols):
 
 
 def randbin(n, p, simulations=None):
-	_require_int(n)
+	n = require_int(n)
 	if not (0 <= p <= 1):
 		raise ValueError("randBin: p must be in [0, 1]")
 	if simulations is None:
 		return builtins.sum(1 for _ in range(n) if random.random() < p)
-	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(_require_int(simulations))])
+	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(require_int(simulations))])
 
 
 # ── Probability distributions ────────────────────────────────────────────────
@@ -813,21 +813,21 @@ def _inc_beta(a, b, x):
 
 
 def normalpdf(x, mu=0, sigma=1):
-	_require_real(x)
+	require_real(x)
 	z = (x - mu) / sigma
 	return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2 * math.pi))
 
 
 def normalcdf(lower, upper, mu=0, sigma=1):
-	_require_real(lower)
-	_require_real(upper)
+	require_real(lower)
+	require_real(upper)
 	def _cdf(z):
 		return 0.5 * (1 + math.erf(z / math.sqrt(2)))
 	return _cdf((upper - mu) / sigma) - _cdf((lower - mu) / sigma)
 
 
 def invnorm(p, mu=0, sigma=1):
-	_require_real(p)
+	require_real(p)
 	if p <= 0:
 		return -1e99
 	if p >= 1:
@@ -854,16 +854,16 @@ def invnorm(p, mu=0, sigma=1):
 
 
 def tpdf(t, df):
-	_require_real(t)
-	_require_real(df)
+	require_real(t)
+	require_real(df)
 	log_coeff = math.lgamma((df + 1) / 2) - 0.5 * math.log(df * math.pi) - math.lgamma(df / 2)
 	return math.exp(log_coeff - (df + 1) / 2 * math.log(1 + t * t / df))
 
 
 def tcdf(lower, upper, df):
-	_require_real(lower)
-	_require_real(upper)
-	_require_real(df)
+	require_real(lower)
+	require_real(upper)
+	require_real(df)
 	def _t_cdf(x, v):
 		if x == 0:
 			return 0.5
@@ -877,8 +877,8 @@ def tcdf(lower, upper, df):
 
 
 def invt(p, df):
-	_require_real(p)
-	_require_real(df)
+	require_real(p)
+	require_real(df)
 	if p <= 0:
 		return -1e99
 	if p >= 1:
@@ -898,8 +898,8 @@ def invt(p, df):
 
 
 def chi2pdf(x, df):
-	_require_real(x)
-	_require_real(df)
+	require_real(x)
+	require_real(df)
 	if x <= 0:
 		return 0.0
 	k = df
@@ -907,9 +907,9 @@ def chi2pdf(x, df):
 
 
 def chi2cdf(lower, upper, df):
-	_require_real(lower)
-	_require_real(upper)
-	_require_real(df)
+	require_real(lower)
+	require_real(upper)
+	require_real(df)
 	def _cdf(x, k):
 		if x <= 0:
 			return 0.0
@@ -918,9 +918,9 @@ def chi2cdf(lower, upper, df):
 
 
 def fpdf(x, df1, df2):
-	_require_real(x)
-	_require_real(df1)
-	_require_real(df2)
+	require_real(x)
+	require_real(df1)
+	require_real(df2)
 	if x <= 0:
 		return 0.0
 	d1, d2 = df1, df2
@@ -930,10 +930,10 @@ def fpdf(x, df1, df2):
 
 
 def fcdf(lower, upper, df1, df2):
-	_require_real(lower)
-	_require_real(upper)
-	_require_real(df1)
-	_require_real(df2)
+	require_real(lower)
+	require_real(upper)
+	require_real(df1)
+	require_real(df2)
 	def _cdf(x, d1, d2):
 		if x <= 0:
 			return 0.0
@@ -943,17 +943,17 @@ def fcdf(lower, upper, df1, df2):
 
 
 def binompdf(n, p, k=None):
-	_require_int(n)
-	_require_real(p)
+	n = require_int(n)
+	require_real(p)
 	if k is None:
 		return TiList([math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(n + 1)])
-	k = _require_int(k)
+	k = require_int(k)
 	return math.comb(n, k) * p ** k * (1 - p) ** (n - k)
 
 
 def binomcdf(n, p, k=None):
-	_require_int(n)
-	_require_real(p)
+	n = require_int(n)
+	require_real(p)
 	if k is None:
 		acc = 0.0
 		result = []
@@ -961,29 +961,29 @@ def binomcdf(n, p, k=None):
 			acc += math.comb(n, i) * p ** i * (1 - p) ** (n - i)
 			result.append(acc)
 		return TiList(result)
-	k = _require_int(k)
+	k = require_int(k)
 	return builtins.sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(k + 1))
 
 
 def poissonpdf(lam, k):
-	_require_real(lam)
-	_require_int(k)
+	require_real(lam)
+	k = require_int(k)
 	return math.exp(-lam) * lam ** k / math.factorial(k)
 
 
 def poissoncdf(lam, k):
-	_require_real(lam)
-	_require_int(k)
+	require_real(lam)
+	k = require_int(k)
 	return builtins.sum(math.exp(-lam) * lam ** i / math.factorial(i) for i in range(k + 1))
 
 
 def geometpdf(p, n):
-	_require_real(p)
-	_require_int(n)
+	require_real(p)
+	n = require_int(n)
 	return p * (1 - p) ** (n - 1)
 
 
 def geometcdf(p, n):
-	_require_real(p)
-	_require_int(n)
+	require_real(p)
+	n = require_int(n)
 	return 1 - (1 - p) ** n

@@ -2,6 +2,9 @@ How to handle colon:
 Colon closes all delimiters EXCEPT quotation marks (Store arrow does close quotation marks)
 As a side note, converters also close all delimiters except quotes
 
+delimiters don't close other delimiters! For example, ({7) is not valid.
+Possibly the way to handle this is with exceptions. Parentheticals/lists/matrices do raise an exception when not closed, but then it's caught and the next token is evaluated to see if it's a valid close-all token like STORE
+But I'm not sure this is the best way. What other ideas do you have?
 
 Instead of _make_variable, have the tokens create the variable. This would be easy since most variable tokens are created in a loop.
 Alternatively, set the variable in __post_init__ so that Variable actually has access to the token object

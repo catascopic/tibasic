@@ -53,9 +53,11 @@ class Token:
 
 	def can_start_atom(self) -> bool:
 		return (
-			self.variable is not None or self.nullary is not None or self.func is not None or
-			self.is_digit() or
-			self in {DOT, L_PAREN, L_BRACE, QUOTE, NEG, LIST_PREFIX}
+			self.is_digit()
+			or self.variable is not None
+			or self.nullary is not None
+			or self.func is not None
+			or self in {DOT, L_PAREN, L_BRACE, L_BRACKET, QUOTE, NEG, LIST_PREFIX}
 		)
 	
 	def __repr__(self):

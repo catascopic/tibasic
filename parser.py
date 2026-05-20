@@ -96,7 +96,7 @@ class Parser:
 		if not self.eat_if(R_BRACE):
 			items.append(self.parse_expr())
 			while self.eat_if(COMMA):
-				items.append(_require_num(self.parse_expr()))
+				items.append(require_num(self.parse_expr()))
 			self.eat_if(R_BRACE)
 		return TiList(items)
 
@@ -105,13 +105,17 @@ class Parser:
 		rows = []
 		while True:
 			self.expect(L_BRACKET)
-			row = [self.parse_expr()]
-			while self.eat_if(COMMA):
-				row.append(_require_real(self.parse_expr()))
-			self.eat_if(R_BRACKET)
+			row = []
+			while True:
+				row.append(require_real(self.parse_expr()))
+				if not self.eat_if(COMMA):
+					break
 			rows.append(row)
+			if not self.eat_if(R_BRACKET):
+				break
 			if not self.eat_if(COMMA):
 				break
+
 		self.eat_if(R_BRACKET)
 		return TiMatrix(rows)
 
@@ -262,7 +266,7 @@ class Parser:
 			if t.can_start_atom():
 				if 60 <= min_bp:
 					break
-				lhs = lhs * self.parse_expr(61)
+				lhs = purefunctions.mul(lhs, self.parse_expr(61))
 				continue
 
 			break
@@ -382,7 +386,7 @@ if __name__ == '__main__':
 	from tokens import *
 
 	env = Environment()
-	d = TOKENS[0x2E:0x37]
+	digits = TOKENS[0x2E:0x37]
 	str_to_token = {t.text: t for t in reversed(TOKENS)}
 
 	def test(*line):
@@ -391,7 +395,7 @@ if __name__ == '__main__':
 			if isinstance(obj, Token):
 				tokens.append(obj)
 			elif isinstance(obj, int):
-				tokens.append(d[obj])
+				tokens.append(digits[obj])
 			elif isinstance(obj, str):
 				if obj.startswith('&'):
 					tokens.append(str_to_token[obj[1:]])
@@ -404,7 +408,9 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print(env.ans)
 
-	test('[[1,2,[4',STORE,(0x5C,0))
-	# test('[[1,2.5],[π,4]]',STORE,(0x5C,0))
+	# test('[[1,2,[',STORE,(0x5C,0))
+	test('&identity(','2)')
+	test('&Ans','[[1,2.5],[π,4]]')
+	test('&Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
-	# print(env.matrices)
+	print(env.matrices)

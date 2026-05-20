@@ -16,31 +16,33 @@ def _repr_num(value):
 
 def _require_type(value, tp):
 	if not isinstance(value, tp):
-		raise ValueError(f"Invalid type: {value!r}; required: {tp.__name__}")
+		raise ValueError(f"Invalid value: {value!r}; required: {tp.__name__}")
 	return value
 
-def _require_num(value):
+def require_num(value):
 	return _require_type(value, Number)
 
-def _require_real(value):
-	if isinstance(value, complex) and value.imag != 0:
+def require_real(value):
+	require_num(value)
+	if isinstance(value, complex):
 		raise ValueError(f"Expected real number, got complex: {value}")
-	return value.real if isinstance(value, complex) else value
+	return value
 
-def _require_list(value):
+def require_int(value):
+	require_real(value)
+	int_value = int(value)
+	if value != int_value:
+		raise ValueError(f"Expected integer, got {value}")
+	return int_value
+
+def require_list(value):
 	return _require_type(value, TiList)
 
-def _require_matrix(value):
+def require_matrix(value):
 	return _require_type(value, TiMatrix)
 
-def _require_str(value):
+def require_str(value):
 	return _require_type(value, str)
-
-def _require_int(value):
-	value = _require_real(value)
-	if value != int(value):
-		raise ValueError(f"Expected integer, got {value}")
-	return int(value)
 
 
 class TiList:

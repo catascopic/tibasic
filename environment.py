@@ -2,7 +2,7 @@ import math
 import random
 
 from datetime import datetime, date
-from tiobjects import TiList, TiMatrix, TiTypeError, _require_num, _require_list, _require_matrix, _require_str
+from tiobjects import TiList, TiMatrix, TiTypeError, require_num, require_list, require_matrix, require_str
 
 
 class _VarArray:
@@ -40,7 +40,7 @@ class NumericVar(Variable):
 		return env.numerics[self._idx]
 
 	def set(self, env, value):
-		env.numerics[self._idx] = _require_num(value)
+		env.numerics[self._idx] = require_num(value)
 
 
 class ListVar(Variable):
@@ -53,7 +53,7 @@ class ListVar(Variable):
 		return env.lists[self._idx]
 
 	def set(self, env, value):
-		env.lists[self._idx] = _require_list(value)
+		env.lists[self._idx] = require_list(value)
 
 
 class UserListVar(Variable):
@@ -66,7 +66,7 @@ class UserListVar(Variable):
 		return env.user_lists[self._name]
 
 	def set(self, env, value):
-		env.user_lists[self._name] = _require_list(value)
+		env.user_lists[self._name] = require_list(value)
 
 
 class MatrixVar(Variable):
@@ -79,7 +79,7 @@ class MatrixVar(Variable):
 		return env.matrices[self._idx]
 
 	def set(self, env, value):
-		env.matrices[self._idx] = _require_matrix(value)
+		env.matrices[self._idx] = require_matrix(value)
 
 
 class StringVar(Variable):
@@ -92,7 +92,7 @@ class StringVar(Variable):
 		return env.strings[self._idx]
 
 	def set(self, env, value):
-		env.strings[self._idx] = _require_str(value)
+		env.strings[self._idx] = require_str(value)
 
 
 class StatVar(Variable):
