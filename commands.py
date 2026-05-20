@@ -9,7 +9,7 @@ def _exec_repeat(parser):
 
 def _exec_for(parser):
 	var_tok = parser.advance()
-	if not var_tok.is_real_var():
+	if not var_tok.is_numeric_var():
 		raise ValueError("For: first arg must be a variable")
 	parser.expect(COMMA)
 	start = parser.parse_expr()

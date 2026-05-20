@@ -158,7 +158,7 @@ class Parser:
 	def _read_name(self) -> str:
 		"""Read alphanumeric tokens as an identifier (prgm, user list, etc.)."""
 		t = self.advance()
-		if not t.is_real_var():
+		if not t.is_numeric_var():
 			raise ParseError("Expected a name")
 		name = [t.text]
 		while self.peek().is_name_char():

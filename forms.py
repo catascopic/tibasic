@@ -13,11 +13,11 @@ from environment import Variable
 
 @contextmanager
 def _scoped_var(env, var):
-	saved = env.reals[var]
+	saved = env.numerics[var]
 	try:
-		yield env.reals
+		yield env.numerics
 	finally:
-		env.reals[var] = saved
+		env.numerics[var] = saved
 
 
 def _parse_method(method):
@@ -63,7 +63,7 @@ class ArgParser:
 	@_parse_method
 	def real_var(self) -> Token:
 		tok = self._parser.advance()
-		if not tok.is_real_var():
+		if not tok.is_numeric_var():
 			raise ValueError(f"Expected a real variable, got {tok.text!r}")
 		return tok
 

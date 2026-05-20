@@ -2,7 +2,7 @@ import math
 import random
 
 from datetime import datetime, date
-from tiobjects import TiList, TiMatrix, TiTypeError, _require_real, _require_list, _require_matrix, _require_str
+from tiobjects import TiList, TiMatrix, TiTypeError, _require_num, _require_list, _require_matrix, _require_str
 
 
 class _VarArray:
@@ -30,17 +30,17 @@ class Variable:
 	def set(self, env, value): ...
 
 
-class RealVar(Variable):
+class NumericVar(Variable):
 	__slots__ = ('_idx',)
 
 	def __init__(self, idx: int):
 		self._idx = idx
 
 	def get(self, env):
-		return env.reals[self._idx]
+		return env.numerics[self._idx]
 
 	def set(self, env, value):
-		env.reals[self._idx] = float(_require_real(value))
+		env.numerics[self._idx] = _require_num(value)
 
 
 class ListVar(Variable):
@@ -137,7 +137,7 @@ ANS_VAR = AnsVar()
 class Environment:
 
 	def __init__(self):
-		self.reals      = _VarArray(27,    0)     # A–Z, θ
+		self.numerics   = _VarArray(27,    0)     # A–Z, θ
 		self.lists      = _VarArray(6,     None) # L1–L6
 		self.matrices   = _VarArray(10,    None) # [A]–[J]
 		self.strings    = _VarArray(10,    "")   # Str0–9

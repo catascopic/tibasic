@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 import math, itertools
 from environment import (
-	Environment, Variable, RealVar, ListVar, MatrixVar, StringVar, StatVar, WindowVar, ANS_VAR,
+	Environment, Variable, NumericVar, ListVar, MatrixVar, StringVar, StatVar, WindowVar, ANS_VAR,
 )
 import purefunctions
 import forms
@@ -24,7 +24,7 @@ class Token:
 
 	# ── Token type predicates ──────────────────────────────────────────────────
 
-	def is_real_var(self) -> bool:
+	def is_numeric_var(self) -> bool:
 		return 0x41 <= self.code[0] < 0x5c
 
 	def is_list_var(self) -> bool:
@@ -46,7 +46,7 @@ class Token:
 		return 0x30 <= self.code[0] <= 0x39
 
 	def is_name_char(self):
-		return self.is_real_var() or self.is_digit()
+		return self.is_numeric_var() or self.is_digit()
 
 	def can_start_atom(self) -> bool:
 		return (
@@ -68,7 +68,7 @@ def _make_pure_func(f):
 def _make_variable(code: bytes) -> Variable | None:
 	b0 = code[0]
 	if 0x41 <= b0 <= 0x5b:  # A–Z, θ
-		return RealVar(b0 - 0x41)
+		return NumericVar(b0 - 0x41)
 	if b0 == 0x5d:           # L1–L6
 		return ListVar(code[1])
 	if b0 == 0x5c:           # [A]–[J]
