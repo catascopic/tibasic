@@ -131,7 +131,7 @@ def sigma(a: ArgParser) -> float:
 	total = 0
 	n = start
 	with _scoped_var(a.env, var) as reals:
-		while n <= end
+		while n <= end:
 			reals[var] = n
 			total += formula.eval()
 			n += 1
@@ -182,7 +182,7 @@ def matr_to_list(a: ArgParser) -> None:
 		list_refs.append(a.list_var())
 	a.end()
 	for col, ref in enumerate(list_refs):
-		ref.set(TiList([mat.inner[r][col] for r in range(mat.rows)]))
+		ref.set(a.env, TiList([mat.inner[r][col] for r in range(mat.rows)]))
 
 
 def list_to_matr(a: ArgParser) -> None:
@@ -194,13 +194,13 @@ def list_to_matr(a: ArgParser) -> None:
 		# TODO:
 		# if a.peek().is_matrix_var():
 		if a.next_is_matrix_var():
-			mat_key = a.matrix_var()
+			mat_var = a.matrix_var()
 			break
 	a.end()
 	cols = len(list_vals)
 	rows = max(len(lst) for lst in list_vals)
 	# TODO: can we use zip with a default value?
-	a.env.matrices[mat_key] = TiMatrix([
+	mat_var.set(a.env, TiMatrix([
 		[list_vals[c].inner[r] if r < len(list_vals[c]) else 0.0 for c in range(cols)]
 		for r in range(rows)
-	])
+	]))

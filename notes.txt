@@ -1,3 +1,6 @@
+Remove ListRef in favor of passing Variable objects
+
+
 Enforce correct data type when storing (3->L1)!
 Maybe there should be a special file for guard statements, though it would have to import TiList/Matrix, so maybe those should go in a separate file, too.
 I think variable type enforcement should be done by making a Variable class in environment.py, which implements get(env) and set(env, value).
@@ -91,3 +94,15 @@ value_fn -> resolve
 
 Variables shoould also implement resolve!
 New field: store(env) function for variables, also rand, but not dim since it takes an additional argument and makes more sense as a special case
+
+
+
+Okay, I have a pretty big change in mind: I want to make the important tokens, or maybe all tokens, top-level objects. Like this:
+
+L_BRACKET = token(b'\x06', "[", "symbol", "Opens a matrix literal", key='[')
+
+And then include this reference in my big list of tokens.
+Alternatively, I could have the "token" method add it to the list automatically.
+Ideally tokens would be enums, but I feel like Python enums aren't great for complex objects. But I want it to be similar to that.
+Also, instead of the operations module defining a lookup table, each token would have a reference to the function/command/opoerator it implements.
+Finally, in the parser, token comparison would be done by comparing actual token objects. You could do `if token is L_BRACKET` instead of comparing the byte code. Does this seem like a good change?

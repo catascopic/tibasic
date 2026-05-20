@@ -65,6 +65,23 @@ def _make_pure_func(f):
 		return f(*a.parse_args())
 	return wrapper
 
+def _make_variable(code: bytes) -> Variable | None:
+	b0 = code[0]
+	if 0x41 <= b0 <= 0x5b:  # A–Z, θ
+		return RealVar(b0 - 0x41)
+	if b0 == 0x5d:           # L1–L6
+		return ListVar(code[1])
+	if b0 == 0x5c:           # [A]–[J]
+		return MatrixVar(code[1])
+	if b0 == 0xaa:           # Str0–9
+		return StringVar(code[1])
+	if b0 == 0x62:           # stat vars
+		return StatVar(code[1])
+	if b0 == 0x63:           # window vars
+		return WindowVar(code[1])
+	return None
+
+
 def token(
 	code: bytes,
 	text: str,
@@ -76,6 +93,7 @@ def token(
 	func: Callable | None = None,
 	pure_func: Callable | None = None,
 	cmd: Callable | None = None,
+	variable: Variable | None = None,
 	nullary: Callable | None = None,
 	converter: Callable | None = None,
 ) -> Token:
@@ -87,10 +105,12 @@ def token(
 		if func is not None:
 			raise ValueError(f"Token {text!r}: cannot set both func and pure_func")
 		func = _make_pure_func(pure_func)
+	if variable is None and nullary is None:
+		variable = _make_variable(code)
 
 	return Token(
 		code, text,
-		bp, binary_op, unary_op, postfix, func, cmd, None, nullary, converter,
+		bp, binary_op, unary_op, postfix, func, cmd, variable, nullary, converter,
 	)
 
 
@@ -110,7 +130,7 @@ DOT		 = token(b'\x3a', ".")
 COLON	   = token(b'\x3e', ":")
 NEWLINE	 = token(b'\x3f', "↵")
 PRGM		= token(b'\x5f', "prgm")
-ANS		 = token(b'\x72', "Ans")
+ANS		 = token(b'\x72', "Ans", variable=ANS_VAR)
 NEG		 = token(b'\xb0', "−", unary_op=purefunctions.neg)
 DIM      = token(b'\xb5', "dim(", pure_func=purefunctions.dim)
 LIST_PREFIX = token(b'\xeb', "∟")
@@ -724,24 +744,6 @@ TOKENS: list[Token] = [
 	token(b'\xef\x3c', "FRAC"),
 	token(b'\xef\x3d', "FRAC-APPROX"),
 ]
-
-# Assign ANS_VAR and Variable instances (done post-creation to capture token identity)
-ANS.variable = ANS_VAR
-for _t in TOKENS:
-	if _t.variable is not None or _t.nullary is not None:
-		continue  # already set on named constants (ANS, RAND, nullary tokens, etc.)
-	if _t.is_real_var():
-		_t.variable = RealVar(_t)
-	elif _t.is_list_var():
-		_t.variable = ListVar(_t)
-	elif _t.is_matrix_var():
-		_t.variable = MatrixVar(_t)
-	elif _t.is_string_var():
-		_t.variable = StringVar(_t)
-	elif _t.is_stat_var():
-		_t.variable = StatVar(_t)
-	elif _t.is_window_var():
-		_t.variable = WindowVar(_t)
 
 
 if __name__ == '__main__':

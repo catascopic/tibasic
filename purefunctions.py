@@ -7,40 +7,11 @@ import sys
 from functools import wraps
 from itertools import accumulate, pairwise, chain, repeat, batched
 from math import prod
-from numbers import Number
-
-from tiobjects import TiList, TiMatrix
-
-
-# ── Type helpers ────────────────────────────────────────────────────────────────
-
-def _require_type(value, tp):
-	if not isinstance(value, tp):
-		raise ValueError(f"Invalid type: {value!r}; required: {tp.__name__}")
-	return value
-
-def _require_num(value):
-	return _require_type(value, Number)
-
-def _require_real(value):
-	if isinstance(value, complex) and value.imag != 0:
-		raise ValueError(f"Expected real number, got complex: {value}")
-	return value.real if isinstance(value, complex) else value
-
-def _require_list(value):
-	return _require_type(value, TiList)
-
-def _require_matrix(value):
-	return _require_type(value, TiMatrix)
-
-def _require_str(value):
-	return _require_type(value, str)
-
-def _require_int(value):
-	value = _require_real(value)
-	if value != int(value):
-		raise ValueError(f"Expected integer, got {value}")
-	return int(value)
+from tiobjects import (
+	TiList, TiMatrix,
+	_require_type, _require_num, _require_real,
+	_require_list, _require_matrix, _require_str, _require_int,
+)
 
 
 

@@ -1,5 +1,6 @@
 import builtins
 from itertools import repeat
+from numbers import Number
 
 
 class TiTypeError(Exception):
@@ -11,9 +12,32 @@ def _repr_num(value):
 	return repr(int_value if int_value == value else value)
 
 
-def _check_int(value):
-	if isinstance(value, complex):
-		value = value.real
+# ── Guard functions ───────────────────────────────────────────────────────────────
+
+def _require_type(value, tp):
+	if not isinstance(value, tp):
+		raise ValueError(f"Invalid type: {value!r}; required: {tp.__name__}")
+	return value
+
+def _require_num(value):
+	return _require_type(value, Number)
+
+def _require_real(value):
+	if isinstance(value, complex) and value.imag != 0:
+		raise ValueError(f"Expected real number, got complex: {value}")
+	return value.real if isinstance(value, complex) else value
+
+def _require_list(value):
+	return _require_type(value, TiList)
+
+def _require_matrix(value):
+	return _require_type(value, TiMatrix)
+
+def _require_str(value):
+	return _require_type(value, str)
+
+def _require_int(value):
+	value = _require_real(value)
 	if value != int(value):
 		raise ValueError(f"Expected integer, got {value}")
 	return int(value)
