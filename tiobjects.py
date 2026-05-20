@@ -121,6 +121,9 @@ class TiMatrix:
 
 	def __repr__(self):
 		return '[' + ''.join('[' + ' '.join(_repr_num(x) for x in row) + ']' for row in self.inner) + ']'
+		# widths = [max(len(_repr_num(row[c])) for row in self.inner) for c in range(len(self.inner[0]))]
+		# return f"[{'\n'.join([f"[{' '.join(f'{_repr_num(x):{widths[c]}}' for c, x in enumerate(row))}]" for row in self.inner])}]"
+		
 
 	def set_dim(self, dim_list):
 		new_rows, new_cols = int(dim_list[0]), int(dim_list[1])

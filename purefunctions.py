@@ -702,16 +702,17 @@ def list_matr(mat, *lists):
 
 # ── randM / randBin ──────────────────────────────────────────────────────────
 
-def randm(rows, cols):
-	if not (1 <= require_int(rows) <= 99) or not (1 <= require_int(cols) <= 99):
+def rand_m(rows, cols):
+	rows = require_int(rows)
+	cols = require_int(cols)
+	if not (1 <= rows <= 99) or not (1 <= cols <= 99):
 		raise ValueError("randM: dimensions must be 1-99")
 	# Per spec: entries are successive randInt(-9,9) calls filled bottom-right to top-left
-	flat = [random.randint(-9, 9) for _ in range(rows * cols)]
-	flat.reverse()
-	return TiMatrix([flat[r * cols:(r + 1) * cols] for r in range(rows)])
+	data = [random.randint(-9, 9) for _ in range(rows * cols)]
+	return TiMatrix([list(row) for row in batched(reversed(data), cols)])
 
 
-def randbin(n, p, simulations=None):
+def rand_bin(n, p, simulations=None):
 	n = require_int(n)
 	if not (0 <= p <= 1):
 		raise ValueError("randBin: p must be in [0, 1]")

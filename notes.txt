@@ -1,10 +1,10 @@
+Let's talk about delimiters. The parser never expects you to close them, but this is only partly correct: delimiters don't close other delimiters! For example, ({7) is not valid.
+Possibly the way to handle this is with exceptions. Parentheticals/lists/matrices could raise an exception when not closed, but then it's caught and the next token is evaluated to see if it's a valid close-all token like STORE
+But I'm not sure this is the best way. What other ideas do you have?
+
 How to handle colon:
 Colon closes all delimiters EXCEPT quotation marks (Store arrow does close quotation marks)
 As a side note, converters also close all delimiters except quotes
-
-delimiters don't close other delimiters! For example, ({7) is not valid.
-Possibly the way to handle this is with exceptions. Parentheticals/lists/matrices do raise an exception when not closed, but then it's caught and the next token is evaluated to see if it's a valid close-all token like STORE
-But I'm not sure this is the best way. What other ideas do you have?
 
 Instead of _make_variable, have the tokens create the variable. This would be easy since most variable tokens are created in a loop.
 Alternatively, set the variable in __post_init__ so that Variable actually has access to the token object
@@ -20,16 +20,18 @@ See the file in "webref/Error Conditions - TI-Basic Developer.htm"
 add a peek method for ArgParser that just calles _parser.peek()
 
 
+Is [2] valid???
 
 
+
+
+Add aliases to any token that has a character that can't be typed on the keyboard
+
+********
 
 for tokens.py:
 Consult the scraped data for better descriptions
 Also add a params field, like for seq( it should be "formula, variable, start-value, end-value [, step]"
-Add aliases to any token that has a character that can't be typed on the keyboard
-
-
-********
 
 File format info: https://gist.github.com/SimonEast/244a0fd04526ea1acbec2e2ceb2e7924
 

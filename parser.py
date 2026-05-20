@@ -409,8 +409,8 @@ if __name__ == '__main__':
 		print(env.ans)
 
 	# test('[[1,2,[',STORE,(0x5C,0))
-	test('&identity(','2)')
-	test('&Ans','[[1,2.5],[π,4]]')
-	test('&Ans',STORE,(0x5C,0))
+	# test('[[1,2.5],[π,4]]')
+	test('&randM(','3,4')
+	# test('&Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
 	print(env.matrices)
