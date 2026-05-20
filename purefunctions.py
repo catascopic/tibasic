@@ -428,7 +428,7 @@ def det(mat):
 	require_matrix(mat)
 	n = mat.rows
 	if n == 0 or n != mat.cols:
-		raise ValueError(f"det requires a non-empty square matrix, got {mat.rows}×{mat.cols}")
+		raise ValueError(f"det requires a square matrix, got {mat.rows}×{mat.cols}")
 	m = [row.copy() for row in mat.inner]
 	sign = 1.0
 	for col in range(n):

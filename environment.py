@@ -123,27 +123,16 @@ class WindowVar(Variable):
 		env.window[self._idx] = float(value)
 
 
-class AnsVar(Variable):
-	def get(self, env):
-		return env.ans
-
-	def set(self, env, value):
-		env.ans = value
-
-
-ANS_VAR = AnsVar()
-
-
 class Environment:
 
 	def __init__(self):
-		self.numerics   = _VarArray(27,    0)     # A–Z, θ
+		self.numerics   = _VarArray(27,    0)    # A–Z, θ
 		self.lists      = _VarArray(6,     None) # L1–L6
 		self.matrices   = _VarArray(10,    None) # [A]–[J]
 		self.strings    = _VarArray(10,    "")   # Str0–9
 		self.stat       = _VarArray(0x3D,  0)    # stat vars
 		self.window     = _VarArray(0x37,  0)    # window vars
-		self.user_lists = {}                                           # ∟NAME lists
+		self.user_lists = {}                     # ∟NAME lists
 		self.ans        = 0
 		self.dt_fmt     = 1
 		self.tm_fmt     = 12
@@ -151,32 +140,32 @@ class Environment:
 		self.key_code   = 0
 
 	def set_random_seed(self, value):
-		random.seed(float(value))
+		random.seed(value)
 
 	# ── Nullary helpers (used by nullary= fields in tokens) ──────────────────────
 
 	def get_date(self):
 		t = date.today()
-		return TiList([float(t.year), float(t.month), float(t.day)])
+		return TiList([t.year, t.month, t.day])
 
 	def get_time(self):
 		t = datetime.now()
-		return TiList([float(t.hour), float(t.minute), float(t.second)])
+		return TiList([t.hour, t.minute, t.second])
 
 	def start_tmr(self):
-		return float(int(datetime.now().timestamp()))
+		return int(datetime.now().timestamp())
 
 	def get_dt_fmt(self):
-		return float(self.dt_fmt)
+		return self.dt_fmt
 
 	def get_tm_fmt(self):
-		return float(self.tm_fmt)
+		return self.tm_fmt
 
 	def is_clock_on(self):
-		return 1.0 if self.clock_on else 0.0
+		return int(self.clock_on)
 
 	def get_key(self):
-		return float(self.key_code)
+		return self.key_code
 
 	def rand(self):
 		return random.random()

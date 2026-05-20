@@ -414,3 +414,7 @@ if __name__ == '__main__':
 	# test('&Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
 	print(env.matrices)
+
+	for token in TOKENS:
+		c = token.code
+		print(f"token(b'{''.join('\\x{:02x}'.format(letter) for letter in c)}', {token.text!r}),")

@@ -96,34 +96,29 @@ class TiMatrix:
 	@property
 	def cols(self):
 		return len(self.inner[0]) if self.inner else 0
+		
+	def _check_index(self, index):
+		row_index, col_index = index
+		row_index = require_int(row_index)
+		col_index = require_int(col_index)
+		if not (1 <= row_index <= self.rows):
+			raise IndexError(f"{row_index=}")
+		if not (1 <= col_index <= self.cols):
+			raise IndexError(f"{col_index=}")
+		return row_index, col_index
 
 	def __getitem__(self, index):
-		row_index, col_index = index
-		if row_index != int(row_index) or not (1 <= row_index <= self.rows):
-			raise IndexError(f"{row_index=}")
-		if col_index != int(col_index) or not (1 <= col_index <= self.cols):
-			raise IndexError(f"{col_index=}")
+		row_index, col_index = self._check_index(index)
 		return self.inner[int(row_index) - 1][int(col_index) - 1]
 
 	def __setitem__(self, index, value):
-		row_index, col_index = index
-		if row_index != int(row_index) or not (1 <= row_index <= self.rows):
-			raise IndexError(f"{row_index=}")
-		if col_index != int(col_index) or not (1 <= col_index <= self.cols):
-			raise IndexError(f"{col_index=}")
+		row_index, col_index = self._check_index(index)
 		self.inner[int(row_index) - 1][int(col_index) - 1] = value
-
-	def __len__(self):
-		return self.rows
-
-	def __iter__(self):
-		return iter(self.inner)
 
 	def __repr__(self):
 		return '[' + ''.join('[' + ' '.join(_repr_num(x) for x in row) + ']' for row in self.inner) + ']'
 		# widths = [max(len(_repr_num(row[c])) for row in self.inner) for c in range(len(self.inner[0]))]
 		# return f"[{'\n'.join([f"[{' '.join(f'{_repr_num(x):{widths[c]}}' for c, x in enumerate(row))}]" for row in self.inner])}]"
-		
 
 	def set_dim(self, dim_list):
 		new_rows, new_cols = int(dim_list[0]), int(dim_list[1])
@@ -155,13 +150,14 @@ class TiMatrix:
 			raise ValueError(f"Dimension mismatch: ({self.rows}×{self.cols}) @ ({other.rows}×{other.cols})")
 		return TiMatrix([
 			[
-				builtins.sum(self.inner[r][k] * other.inner[k][c] for k in range(self.cols))
-				for c in range(other.cols)
+				builtins.sum(
+					self.inner[r][k] * other.inner[k][c] for k in range(self.cols)
+				) for c in range(other.cols)
 			] for r in range(self.rows)
 		])
 
 	def __pow__(self, n):
-		n = _check_int(n)
+		n = require_int(n)
 		if self.rows != self.cols:
 			raise ValueError(f"Matrix power requires a square matrix, got {self.rows}×{self.cols}")
 		if n < 0:

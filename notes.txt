@@ -23,6 +23,9 @@ add a peek method for ArgParser that just calles _parser.peek()
 Is [2] valid???
 
 
+rowswap, etc: better implementations that don't copy unnecessarily
+
+rand is nullary but can also be called like rand(7) to generate 7 random numbers
 
 
 Add aliases to any token that has a character that can't be typed on the keyboard
