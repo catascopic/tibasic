@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from tiobjects import TiList, TiMatrix
+from tiobjects import TiList, TiMatrix, require_num, require_real
 from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
@@ -21,7 +21,6 @@ class Thunk:
 
 	def eval(self):
 		return Parser(self.tokens, self.env).parse_expr()
-
 
 
 class Parser:
@@ -51,7 +50,7 @@ class Parser:
 
 	def expect(self, tok: Token) -> None:
 		if self.peek() is not tok:
-			raise ParseError(f"Expected {tok.text!r}, got {self.peek().text!r}")
+			raise ParseError(f"Expected {tok}, got {self.peek()}")
 		self.pos += 1
 
 	def at_end(self) -> bool:
@@ -97,20 +96,22 @@ class Parser:
 		if not self.eat_if(R_BRACE):
 			items.append(self.parse_expr())
 			while self.eat_if(COMMA):
-				items.append(self.parse_expr())
+				items.append(_require_num(self.parse_expr()))
 			self.eat_if(R_BRACE)
 		return TiList(items)
 
 	def parse_matrix_literal(self) -> TiMatrix:
 		"""Opening [ already consumed; reads one or more [row] blocks."""
 		rows = []
-		while self.peek() is L_BRACKET:
-			self.advance()
+		while True:
+			self.expect(L_BRACKET)
 			row = [self.parse_expr()]
 			while self.eat_if(COMMA):
-				row.append(self.parse_expr())
+				row.append(_require_real(self.parse_expr()))
 			self.eat_if(R_BRACKET)
 			rows.append(row)
+			if not self.eat_if(COMMA):
+				break
 		self.eat_if(R_BRACKET)
 		return TiMatrix(rows)
 
@@ -172,7 +173,7 @@ class Parser:
 			raise ParseError("Expected an expression")
 
 		t = self.advance()
-		
+
 		if t.is_digit() or t is DOT:
 			return self.parse_num_literal(t)
 		if t is QUOTE:
@@ -193,43 +194,44 @@ class Parser:
 		if t is SCI_E:
 			return SCI_E.binary_op(1.0, self.parse_expr(SCI_E.bp[1]))
 
-		if t is LIST_PREFIX:
-			return self.parse_list_atom(UserListVar(self._read_name()).get(self.env))
-
-		# Function call
 		if t.func is not None:
 			return t.func(ArgParser(self))
-
+			
 		# Nullary constants (π, e, rand, Ans, getDate, etc.)
 		if t.nullary is not None:
 			return t.nullary(self.env)
 
-		# Typed variables
-		if t.variable is not None:
+		if t.is_list_var():
+			return self.parse_list_atom(t.variable)
+
+		if t is LIST_PREFIX:
+			return self.parse_list_atom(UserListVar(self._read_name()))
+		
+		if t.is_matrix_var():
 			val = t.variable.get(self.env)
-			if t.is_list_var():
-				return self.parse_list_atom(val)
-			if t.is_matrix_var() and self.peek() is L_PAREN:
-				return val[self.parse_row_col()]
+			if self.eat_if(L_PAREN):
+				val = val[self.parse_row_col()]
+				self.eat_if(R_PAREN)
 			return val
 
-		raise ParseError(f"Unexpected token in expression: {t.text!r}")
+		if t.variable is not None:
+			return t.variable.get(self.env)
+			
+		raise ParseError(f"Unexpected token in expression: {t}")
 
-	def parse_list_atom(self, val):
-		if self.peek() is L_PAREN:
-			self.advance()
-			idx = self.parse_expr()
+	def parse_list_atom(self, var):
+		val = var.get(self.env)
+		if self.eat_if(L_PAREN):
+			val = val[self.parse_expr()]
 			self.eat_if(R_PAREN)
-			return val[idx]  # TiList uses 1-based indexing
-		return val
+		return lst
 
 	def parse_row_col(self):
-		self.advance()
 		row = self.parse_expr()
 		self.expect(COMMA)
 		col = self.parse_expr()
 		self.eat_if(R_PAREN)
-		return int(row) - 1, int(col) - 1
+		return row, col
 
 	# ── Pratt expression parser ────────────────────────────────────────────────
 
@@ -269,7 +271,7 @@ class Parser:
 
 	# ── Store target parser ────────────────────────────────────────────────────
 
-	def parse_store_target(self, value):
+	def parse_store(self, value):
 		t = self.advance()
 
 		if t.is_list_var():
@@ -283,7 +285,11 @@ class Parser:
 
 		elif t.is_matrix_var():
 			if self.eat_if(L_PAREN):
-				t.variable.get(self.env)[self.parse_row_col()] = value
+				mat = t.variable.get(self.env)
+				if mat is None:
+					raise ValueError(f"Undefined matrix: {t.text}")
+				mat[self.parse_row_col()] = value
+				self.eat_if(R_PAREN)
 			else:
 				t.variable.set(self.env, value)
 
@@ -340,7 +346,7 @@ class Parser:
 			return
 
 		t = self.peek()
-		
+
 		# prgm subprogram call
 		if t is PRGM:
 			self.advance()
@@ -351,21 +357,23 @@ class Parser:
 		elif t.cmd is not None:
 			self.advance()
 			t.cmd(ArgParser(self))
-			
+
 		# Expression statement, optionally followed by → target or converter
 		else:
 			value = self.parse_expr()
 			if self.eat_if(STORE):
-				self.parse_store_target(value)
+				self.parse_store(value)
 			elif self.peek().converter is not None:
 				value = self.advance().converter(value)
+			else:
+				self.expect(EOF_TOKEN)
 			self.env.ans = value
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-def parse_line(tokens: list[Token], env: dict):
-	"""Parse and evaluate a single program line. Returns a StatementResult."""
+def parse_line(tokens: list[Token], env: Environment):
+	"""Parse and evaluate a single program line."""
 	Parser(tokens, env).parse_statement()
 
 
@@ -373,13 +381,30 @@ def parse_line(tokens: list[Token], env: dict):
 if __name__ == '__main__':
 	from tokens import *
 
-	d = TOKENS[0x2E:0x37]
-	lookup = {t.code: t for t in TOKENS}
-	def tok(hi, low=None):
-		return lookup[bytes([hi] if low is None else [hi, low])]
-
 	env = Environment()
-	parse_line([L_BRACE, d[3], COMMA, d[1], d[0], STORE, tok(0x5d, 0)], env)
-	# parse_line([d[3], STORE, tok(0x5d, 0)], env)
-	# parse_line([d[3], STORE, tok(0x5d, 0), L_PAREN, d[1]], env)
-	print(env.lists)
+	d = TOKENS[0x2E:0x37]
+	str_to_token = {t.text: t for t in reversed(TOKENS)}
+
+	def test(*line):
+		tokens = []
+		for obj in line:
+			if isinstance(obj, Token):
+				tokens.append(obj)
+			elif isinstance(obj, int):
+				tokens.append(d[obj])
+			elif isinstance(obj, str):
+				if obj.startswith('&'):
+					tokens.append(str_to_token[obj[1:]])
+				else:
+					for c in obj:
+						tokens.append(str_to_token[c])
+			else:
+				tokens.append(TOKEN_TABLE[obj])
+		print(''.join(t.text for t in tokens))
+		parse_line(tokens, env)
+		print(env.ans)
+
+	test('[[1,2,[4',STORE,(0x5C,0))
+	# test('[[1,2.5],[π,4]]',STORE,(0x5C,0))
+	# test(3,STORE,(0x5C,0),'(2,1')
+	# print(env.matrices)

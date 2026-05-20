@@ -1,3 +1,15 @@
+How to handle colon:
+Colon closes all delimiters EXCEPT quotation marks (Store arrow does close quotation marks)
+As a side note, converters also close all delimiters except quotes
+
+
+Instead of _make_variable, have the tokens create the variable. This would be easy since most variable tokens are created in a loop.
+Alternatively, set the variable in __post_init__ so that Variable actually has access to the token object
+
+
+Tell me about the logic behind if entry_type == 0x000d:
+
+
 according to the nDeriv( page, nDeriv( can be nested up to one time.
 See the file in "webref/Error Conditions - TI-Basic Developer.htm"
 

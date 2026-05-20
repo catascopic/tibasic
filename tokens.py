@@ -1,4 +1,4 @@
-﻿from collections.abc import Callable
+﻿from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 import math, itertools
@@ -57,9 +57,12 @@ class Token:
 			self.is_digit() or
 			self in {DOT, L_PAREN, L_BRACE, QUOTE, NEG, LIST_PREFIX}
 		)
+	
+	def __repr__(self):
+		return f"{self.code.hex().upper()}:{self.text}"
 
 
-EOF_TOKEN = Token(b'\x00', '')
+EOF_TOKEN = Token(b'\x00', '<END-OF-INPUT>')
 
 _SEEN: set[bytes] = set()
 
@@ -131,7 +134,7 @@ QUOTE	   = token(b'\x2a', '"')
 COMMA	   = token(b'\x2b', ",")
 DOT		 = token(b'\x3a', ".")
 COLON	   = token(b'\x3e', ":")
-NEWLINE	 = token(b'\x3f', "↵")
+NEWLINE	 = token(b'\x3f', "\n")
 PRGM		= token(b'\x5f', "prgm")
 ANS		 = token(b'\x72', "Ans", variable=ANS_VAR)
 NEG		 = token(b'\xb0', "−", unary_op=purefunctions.neg)
@@ -749,6 +752,49 @@ TOKENS: list[Token] = [
 ]
 
 
+class TokenTable:
+
+	def __init__(self, tokens):
+		self._table: list[Token | list[Token | None] | None] = [None] * 256
+		for token in tokens:
+			b0 = token.code[0]
+			if len(token.code) == 1:
+				self._table[b0] = token
+			else:
+				sub = self._table[b0]
+				if sub is None:
+					self._table[b0] = sub = []
+				b1 = token.code[1]
+				if b1 >= len(sub):
+					sub.extend([None] * (b1 + 1 - len(sub)))
+				sub[b1] = token
+
+	def __getitem__(self, code: int | Sequence[int]) -> Token:
+		if isinstance(code, int):
+			code = (code,)
+		b0 = code[0]
+		if len(code) == 1:
+			table = self._table
+			idx = b0
+		else:
+			sub = self._table[b0]
+			if sub is None:
+				raise KeyError(code)
+			table = sub
+			idx = code[1]
+			
+		token = table[idx] if idx < len(table) else None
+		if token is None:
+			raise KeyError(code)
+		return token
+	
+	def __repr__(self):
+		return repr(self._table)
+
+
+TOKEN_TABLE = TokenTable(TOKENS)
+
+
 if __name__ == '__main__':
 	@dataclass
 	class NullToken:
@@ -789,24 +835,4 @@ if __name__ == '__main__':
 		if token is None:
 			print('MISSING:', hex(0xBB00 + i))
 
-	import json
-	with open('desc.json', encoding='utf-8') as f:
-		desc_lookup = json.load(f)
-
-	def token_data(token):
-		code = token.code.hex()
-		desc = desc_lookup.get(code, {})
-		data = dict(
-			code=code.upper(),
-			text=token.text,
-			desc=desc.get('desc', 'MISSING'),
-		)
-		if desc and 'alias' in desc:
-			data['alias'] = desc['alias'][0]
-		
-		return data
-
-	new_data = [token_data(t) for t in sorted(TOKENS, key=lambda t: t.code)]
-	with open('tokens.json', 'w', encoding='utf-8') as f:
-		json.dump(new_data, f, indent='\t', ensure_ascii=False)
-	print(len(new_data))
+	print(TOKEN_TABLE)
