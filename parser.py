@@ -276,6 +276,10 @@ class Parser:
 	# ── Store target parser ────────────────────────────────────────────────────
 
 	def parse_store(self, value):
+		if self.peek().is_numeric_var() and isinstance(value, TiList):
+			self.env.user_lists[self._read_name()] = value
+			return
+	
 		t = self.advance()
 
 		if t.is_list_var():
@@ -299,9 +303,6 @@ class Parser:
 
 		elif t is RAND:
 			self.env.set_random_seed(value)
-		
-		elif t.is_numeric_var() and isinstance(value, TiList):
-			# TODO
 
 		elif t.variable is not None:
 			t.variable.set(self.env, value)
@@ -323,7 +324,7 @@ class Parser:
 	def parse_store_dim(self, value):
 		t = self.peek()
 		if t.is_list_var() or t is LIST_PREFIX:
-			var = self.parse_list_var_key()
+			var = self.parse_list_var()
 			lst = var.get(self.env)
 			if lst is None:
 				lst = TiList([])
@@ -341,7 +342,7 @@ class Parser:
 
 	# ── Variable key parsers ──────────────────────────────────────────────────────
 
-	def parse_list_var_key(self) -> Variable:
+	def parse_list_var(self) -> Variable:
 		t = self.advance()
 		if t.is_list_var():
 			return t.variable
