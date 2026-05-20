@@ -149,9 +149,9 @@ FACT		= token(b'\x2d', "!", postfix=True, unary_op=purefunctions.factorial)
 
 # Binary operators
 SCI_E	   = token(b'\x3b', "ᴇ", bp=(65, 66), binary_op=lambda a, b: purefunctions.mul(a, 10 ** b))
-OR		  = token(b'\x3c', "or",  bp=(20, 21), binary_op=purefunctions.or_)
-XOR		 = token(b'\x3d', "xor", bp=(20, 21), binary_op=purefunctions.xor)
-AND		 = token(b'\x40', "and", bp=(30, 31), binary_op=purefunctions.and_)
+OR		  = token(b'\x3c', " or ",  bp=(20, 21), binary_op=purefunctions.or_)
+XOR		 = token(b'\x3d', " xor ", bp=(20, 21), binary_op=purefunctions.xor)
+AND		 = token(b'\x40', " and ", bp=(30, 31), binary_op=purefunctions.and_)
 EQ		  = token(b'\x6a', "=", bp=(40, 41), binary_op=purefunctions.eq)
 LT		  = token(b'\x6b', "<", bp=(40, 41), binary_op=purefunctions.lt)
 GT		  = token(b'\x6c', ">", bp=(40, 41), binary_op=purefunctions.gt)

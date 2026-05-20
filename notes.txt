@@ -4,11 +4,8 @@ See the file in "webref/Error Conditions - TI-Basic Developer.htm"
 File format info: https://gist.github.com/SimonEast/244a0fd04526ea1acbec2e2ceb2e7924
 
 add a peek method for ArgParser that just calles _parser.peek()
-See TODOs in forms.py
 
-Change ListRef to be the same as whatever interface Token implements/wraps to handle variable storing
 
-Can always store to L1(1) or even index 1 at user lists
 
 
 
@@ -19,6 +16,9 @@ Add aliases to any token that has a character that can't be typed on the keyboar
 
 
 ********
+
+Change ListRef to be the same as whatever interface Token implements/wraps to handle variable storing
+Can always store to L1(1) or even index 1 at user lists
 
 Enforce correct data type when storing (3->L1)!
 Maybe there should be a special file for guard statements, though it would have to import TiList/Matrix, so maybe those should go in a separate file, too.
