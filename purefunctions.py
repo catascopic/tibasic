@@ -127,9 +127,10 @@ def cum_sum(lst):
 	if isinstance(lst, TiMatrix):
 		cols = lst.cols
 		rows = lst.rows
+		# TODO: can be simplified with zip?
 		return TiMatrix([
 			[builtins.sum(lst.inner[rr][c] for rr in range(r + 1))
-			 for c in range(cols)]
+				for c in range(cols)]
 			for r in range(rows)
 		])
 	return TiList(list(accumulate(require_list(lst))))

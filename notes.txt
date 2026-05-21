@@ -4,16 +4,10 @@ You can also write a number in DMS, but it must be a numeric literal, like 180DE
 Also, trig functions actually do need access to the environment so they can see what mode the calculator is in!
 
 After realizing that I had to redo the eq/ne functions to handle strings, it made me realize that I should go back to my original strategy of using magic methods.
-TiList, TiMatrix, TiString: eq,ne,add
-TiList, TiMatrix: neg,mul,pow
-TiList: lt,gt,le,ge,sub,div
-
-In theory, the TiList-only methods could be handled with @vectorized, but I think it's easier to implement all the operators.
+I've implemented them, but can you take a look at my work? I especially want to know if the matrix operators look good.
+Is there anywhere else I can return NotImplemented to simplify the code?
 
 Make a special VarArray subclass for numerics that stores None as the default, but sets to 0 when you try to access a variable with value None
-
-
-postfix should be a function
 
 TiList: change inner to data
 TiMatrix: change rows to data

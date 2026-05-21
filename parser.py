@@ -377,7 +377,7 @@ class Parser:
 		if t.is_matrix_var():
 			return t.variable
 		raise ParseError(f"Expected a matrix variable, got {t.text!r}")
-	
+
 	def parse_any_var(self) -> Variable:
 		t = self.advance()
 		if t is LIST_PREFIX:
@@ -448,10 +448,13 @@ if __name__ == '__main__':
 						tokens.append(str_to_token[c])
 			else:
 				tokens.append(TOKEN_TABLE[obj])
-		print(''.join(t.text for t in tokens))
+		print('>>', ''.join(t.text for t in tokens))
 		parse_line(tokens, env)
-		print(env.ans)
+		print('<<', env.ans)
 
+	test('[[1,2],[3,4]]',STORE,'&[A]')
+	test('&[A]','^4')
+	test('&[A]')
 	# test('&length(', '"', '& or ')
 	# test('{1,2,3}',SCI_E,'{1,2,3}')
 	# test('[[2','&dim(','{1,2,3]')
@@ -465,4 +468,4 @@ if __name__ == '__main__':
 	# test('&randM(','3,4')
 	# test('&Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
-	print(env.numerics)
+	# print(env.numerics)

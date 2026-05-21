@@ -184,23 +184,25 @@ class TiMatrix:
 	def transform(self, func):
 		return TiMatrix([[func(x) for x in row] for row in self.inner])
 	
+	def transform_zip(self, other, func):
+		return TiMatrix([
+			[func(a, b) for a, b in zip(row_a, row_b)]
+			for row_a, row_b in zip(self.inner, other.inner)
+		])
+	
 	def __add__(self, other):
-		raise NotImplementedError
+		return self.transform_zip(other, operator.add) if isinstance(other, TiMatrix) else self.transform(lambda x: x + other)
 	
 	def __radd__(self, other):
-		raise NotImplementedError
+		return self + other
 
 	def __sub__(self, other):
-		raise NotImplementedError
+		return self.transform_zip(other, operator.sub) if isinstance(other, TiMatrix) else self.transform(lambda x: x - other)
 	
 	def __rsub__(self, other):
-		raise NotImplementedError
+		return other.transform_zip(self, operator.sub) if isinstance(other, TiMatrix) else self.transform(lambda x: other - x)
 
-	def __mul__(self, other):
-		if isinstance(other, Number):
-			return self.transform(lambda i: i + other)
-		if not isinstance(other, TiMatrix):
-			raise ValueError(f"Cannot multiply matrix by {type(other).__name__}")
+	def __matmul__(self, other):
 		if self.cols != other.rows:
 			raise ValueError(f"Dimension mismatch: ({self.rows}×{self.cols}) @ ({other.rows}×{other.cols})")
 		return TiMatrix([
@@ -211,8 +213,17 @@ class TiMatrix:
 			] for r in range(self.rows)
 		])
 	
+	def __mul__(self, other):
+		if isinstance(other, Number):
+			return self.transform(lambda x: x * other)
+		if isinstance(other, TiMatrix):
+			return self @ other
+		raise ValueError(f"Cannot multiply matrix by {other}")
+	
 	def __rmul__(self, other):
-		raise NotImplementedError
+		if isinstance(other, Number):
+			return self.transform(lambda x: other * x)
+		return NotImplemented
 
 	def __pow__(self, n):
 		n = require_int(n)
@@ -221,17 +232,19 @@ class TiMatrix:
 		if n < 0:
 			raise ValueError("Negative matrix power not supported")
 		size = self.rows
-		result = TiMatrix([[1.0 if r == c else 0.0 for c in range(size)] for r in range(size)])
-		base = self.copy()
+		result = TiMatrix([[int(r == c) for c in range(size)] for r in range(size)])
+		base = self
 		while n > 0:
 			if n & 1:
-				result = result * base
-			base = base * base
+				result = result @ base
+			base = base @ base
 			n >>= 1
 		return result
-	
+
 	def __eq__(self, other):
-		raise NotImplementedError
+		if isinstance(other, TiMatrix):
+			return self.inner == other.inner
+		raise ValueError(f"Expected matrix, got {other}")
 	
 	# get __ne__ for free
 	
