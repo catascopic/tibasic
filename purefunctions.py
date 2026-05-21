@@ -10,7 +10,7 @@ from math import prod
 from tiobjects import (
 	TiList, TiMatrix,
 	require_num, require_real,
-	require_list, require_matrix, require_str, require_int,
+	TiString, require_list, require_matrix, require_str, require_int,
 )
 
 
@@ -116,8 +116,8 @@ def add(a, b):
 		if (a.rows, a.cols) != (b.rows, b.cols):
 			raise ValueError(f"add: dim mismatch {a.rows}×{a.cols} vs {b.rows}×{b.cols}")
 		return TiMatrix([[a.inner[r][c] + b.inner[r][c] for c in range(a.cols)] for r in range(a.rows)])
-	if isinstance(a, str) or isinstance(b, str):
-		return a + b
+	if isinstance(a, TiString) and isinstance(b, TiString):
+		return TiString(a.tokens + b.tokens)
 	return _vec_add(a, b)
 
 
@@ -313,15 +313,21 @@ def to_frac(x):
 
 # ── String functions ────────────────────────────────────────────────────────────
 
-def in_string(value, substring):
-	return require_str(value).find(require_str(substring)) + 1
+def in_string(value, substring, start=1):
+	v = require_str(value).tokens
+	s = require_str(substring).tokens
+	start = int(start) - 1  # convert to 0-indexed
+	for i in range(start, len(v) - len(s) + 1):
+		if all(v[i + j].code == s[j].code for j in range(len(s))):
+			return i + 1
+	return 0
 
 
 def length(value):
 	return len(require_str(value))
 
 
-def sub(value, start, length):
+def sub_string(value, start, length):
 	if isinstance(value, Number):
 		return value / 100
 	require_str(value)
@@ -330,7 +336,7 @@ def sub(value, start, length):
 		raise ValueError(f"sub: length must be ≥ 1, got {length}")
 	if not (1 <= start <= len(value) - length + 1):
 		raise ValueError(f"sub: index out of range")
-	return value[start - 1 : start - 1 + length]
+	return TiString(value.tokens[start - 1 : start - 1 + length])
 
 # ── Aggregate / statistics ───────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 import purefunctions
-from tiobjects import TiList, TiMatrix, require_num, require_real
+from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
@@ -93,13 +93,13 @@ class Parser:
 		except ValueError:
 			raise ParseError(f"Bad numeric literal: {num!r}")
 
-	def parse_string_literal(self) -> str:
+	def parse_string_literal(self) -> TiString:
 		"""Opening \" already consumed. Reads until the next \" or end of line."""
-		chars = []
+		tokens = []
 		while not self.at_end() and self.peek() is not QUOTE:
-			chars.append(self.advance().text)
+			tokens.append(self.advance())
 		self.eat_if(QUOTE)  # closing " is optional
-		return "".join(chars)
+		return TiString(tokens)
 
 	def parse_list_literal(self) -> TiList:
 		"""{ already consumed."""

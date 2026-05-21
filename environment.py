@@ -2,7 +2,7 @@ import math
 import random
 
 from datetime import datetime, date
-from tiobjects import TiList, TiMatrix, TiTypeError, require_num, require_list, require_matrix, require_str
+from tiobjects import TiList, TiMatrix, TiString, TiTypeError, require_num, require_list, require_matrix, require_str
 
 
 class _VarArray:
@@ -126,12 +126,12 @@ class WindowVar(Variable):
 class Environment:
 
 	def __init__(self):
-		self.numerics   = _VarArray(27,    0)    # A–Z, θ
-		self.lists      = _VarArray(6,     None) # L1–L6
-		self.matrices   = _VarArray(10,    None) # [A]–[J]
-		self.strings    = _VarArray(10,    "")   # Str0–9
-		self.stat       = _VarArray(0x3D,  0)    # stat vars
-		self.window     = _VarArray(0x37,  0)    # window vars
+		self.numerics   = _VarArray(27,   0)    # A–Z, θ
+		self.lists      = _VarArray(6,    None) # L1–L6
+		self.matrices   = _VarArray(10,   None) # [A]–[J]
+		self.strings    = _VarArray(10,   None) # Str0–9
+		self.stat       = _VarArray(0x3D, 0)    # stat vars
+		self.window     = _VarArray(0x37, 0)    # window vars
 		self.user_lists = {}                     # ∟NAME lists
 		self.ans        = 0
 		self.dt_fmt     = 1
