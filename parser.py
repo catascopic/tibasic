@@ -208,12 +208,16 @@ class Parser:
 		if t is SCI_E:
 			return SCI_E.binary_op(1.0, self.parse_expr(SCI_E.bp[1]))
 
+		# Nullary constants (π, e, rand, Ans, getDate, etc.)
+		# Checked before func so tokens with both can dispatch on whether ( follows.
+		if t.nullary is not None:
+			if self.peek() is L_PAREN and t.func is not None:
+				self.advance()  # consume (
+				return t.func(ArgParser(self))
+			return t.nullary(self.env)
+
 		if t.func is not None:
 			return t.func(ArgParser(self))
-			
-		# Nullary constants (π, e, rand, Ans, getDate, etc.)
-		if t.nullary is not None:
-			return t.nullary(self.env)
 
 		if t.is_list_var():
 			return self.parse_list_atom(t.variable)
@@ -435,8 +439,7 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print(env.ans)
 
-	test('{1')
-	test('&Ans','(1')
+	test('&rand', '(5')
 	# test('[[1:[[','&Ans','(1,1')
 	# test('{5,5',STORE,'&dim(',(0x5C,0))
 	# test('{5',STORE,LIST_PREFIX,'AB')

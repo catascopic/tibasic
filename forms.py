@@ -1,5 +1,6 @@
 from __future__ import annotations
 import operator
+import purefunctions
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -101,6 +102,19 @@ class ArgParser:
 	def next_is_list_var(self) -> bool:
 		pos = self._parser.pos + 1
 		return pos < len(self._parser.tokens) and self._parser.tokens[pos].is_list_var_start()
+
+
+def ans_index_or_mul(a: ArgParser):
+	ans = a.env.ans
+	args = a.parse_args()
+	if isinstance(ans, TiMatrix):
+		return ans[args]
+	if len(args) != 1:
+		raise ValueError(f"Too many arguments: {args}")
+	(arg,) = args
+	if isinstance(ans, TiList):
+		return ans[arg]
+	return purefunctions.mul(ans, arg)
 
 
 def seq(a: ArgParser) -> TiList:

@@ -4,6 +4,9 @@ Additionally, Colon closes all delimiters EXCEPT quotation marks (Store arrow DO
 As a side note, converters also close all delimiters except quotes
 But I'm not sure this is the best way. What other ideas do you have?
 
+[[1[[2 NOT VALID
+
+
 
 Instead of _make_variable, have the tokens create the variable. This would be easy since most variable tokens are created in a loop.
 Alternatively, set the variable in __post_init__ so that Variable actually has access to the token object

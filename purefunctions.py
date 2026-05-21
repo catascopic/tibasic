@@ -540,6 +540,10 @@ def remainder(a, b):
 
 # ── Random ──────────────────────────────────────────────────────────────────────
 
+def rand_list(n):
+	return TiList([random.random() for _ in range(require_int(n))])
+
+
 def randint(low, high, count=1):
 	low, high = require_int(low), require_int(high)
 	if count == 1:
