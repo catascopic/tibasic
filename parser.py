@@ -447,7 +447,9 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print(env.ans)
 
-	test('[[2','&dim(','{1,2,3]')
+	# test('&length(', '"', '& or ')
+	test('&sub(','"ABCD",2,0')
+	# test('[[2','&dim(','{1,2,3]')
 	# test('&rand', '(5')
 	# test('[[1:[[','&Ans','(1,1')
 	# test('{5,5',STORE,'&dim(',(0x5C,0))

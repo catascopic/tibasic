@@ -7,6 +7,7 @@ import sys
 from functools import wraps
 from itertools import accumulate, pairwise, chain, repeat, batched
 from math import prod
+from numbers import Number
 from tiobjects import (
 	TiList, TiMatrix,
 	require_num, require_real,
@@ -316,9 +317,9 @@ def to_frac(x):
 def in_string(value, substring, start=1):
 	v = require_str(value).tokens
 	s = require_str(substring).tokens
-	start = int(start) - 1  # convert to 0-indexed
+	start = require_int(start) - 1
 	for i in range(start, len(v) - len(s) + 1):
-		if all(v[i + j].code == s[j].code for j in range(len(s))):
+		if v[i:i + len(s)] == s:
 			return i + 1
 	return 0
 
@@ -327,11 +328,13 @@ def length(value):
 	return len(require_str(value))
 
 
-def sub_string(value, start, length):
-	if isinstance(value, Number):
+# TODO: move to forms
+def sub_string(value, start=None, length=None):
+	if isinstance(value, Number) and start is None and length is None:
 		return value / 100
 	require_str(value)
-	start, length = int(start), int(length)
+	start = require_int(start)
+	length = require_int(length)
 	if length < 1:
 		raise ValueError(f"sub: length must be ≥ 1, got {length}")
 	if not (1 <= start <= len(value) - length + 1):

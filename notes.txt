@@ -1,4 +1,6 @@
+% operator
 
+empty strings are usually invalid
 
 Instead of _make_variable, have the tokens create the variable. This would be easy since most variable tokens are created in a loop.
 Alternatively, set the variable in __post_init__ so that Variable actually has access to the token object

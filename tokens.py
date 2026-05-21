@@ -541,7 +541,7 @@ TOKENS: list[Token] = [
     token(b'\xbb\x09', 'gcd(',      pure_func=purefunctions.gcd),
     token(b'\xbb\x0a', 'randInt(',  pure_func=purefunctions.randint),
     token(b'\xbb\x0b', 'randBin(', pure_func=purefunctions.rand_bin),
-    token(b'\xbb\x0c', 'sub(',      pure_func=purefunctions.sub),
+    token(b'\xbb\x0c', 'sub(',      pure_func=purefunctions.sub_string),
     token(b'\xbb\x0d', 'stdDev('),
     token(b'\xbb\x0e', 'variance('),
     token(b'\xbb\x0f', 'inString(', pure_func=purefunctions.in_string),
