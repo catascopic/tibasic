@@ -30,6 +30,7 @@ class Parser:
 		self.tokens = tokens
 		self.pos = 0
 		self.env = env
+		self._struct_depth = 0
 
 	# ── Primitives ─────────────────────────────────────────────────────────────
 
@@ -102,16 +103,19 @@ class Parser:
 
 	def parse_list_literal(self) -> TiList:
 		"""{ already consumed."""
+		self._struct_depth += 1
 		items = []
 		if not self.eat_if(R_BRACE):
 			items.append(self.parse_expr())
 			while self.eat_if(COMMA):
 				items.append(require_num(self.parse_expr()))
 			self.close_delimiter(R_BRACE)
+		self._struct_depth -= 1
 		return TiList(items)
 
 	def parse_matrix_literal(self) -> TiMatrix:
 		"""Opening [ already consumed; reads one or more [row] blocks."""
+		self._struct_depth += 1
 		rows = []
 		while True:
 			self.expect(L_BRACKET)
@@ -125,7 +129,7 @@ class Parser:
 				break
 			if not self.eat_if(COMMA):
 				break
-
+		self._struct_depth -= 1
 		self.close_delimiter(R_BRACKET)
 		return TiMatrix(rows)
 
@@ -193,8 +197,12 @@ class Parser:
 		if t is QUOTE:
 			return self.parse_string_literal()
 		if t is L_BRACE:
+			if self._struct_depth > 0:
+				raise ParseError("List literal not allowed inside a list or matrix")
 			return self.parse_list_literal()
 		if t is L_BRACKET:
+			if self._struct_depth > 0:
+				raise ParseError("Matrix literal not allowed inside a list or matrix")
 			return self.parse_matrix_literal()
 		if t is L_PAREN:
 			val = self.parse_expr()
@@ -439,7 +447,8 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print(env.ans)
 
-	test('&rand', '(5')
+	test('[[2','&dim(','{1,2,3]')
+	# test('&rand', '(5')
 	# test('[[1:[[','&Ans','(1,1')
 	# test('{5,5',STORE,'&dim(',(0x5C,0))
 	# test('{5',STORE,LIST_PREFIX,'AB')
