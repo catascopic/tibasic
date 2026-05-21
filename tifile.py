@@ -18,6 +18,15 @@ class TiProgram:
 	archived: bool = False
 	locked:   bool = False
 
+	def __repr__(self):
+		return f"prgm{self.name}(tokens={len(self.tokens)};{'' if self.archived else 'un'}archived/{'' if self.locked else 'un'}locked)"
+	
+	def print(self):
+		if self.comment:
+			print(self.comment)
+		print(f"PRGM:{self.name} ({'' if self.archived else 'un'}archived/{'' if self.locked else 'un'}locked)")
+		print(''.join(t.text for t in self.tokens))
+
 
 def read(file) -> TiProgram:
 	with open(file, 'rb') as f:
@@ -31,12 +40,7 @@ def read(file) -> TiProgram:
 		f.seek(2, 1)  # skip body/checksum length
 		(file_type,) = f.read(1)
 		name = f.read(8).rstrip(b'\x00').decode('ascii')
-
-		if entry_type == 0x000d:
-			_version, archived = f.read(2)
-		else:
-			archived = 0x00
-
+		_version, archived = f.read(2)  # TODO: field missing when entry_type != 0x000d???
 		f.seek(2, 1)  # skip body/checksum length duplicate
 		end = int.from_bytes(f.read(2), 'little') + f.tell()
 		tokens = []
@@ -45,7 +49,6 @@ def read(file) -> TiProgram:
 			tokens.append(TOKEN_TABLE[f.read(2 if b in _TWO_BYTE_PREFIXES else 1)])
 	
 	# TODO: checksum check
-
 	return TiProgram(
 		name     = name,
 		tokens   = tokens,
@@ -63,7 +66,7 @@ def write(file, prog: TiProgram) -> None:
 	data_len   = len(program) + 2  # +2 for the prog_len prefix inside var data
 
 	var_entry = (
-		b'\x0d\x00'                           # entry header type: 0x000D (includes version + flag)
+		b'\x0b\x00'                           # entry header type: 0x000D (includes version + flag)
 		+ data_len.to_bytes(2, 'little')      # length of var data
 		+ bytes([locked])                     # 0x05 = program, 0x06 = edit-locked
 		+ name_bytes                          # variable name, null-padded to 8 bytes
@@ -89,8 +92,4 @@ if __name__ == '__main__':
 	import sys
 
 	for path in sys.argv[1:]:
-		prog = read(path)
-		if prog.comment:
-			print(prog.comment)
-		print(f"PRGM:{prog.name} (locked={prog.locked}, archived={prog.archived})")
-		print(''.join(t.text for t in prog.tokens).encode(sys.stdout.encoding, errors='replace').decode(sys.stdout.encoding))
+		read(path).print()

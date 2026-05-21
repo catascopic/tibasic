@@ -210,11 +210,12 @@ class Parser:
 			return val
 
 		if t is NEG:
-			return t.unary_op(self.parse_expr(65))
+			# special case, this is the only prefix unary operator
+			return purefunctions.neg(self.parse_expr(65))
 
 		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ10 = 10^10)
 		if t is SCI_E:
-			return SCI_E.binary_op(1.0, self.parse_expr(SCI_E.bp[1]))
+			return SCI_E.operator(1.0, self.parse_expr(SCI_E.bp[1]))
 
 		# Nullary constants (π, e, rand, Ans, getDate, etc.)
 		# Checked before func so tokens with both can dispatch on whether ( follows.
@@ -272,7 +273,7 @@ class Parser:
 				if 80 <= min_bp:
 					break
 				self.advance()
-				lhs = t.unary_op(lhs)
+				lhs = t.postfix(lhs)
 				continue
 
 			# Explicit binary operator
@@ -281,7 +282,7 @@ class Parser:
 				if left_bp <= min_bp:
 					break
 				self.advance()
-				lhs = t.binary_op(lhs, self.parse_expr(right_bp))
+				lhs = t.operator(lhs, self.parse_expr(right_bp))
 				continue
 
 			# Implicit multiplication
@@ -387,18 +388,15 @@ class Parser:
 
 			t = self.peek()
 
-			# prgm subprogram call
 			if t is PRGM:
 				self.advance()
 				name = self._read_name()
 				val = self.env.programs[name].execute()
 
-			# Command tokens dispatch via token.cmd
-			elif t.cmd is not None:
+			elif t.command is not None:
 				self.advance()
-				t.cmd(ArgParser(self))
+				t.command(ArgParser(self))
 
-			# Expression statement, optionally followed by → target or converter
 			else:
 				value = self.parse_expr()
 				if self.eat_if(STORE):
@@ -448,7 +446,7 @@ if __name__ == '__main__':
 		print(env.ans)
 
 	# test('&length(', '"', '& or ')
-	test('&sub(','"ABCD",2,0')
+	test('"ABC"≠"EBC"')
 	# test('[[2','&dim(','{1,2,3]')
 	# test('&rand', '(5')
 	# test('[[1:[[','&Ans','(1,1')
@@ -460,4 +458,4 @@ if __name__ == '__main__':
 	# test('&randM(','3,4')
 	# test('&Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
-	print(env.matrices)
+	# print(env.matrices)

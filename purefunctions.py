@@ -4,6 +4,7 @@ import math
 import operator
 import random
 import sys
+from fractions import Fraction
 from functools import wraps
 from itertools import accumulate, pairwise, chain, repeat, batched
 from math import prod
@@ -74,13 +75,19 @@ def xor(a, b):
 
 # ── Comparison operators ──────────────────────────────────────────────────────────
 
-@vectorized
-def eq(a, b):
-	return int(require_real(a) == require_real(b))
+_vec_eq = vectorized(operator.eq)
+_vec_ne = vectorized(operator.ne)
 
-@vectorized
+
+def eq(a, b):
+	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix) or isinstance(a, TiString) and isinstance(b, TiString):
+		return a == b
+	return _vec_eq(a, b)
+
 def ne(a, b):
-	return int(require_real(a) != require_real(b))
+	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix) or isinstance(a, TiString) and isinstance(b, TiString):
+		return a != b
+	return _vec_ne(a, b)
 
 @vectorized
 def lt(a, b):
@@ -214,7 +221,7 @@ def cbrt(x):
 	return cmath.exp(cmath.log(x) / 3) if isinstance(x, complex) else math.cbrt(x)
 
 @vectorized
-def xth_root(x, n):
+def xth_root(n, x):
 	return cmath.exp(cmath.log(x) / n) if isinstance(x, complex) or x < 0 else x ** (1 / n)
 
 
@@ -256,37 +263,12 @@ def imag(x):
 def conj(a):
 	return complex(a.real, -a.imag) if isinstance(a, complex) else a
 
-# Technically works on matrices, but since matrices can't store complex numbers, the result is all 0s
+# Technically works on matrices, but since matrices can't store complex numbers, the result is all 0s.
+# TiBasicDev thinks this is basically a bug, so I'm not implementing it in order to discourage it.
+# (If you want a matrix of all 0s, you can just do 0[A].)
 @vectorized
 def angle(a):
 	return cmath.phase(a)
-
-
-# ── Sorting / filling ────────────────────────────────────────────────────────────
-
-def sort_a(lst, *dep, reverse=False):
-	inner = require_list(lst).inner
-	indices = sorted(range(len(inner)), key=lambda i: inner[i], reverse=reverse)
-	lst.inner = [inner[i] for i in indices]
-	for d in dep:
-		d.inner = [d.inner[i] for i in indices]
-
-
-def sort_d(lst, *dep):
-	sort_a(lst, *dep, reverse=True)
-
-
-def fill(lst, x):
-	require_num(x)
-	if isinstance(lst, TiList):
-		for i in range(len(lst.inner)):
-			lst.inner[i] = x
-	elif isinstance(lst, TiMatrix):
-		for row in lst.inner:
-			for i in range(len(row)):
-				row[i] = x
-	else:
-		raise ValueError(f"fill: expected list or matrix, got {type(lst).__name__}")
 
 
 # ── Converters (►DMS, ►Dec, ►Frac) ─────────────────────────────────────────────
@@ -306,7 +288,6 @@ def to_dec(x):
 	return require_real(x)
 
 def to_frac(x):
-	from fractions import Fraction
 	x = require_real(x)
 	f = Fraction(x).limit_denominator(10000)
 	return float(f) if f.denominator == 1 else f"{f.numerator}/{f.denominator}"
@@ -314,8 +295,8 @@ def to_frac(x):
 
 # ── String functions ────────────────────────────────────────────────────────────
 
-def in_string(value, substring, start=1):
-	v = require_str(value).tokens
+def in_string(string, substring, start=1):
+	v = require_str(string).tokens
 	s = require_str(substring).tokens
 	start = require_int(start) - 1
 	for i in range(start, len(v) - len(s) + 1):
@@ -324,22 +305,24 @@ def in_string(value, substring, start=1):
 	return 0
 
 
-def length(value):
-	return len(require_str(value))
+def length(string):
+	return len(require_str(string))
 
 
-# TODO: move to forms
-def sub_string(value, start=None, length=None):
-	if isinstance(value, Number) and start is None and length is None:
-		return value / 100
-	require_str(value)
-	start = require_int(start)
-	length = require_int(length)
-	if length < 1:
-		raise ValueError(f"sub: length must be ≥ 1, got {length}")
-	if not (1 <= start <= len(value) - length + 1):
-		raise ValueError(f"sub: index out of range")
-	return TiString(value.tokens[start - 1 : start - 1 + length])
+def sub_string(*args):
+	if len(args) == 1:
+		return require_number(args[0]) / 100
+	if len(args) == 3:
+		string, start, lenth = args
+		require_str(string)
+		start = require_int(start)
+		length = require_int(length)
+		if length < 1:
+			raise ValueError(f"sub: length must be ≥ 1, got {length}")
+		if not (1 <= start <= len(string) - length + 1):
+			raise ValueError(f"sub: index out of range")
+		return TiString(string.tokens[start - 1 : start - 1 + length])
+	raise ValueError(f"Invalid arguments: {args}")
 
 # ── Aggregate / statistics ───────────────────────────────────────────────────────
 
@@ -677,42 +660,6 @@ def p_ry(r, theta):
 	return require_real(r) * math.sin(require_real(theta))
 
 
-# ── Matrix/list conversions ──────────────────────────────────────────────────
-
-def matr_list(mat, *args):
-	"""matr_list(mat, list1, list2, ...) or matr_list(mat, col_num, list)"""
-	require_matrix(mat)
-	if len(args) == 2 and isinstance(args[0], (int, float)):
-		# Single-column extraction: matr_list(mat, col#, list_var)
-		col = require_int(args[0])
-		if not (1 <= col <= mat.cols):
-			raise ValueError(f"matr_list: column {col} out of range")
-		target = args[1]
-		require_list(target)
-		target.inner = [mat.inner[r][col - 1] for r in range(mat.rows)]
-		return
-	# Store successive columns into the provided lists
-	for i, lst in enumerate(args):
-		if i >= mat.cols:
-			break
-		require_list(lst)
-		lst.inner = [mat.inner[r][i] for r in range(mat.rows)]
-
-
-def list_matr(mat, *lists):
-	"""list_matr(list1, list2, ..., mat) — the last arg is the matrix variable."""
-	# Note: in TI-BASIC, List►matr(list1,...,mat) stores to mat
-	require_matrix(mat)
-	if not lists:
-		raise ValueError("list_matr: need at least one list")
-	cols = len(lists)
-	max_rows = builtins.max(len(require_list(lst)) for lst in lists)
-	mat.inner = [
-		[lists[c].inner[r] if r < len(lists[c]) else 0.0 for c in range(cols)]
-		for r in range(max_rows)
-	]
-
-
 # ── randM / randBin ──────────────────────────────────────────────────────────
 
 def rand_m(rows, cols):
@@ -902,6 +849,7 @@ def invt(p, df):
 	for _ in range(50):
 		fx = tcdf(-1e99, x, df) - p
 		fpx = tpdf(x, df)
+		# TODO: calculator doesn't go below 1e-99
 		if builtins.abs(fpx) < 1e-300:
 			break
 		dx = fx / fpx

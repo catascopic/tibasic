@@ -266,3 +266,47 @@ def list_to_matr(a: ArgParser) -> None:
 		[list_vals[c].inner[r] if r < len(list_vals[c]) else 0 for c in range(cols)]
 		for r in range(rows)
 	]))
+
+
+# ── Sorting / filling ────────────────────────────────────────────────────────────
+
+# THESE ARE COMMANDS, NOT FUNCTIONS!
+
+def _sort(a: ArgParser, reverse: bool):
+	main = a.list_var().get(a.env)
+	deps = []
+	while a.has_next_arg():
+		deps.append(a.list_var().get(a.env))
+	a.end()
+	if not deps:
+		sort(main, reverse=reverse)
+	else:
+		data = main.inner
+		indices = sorted(range(len(data)), key=lambda i: data[i], reverse=reverse)
+		lst.inner = [data[i] for i in indices]
+		for d in deps:
+			d.inner = [d.inner[i] for i in indices]
+
+
+def sort_a(a: ArgParser):
+	_sort(a, True)
+
+
+def sort_d(a: ArgParser):
+	_sort(a, False)
+
+
+def fill(a: ArgParser):
+	# TODO: implement this method
+	var = a.list_or_mat_var().get(a.env)
+	x = require_real(a.expr())
+	a.end()
+	if isinstance(lst, TiList):
+		for i in range(len(lst.inner)):
+			lst.inner[i] = x
+	elif isinstance(lst, TiMatrix):
+		for row in lst.inner:
+			for i in range(len(row)):
+				row[i] = x
+	else:
+		raise ValueError(f"fill: expected list or matrix, got {type(lst).__name__}")

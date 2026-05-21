@@ -5,22 +5,32 @@ import math, itertools
 from environment import (
     Environment, Variable, NumericVar, ListVar, MatrixVar, StringVar, StatVar, WindowVar,
 )
-import purefunctions
+import purefunctions as pf
 import forms
 
-@dataclass(eq=False)
+
+
+@dataclass(slots=True, eq=False)
 class Token:
     code: bytes
     text: str
-    bp: tuple | None = None # (left_bp, right_bp) for binary operators
-    binary_op: Any = None   # (lhs, rhs) -> value
-    unary_op: Any = None    # (operand) -> value  (prefix or postfix)
-    postfix: bool = False   # True for postfix unary operators
-    func: Any = None        # (ArgParser) -> value  for function tokens
-    cmd: Any = None         # (ArgParser) -> None  for command tokens
-    variable: Any = None    # Variable instance for storable typed variables
-    nullary: Any = None     # (env) -> value  for read-only computed constants
-    converter: Any = None   # (value) -> value  for ►DMS, ►Dec, ►Frac etc.
+    bp: tuple[int, int] | None = None  # (left_bp, right_bp) for binary operators
+    operator:  Callable | None = None  # (lhs, rhs) -> value
+    postfix:   Callable | None = None  # (operand) -> value  (prefix or postfix)
+    function:  Callable | None = None  # (ArgParser) -> value  for function tokens
+    command:   Callable | None = None  # (ArgParser) -> None  for command tokens
+    nullary:   Callable | None = None  # (env) -> value  for read-only computed constants
+    converter: Callable | None = None  # (value) -> value  for ►DMS, ►Dec, ►Frac and others
+    variable:  Callable | None = None  # Variable instance for storable typed variables
+	
+	# TiValue = Number | TiList | TiMatrix | TiString
+	# operator:  Callable[[TiValue, TiValue], TiValue] | None = None
+    # postfix:   Callable[[TiValue], TiValue] | None = None
+    # function:  Callable[[ArgParser], TiValue] | None = None
+    # command:   Callable[[ArgParser], TiValue] | None = None
+    # nullary:   Callable[[], TiValue] | None = None
+    # converter: Callable[[TiValue], TiValue] | None = None
+	# atom: bool = False
 
     # ── Token type predicates ──────────────────────────────────────────────────
 
@@ -56,7 +66,7 @@ class Token:
             self.is_digit()
             or self.variable is not None
             or self.nullary is not None
-            or self.func is not None
+            or self.function is not None
             or self in {DOT, L_PAREN, L_BRACE, L_BRACKET, QUOTE, NEG, LIST_PREFIX}
         )
     
@@ -95,15 +105,14 @@ def token(
     text: str,
     *,
     bp: tuple[int, int] | None = None,
-    binary_op=None,
-    unary_op=None,
-    postfix: bool = False,
-    func: Callable | None = None,
+    operator:  Callable | None = None,
+    postfix:   Callable | None = None,
+    func:      Callable | None = None,
     pure_func: Callable | None = None,
-    cmd: Callable | None = None,
-    variable: Variable | None = None,
-    nullary: Callable | None = None,
+    cmd:       Callable | None = None,
+    nullary:   Callable | None = None,
     converter: Callable | None = None,
+    variable:  Variable | None = None,
 ) -> Token:
 
     if code in _SEEN:
@@ -116,10 +125,7 @@ def token(
     if variable is None and nullary is None:
         variable = _make_variable(code)
 
-    return Token(
-        code, text,
-        bp, binary_op, unary_op, postfix, func, cmd, variable, nullary, converter,
-    )
+    return Token(code, text, bp, operator, postfix, func, cmd, variable, nullary, converter)
 
 
 # ── Named syntactic tokens (referenced by identity in the parser) ──────────────
@@ -139,47 +145,47 @@ COLON       = token(b'\x3e', ':')
 NEWLINE     = token(b'\x3f', '\n')
 PRGM        = token(b'\x5f', 'prgm')
 ANS         = token(b'\x72', 'Ans', nullary=Environment.get_ans, func=forms.ans_index_or_mul)
-NEG         = token(b'\xb0', '−', unary_op=purefunctions.neg)
-DIM         = token(b'\xb5', 'dim(', pure_func=purefunctions.dim)
+NEG         = token(b'\xb0', '−')
+DIM         = token(b'\xb5', 'dim(', pure_func=pf.dim)
 LIST_PREFIX = token(b'\xeb', '∟')
 
 # Postfix operators
-RAD       = token(b'\x0a', 'ʳ', postfix=True, unary_op=lambda x: x)
-DEG       = token(b'\x0b', '°', postfix=True, unary_op=math.radians)
-INV       = token(b'\x0c', '⁻¹', postfix=True, unary_op=purefunctions.inv)
-SQ        = token(b'\x0d', '²', postfix=True, unary_op=lambda x: purefunctions.pow_(x, 2))
-TRANSPOSE = token(b'\x0e', 'ᵀ', postfix=True, unary_op=purefunctions.transpose)
-CUBE      = token(b'\x0f', '³', postfix=True, unary_op=lambda x: purefunctions.pow_(x, 3))
-FACT      = token(b'\x2d', '!', postfix=True, unary_op=purefunctions.factorial)
+RAD       = token(b'\x0a', 'ʳ',	postfix=lambda x: x)
+DEG       = token(b'\x0b', '°',	postfix=math.radians)
+INV       = token(b'\x0c', '⁻¹',	postfix=pf.inv)
+SQ        = token(b'\x0d', '²',	postfix=lambda x: pf.pow(x, 2))
+TRANSPOSE = token(b'\x0e', 'ᵀ',	postfix=pf.transpose)
+CUBE      = token(b'\x0f', '³',	postfix=lambda x: pf.pow(x, 3))
+FACT      = token(b'\x2d', '!',	postfix=pf.factorial)
 
 # Binary operators
-SCI_E = token(b'\x3b', 'ᴇ', bp=(65, 66), binary_op=lambda a, b: purefunctions.mul(a, 10 ** b))
-OR    = token(b'\x3c', ' or ',  bp=(20, 21), binary_op=purefunctions.or_)
-XOR   = token(b'\x3d', ' xor ', bp=(20, 21), binary_op=purefunctions.xor)
-AND   = token(b'\x40', ' and ', bp=(30, 31), binary_op=purefunctions.and_)
-EQ    = token(b'\x6a', '=', bp=(40, 41), binary_op=purefunctions.eq)
-LT    = token(b'\x6b', '<', bp=(40, 41), binary_op=purefunctions.lt)
-GT    = token(b'\x6c', '>', bp=(40, 41), binary_op=purefunctions.gt)
-LE    = token(b'\x6d', '≤', bp=(40, 41), binary_op=purefunctions.le)
-GE    = token(b'\x6e', '≥', bp=(40, 41), binary_op=purefunctions.ge)
-NE    = token(b'\x6f', '≠', bp=(40, 41), binary_op=purefunctions.ne)
-ADD   = token(b'\x70', '+', bp=(50, 51), binary_op=purefunctions.add)
-SUB   = token(b'\x71', '-', bp=(50, 51), binary_op=purefunctions.sub)
-MUL   = token(b'\x82', '*', bp=(60, 61), binary_op=purefunctions.mul)
-DIV   = token(b'\x83', '/', bp=(60, 61), binary_op=purefunctions.div)
-NPR   = token(b'\x94', 'nPr', bp=(60, 61), binary_op=purefunctions.npr)
-NCR   = token(b'\x95', 'nCr', bp=(60, 61), binary_op=purefunctions.ncr)
-RAND  = token(b'\xab', 'rand', nullary=Environment.rand, pure_func=purefunctions.rand_list)
-POW   = token(b'\xf0', '^', bp=(70, 69), binary_op=purefunctions.pow)
-XROOT = token(b'\xf1', '×√', bp=(60, 61), binary_op=lambda a, b: purefunctions.xth_root(b, a))
+SCI_E = token(b'\x3b', 'ᴇ',     bp=(65, 66), operator=lambda a, b: pf.mul(a, 10 ** b))
+OR    = token(b'\x3c', ' or ',  bp=(20, 21), operator=pf.or_)
+XOR   = token(b'\x3d', ' xor ', bp=(20, 21), operator=pf.xor)
+AND   = token(b'\x40', ' and ', bp=(30, 31), operator=pf.and_)
+EQ    = token(b'\x6a', '=',     bp=(40, 41), operator=pf.eq)
+LT    = token(b'\x6b', '<',     bp=(40, 41), operator=pf.lt)
+GT    = token(b'\x6c', '>',     bp=(40, 41), operator=pf.gt)
+LE    = token(b'\x6d', '≤',     bp=(40, 41), operator=pf.le)
+GE    = token(b'\x6e', '≥',     bp=(40, 41), operator=pf.ge)
+NE    = token(b'\x6f', '≠',     bp=(40, 41), operator=pf.ne)
+ADD   = token(b'\x70', '+',     bp=(50, 51), operator=pf.add)
+SUB   = token(b'\x71', '-',     bp=(50, 51), operator=pf.sub)
+MUL   = token(b'\x82', '*',     bp=(60, 61), operator=pf.mul)
+DIV   = token(b'\x83', '/',     bp=(60, 61), operator=pf.div)
+NPR   = token(b'\x94', 'nPr',   bp=(60, 61), operator=pf.npr)
+NCR   = token(b'\x95', 'nCr',   bp=(60, 61), operator=pf.ncr)
+RAND  = token(b'\xab', 'rand', nullary=Environment.rand, pure_func=pf.rand_list)
+POW   = token(b'\xf0', '^',     bp=(70, 69), operator=pf.pow)
+XROOT = token(b'\xf1', '×√',    bp=(60, 61), operator=pf.xth_root)
 
 # ── Token list ─────────────────────────────────────────────────────────────────
 
 TOKENS: list[Token] = [
     # One-byte tokens
-    token(b'\x01', '►DMS',  converter=purefunctions.to_dms),
-    token(b'\x02', '►Dec',  converter=purefunctions.to_dec),
-    token(b'\x03', '►Frac', converter=purefunctions.to_frac),
+    token(b'\x01', '►DMS',  converter=pf.to_dms),
+    token(b'\x02', '►Dec',  converter=pf.to_dec),
+    token(b'\x03', '►Frac', converter=pf.to_frac),
     STORE,
     token(b'\x05', 'Boxplot'),
     L_BRACKET,
@@ -194,22 +200,22 @@ TOKENS: list[Token] = [
     CUBE,
     L_PAREN,
     R_PAREN,
-    token(b'\x12', 'round(',   pure_func=purefunctions.round),
+    token(b'\x12', 'round(',   pure_func=pf.round),
     token(b'\x13', 'pxl-Test('),
     token(b'\x14', 'augment('),
     token(b'\x15', 'rowSwap('),
     token(b'\x16', 'row+('),
     token(b'\x17', '*row('),
     token(b'\x18', '*row+('),
-    token(b'\x19', 'max(',    pure_func=purefunctions.max),
-    token(b'\x1a', 'min(',    pure_func=purefunctions.min),
+    token(b'\x19', 'max(',    pure_func=pf.max),
+    token(b'\x1a', 'min(',    pure_func=pf.min),
     token(b'\x1b', 'R►Pr('),
     token(b'\x1c', 'R►Pθ('),
     token(b'\x1d', 'P►Rx('),
     token(b'\x1e', 'P►Ry('),
-    token(b'\x1f', 'median(', pure_func=purefunctions.median),
-    token(b'\x20', 'randM(', pure_func=purefunctions.rand_m),
-    token(b'\x21', 'mean(',   pure_func=purefunctions.mean),
+    token(b'\x1f', 'median(', pure_func=pf.median),
+    token(b'\x20', 'randM(', pure_func=pf.rand_m),
+    token(b'\x21', 'mean(',   pure_func=pf.mean),
     token(b'\x22', 'solve('),
     token(b'\x23', 'seq(',    func=forms.seq),
     token(b'\x24', 'fnInt(',  func=forms.fnint),
@@ -302,42 +308,42 @@ TOKENS: list[Token] = [
     token(b'\xa5', 'Circle('),
     token(b'\xa6', 'Horizontal '),
     token(b'\xa7', 'Tangent('),
-    token(b'\xa8', 'DrawInv'),
-    token(b'\xa9', 'DrawF'),
+    token(b'\xa8', 'DrawInv '),
+    token(b'\xa9', 'DrawF '),
     RAND,
     token(b'\xac', 'π', nullary=lambda env: math.pi),
     token(b'\xad', 'getKey', nullary=Environment.get_key),
     token(b'\xae', "'"),
     token(b'\xaf', '?'),
     NEG,
-    token(b'\xb1', 'int(',    pure_func=purefunctions.int_),
-    token(b'\xb2', 'abs(',    pure_func=purefunctions.abs),
-    token(b'\xb3', 'det(',    pure_func=purefunctions.det),
-    token(b'\xb4', 'identity(', pure_func=purefunctions.identity),
+    token(b'\xb1', 'int(',		pure_func=pf.int_),
+    token(b'\xb2', 'abs(',		pure_func=pf.abs),
+    token(b'\xb3', 'det(',		pure_func=pf.det),
+    token(b'\xb4', 'identity(',	pure_func=pf.identity),
     DIM,
-    token(b'\xb6', 'sum(',    pure_func=purefunctions.sum),
-    token(b'\xb7', 'prod(',   pure_func=purefunctions.prod),
-    token(b'\xb8', 'not(',    pure_func=purefunctions.not_),
-    token(b'\xb9', 'iPart(',  pure_func=purefunctions.i_part),
-    token(b'\xba', 'fPart(',  pure_func=purefunctions.f_part),
-    token(b'\xbc', '√(', pure_func=purefunctions.sqrt),
-    token(b'\xbd', '³√(',   pure_func=purefunctions.cbrt),
-    token(b'\xbe', 'ln(',     pure_func=purefunctions.ln),
-    token(b'\xbf', 'e^(',     pure_func=purefunctions.exp),
-    token(b'\xc0', 'log(',    pure_func=purefunctions.log),
-    token(b'\xc1', '10^(',    pure_func=purefunctions.pow10),
-    token(b'\xc2', 'sin(',    pure_func=purefunctions.sin),
-    token(b'\xc3', 'sin⁻¹(',  pure_func=purefunctions.asin),
-    token(b'\xc4', 'cos(',    pure_func=purefunctions.cos),
-    token(b'\xc5', 'cos⁻¹(',  pure_func=purefunctions.acos),
-    token(b'\xc6', 'tan(',    pure_func=purefunctions.tan),
-    token(b'\xc7', 'tan⁻¹(',  pure_func=purefunctions.atan),
-    token(b'\xc8', 'sinh(',   pure_func=purefunctions.sinh),
-    token(b'\xc9', 'sinh⁻¹(', pure_func=purefunctions.asinh),
-    token(b'\xca', 'cosh(',   pure_func=purefunctions.cosh),
-    token(b'\xcb', 'cosh⁻¹(', pure_func=purefunctions.acosh),
-    token(b'\xcc', 'tanh(',   pure_func=purefunctions.tanh),
-    token(b'\xcd', 'tanh⁻¹(', pure_func=purefunctions.atanh),
+    token(b'\xb6', 'sum(',		pure_func=pf.sum),
+    token(b'\xb7', 'prod(',		pure_func=pf.prod),
+    token(b'\xb8', 'not(',		pure_func=pf.not_),
+    token(b'\xb9', 'iPart(',	pure_func=pf.i_part),
+    token(b'\xba', 'fPart(',	pure_func=pf.f_part),
+    token(b'\xbc', '√(',		pure_func=pf.sqrt),
+    token(b'\xbd', '³√(',		pure_func=pf.cbrt),
+    token(b'\xbe', 'ln(',   	pure_func=pf.ln),
+    token(b'\xbf', 'e^(',   	pure_func=pf.exp),
+    token(b'\xc0', 'log(',  	pure_func=pf.log),
+    token(b'\xc1', '10^(',  	pure_func=pf.pow10),
+    token(b'\xc2', 'sin(',  	pure_func=pf.sin),
+    token(b'\xc3', 'sin⁻¹(',		pure_func=pf.asin),
+    token(b'\xc4', 'cos(',		pure_func=pf.cos),
+    token(b'\xc5', 'cos⁻¹(',		pure_func=pf.acos),
+    token(b'\xc6', 'tan(',		pure_func=pf.tan),
+    token(b'\xc7', 'tan⁻¹(',		pure_func=pf.atan),
+    token(b'\xc8', 'sinh(',		pure_func=pf.sinh),
+    token(b'\xc9', 'sinh⁻¹(',	pure_func=pf.asinh),
+    token(b'\xca', 'cosh(',		pure_func=pf.cosh),
+    token(b'\xcb', 'cosh⁻¹(',	pure_func=pf.acosh),
+    token(b'\xcc', 'tanh(',		pure_func=pf.tanh),
+    token(b'\xcd', 'tanh⁻¹(',	pure_func=pf.atanh),
     token(b'\xce', 'If '),
     token(b'\xcf', 'Then'),
     token(b'\xd0', 'Else'),
@@ -537,14 +543,14 @@ TOKENS: list[Token] = [
     token(b'\xbb\x05', '►Nom('),
     token(b'\xbb\x06', '►Eff('),
     token(b'\xbb\x07', 'dbd('),
-    token(b'\xbb\x08', 'lcm(',      pure_func=purefunctions.lcm),
-    token(b'\xbb\x09', 'gcd(',      pure_func=purefunctions.gcd),
-    token(b'\xbb\x0a', 'randInt(',  pure_func=purefunctions.randint),
-    token(b'\xbb\x0b', 'randBin(', pure_func=purefunctions.rand_bin),
-    token(b'\xbb\x0c', 'sub(',      pure_func=purefunctions.sub_string),
+    token(b'\xbb\x08', 'lcm(',      pure_func=pf.lcm),
+    token(b'\xbb\x09', 'gcd(',      pure_func=pf.gcd),
+    token(b'\xbb\x0a', 'randInt(',  pure_func=pf.randint),
+    token(b'\xbb\x0b', 'randBin(', pure_func=pf.rand_bin),
+    token(b'\xbb\x0c', 'sub(',      pure_func=pf.sub_string),
     token(b'\xbb\x0d', 'stdDev('),
     token(b'\xbb\x0e', 'variance('),
-    token(b'\xbb\x0f', 'inString(', pure_func=purefunctions.in_string),
+    token(b'\xbb\x0f', 'inString(', pure_func=pf.in_string),
     token(b'\xbb\x10', 'normalcdf('),
     token(b'\xbb\x11', 'invNorm('),
     token(b'\xbb\x12', 'tcdf('),
@@ -560,20 +566,20 @@ TOKENS: list[Token] = [
     token(b'\xbb\x1c', 'tpdf('),
     token(b'\xbb\x1d', 'χ²pdf('),
     token(b'\xbb\x1e', 'Fpdf('),
-    token(b'\xbb\x1f', 'randNorm(', pure_func=purefunctions.randnorm),
+    token(b'\xbb\x1f', 'randNorm(', pure_func=pf.randnorm),
     token(b'\xbb\x20', 'tvm_Pmt'),
     token(b'\xbb\x21', 'tvm_I%'),
     token(b'\xbb\x22', 'tvm_PV'),
     token(b'\xbb\x23', 'tvm_N'),
     token(b'\xbb\x24', 'tvm_FV'),
-    token(b'\xbb\x25', 'conj(',   pure_func=purefunctions.conj),
-    token(b'\xbb\x26', 'real(',   pure_func=purefunctions.real),
-    token(b'\xbb\x27', 'imag(',   pure_func=purefunctions.imag),
-    token(b'\xbb\x28', 'angle(',  pure_func=purefunctions.angle),
-    token(b'\xbb\x29', 'cumSum(', pure_func=purefunctions.cum_sum),
+    token(b'\xbb\x25', 'conj(',   pure_func=pf.conj),
+    token(b'\xbb\x26', 'real(',   pure_func=pf.real),
+    token(b'\xbb\x27', 'imag(',   pure_func=pf.imag),
+    token(b'\xbb\x28', 'angle(',  pure_func=pf.angle),
+    token(b'\xbb\x29', 'cumSum(', pure_func=pf.cum_sum),
     token(b'\xbb\x2a', 'expr('),
-    token(b'\xbb\x2b', 'length(', pure_func=purefunctions.length),
-    token(b'\xbb\x2c', 'ΔList(', pure_func=purefunctions.delta_list),
+    token(b'\xbb\x2b', 'length(', pure_func=pf.length),
+    token(b'\xbb\x2c', 'ΔList(', pure_func=pf.delta_list),
     token(b'\xbb\x2d', 'ref('),
     token(b'\xbb\x2e', 'rref('),
     token(b'\xbb\x2f', '►Rect'),
@@ -797,10 +803,10 @@ TOKENS: list[Token] = [
     token(b'\xef\x1e', '<mathprintbox>'),
     token(b'\xef\x30', '►n/d◄►Un/d'),
     token(b'\xef\x31', '►F◄►D'),
-    token(b'\xef\x32', 'remainder(',    pure_func=purefunctions.remainder),
+    token(b'\xef\x32', 'remainder(',    pure_func=pf.remainder),
     token(b'\xef\x33', 'Σ(', func=forms.sigma),
-    token(b'\xef\x34', 'logBASE(',      pure_func=purefunctions.logbase),
-    token(b'\xef\x35', 'randIntNoRep(', pure_func=purefunctions.randintnotrep),
+    token(b'\xef\x34', 'logBASE(',      pure_func=pf.logbase),
+    token(b'\xef\x35', 'randIntNoRep(', pure_func=pf.randintnotrep),
     token(b'\xef\x36', 'MATHPRINT'),
     token(b'\xef\x37', 'CLASSIC'),
     token(b'\xef\x38', 'n/d'),

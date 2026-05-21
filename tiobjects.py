@@ -7,9 +7,8 @@ class TiTypeError(Exception):
 	pass
 
 
-def _repr_num(value):
-	int_value = int(value)
-	return repr(int_value if int_value == value else value)
+def repr_num(value):
+	return repr(int(value) if value.is_integer() else value)
 
 
 # ── Guard functions ───────────────────────────────────────────────────────────────
@@ -30,10 +29,9 @@ def require_real(value):
 
 def require_int(value):
 	require_real(value)
-	int_value = int(value)
-	if value != int_value:
+	if not value.is_integer():
 		raise ValueError(f"Expected integer, got {value}")
-	return int_value
+	return int(value)
 
 def require_list(value):
 	return _require_type(value, TiList)
@@ -45,30 +43,8 @@ def require_str(value):
 	return _require_type(value, TiString)
 
 
-class TiString:
-	__slots__ = ('tokens',)
-
-	def __init__(self, tokens: list):
-		self.tokens = tokens
-
-	def __len__(self):
-		return len(self.tokens)
-
-	def __eq__(self, other):
-		if isinstance(other, TiString):
-			return len(self.tokens) == len(other.tokens) and all(
-				a.code == b.code for a, b in zip(self.tokens, other.tokens)
-			)
-		return NotImplemented
-
-	def __str__(self):
-		return ''.join(t.text for t in self.tokens)
-
-	def __repr__(self):
-		return '"' + str(self) + '"'
-
-
 class TiList:
+	__slots__ = ('inner',)
 
 	def __init__(self, data=None):
 		self.inner = [] if data is None else data
@@ -93,7 +69,7 @@ class TiList:
 		return iter(self.inner)
 
 	def __repr__(self):
-		return f"{{{','.join(_repr_num(i) for i in self)}}}"
+		return f"{{{','.join(repr_num(i) for i in self)}}}"
 
 	def set_dim(self, value):
 		new_dim = int(value)
@@ -118,6 +94,7 @@ def _check_valid_dim(rows, cols):
 
 
 class TiMatrix:
+	__slots__ = ('inner',)
 
 	def __init__(self, data=None):
 		self.inner = [] if data is None else data
@@ -149,9 +126,9 @@ class TiMatrix:
 		self.inner[int(row_index) - 1][int(col_index) - 1] = value
 
 	def __repr__(self):
-		return '[' + ''.join('[' + ' '.join(_repr_num(x) for x in row) + ']' for row in self.inner) + ']'
-		# widths = [max(len(_repr_num(row[c])) for row in self.inner) for c in range(len(self.inner[0]))]
-		# return f"[{'\n'.join([f"[{' '.join(f'{_repr_num(x):{widths[c]}}' for c, x in enumerate(row))}]" for row in self.inner])}]"
+		return '[' + ''.join('[' + ' '.join(repr_num(x) for x in row) + ']' for row in self.inner) + ']'
+		# widths = [max(len(repr_num(row[c])) for row in self.inner) for c in range(len(self.inner[0]))]
+		# return f"[{'\n'.join([f"[{' '.join(f'{repr_num(x):{widths[c]}}' for c, x in enumerate(row))}]" for row in self.inner])}]"
 
 	def set_dim(self, dim_list: TiList):
 		new_rows, new_cols = _check_valid_dim(*dim_list.inner)
@@ -208,3 +185,24 @@ class TiMatrix:
 
 	def copy(self):
 		return TiMatrix([row.copy() for row in self.inner])
+
+
+class TiString:
+	__slots__ = ('tokens',)
+
+	def __init__(self, tokens: list['Token']):
+		self.tokens = tokens
+
+	def __len__(self):
+		return len(self.tokens)
+
+	def __eq__(self, other):
+		if isinstance(other, TiString):
+			return self.tokens == other.tokens
+		return NotImplemented
+
+	def __str__(self):
+		return ''.join(t.text for t in self.tokens)
+
+	def __repr__(self):
+		return '"' + str(self) + '"'
