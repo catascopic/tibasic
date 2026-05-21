@@ -271,14 +271,6 @@ class TiMatrix:
 		# return f"[{'\n'.join([f"[{' '.join(f'{repr_num(x):{widths[c]}}' for c, x in enumerate(row))}]" for row in self.inner])}]"
 
 
-def _make_mat_op(op):
-	def list_op(self, other):
-		if isinstance(other, TiMatrix):
-			return TiMatrix([op(a, b) for a, b in zip(self, other, strict=True)])
-		return TiMatrix([op(a) for a in self.inner])
-	return list_op
-
-
 class TiString:
 	__slots__ = ('tokens',)
 
