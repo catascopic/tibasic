@@ -7,7 +7,7 @@ from tokens import (
 	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, ANS, NEG, LIST_PREFIX,
 	RAND, DIM, SCI_E
 )
-from environment import Environment, Variable, UserListVar
+from environment import Environment, Variable, UserListVar, NumericVar
 from forms import ArgParser
 
 class ParseError(Exception):
@@ -276,6 +276,10 @@ class Parser:
 	# ── Store target parser ────────────────────────────────────────────────────
 
 	def parse_store(self, value):
+		if self.peek().is_numeric_var() and isinstance(value, TiList):
+			self.env.user_lists[self._read_name()] = value
+			return
+				
 		t = self.advance()
 
 		if t.is_list_var():
@@ -300,9 +304,6 @@ class Parser:
 		elif t is RAND:
 			self.env.set_random_seed(value)
 		
-		elif t.is_numeric_var() and isinstance(value, TiList):
-			# TODO
-
 		elif t.variable is not None:
 			t.variable.set(self.env, value)
 
@@ -421,7 +422,7 @@ if __name__ == '__main__':
 		print(env.ans)
 
 	# test('{5,5',STORE,'&dim(',(0x5C,0))
-	test('{5',STORE,'A')
+	test('{5',STORE,LIST_PREFIX,'AB')
 	# test(0,STORE,'&dim(',(0x5D,0))
 	# test('[[1,2,[',STORE,(0x5C,0))
 	# test('[[1,2.5],[π,4]]')
