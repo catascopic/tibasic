@@ -70,11 +70,15 @@ class ArgParser:
 
 	@_parse_method
 	def list_var(self) -> Variable:
-		return self._parser.parse_list_var_key()
+		return self._parser.parse_list_var()
 
 	@_parse_method
 	def matrix_var(self) -> Variable:
-		return self._parser.parse_matrix_var_key()
+		return self._parser.parse_matrix_var()
+
+	@_parse_method
+	def var(self) -> Variable:
+		return self._parser.parse_any_var()
 
 	def end(self):
 		self._parser.eat_if_rparen()
@@ -158,7 +162,7 @@ def sigma(a: ArgParser) -> float:
 	return total
 
 
-def nderiv(a: ArgParser) -> float:
+def n_deriv(a: ArgParser) -> float:
 	formula = a.thunk()
 	var = a.real_var()
 	val = a.expr()
@@ -214,7 +218,7 @@ def _adaptive_gk15(f, lo, hi, tol, depth=0):
 	)
 
 
-def fnint(a: ArgParser) -> float:
+def fn_int(a: ArgParser) -> float:
 	formula = a.thunk()
 	var = a.real_var()
 	lo = a.expr()
@@ -297,8 +301,7 @@ def sort_d(a: ArgParser):
 
 
 def fill(a: ArgParser):
-	# TODO: implement this method
-	var = a.list_or_mat_var().get(a.env)
+	var = a.var().get(a.env)
 	x = require_real(a.expr())
 	a.end()
 	if isinstance(lst, TiList):

@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import purefunctions
 from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
 	Token, EOF_TOKEN,
@@ -151,7 +150,7 @@ class Parser:
 				break
 			out.append(t)
 			self.pos += 1
-			if t.func is not None or t is L_PAREN:
+			if t.function is not None or t is L_PAREN:
 				self._capture_subgroup(out)
 				if self.pos < len(self.tokens) and self.tokens[self.pos] is R_PAREN:
 					out.append(self.tokens[self.pos])
@@ -210,23 +209,23 @@ class Parser:
 			return val
 
 		if t is NEG:
-			# special case, this is the only prefix unary operator
-			return purefunctions.neg(self.parse_expr(65))
+			# special case: this is the only prefix unary operator
+			return -self.parse_expr(65)
 
 		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ10 = 10^10)
 		if t is SCI_E:
-			return SCI_E.operator(1.0, self.parse_expr(SCI_E.bp[1]))
+			return SCI_E.operator(1, self.parse_expr(SCI_E.bp[1]))
 
 		# Nullary constants (π, e, rand, Ans, getDate, etc.)
-		# Checked before func so tokens with both can dispatch on whether ( follows.
+		# Checked before function so tokens with both can dispatch on whether ( follows.
 		if t.nullary is not None:
-			if self.peek() is L_PAREN and t.func is not None:
-				self.advance()  # consume (
-				return t.func(ArgParser(self))
+			if self.peek() is L_PAREN and t.function is not None:
+				self.advance()
+				return t.function(ArgParser(self))
 			return t.nullary(self.env)
 
-		if t.func is not None:
-			return t.func(ArgParser(self))
+		if t.function is not None:
+			return t.function(ArgParser(self))
 
 		if t.is_list_var():
 			return self.parse_list_atom(t.variable)
@@ -289,7 +288,7 @@ class Parser:
 			if t.can_start_atom():
 				if 60 <= min_bp:
 					break
-				lhs = purefunctions.mul(lhs, self.parse_expr(61))
+				lhs = lhs * self.parse_expr(61)
 				continue
 
 			break
@@ -311,9 +310,6 @@ class Parser:
 		elif t is LIST_PREFIX:
 			self.parse_store_list(UserListVar(self._read_name()), value)
 
-		elif t is DIM:
-			self.parse_store_dim(value)
-
 		elif t.is_matrix_var():
 			if self.eat_if(L_PAREN):
 				mat = t.variable.get(self.env)
@@ -323,12 +319,15 @@ class Parser:
 				self.eat_if(R_PAREN)
 			else:
 				t.variable.set(self.env, value)
-
-		elif t is RAND:
-			self.env.set_random_seed(value)
 		
 		elif t.variable is not None:
 			t.variable.set(self.env, value)
+
+		elif t is DIM:
+			self.parse_store_dim(value)
+			
+		elif t is RAND:
+			self.env.set_random_seed(value)
 
 		else:
 			raise ParseError(f"Invalid store target: {t}")
@@ -373,11 +372,19 @@ class Parser:
 			return UserListVar(self._read_name())
 		raise ParseError(f"Expected a list variable, got {t.text!r}")
 
-	def parse_matrix_var_key(self) -> Variable:
+	def parse_matrix_var(self) -> Variable:
 		t = self.advance()
 		if t.is_matrix_var():
 			return t.variable
 		raise ParseError(f"Expected a matrix variable, got {t.text!r}")
+	
+	def parse_any_var(self) -> Variable:
+		t = self.advance()
+		if t is LIST_PREFIX:
+			return UserListVar(self._read_name())
+		if t.variable:
+			return t.variable
+		raise ParseError(f"Expected a list variable, got {t.text!r}")
 
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 
@@ -446,7 +453,7 @@ if __name__ == '__main__':
 		print(env.ans)
 
 	# test('&length(', '"', '& or ')
-	test('"ABC"≠"EBC"')
+	# test('{1,2,3}',SCI_E,'{1,2,3}')
 	# test('[[2','&dim(','{1,2,3]')
 	# test('&rand', '(5')
 	# test('[[1:[[','&Ans','(1,1')
@@ -458,4 +465,4 @@ if __name__ == '__main__':
 	# test('&randM(','3,4')
 	# test('&Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
-	# print(env.matrices)
+	print(env.numerics)

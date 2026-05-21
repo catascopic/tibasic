@@ -5,8 +5,6 @@ from pathlib import Path
 from tokens import Token, TOKENS, TOKEN_TABLE
 
 
-SIGNATURE = b'**TI83F*'
-# TODO: b'**TI83**' and b'**TI82**' might also be valid
 _TWO_BYTE_PREFIXES = {t.code[0] for t in TOKENS if len(t.code) == 2}
 
 
@@ -30,8 +28,9 @@ class TiProgram:
 
 def read(file) -> TiProgram:
 	with open(file, 'rb') as f:
-		if f.read(8) != SIGNATURE:
-			raise ValueError(f"{file}: not a TI-83/84 variable file")
+		signature = f.read(8)
+		if not signature.startswith(b'**TI8'):  # could be 82, 83, 83F
+			raise ValueError(f"{file}: Invalid .8xp signature: {signature}")
 
 		f.seek(3, 1)  # skip 1a 0a 00
 		comment = f.read(42).rstrip(b'\x00 ').decode('ascii', errors='replace')
@@ -53,7 +52,7 @@ def read(file) -> TiProgram:
 		name     = name,
 		tokens   = tokens,
 		comment  = comment,
-		archived = archived == 0x80,
+		archived = bool(archived & 0x80),
 		locked   = file_type == 0x06,
 	)
 
@@ -66,7 +65,7 @@ def write(file, prog: TiProgram) -> None:
 	data_len   = len(program) + 2  # +2 for the prog_len prefix inside var data
 
 	var_entry = (
-		b'\x0b\x00'                           # entry header type: 0x000D (includes version + flag)
+		b'\x0D\x00'                           # entry header type: 0x000D (includes version + flag)
 		+ data_len.to_bytes(2, 'little')      # length of var data
 		+ bytes([locked])                     # 0x05 = program, 0x06 = edit-locked
 		+ name_bytes                          # variable name, null-padded to 8 bytes
@@ -80,7 +79,7 @@ def write(file, prog: TiProgram) -> None:
 	comment_bytes = prog.comment.encode('ascii')[:42].ljust(42, b'\x00')
 	checksum  = sum(var_entry) & 0xFFFF
 	with open(file, 'wb') as f:
-		f.write(SIGNATURE)
+		f.write(b'**TI83F*')
 		f.write(b'\x1a\x0a\x00')
 		f.write(comment_bytes)
 		f.write(len(var_entry).to_bytes(2, 'little'))

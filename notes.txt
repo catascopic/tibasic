@@ -1,6 +1,17 @@
-DMS class that inherits Number
+DMS class that inherits Number, whose only difference is that it displays numbers in DMS mode.
+The DEG symbol converts a number from radians to degrees if the calculator is in radians mode
+You can also write a number in DMS, but it must be a numeric literal, like 180DEG30'3". No expressions are allowed as any of the terms, not even parentheses. However, the terms don't need to be whole numbers.
+Also, trig functions actually do need access to the environment so they can see what mode the calculator is in!
 
-Go back to magic methods on types!
+After realizing that I had to redo the eq/ne functions to handle strings, it made me realize that I should go back to my original strategy of using magic methods.
+TiList, TiMatrix, TiString: eq,ne,add
+TiList, TiMatrix: neg,mul,pow
+TiList: lt,gt,le,ge,sub,div
+
+In theory, the TiList-only methods could be handled with @vectorized, but I think it's easier to implement all the operators.
+
+Make a special VarArray subclass for numerics that stores None as the default, but sets to 0 when you try to access a variable with value None
+
 
 postfix should be a function
 

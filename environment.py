@@ -7,10 +7,11 @@ from tiobjects import TiList, TiMatrix, TiString, TiTypeError, require_num, requ
 
 class _VarArray:
 	"""Array-backed variable store with integer indexing."""
-	__slots__ = ('_data',)
+	__slots__ = ('_data','_formatter')
 
-	def __init__(self, size, default):
+	def __init__(self, size, default, formatter):
 		self._data = [default] * size
+		self._formatter = formatter
 
 	def __getitem__(self, idx: int):
 		return self._data[idx]
@@ -19,7 +20,7 @@ class _VarArray:
 		self._data[idx] = value
 
 	def __repr__(self):
-		return repr(self._data)
+		return ', '.join(f"{self._formatter(i)}={x}" for i, x in enumerate(self._data))
 
 
 # ── Variable hierarchy ────────────────────────────────────────────────────────────
@@ -126,13 +127,13 @@ class WindowVar(Variable):
 class Environment:
 
 	def __init__(self):
-		self.numerics   = _VarArray(27,   0)    # A–Z, θ
-		self.lists      = _VarArray(6,    None) # L1–L6
-		self.matrices   = _VarArray(10,   None) # [A]–[J]
-		self.strings    = _VarArray(10,   None) # Str0–9
-		self.stat       = _VarArray(0x3D, 0)    # stat vars
-		self.window     = _VarArray(0x37, 0)    # window vars
-		self.user_lists = {}                     # ∟NAME lists
+		self.numerics   = _VarArray(27,   0,    lambda n: chr(65+n) if n < 26 else 'θ') # A–Z, θ
+		self.lists      = _VarArray(6,    None, lambda n: f"L{n+1}")   # L1–L6
+		self.matrices   = _VarArray(10,   None, lambda n: f"[{chr(65+n)}]")  # [A]–[J]
+		self.strings    = _VarArray(10,   None, lambda n: f"Str{n+1}") # Str0–9
+		self.stat       = _VarArray(0x3D, 0   , repr)                  # stat vars
+		self.window     = _VarArray(0x37, 0   , repr)                  # window vars
+		self.user_lists = {}                                           # ∟NAME lists
 		self.ans        = 0
 		self.dt_fmt     = 1
 		self.tm_fmt     = 12

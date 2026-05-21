@@ -1,5 +1,6 @@
 ﻿from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+import operator as op
 from typing import Any
 import math, itertools
 from environment import (
@@ -125,7 +126,7 @@ def token(
     if variable is None and nullary is None:
         variable = _make_variable(code)
 
-    return Token(code, text, bp, operator, postfix, func, cmd, variable, nullary, converter)
+    return Token(code, text, bp, operator, postfix, func, cmd, nullary, converter, variable)
 
 
 # ── Named syntactic tokens (referenced by identity in the parser) ──────────────
@@ -159,24 +160,24 @@ CUBE      = token(b'\x0f', '³',	postfix=lambda x: pf.pow(x, 3))
 FACT      = token(b'\x2d', '!',	postfix=pf.factorial)
 
 # Binary operators
-SCI_E = token(b'\x3b', 'ᴇ',     bp=(65, 66), operator=lambda a, b: pf.mul(a, 10 ** b))
+SCI_E = token(b'\x3b', 'ᴇ',     bp=(65, 66), operator=lambda a, b: a * 10 ** b)
 OR    = token(b'\x3c', ' or ',  bp=(20, 21), operator=pf.or_)
 XOR   = token(b'\x3d', ' xor ', bp=(20, 21), operator=pf.xor)
 AND   = token(b'\x40', ' and ', bp=(30, 31), operator=pf.and_)
-EQ    = token(b'\x6a', '=',     bp=(40, 41), operator=pf.eq)
-LT    = token(b'\x6b', '<',     bp=(40, 41), operator=pf.lt)
-GT    = token(b'\x6c', '>',     bp=(40, 41), operator=pf.gt)
-LE    = token(b'\x6d', '≤',     bp=(40, 41), operator=pf.le)
-GE    = token(b'\x6e', '≥',     bp=(40, 41), operator=pf.ge)
-NE    = token(b'\x6f', '≠',     bp=(40, 41), operator=pf.ne)
-ADD   = token(b'\x70', '+',     bp=(50, 51), operator=pf.add)
-SUB   = token(b'\x71', '-',     bp=(50, 51), operator=pf.sub)
-MUL   = token(b'\x82', '*',     bp=(60, 61), operator=pf.mul)
-DIV   = token(b'\x83', '/',     bp=(60, 61), operator=pf.div)
+EQ    = token(b'\x6a', '=',     bp=(40, 41), operator=op.eq)
+LT    = token(b'\x6b', '<',     bp=(40, 41), operator=op.lt)
+GT    = token(b'\x6c', '>',     bp=(40, 41), operator=op.gt)
+LE    = token(b'\x6d', '≤',     bp=(40, 41), operator=op.le)
+GE    = token(b'\x6e', '≥',     bp=(40, 41), operator=op.ge)
+NE    = token(b'\x6f', '≠',     bp=(40, 41), operator=op.ne)
+ADD   = token(b'\x70', '+',     bp=(50, 51), operator=op.add)
+SUB   = token(b'\x71', '-',     bp=(50, 51), operator=op.sub)
+MUL   = token(b'\x82', '*',     bp=(60, 61), operator=op.mul)
+DIV   = token(b'\x83', '/',     bp=(60, 61), operator=op.truediv)
 NPR   = token(b'\x94', 'nPr',   bp=(60, 61), operator=pf.npr)
 NCR   = token(b'\x95', 'nCr',   bp=(60, 61), operator=pf.ncr)
 RAND  = token(b'\xab', 'rand', nullary=Environment.rand, pure_func=pf.rand_list)
-POW   = token(b'\xf0', '^',     bp=(70, 69), operator=pf.pow)
+POW   = token(b'\xf0', '^',     bp=(70, 69), operator=op.pow)
 XROOT = token(b'\xf1', '×√',    bp=(60, 61), operator=pf.xth_root)
 
 # ── Token list ─────────────────────────────────────────────────────────────────
@@ -218,8 +219,8 @@ TOKENS: list[Token] = [
     token(b'\x21', 'mean(',   pure_func=pf.mean),
     token(b'\x22', 'solve('),
     token(b'\x23', 'seq(',    func=forms.seq),
-    token(b'\x24', 'fnInt(',  func=forms.fnint),
-    token(b'\x25', 'nDeriv(', func=forms.nderiv),
+    token(b'\x24', 'fnInt(',  func=forms.fn_int),
+    token(b'\x25', 'nDeriv(', func=forms.n_deriv),
     token(b'\x27', 'fMin('),
     token(b'\x28', 'fMax('),
     token(b'\x29', ' '),
