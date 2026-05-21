@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from tiobjects import TiList, TiMatrix, require_num, require_real
+import purefunctions
+from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
@@ -29,6 +30,7 @@ class Parser:
 		self.tokens = tokens
 		self.pos = 0
 		self.env = env
+		self._struct_depth = 0
 
 	# ── Primitives ─────────────────────────────────────────────────────────────
 
@@ -68,6 +70,15 @@ class Parser:
 	def peek_is_rparen(self) -> bool:
 		return self.peek() is R_PAREN
 
+	def close_delimiter(self, expected: Token) -> None:
+		"""Consume expected closer, or implicitly close at statement boundaries.
+		Raises ParseError if a mismatched closing delimiter is found."""
+		if self.eat_if(expected):
+			return
+		t = self.peek()
+		if t is R_PAREN or t is R_BRACE or t is R_BRACKET:
+			raise ParseError(f"Mismatched delimiter: expected {expected.text!r}, got {t.text!r}")
+
 	# ── Sub-parsers ────────────────────────────────────────────────────────────
 
 	def parse_num_literal(self, first: Token) -> float:
@@ -82,26 +93,29 @@ class Parser:
 		except ValueError:
 			raise ParseError(f"Bad numeric literal: {num!r}")
 
-	def parse_string_literal(self) -> str:
+	def parse_string_literal(self) -> TiString:
 		"""Opening \" already consumed. Reads until the next \" or end of line."""
-		chars = []
+		tokens = []
 		while not self.at_end() and self.peek() is not QUOTE:
-			chars.append(self.advance().text)
+			tokens.append(self.advance())
 		self.eat_if(QUOTE)  # closing " is optional
-		return "".join(chars)
+		return TiString(tokens)
 
 	def parse_list_literal(self) -> TiList:
 		"""{ already consumed."""
+		self._struct_depth += 1
 		items = []
 		if not self.eat_if(R_BRACE):
 			items.append(self.parse_expr())
 			while self.eat_if(COMMA):
 				items.append(require_num(self.parse_expr()))
-			self.eat_if(R_BRACE)
+			self.close_delimiter(R_BRACE)
+		self._struct_depth -= 1
 		return TiList(items)
 
 	def parse_matrix_literal(self) -> TiMatrix:
 		"""Opening [ already consumed; reads one or more [row] blocks."""
+		self._struct_depth += 1
 		rows = []
 		while True:
 			self.expect(L_BRACKET)
@@ -115,8 +129,8 @@ class Parser:
 				break
 			if not self.eat_if(COMMA):
 				break
-
-		self.eat_if(R_BRACKET)
+		self._struct_depth -= 1
+		self.close_delimiter(R_BRACKET)
 		return TiMatrix(rows)
 
 	def parse_args(self) -> list:
@@ -183,12 +197,16 @@ class Parser:
 		if t is QUOTE:
 			return self.parse_string_literal()
 		if t is L_BRACE:
+			if self._struct_depth > 0:
+				raise ParseError("List literal not allowed inside a list or matrix")
 			return self.parse_list_literal()
 		if t is L_BRACKET:
+			if self._struct_depth > 0:
+				raise ParseError("Matrix literal not allowed inside a list or matrix")
 			return self.parse_matrix_literal()
 		if t is L_PAREN:
 			val = self.parse_expr()
-			self.eat_if(R_PAREN)
+			self.close_delimiter(R_PAREN)
 			return val
 
 		if t is NEG:
@@ -198,12 +216,16 @@ class Parser:
 		if t is SCI_E:
 			return SCI_E.binary_op(1.0, self.parse_expr(SCI_E.bp[1]))
 
+		# Nullary constants (π, e, rand, Ans, getDate, etc.)
+		# Checked before func so tokens with both can dispatch on whether ( follows.
+		if t.nullary is not None:
+			if self.peek() is L_PAREN and t.func is not None:
+				self.advance()  # consume (
+				return t.func(ArgParser(self))
+			return t.nullary(self.env)
+
 		if t.func is not None:
 			return t.func(ArgParser(self))
-			
-		# Nullary constants (π, e, rand, Ans, getDate, etc.)
-		if t.nullary is not None:
-			return t.nullary(self.env)
 
 		if t.is_list_var():
 			return self.parse_list_atom(t.variable)
@@ -227,8 +249,8 @@ class Parser:
 		val = var.get(self.env)
 		if self.eat_if(L_PAREN):
 			val = val[self.parse_expr()]
-			self.eat_if(R_PAREN)
-		return lst
+			self.close_delimiter(R_PAREN)
+		return val
 
 	def parse_row_col(self):
 		row = self.parse_expr()
@@ -279,7 +301,7 @@ class Parser:
 		if self.peek().is_numeric_var() and isinstance(value, TiList):
 			self.env.user_lists[self._read_name()] = value
 			return
-	
+				
 		t = self.advance()
 
 		if t.is_list_var():
@@ -303,7 +325,7 @@ class Parser:
 
 		elif t is RAND:
 			self.env.set_random_seed(value)
-
+		
 		elif t.variable is not None:
 			t.variable.set(self.env, value)
 
@@ -328,14 +350,14 @@ class Parser:
 			lst = var.get(self.env)
 			if lst is None:
 				lst = TiList([])
-				var.set(env, lst)
+				var.set(self.env, lst)
 			lst.set_dim(value)
 		elif t.is_matrix_var():
 			self.advance()
 			mat = t.variable.get(self.env)
 			if mat is None:
 				mat = TiMatrix([])
-				t.variable.set(env, mat)
+				t.variable.set(self.env, mat)
 			mat.set_dim(value)
 		else:
 			raise ParseError(f"Invalid store-to-dim target: {t}")
@@ -359,32 +381,36 @@ class Parser:
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 
 	def parse_statement(self):
-		if self.at_end():
-			return
+		while True:
+			if self.at_end():
+				return
 
-		t = self.peek()
+			t = self.peek()
 
-		# prgm subprogram call
-		if t is PRGM:
-			self.advance()
-			name = self._read_name()
-			val = self.env.programs[name].execute()
+			# prgm subprogram call
+			if t is PRGM:
+				self.advance()
+				name = self._read_name()
+				val = self.env.programs[name].execute()
 
-		# Command tokens dispatch via token.cmd
-		elif t.cmd is not None:
-			self.advance()
-			t.cmd(ArgParser(self))
+			# Command tokens dispatch via token.cmd
+			elif t.cmd is not None:
+				self.advance()
+				t.cmd(ArgParser(self))
 
-		# Expression statement, optionally followed by → target or converter
-		else:
-			value = self.parse_expr()
-			if self.eat_if(STORE):
-				self.parse_store(value)
-			elif self.peek().converter is not None:
-				value = self.advance().converter(value)
+			# Expression statement, optionally followed by → target or converter
 			else:
-				self.expect(EOF_TOKEN)
-			self.env.ans = value
+				value = self.parse_expr()
+				if self.eat_if(STORE):
+					self.parse_store(value)
+				elif self.peek().converter is not None:
+					value = self.advance().converter(value)
+				self.env.ans = value
+				
+			if not self.eat_if(COLON):
+				break
+
+		self.expect(EOF_TOKEN)
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
@@ -421,12 +447,17 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print(env.ans)
 
+	# test('&length(', '"', '& or ')
+	test('&sub(','"ABCD",2,0')
+	# test('[[2','&dim(','{1,2,3]')
+	# test('&rand', '(5')
+	# test('[[1:[[','&Ans','(1,1')
 	# test('{5,5',STORE,'&dim(',(0x5C,0))
-	test('{5',STORE,'A')
+	# test('{5',STORE,LIST_PREFIX,'AB')
 	# test(0,STORE,'&dim(',(0x5D,0))
-	# test('[[1,2,[',STORE,(0x5C,0))
+	# test(1,STORE,'A:3',STORE,'B')
 	# test('[[1,2.5],[π,4]]')
 	# test('&randM(','3,4')
 	# test('&Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
-	print(env.user_lists)
+	print(env.matrices)

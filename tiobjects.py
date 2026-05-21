@@ -42,7 +42,30 @@ def require_matrix(value):
 	return _require_type(value, TiMatrix)
 
 def require_str(value):
-	return _require_type(value, str)
+	return _require_type(value, TiString)
+
+
+class TiString:
+	__slots__ = ('tokens',)
+
+	def __init__(self, tokens: list):
+		self.tokens = tokens
+
+	def __len__(self):
+		return len(self.tokens)
+
+	def __eq__(self, other):
+		if isinstance(other, TiString):
+			return len(self.tokens) == len(other.tokens) and all(
+				a.code == b.code for a, b in zip(self.tokens, other.tokens)
+			)
+		return NotImplemented
+
+	def __str__(self):
+		return ''.join(t.text for t in self.tokens)
+
+	def __repr__(self):
+		return '"' + str(self) + '"'
 
 
 class TiList:
