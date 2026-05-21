@@ -1,7 +1,6 @@
 """Read and write TI-83/84 .8xp program files."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from tokens import Token, TOKENS, TOKEN_TABLE
 
@@ -23,7 +22,7 @@ class TiProgram:
 def read(file) -> TiProgram:
 	with open(file, 'rb') as f:
 		if f.read(8) != SIGNATURE:
-			raise ValueError(f"{path}: not a TI-83/84 variable file")
+			raise ValueError(f"{file}: not a TI-83/84 variable file")
 
 		f.seek(3, 1)  # skip 1a 0a 00
 		comment = f.read(42).rstrip(b'\x00 ').decode('ascii', errors='replace')
@@ -56,7 +55,7 @@ def read(file) -> TiProgram:
 	)
 
 
-def write(path, prog: TiProgram) -> None:
+def write(file, prog: TiProgram) -> None:
 	program    = b''.join(t.code for t in prog.tokens)
 	name_bytes = prog.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
 	locked     = 0x06 if prog.locked else 0x05
