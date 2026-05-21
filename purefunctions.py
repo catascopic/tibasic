@@ -129,7 +129,7 @@ def cum_sum(lst):
 		rows = lst.rows
 		# TODO: can be simplified with zip?
 		return TiMatrix([
-			[builtins.sum(lst.inner[rr][c] for rr in range(r + 1))
+			[builtins.sum(lst.data[rr][c] for rr in range(r + 1))
 				for c in range(cols)]
 			for r in range(rows)
 		])
@@ -142,11 +142,11 @@ def delta_list(lst):
 
 def augment(a, b):
 	if isinstance(a, TiList) and isinstance(b, TiList):
-		return TiList(a.inner + b.inner)
+		return TiList(a.data + b.data)
 	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix):
 		if a.rows != b.rows:
 			raise ValueError(f"Row count mismatch: {a.rows} vs {b.rows}")
-		return TiMatrix([r1 + r2 for r1, r2 in zip(a.inner, b.inner)])
+		return TiMatrix([r1 + r2 for r1, r2 in zip(a.data, b.data)])
 	raise ValueError("augment: both args must be lists or both must be matrices")
 
 
@@ -320,7 +320,7 @@ def det(mat):
 	n = mat.rows
 	if n == 0 or n != mat.cols:
 		raise ValueError(f"det requires a square matrix, got {mat.rows}×{mat.cols}")
-	m = [row.copy() for row in mat.inner]
+	m = [row.copy() for row in mat.data]
 	sign = 1.0
 	for col in range(n):
 		pivot = next((r for r in range(col, n) if m[r][col] != 0), None)
@@ -344,29 +344,29 @@ def identity(n):
 
 def transpose(mat):
 	require_matrix(mat)
-	return TiMatrix([[mat.inner[r][c] for r in range(mat.rows)] for c in range(mat.cols)])
+	return TiMatrix([[mat.data[r][c] for r in range(mat.rows)] for c in range(mat.cols)])
 
 
 def sum(lst, start=None, end=None):
-	inner = require_list(lst).inner
+	data = require_list(lst).data
 	if start is None:
-		return builtins.sum(inner)
+		return builtins.sum(data)
 	start = require_int(start)
-	end = require_int(end) if end is not None else len(inner)
-	if not (1 <= start <= end <= len(inner)):
-		raise ValueError(f"sum: index out of range (start={start}, end={end}, dim={len(inner)})")
-	return builtins.sum(inner[start - 1 : end])
+	end = require_int(end) if end is not None else len(data)
+	if not (1 <= start <= end <= len(data)):
+		raise ValueError(f"sum: index out of range (start={start}, end={end}, dim={len(data)})")
+	return builtins.sum(data[start - 1 : end])
 
 
 def prod(lst, start=None, end=None):
-	inner = require_list(lst).inner
+	data = require_list(lst).data
 	if start is None:
-		return math.prod(inner)
+		return math.prod(data)
 	start = require_int(start)
-	end = require_int(end) if end is not None else len(inner)
-	if not (1 <= start <= end <= len(inner)):
-		raise ValueError(f"prod: index out of range (start={start}, end={end}, dim={len(inner)})")
-	return math.prod(inner[start - 1 : end])
+	end = require_int(end) if end is not None else len(data)
+	if not (1 <= start <= end <= len(data)):
+		raise ValueError(f"prod: index out of range (start={start}, end={end}, dim={len(data)})")
+	return math.prod(data[start - 1 : end])
 
 
 # ── Transcendental functions ────────────────────────────────────────────────────
@@ -492,7 +492,7 @@ def ref(mat):
 	require_matrix(mat)
 	if mat.rows > mat.cols:
 		raise ValueError(f"ref: matrix must have at least as many columns as rows")
-	m = [row.copy() for row in mat.inner]
+	m = [row.copy() for row in mat.data]
 	rows, cols = mat.rows, mat.cols
 	pivot_row = 0
 	for col in range(cols):
@@ -517,7 +517,7 @@ def rref(mat):
 	require_matrix(mat)
 	if mat.rows > mat.cols:
 		raise ValueError(f"rref: matrix must have at least as many columns as rows")
-	m = [row.copy() for row in mat.inner]
+	m = [row.copy() for row in mat.data]
 	rows, cols = mat.rows, mat.cols
 	pivot_row = 0
 	for col in range(cols):

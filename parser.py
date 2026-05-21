@@ -124,6 +124,8 @@ class Parser:
 				if not self.eat_if(COMMA):
 					break
 			rows.append(row)
+			if len(row) != len(rows[0]):
+				raise ValueError(f"Unequal matrix rows: {rows}")
 			if not self.eat_if(R_BRACKET):
 				break
 			if not self.eat_if(COMMA):
@@ -453,8 +455,9 @@ if __name__ == '__main__':
 		print('<<', env.ans)
 
 	test('[[1,2],[3,4]]',STORE,'&[A]')
-	test('&[A]','^4')
-	test('&[A]')
+	test('&[A]','+[[5,6],[7,8]]')
+	# test('&[A]','^4')
+	# test('&[A]')
 	# test('&length(', '"', '& or ')
 	# test('{1,2,3}',SCI_E,'{1,2,3}')
 	# test('[[2','&dim(','{1,2,3]')

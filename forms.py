@@ -243,12 +243,12 @@ def matr_to_list(a: ArgParser) -> None:
 			list_refs.append(a.list_var())
 		a.end()
 		for col, ref in enumerate(list_refs):
-			ref.set(a.env, TiList([mat.inner[r][col] for r in range(mat.rows)]))
+			ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))
 	else:
 		col = int(a.expr()) - 1
 		ref = a.list_var()
 		a.end()
-		ref.set(a.env, TiList([mat.inner[r][col] for r in range(mat.rows)]))
+		ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))
 
 
 def list_to_matr(a: ArgParser) -> None:
@@ -267,7 +267,7 @@ def list_to_matr(a: ArgParser) -> None:
 	rows = max(len(lst) for lst in list_vals)
 	# TODO: can we use zip with a default value?
 	mat_var.set(a.env, TiMatrix([
-		[list_vals[c].inner[r] if r < len(list_vals[c]) else 0 for c in range(cols)]
+		[list_vals[c].data[r] if r < len(list_vals[c]) else 0 for c in range(cols)]
 		for r in range(rows)
 	]))
 
@@ -285,11 +285,11 @@ def _sort(a: ArgParser, reverse: bool):
 	if not deps:
 		sort(main, reverse=reverse)
 	else:
-		data = main.inner
+		data = main.data
 		indices = sorted(range(len(data)), key=lambda i: data[i], reverse=reverse)
-		lst.inner = [data[i] for i in indices]
+		lst.data = [data[i] for i in indices]
 		for d in deps:
-			d.inner = [d.inner[i] for i in indices]
+			d.data = [d.data[i] for i in indices]
 
 
 def sort_a(a: ArgParser):
@@ -305,10 +305,10 @@ def fill(a: ArgParser):
 	x = require_real(a.expr())
 	a.end()
 	if isinstance(lst, TiList):
-		for i in range(len(lst.inner)):
-			lst.inner[i] = x
+		for i in range(len(lst.data)):
+			lst.data[i] = x
 	elif isinstance(lst, TiMatrix):
-		for row in lst.inner:
+		for row in lst.data:
 			for i in range(len(row)):
 				row[i] = x
 	else:

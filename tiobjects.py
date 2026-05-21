@@ -45,43 +45,43 @@ def require_str(value):
 
 
 class TiList:
-	__slots__ = ('inner',)
+	__slots__ = ('data',)
 
 	def __init__(self, data=None):
-		self.inner = [] if data is None else data
+		self.data = [] if data is None else data
 
 	def __getitem__(self, index):
 		if index != int(index) or not (1 <= index <= len(self)):
 			raise IndexError(f"{index=}")
-		return self.inner[int(index) - 1]
+		return self.data[int(index) - 1]
 
 	def __setitem__(self, index, value):
 		if index == len(self) + 1:
-			self.inner.append(value)
+			self.data.append(value)
 		elif index != int(index) or not (1 <= index <= len(self)):
 			raise ValueError(f"out of bounds: {index}; dim: {len(self)}")
 		else:
-			self.inner[int(index) - 1] = value
+			self.data[int(index) - 1] = value
 
 	def __len__(self):
-		return len(self.inner)
+		return len(self.data)
 
 	def __iter__(self):
-		return iter(self.inner)
+		return iter(self.data)
 	
 	def __neg__(self):
-		return TiList([-a for a in self.inner])
+		return TiList([-a for a in self.data])
 
 	def set_dim(self, value):
 		new_dim = int(value)
 		dim = len(self)
 		if new_dim < dim:
-			del self.inner[new_dim:]
+			del self.data[new_dim:]
 		elif new_dim > dim:
-			self.inner.extend(repeat(0, new_dim - dim))
+			self.data.extend(repeat(0, new_dim - dim))
 
 	def copy(self):
-		return TiList(self.inner.copy())
+		return TiList(self.data.copy())
 
 	def __repr__(self):
 		return f"{{{','.join(repr_num(i) for i in self)}}}"
@@ -91,7 +91,7 @@ def _vectorize_op(op):
 	def list_op(self, other):
 		if isinstance(other, TiList):
 			return TiList([op(a, b) for a, b in zip(self, other, strict=True)])
-		return TiList([op(a, other) for a in self.inner])
+		return TiList([op(a, other) for a in self.data])
 	return list_op
 
 
@@ -127,18 +127,18 @@ def _check_valid_dim(rows, cols):
 
 
 class TiMatrix:
-	__slots__ = ('inner',)
+	__slots__ = ('data',)
 
 	def __init__(self, data=None):
-		self.inner = [] if data is None else data
+		self.data = [] if data is None else data
 
 	@property
 	def rows(self):
-		return len(self.inner)
+		return len(self.data)
 
 	@property
 	def cols(self):
-		return len(self.inner[0]) if self.inner else 0
+		return len(self.data[0]) if self.data else 0
 		
 	def _check_index(self, index):
 		if len(index) != 2:
@@ -154,17 +154,17 @@ class TiMatrix:
 
 	def __getitem__(self, index):
 		row_index, col_index = self._check_index(index)
-		return self.inner[int(row_index) - 1][int(col_index) - 1]
+		return self.data[int(row_index) - 1][int(col_index) - 1]
 
 	def __setitem__(self, index, value):
 		row_index, col_index = self._check_index(index)
-		self.inner[int(row_index) - 1][int(col_index) - 1] = value
+		self.data[int(row_index) - 1][int(col_index) - 1] = value
 
 	def set_dim(self, dim_list: TiList):
-		new_rows, new_cols = _check_valid_dim(*dim_list.inner)
-		self.inner = [
+		new_rows, new_cols = _check_valid_dim(*dim_list.data)
+		self.data = [
 			[
-				self.inner[r][c] if r < self.rows and c < self.cols else 0.0
+				self.data[r][c] if r < self.rows and c < self.cols else 0.0
 				for c in range(new_cols)
 			] for r in range(new_rows)
 		]
@@ -173,21 +173,26 @@ class TiMatrix:
 		n = _check_int(r)
 		if not (1 <= n <= self.rows):
 			raise IndexError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
-		return self.inner[n - 1].copy()
+		return self.data[n - 1].copy()
 
 	def set_row(self, r, row: list) -> None:
 		n = _check_int(r)
 		if not (1 <= n <= self.rows):
 			raise IndexError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
-		self.inner[n - 1] = row
+		self.data[n - 1] = row
 
 	def transform(self, func):
-		return TiMatrix([[func(x) for x in row] for row in self.inner])
+		return TiMatrix([[func(x) for x in row] for row in self.data])
 	
 	def transform_zip(self, other, func):
+		if self.rows != other.rows or self.cols != other.cols:
+			raise ValueError(
+				"Operation not allowed in matrices with different sizes: "
+				f"{self.rows}×{self.cols} vs. {other.rows}×{other.cols}"
+			)
 		return TiMatrix([
 			[func(a, b) for a, b in zip(row_a, row_b)]
-			for row_a, row_b in zip(self.inner, other.inner)
+			for row_a, row_b in zip(self.data, other.data)
 		])
 	
 	def __add__(self, other):
@@ -208,7 +213,7 @@ class TiMatrix:
 		return TiMatrix([
 			[
 				builtins.sum(
-					self.inner[r][k] * other.inner[k][c] for k in range(self.cols)
+					self.data[r][k] * other.data[k][c] for k in range(self.cols)
 				) for c in range(other.cols)
 			] for r in range(self.rows)
 		])
@@ -243,7 +248,7 @@ class TiMatrix:
 
 	def __eq__(self, other):
 		if isinstance(other, TiMatrix):
-			return self.inner == other.inner
+			return self.data == other.data
 		raise ValueError(f"Expected matrix, got {other}")
 	
 	# get __ne__ for free
@@ -256,7 +261,7 @@ class TiMatrix:
 		if self.cols != n:
 			raise ValueError(f"inv: matrix must be square, got {m.rows}×{m.cols}")
 		
-		aug = [row.copy() + [1 if i == j else 0 for j in range(n)] for i, row in enumerate(self.inner)]
+		aug = [row.copy() + [1 if i == j else 0 for j in range(n)] for i, row in enumerate(self.data)]
 		for col in range(n):
 			pivot_row = max(range(col, n), key=lambda r: abs(aug[r][col]))
 			aug[col], aug[pivot_row] = aug[pivot_row], aug[col]
@@ -276,12 +281,12 @@ class TiMatrix:
 		return TiMatrix([row[n:] for row in aug])
 
 	def copy(self):
-		return TiMatrix([row.copy() for row in self.inner])
+		return TiMatrix([row.copy() for row in self.data])
 
 	def __repr__(self):
-		return '[' + ''.join('[' + ' '.join(repr_num(x) for x in row) + ']' for row in self.inner) + ']'
-		# widths = [max(len(repr_num(row[c])) for row in self.inner) for c in range(len(self.inner[0]))]
-		# return f"[{'\n'.join([f"[{' '.join(f'{repr_num(x):{widths[c]}}' for c, x in enumerate(row))}]" for row in self.inner])}]"
+		return '[' + ''.join('[' + ' '.join(repr_num(x) for x in row) + ']' for row in self.data) + ']'
+		# widths = [max(len(repr_num(row[c])) for row in self.data) for c in range(len(self.data[0]))]
+		# return f"[{'\n'.join([f"[{' '.join(f'{repr_num(x):{widths[c]}}' for c, x in enumerate(row))}]" for row in self.data])}]"
 
 
 class TiString:
