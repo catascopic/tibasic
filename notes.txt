@@ -14,12 +14,7 @@ See the file in "webref/Error Conditions - TI-Basic Developer.htm"
 
 add a peek method for ArgParser that just calles _parser.peek()
 
-Is [2] valid???
-
 rowswap, etc: better implementations that don't copy unnecessarily
-
-rand is nullary but can also be called like rand(7) to generate 7 random numbers
-
 
 Add aliases to any token that has a character that can't be typed on the keyboard
 
@@ -33,6 +28,8 @@ Mixing delimiters doesn't work!
 {length("123 VALID
 
 
+Is [2] valid???
+rand is nullary but can also be called like rand(7) to generate 7 random numbers
 Let's talk about delimiters. The parser never expects you to close them, but this is only partly correct: delimiters don't close other delimiters! For example, ({7) is not valid.
 Possibly the way to handle this is with exceptions. Parentheticals/lists/matrices could raise an exception when not closed, but then it's caught and the next token is evaluated to see if it's a valid close-all token like STORE
 Additionally, Colon closes all delimiters EXCEPT quotation marks (Store arrow DOES close quotation marks)
