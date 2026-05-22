@@ -69,14 +69,14 @@ class Parser:
 	def peek_is_rparen(self) -> bool:
 		return self.peek() is R_PAREN
 
-	def close_delimiter(self, expected: Token) -> None:
+	def close_delimiter(self, expected: Token) -> bool:
 		"""Consume expected closer, or implicitly close at statement boundaries.
-		Raises ParseError if a mismatched closing delimiter is found."""
+		Raises ParseError if a stray ) is found."""
 		if self.eat_if(expected):
-			return
-		t = self.peek()
-		if t is R_PAREN or t is R_BRACE or t is R_BRACKET:
-			raise ParseError(f"Mismatched delimiter: expected {expected.text!r}, got {t.text!r}")
+			return True
+		if self.peek() is R_PAREN:
+			raise ParseError(f"Mismatched delimiter: expected {expected.text!r}, got ')'")
+		return False
 
 	# ── Sub-parsers ────────────────────────────────────────────────────────────
 
@@ -142,9 +142,10 @@ class Parser:
 			rows.append(row)
 			if len(row) != len(rows[0]):
 				raise ValueError(f"Unequal matrix rows: {rows}")
-			if not self.eat_if(R_BRACKET):
+			if not self.close_delimiter(R_BRACKET):
 				break
-			if not self.eat_if(COMMA):
+			self.eat_if(COMMA)
+			if self.peek() is not L_BRACKET:
 				break
 		self._struct_depth -= 1
 		self.close_delimiter(R_BRACKET)
@@ -287,19 +288,19 @@ class Parser:
 		lhs = self.parse_atom()
 
 		while True:
-			t = self.peek()
 
 			# Angle-mode conversions (need env access, so handled here rather than as token postfixes)
-			if t is DEG:
-				self.advance()
+			if self.eat_if(DEG):
 				lhs = self.env.to_radians(lhs)
 				continue
-			if t is RAD:
-				self.advance()
+			if self.eat_if(RAD):
 				lhs = self.env.to_degrees(lhs)
 				continue
 
+			t = self.peek()
+
 			# Postfix operators
+			# make a .eat_if_flag method if I make flags for tokens after decoupling from functions
 			if t.postfix:
 				if 80 <= min_bp:  # currently never true, consider removing after design is finalized
 					break
@@ -425,16 +426,12 @@ class Parser:
 			if self.at_end():
 				return
 
-			t = self.peek()
-
-			if t is PRGM:
-				self.advance()
+			if self.eat_if(PRGM):
 				name = self._read_name()
 				val = self.env.programs[name].execute()
 
-			elif t.command is not None:
-				self.advance()
-				t.command(ArgParser(self))
+			elif self.peek().command is not None:
+				self.advance().command(ArgParser(self))
 
 			else:
 				value = self.parse_expr()
@@ -484,8 +481,10 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print('<<', env.ans)
 
-	test('5°5°\'')
-	# test('[[1,2],[3,4]]',STORE,'&[A]')
+	env.angle_mode = 'DEG'
+	
+	test(1,DEG,RAD)
+	# test('([[1,2][3,4',STORE,'&[A]')
 	# test('&[A]','+[[5,6],[7,8]]')
 	# test('&[A]','^4')
 	# test('&[A]')
