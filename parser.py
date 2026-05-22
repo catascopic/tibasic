@@ -165,16 +165,24 @@ class Parser:
 		self._capture_subgroup(out)
 		return Thunk(out, self.env)
 
+	def peek_digit_or_dot(self) -> bool:
+		t = self.peek()
+		return t.is_digit() or t is DOT
+
 	def _apply_deg(self, degrees):
 		"""Handle ° postfix: parse DMS tail if present, then apply angle-mode conversion."""
-		if self.peek().is_digit() or self.peek() is DOT:
+		if self.peek_digit_or_dot():
 			minutes = self.parse_num_literal(self.advance())
 			self.expect(ARCMIN)
-			seconds = self.parse_num_literal(self.advance())
-			self.eat_if(QUOTE)
+			seconds = 0.0
+			if self.peek_digit_or_dot():
+				seconds = self.parse_num_literal(self.advance())
+				self.expect(QUOTE)
 			degrees = degrees + minutes / 60 + seconds / 3600
 			return math.radians(degrees) if self.env.angle_mode == 'RAD' else DMS(degrees)
-		return math.radians(float(degrees)) if self.env.angle_mode == 'RAD' else float(degrees)
+		if self.env.angle_mode == 'RAD':
+			return degrees / (180 / math.pi)
+		return degrees
 
 	def parse_label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name."""
@@ -281,15 +289,18 @@ class Parser:
 		while True:
 			t = self.peek()
 
+			# Degree / DMS
+			if t is DEG:
+				self.advance()
+				lhs = self._apply_deg(lhs)
+				continue
+
 			# Postfix operators
 			if t.postfix:
-				if 80 <= min_bp:
+				if 80 <= min_bp:  # currently never true, consider removing after design is finalized
 					break
 				self.advance()
-				if t is DEG:
-					lhs = self._apply_deg(lhs)
-				else:
-					lhs = t.postfix(lhs)
+				lhs = t.postfix(lhs)
 				continue
 
 			# Explicit binary operator
@@ -469,8 +480,9 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print('<<', env.ans)
 
-	test('[[1,2],[3,4]]',STORE,'&[A]')
-	test('&[A]','+[[5,6],[7,8]]')
+	test('(5)°1\'')
+	# test('[[1,2],[3,4]]',STORE,'&[A]')
+	# test('&[A]','+[[5,6],[7,8]]')
 	# test('&[A]','^4')
 	# test('&[A]')
 	# test('&length(', '"', '& or ')

@@ -25,6 +25,9 @@ move vectorized to tiobjects
 
 ********
 
+Can you make a convenience peek_digit_or_dot to simplify the code?
+Also, one way to impliclty allow applying degrees to lists but not matrices is to divide rather than multiply, since matrices can't be divided
+
 % operator
 
 Make a special VarArray subclass for numerics that stores None as the default, but sets to 0 when you try to access a variable with value None
