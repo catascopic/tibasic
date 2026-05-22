@@ -3,6 +3,7 @@ Change unitsPerEm to 1400
 Check which tokens have non-ascii characters
 
 SCI_E can only take a numeric literal as its exponent (rhs). However, that numeric literal can be in DMS format, indicating that it was the right call to integrate that logic into the numeric literal parser
+IS THIS TRUE???
 
 Also, on the calculator:
 In Radians mode:
