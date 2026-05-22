@@ -1,11 +1,12 @@
+import math
 from dataclasses import dataclass
 
-from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
+from tiobjects import TiList, TiMatrix, TiString, DMS, require_num, require_real
 from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
 	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, ANS, NEG, LIST_PREFIX,
-	RAND, DIM, SCI_E
+	RAND, DIM, SCI_E, DEG, ARCMIN
 )
 from environment import Environment, Variable, UserListVar
 from forms import ArgParser
@@ -164,6 +165,17 @@ class Parser:
 		self._capture_subgroup(out)
 		return Thunk(out, self.env)
 
+	def _apply_deg(self, degrees):
+		"""Handle ° postfix: parse DMS tail if present, then apply angle-mode conversion."""
+		if self.peek().is_digit() or self.peek() is DOT:
+			minutes = self.parse_num_literal(self.advance())
+			self.expect(ARCMIN)
+			seconds = self.parse_num_literal(self.advance())
+			self.eat_if(QUOTE)
+			degrees = degrees + minutes / 60 + seconds / 3600
+			return math.radians(degrees) if self.env.angle_mode == 'RAD' else DMS(degrees)
+		return math.radians(float(degrees)) if self.env.angle_mode == 'RAD' else float(degrees)
+
 	def parse_label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name."""
 		t = self.advance()
@@ -274,7 +286,10 @@ class Parser:
 				if 80 <= min_bp:
 					break
 				self.advance()
-				lhs = t.postfix(lhs)
+				if t is DEG:
+					lhs = self._apply_deg(lhs)
+				else:
+					lhs = t.postfix(lhs)
 				continue
 
 			# Explicit binary operator

@@ -147,6 +147,7 @@ NEWLINE     = token(b'\x3f', '\n')
 PRGM        = token(b'\x5f', 'prgm')
 ANS         = token(b'\x72', 'Ans', nullary=Environment.get_ans, func=forms.ans_index_or_mul)
 NEG         = token(b'\xb0', '−')
+ARCMIN      = token(b'\xae', "'")
 DIM         = token(b'\xb5', 'dim(', pure_func=pf.dim)
 LIST_PREFIX = token(b'\xeb', '∟')
 
@@ -314,7 +315,7 @@ TOKENS: list[Token] = [
     RAND,
     token(b'\xac', 'π', nullary=lambda env: math.pi),
     token(b'\xad', 'getKey', nullary=Environment.get_key),
-    token(b'\xae', "'"),
+    ARCMIN,
     token(b'\xaf', '?'),
     NEG,
     token(b'\xb1', 'int(',		pure_func=pf.int_),
@@ -742,7 +743,7 @@ TOKENS: list[Token] = [
     token(b'\xbb\xd7', '\\'),
     token(b'\xbb\xd8', '|'),
     token(b'\xbb\xd9', '_'),
-    token(b'\xbb\xda', '%'),
+    token(b'\xbb\xda', '%', postfix=lambda x: x / 100),
     token(b'\xbb\xdb', '…'),
     token(b'\xbb\xdc', '∠'),
     token(b'\xbb\xdd', 'ß'),

@@ -12,6 +12,18 @@ def repr_num(value):
 	return repr(int(value) if value.is_integer() else value)
 
 
+class DMS(float):
+	"""A float in decimal degrees that displays as degrees°minutes'seconds\"."""
+	def __repr__(self):
+		total = abs(float(self))
+		sign = '-' if self < 0 else ''
+		d = int(total)
+		m_total = (total - d) * 60
+		m = int(m_total)
+		s = (m_total - m) * 60
+		return f"{sign}{d}°{m}'{repr_num(s)}\""
+
+
 # ── Guard functions ───────────────────────────────────────────────────────────────
 
 def _require_type(value, tp):

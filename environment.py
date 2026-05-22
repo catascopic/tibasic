@@ -151,6 +151,7 @@ class Environment:
 		self.window     = _VarArray(0x37, None, repr)                         # window vars
 		self.user_lists = {}                                               # ∟NAME lists
 		self.ans        = 0
+		self.angle_mode = 'RAD'
 		self.dt_fmt     = 1
 		self.tm_fmt     = 12
 		self.clock_on   = True
