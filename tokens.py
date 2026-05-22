@@ -152,8 +152,8 @@ DIM         = token(b'\xb5', 'dim(', pure_func=pf.dim)
 LIST_PREFIX = token(b'\xeb', '∟')
 
 # Postfix operators
-RAD       = token(b'\x0a', 'ʳ',	postfix=lambda x: x)
-DEG       = token(b'\x0b', '°',	postfix=lambda x: x / (180 / math.pi))
+RAD       = token(b'\x0a', 'ʳ')  # postfix operator that needs env, so gets a special case
+DEG       = token(b'\x0b', '°')  # ditto
 INV       = token(b'\x0c', '⁻¹',	postfix=pf.inv)
 SQ        = token(b'\x0d', '²',	postfix=lambda x: x**2)
 TRANSPOSE = token(b'\x0e', 'ᵀ',	postfix=pf.transpose)

@@ -157,6 +157,12 @@ class Environment:
 		self.clock_on   = True
 		self.key_code   = 0
 
+	def to_radians(self, x):
+		return x / (180 / math.pi) if self.angle_mode == 'RAD' else x
+
+	def to_degrees(self, x):
+		return x / (math.pi / 180) if self.angle_mode == 'DEG' else x
+
 	def set_random_seed(self, value):
 		random.seed(value)
 

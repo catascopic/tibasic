@@ -1,4 +1,3 @@
-import math
 from dataclasses import dataclass
 
 from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
@@ -6,7 +5,7 @@ from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
 	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, ANS, NEG, LIST_PREFIX,
-	RAND, DIM, SCI_E, DEG, ARCMIN
+	RAND, DIM, SCI_E, DEG, RAD, ARCMIN
 )
 from environment import Environment, Variable, UserListVar
 from forms import ArgParser
@@ -106,8 +105,7 @@ class Parser:
 					seconds = self._parse_digits(self.advance())
 					self.expect(QUOTE)
 				value = value + minutes / 60 + seconds / 3600
-			if self.env.angle_mode == 'RAD':
-				return value / (180 / math.pi)
+			return self.env.to_radians(value)
 		return value
 
 	def parse_string_literal(self) -> TiString:
@@ -290,6 +288,16 @@ class Parser:
 
 		while True:
 			t = self.peek()
+
+			# Angle-mode conversions (need env access, so handled here rather than as token postfixes)
+			if t is DEG:
+				self.advance()
+				lhs = self.env.to_radians(lhs)
+				continue
+			if t is RAD:
+				self.advance()
+				lhs = self.env.to_degrees(lhs)
+				continue
 
 			# Postfix operators
 			if t.postfix:
