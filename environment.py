@@ -18,9 +18,14 @@ class _VarArray:
 
 	def __setitem__(self, idx: int, value):
 		self._data[idx] = value
+	
+	def iter_values(self):
+		for i, x in enumerate(self._data):
+			if x is not None:
+				yield self._formatter(i), x
 
 	def __repr__(self):
-		return ', '.join(f"{self._formatter(i)}={x}" for i, x in enumerate(self._data))
+		return ', '.join(iter_values())
 
 
 # ── Variable hierarchy ────────────────────────────────────────────────────────────
@@ -124,16 +129,27 @@ class WindowVar(Variable):
 		env.window[self._idx] = float(value)
 
 
+class _NumericVarArray(_VarArray):
+	def __init__(self):
+		super().__init__(27, None, lambda n: chr(65+n) if n < 26 else 'θ')
+
+	def __getitem__(self, idx: int):
+		val = self._data[idx]
+		if val is None:
+			val = self._data[idx] = 0
+		return val
+
+
 class Environment:
 
 	def __init__(self):
-		self.numerics   = _VarArray(27,   0,    lambda n: chr(65+n) if n < 26 else 'θ') # A–Z, θ
-		self.lists      = _VarArray(6,    None, lambda n: f"L{n+1}")   # L1–L6
-		self.matrices   = _VarArray(10,   None, lambda n: f"[{chr(65+n)}]")  # [A]–[J]
-		self.strings    = _VarArray(10,   None, lambda n: f"Str{n+1}") # Str0–9
-		self.stat       = _VarArray(0x3D, 0   , repr)                  # stat vars
-		self.window     = _VarArray(0x37, 0   , repr)                  # window vars
-		self.user_lists = {}                                           # ∟NAME lists
+		self.numerics   = _NumericVarArray()                               # A–Z, θ
+		self.lists      = _VarArray(6,  None, lambda n: f"L{n+1}")         # L1–L6
+		self.matrices   = _VarArray(10, None, lambda n: f"[{chr(65+n)}]")  # [A]–[J]
+		self.strings    = _VarArray(10, None, lambda n: f"Str{n+1}")       # Str0–9
+		self.stat       = _VarArray(0x3D, None, repr)                         # stat vars
+		self.window     = _VarArray(0x37, None, repr)                         # window vars
+		self.user_lists = {}                                               # ∟NAME lists
 		self.ans        = 0
 		self.dt_fmt     = 1
 		self.tm_fmt     = 12
@@ -173,3 +189,14 @@ class Environment:
 
 	def rand(self):
 		return random.random()
+
+	def iter_values(self):
+		for field in ('numerics', 'lists', 'matrices', 'strings'):
+			yield from getattr(self, field).iter_values()
+		for name, lst in self.user_lists.items():
+			yield f"∟{name}", value
+		yield "Ans", self.ans
+
+	def dump(self):
+		for name, value in self.iter_values():
+			print(f"{name:8}= {value}")

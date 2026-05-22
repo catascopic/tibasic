@@ -1,6 +1,7 @@
 DMS class that inherits Number, whose only difference is that it displays numbers in DMS mode.
 The DEG symbol converts a number from radians to degrees if the calculator is in radians mode
 You can also write a number in DMS, but it must be a numeric literal, like 180DEG30'3". No expressions are allowed as any of the terms, not even parentheses. However, the terms don't need to be whole numbers.
+
 Also, trig functions actually do need access to the environment so they can see what mode the calculator is in!
 
 Make a special VarArray subclass for numerics that stores None as the default, but sets to 0 when you try to access a variable with value None
@@ -20,6 +21,8 @@ add a peek method for ArgParser that just calles _parser.peek()
 rowswap, etc: better implementations that don't copy unnecessarily
 
 Add aliases to any token that has a character that can't be typed on the keyboard
+
+Full token overhaul: operators and bp are okay, everything else moved to dispatcher
 
 ********
 

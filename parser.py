@@ -472,3 +472,4 @@ if __name__ == '__main__':
 	# test('&Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
 	# print(env.numerics)
+	env.dump()
