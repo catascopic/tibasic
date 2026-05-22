@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass
 
-from tiobjects import TiList, TiMatrix, TiString, DMS, require_num, require_real
+from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
@@ -81,7 +81,8 @@ class Parser:
 
 	# ── Sub-parsers ────────────────────────────────────────────────────────────
 
-	def parse_num_literal(self, first: Token) -> float:
+	def _parse_digits(self, first: Token) -> float:
+		"""Parse a bare numeric literal with no DMS handling."""
 		num = [first.text]
 		while True:
 			t = self.peek()
@@ -92,6 +93,22 @@ class Parser:
 			return float(''.join(num))
 		except ValueError:
 			raise ParseError(f"Bad numeric literal: {num!r}")
+
+	def parse_num_literal(self, first: Token) -> float:
+		value = self._parse_digits(first)
+		if self.peek() is DEG:
+			self.advance()
+			if self.peek_digit_or_dot():
+				minutes = self._parse_digits(self.advance())
+				self.expect(ARCMIN)
+				seconds = 0
+				if self.peek_digit_or_dot():
+					seconds = self._parse_digits(self.advance())
+					self.expect(QUOTE)
+				value = value + minutes / 60 + seconds / 3600
+			if self.env.angle_mode == 'RAD':
+				return value / (180 / math.pi)
+		return value
 
 	def parse_string_literal(self) -> TiString:
 		"""Opening \" already consumed. Reads until the next \" or end of line."""
@@ -168,21 +185,6 @@ class Parser:
 	def peek_digit_or_dot(self) -> bool:
 		t = self.peek()
 		return t.is_digit() or t is DOT
-
-	def _apply_deg(self, degrees):
-		"""Handle ° postfix: parse DMS tail if present, then apply angle-mode conversion."""
-		if self.peek_digit_or_dot():
-			minutes = self.parse_num_literal(self.advance())
-			self.expect(ARCMIN)
-			seconds = 0.0
-			if self.peek_digit_or_dot():
-				seconds = self.parse_num_literal(self.advance())
-				self.expect(QUOTE)
-			degrees = degrees + minutes / 60 + seconds / 3600
-			return math.radians(degrees) if self.env.angle_mode == 'RAD' else DMS(degrees)
-		if self.env.angle_mode == 'RAD':
-			return degrees / (180 / math.pi)
-		return degrees
 
 	def parse_label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name."""
@@ -288,12 +290,6 @@ class Parser:
 
 		while True:
 			t = self.peek()
-
-			# Degree / DMS
-			if t is DEG:
-				self.advance()
-				lhs = self._apply_deg(lhs)
-				continue
 
 			# Postfix operators
 			if t.postfix:
@@ -480,7 +476,7 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print('<<', env.ans)
 
-	test('(5)°1\'')
+	test('5°5°\'')
 	# test('[[1,2],[3,4]]',STORE,'&[A]')
 	# test('&[A]','+[[5,6],[7,8]]')
 	# test('&[A]','^4')
