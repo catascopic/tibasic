@@ -206,4 +206,4 @@ class Environment:
 
 	def dump(self):
 		for name, value in self.iter_values():
-			print(f"{name:8}= {value}")
+			print(f"{name:8}= {value!r}")

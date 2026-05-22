@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Custom Font Test</title>
+
+<style>
+    @font-face {
+        font-family: "TestFont";
+        src: url("./TI-83P-Font_fixed.ttf") format("truetype");
+        font-weight: normal;
+        font-style: normal;
+    }
+
+    body {
+        background: #f4f4f4;
+        color: #111;
+        font-family: sans-serif;
+        padding: 32px;
+        line-height: 1.4;
+    }
+
+    h1 {
+        margin-bottom: 8px;
+    }
+
+    .info {
+        color: #555;
+        margin-bottom: 32px;
+    }
+
+    .sample {
+        margin-bottom: 24px;
+        padding: 12px 16px;
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+    }
+
+    .label {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 8px;
+    }
+
+    .text {
+        font-family: "TestFont", sans-serif;
+        white-space: nowrap;
+    }
+</style>
+</head>
+
+<body>
+
+<h1>Custom Font Test Page</h1>
+
+<div class="info">
+    Put your font file next to this HTML file and rename it in the
+    <code>@font-face</code> rule.
+</div>
+
+<div id="samples"></div>
+
+<script>
+    const sizes = [64, 64.25, 63.75];
+
+    const sampleText =
+        "The quick brown fox jumps over the lazy dog 0123456789";
+
+    const container = document.getElementById("samples");
+
+    for (const size of sizes) {
+        const sample = document.createElement("div");
+        sample.className = "sample";
+
+        const label = document.createElement("div");
+        label.className = "label";
+        label.textContent = `${size}px`;
+
+        const text = document.createElement("div");
+        text.className = "text";
+        text.style.fontSize = `${size}px`;
+        text.textContent = sampleText;
+
+        sample.appendChild(label);
+        sample.appendChild(text);
+
+        container.appendChild(sample);
+    }
+</script>
+
+</body>
+</html>

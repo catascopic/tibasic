@@ -1,0 +1,188 @@
+01    | Recursive n                | ⁿ                   
+02    | Recursive u                | ᵘ                   
+03    | Recursive v                | ᵛ                   
+04    | Recursive w                | ʷ                   
+05    | Convert                    | ▶                  
+06    | Square Up                  | 🮝                   
+07    | Square Down                | 🮟                   
+08    | Integral                   | ∫                   
+09    | Cross                      | ×                   
+0A    | Box Icon                   | □                   
+0B    | Cross Icon                 | ✚                  
+0C    | Dot Icon                   | ·                   
+0D    | Subscript T                | ₜ                    
+0E    | Cube Root                  | ∛                  
+0F    | Hexadecimal F              | 𝐅                   
+10    | Root                       | √                   
+11    | Inverse                    | ⁻¹                  
+12    | Square                     | ²                   
+13    | Angle                      | ∠                   
+14    | Degree                     | °                   
+15    | Radian                     | ʳ                   
+16    | Transpose                  | ᵀ                   
+17    | Less Than or Equal To      | ≤                   
+18    | Not Equal To               | ≠                   
+19    | Greater Than or Equal To   | ≥                   
+1A    | Negation                   | ‾                   
+1B    | Exponent                   | ᴇ                   
+1C    | Store                      | →                   
+1D    | Ten                        | ¹⁰                  
+1E    | Up Arrow                   | ↑                   
+1F    | Down Arrow                 | ↓                   
+20    | Space                      | ␠                   
+21    | Exclamation Mark           | !                   
+22    | Quotation Mark             | "                   
+23    | Pound Sign                 | #                   
+24    | Fourth                     | ⁴                   
+25    | Percent Sign               | %                   
+26    | Ampersand                  | &                   
+27    | Apostrophe                 | '                   
+28    | Left Parenthesis           | (                   
+29    | Right Parenthesis          | )                   
+2A    | Asterisk                   | *                   
+2B    | Plus Sign                  | +                   
+2C    | Comma                      | ,                   
+2D    | Dash                       | −                   
+2E    | Period                     | .                   
+2F    | Slash                      | /                   
+30–39 | Digits                     | 0–9                 
+3A    | Colon                      | :                   
+3B    | Semicolon                  | ;                   
+3C    | Less Than                  | <                   
+3D    | Equal To                   | =                   
+3E    | Greater Than               | >                   
+3F    | Question Mark              | ?                   
+40    | At Sign                    | @                   
+41–5A | Capital Letters            | A–Z                 
+5B    | Theta                      | θ                   
+5C    | Backslash                  | \                   
+5D    | Right Bracket              | ]                   
+5E    | Caret                      | ^                   
+5F    | Underscore                 | _                   
+60    | Backquote                  | `                   
+61–7A | Small Letters              | a–z                 
+7B    | Left Brace                 | {                   
+7C    | Vertical Bar               |                     
+7D    | Right Brace                | }                   
+7E    | Tilde                      | ~                   
+7F    | Inverse Equal To           | ≢                  
+80    | Subscript 0                | ₀                   
+81    | Subscript 1                | ₁                   
+82    | Subscript 2                | ₂                   
+83    | Subscript 3                | ₃                   
+84    | Subscript 4                | ₄                   
+85    | Subscript 5                | ₅                   
+86    | Subscript 6                | ₆                   
+87    | Subscript 7                | ₇                   
+88    | Subscript 8                | ₈                   
+89    | Subscript 9                | ₉                   
+8A    | Capital A Acute            | Á                   
+8B    | Capital A Grave            | À                   
+8C    | Capital A Caret            | Â                   
+8D    | Capital A Diaeresis        | Ä                   
+8E    | Small A Acute              | á                   
+8F    | Small A Grave              | à                   
+90    | Small A Caret              | â                   
+91    | Small A Diaeresis          | ä                   
+92    | Capital E Acute            | É                   
+93    | Capital E Grave            | È                   
+94    | Capital E Caret            | Ê                   
+95    | Capital E Diaeresis        | Ë                   
+96    | Small E Acute              | é                   
+97    | Small E Grave              | è                   
+98    | Small E Caret              | ê                   
+99    | Small E Diaeresis          | ë                   
+9A    | Capital I Acute            | Í                   
+9B    | Capital I Grave            | Ì                   
+9C    | Capital I Caret            | Î                   
+9D    | Capital I Diaeresis        | Ï                   
+9E    | Small I Acute              | í                   
+9F    | Small I Grave              | ì                   
+A0    | Small I Caret              | î                   
+A1    | Small I Diaeresis          | ï                   
+A2    | Capital O Acute            | Ó                   
+A3    | Capital O Grave            | Ò                   
+A4    | Capital O Caret            | Ô                   
+A5    | Capital O Diaeresis        | Ö                   
+A6    | Small O Acute              | ó                   
+A7    | Small O Grave              | ò                   
+A8    | Small O Caret              | ô                   
+A9    | Small O Diaeresis          | ö                   
+AA    | Capital U Acute            | Ú                   
+AB    | Capital U Grave            | Ù                   
+AC    | Capital U Caret            | Û                   
+AD    | Capital U Diaeresis        | Ü                   
+AE    | Small U Acute              | ú                   
+AF    | Small U Grave              | ù                   
+B0    | Small U Caret              | û                   
+B1    | Small U Diaeresis          | ü                   
+B2    | Capital C Cedilla          | Ç                   
+B3    | Small C Cedilla            | ç                   
+B4    | Capital N Tilde            | Ñ                   
+B5    | Small N Tilde              | ñ                   
+B6    | Accent                     | ´                   
+B7    | Grave                      | `                   
+B8    | Diaeresis                  | ¨                   
+B9    | Inverted Question Mark     | ¿                   
+BA    | Inverted Exclamation Mark  | ¡                   
+BB    | Small Alpha                | α                   
+BC    | Small Beta                 | β                   
+BD    | Small Gamma                | γ                   
+BE    | Capital Delta              | Δ                   
+BF    | Small Delta                | δ                   
+C0    | Small Epsilon              | ε                   
+C1    | Left Bracket               | [                   
+C2    | Small Lambda               | λ                   
+C3    | Small Mu                   | μ                   
+C4    | Small Pi                   | π                   
+C5    | Small Rho                  | ρ                   
+C6    | Capital Sigma              | Σ                   
+C7    | Small Sigma                | σ                   
+C8    | Small Tau                  | τ                   
+C9    | Small Phi                  | φ                   
+CA    | Capital Omega              | Ω                   
+CB    | X Mean                     | x̄                  
+CC    | Y Mean                     | ȳ                   
+CD    | Superscript X              | ˣ                   
+CE    | Ellipsis                   | …                   
+CF    | Left Pointing Triangle     | ◀                  
+D0    | Block                      | ■                   
+D1    | Per                        | /                   
+D2    | Hyphen                     | -                   
+D3    | Area                       | ²                   
+D4    | Temperature                | °                   
+D5    | Cube                       | ³                   
+D6    | Enter                      | ↵                   
+D7    | Imaginary I                | 𝑖                   
+D8    | P Hat                      | p̂                  
+D9    | Small Chi                  | χ                   
+DA    | Stat F                     | 𝐅                   
+DB    | Natural Logarithm E        | 𝑒                   
+DC    | List Capital L             | 𝐋                   
+DD    | Finance Capital N          | 𝐍                   
+DE    | Two Right Parentheses      | ⸩                   
+DF    | Block Arrow                | 🮞                   
+E0    | Cursor Overwrite           | █                   
+E1    | Cursor Overwrite Second    | ▓                   
+E2    | Cursor Overwrite Capital A | 🅰                  
+E3    | Cursor Overwrite Small A   | ⓐ                  
+E4    | Cursor Insert              | ▏                    
+E5    | Cursor Insert Second       | ▎                    
+E6    | Cursor Insert Capital A    | 🄰                   
+E7    | Cursor Insert Small A      | ⒜                  
+E8    | Graph Line                 | ─                   
+E9    | Graph Thick                | ═                   
+EA    | Graph Above                | ▔                  
+EB    | Graph Below                | ▁                  
+EC    | Graph Path                 | ∙                   
+ED    | Graph Animate              | ◎                  
+EE    | Graph Dot                  | •                   
+EF    | Up Block                   | ▀                   
+F0    | Down Block                 | ▄                   
+F1    | Cursor Full                | █                   
+F2    | Dollar Sign                | $                   
+F3    | Square Up                  | 🮝                   
+F4    | Sharp S                    | ß                   
+F5    | Mixed Fraction Separator   | ᳓                   
+F6    | Fraction Slash             | ⁄                   
+F7    | Entry Box                  | ☐                  

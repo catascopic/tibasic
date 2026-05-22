@@ -5,7 +5,7 @@ from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
 	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, ANS, NEG, LIST_PREFIX,
-	RAND, DIM, SCI_E, DEG, RAD, ARCMIN
+	RAND, DIM, SCI_E, DEG, RAD, APOS
 )
 from environment import Environment, Variable, UserListVar
 from forms import ArgParser
@@ -43,6 +43,7 @@ class Parser:
 		self.pos += 1
 		return t
 
+	# TODO: remane to try_eat?
 	def eat_if(self, tok: Token) -> bool:
 		if self.peek() is tok:
 			self.pos += 1
@@ -95,25 +96,27 @@ class Parser:
 
 	def parse_num_literal(self, first: Token) -> float:
 		value = self._parse_digits(first)
-		if self.peek() is DEG:
-			self.advance()
+		if self.eat_if(DEG):
 			if self.peek_digit_or_dot():
 				minutes = self._parse_digits(self.advance())
-				self.expect(ARCMIN)
+				self.expect(APOS)
 				seconds = 0
 				if self.peek_digit_or_dot():
 					seconds = self._parse_digits(self.advance())
 					self.expect(QUOTE)
 				value = value + minutes / 60 + seconds / 3600
-			return self.env.to_radians(value)
+			else:
+				value = self.env.to_radians(value)
+			return value
 		return value
 
 	def parse_string_literal(self) -> TiString:
 		"""Opening \" already consumed. Reads until the next \" or end of line."""
 		tokens = []
-		while not self.at_end() and self.peek() is not QUOTE:
+		while not (self.at_end() or self.peek() is STORE):
+			if self.eat_if(QUOTE):
+				break
 			tokens.append(self.advance())
-		self.eat_if(QUOTE)  # closing " is optional
 		return TiString(tokens)
 
 	def parse_list_literal(self) -> TiList:
@@ -144,22 +147,12 @@ class Parser:
 				raise ValueError(f"Unequal matrix rows: {rows}")
 			if not self.close_delimiter(R_BRACKET):
 				break
-			self.eat_if(COMMA)
+			self.eat_if(COMMA)  # comma is completely optional between rows
 			if self.peek() is not L_BRACKET:
 				break
-		self._struct_depth -= 1
 		self.close_delimiter(R_BRACKET)
+		self._struct_depth -= 1
 		return TiMatrix(rows)
-
-	def parse_args(self) -> list:
-		"""Comma-separated expressions until ) or end of line. Consumes )."""
-		args = []
-		if not self.at_end() and self.peek() is not R_PAREN:
-			args.append(self.parse_expr())
-			while self.eat_if(COMMA):
-				args.append(self.parse_expr())
-		self.eat_if(R_PAREN)
-		return args
 
 	def _capture_subgroup(self, out: list[Token]) -> None:
 		"""Collect tokens into out until a top-level comma or unmatched ), recursing into sub-groups."""
@@ -417,7 +410,7 @@ class Parser:
 			return UserListVar(self._read_name())
 		if t.variable:
 			return t.variable
-		raise ParseError(f"Expected a list variable, got {t.text!r}")
+		raise ParseError(f"Expected a variable, got {t.text!r}")
 
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 
@@ -483,7 +476,11 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 	
-	test(1,DEG,RAD)
+	# test('&⑽^(', '{1,10')
+	test('5°')
+	test('5°5\'5"')
+	# test('"a',STORE,'&Str1')
+	# test('1°ʳ')
 	# test('([[1,2][3,4',STORE,'&[A]')
 	# test('&[A]','+[[5,6],[7,8]]')
 	# test('&[A]','^4')

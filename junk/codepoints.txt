@@ -1,0 +1,73 @@
+01 U+1D45B Recursive n
+02 U+1D462 Recursive u
+03 U+1D463 Recursive v
+04 U+1D464 Recursive w
+05 U+25BA  Convert
+06 U+1F845 Square Up
+07 U+1F847 Square Down
+08 U+222B  Integral
+09 U+00D7  Cross
+0A U+25AB  Box Icon
+0B U+FE62  Cross Icon
+0C U+2022  Dot Icon
+0D U+1D40  Subscript T
+0E U+00B3  Cube
+0F U+1D7CA Hexadecimal F
+10 U+221A  Root
+11 U+00B9  Inverse
+12 U+00B2  Square
+13 U+2220  Angle
+14 U+00B0  Degree
+15 U+02B3  Radian
+16 U+1D40  Transpose
+17 U+2264  Less Than or Equal To
+18 U+2260  Not Equal To
+19 U+2265  Greater Than or Equal To
+1A U+2212  Negation
+1B U+1D07  Scientific Notation
+1C U+2192  Store
+1D U+247D  Ten
+1E U+2191  Up Arrow
+1F U+2193  Down Arrow
+24 U+2074  Fourth Power
+5B U+03B8  Theta
+F1 U+1FB95 ???
+DA U+1D405 ???
+
+
+
+01 Recursive n 𝑛
+02 Recursive u 𝑢
+03 Recursive v 𝑣
+04 Recursive w 𝑤
+05 Convert ►
+06 Square Up 🡅
+07 Square Down 🡇
+08 Integral ∫
+09 Cross ×
+0A Box Icon ▫
+0B Cross Icon ﹢
+0C Dot Icon •
+0D Subscript T ᵀ
+0E Cube ³
+0F Hexadecimal F 𝟊
+10 Root √
+11 Inverse ¹
+12 Square ²
+13 Angle ∠
+14 Degree °
+15 Radian ʳ
+16 Transpose ᵀ
+17 Less Than or Equal To ≤
+18 Not Equal To ≠
+19 Greater Than or Equal To ≥
+1A Negation −
+1B Scientific Notation ᴇ
+1C Store →
+1D Ten ⑽
+1E Up Arrow ↑
+1F Down Arrow ↓
+24 Fourth Power ⁴
+5B Theta θ
+F1 ??? 🮕
+DA ??? 𝐅

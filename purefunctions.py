@@ -398,7 +398,7 @@ for _name, _real_fn, _cpx_fn in [
 	('ln',    math.log,   cmath.log),
 	('exp',   math.exp,   cmath.exp),
 	('log',   math.log10, cmath.log10),
-	('logbase',   math.log, cmath.log),
+	('log_base', math.log, cmath.log),
 ]:
 	globals()[_name] = _make_dispatch(_name, _real_fn, _cpx_fn)
 
@@ -435,20 +435,20 @@ def rand_list(n):
 	return TiList([random.random() for _ in range(require_int(n))])
 
 
-def randint(low, high, count=1):
+def rand_int(low, high, count=1):
 	low, high = require_int(low), require_int(high)
 	if count == 1:
 		return random.randint(low, high)
 	return TiList([random.randint(low, high) for _ in range(require_int(count))])
 
 
-def randnorm(mu, sigma, n=None):
+def rand_norm(mu, sigma, n=None):
 	if n is None:
 		return random.gauss(mu, sigma)
 	return TiList([random.gauss(mu, sigma) for _ in range(require_int(n))])
 
 
-def randintnotrep(a, b):
+def rand_int_no_rep(a, b):
 	lst = list(range(require_int(a), require_int(b) + 1))
 	random.shuffle(lst)
 	return TiList(lst)

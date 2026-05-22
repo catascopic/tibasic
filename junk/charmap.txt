@@ -1,0 +1,741 @@
+Hex: 01
+Name: "Recursive n"
+BBCode: [font=courier new][i]n[/i][/font]
+LrecurU 	Hex: 02
+Name: "Recursive u"
+BBCode: u
+LrecurV 	Hex: 03
+Name: "Recursive v"
+BBCode: v
+LrecurW 	Hex: 04
+Name: "Recursive w"
+BBCode: w
+Lconvert 	Hex: 05
+Name: "Convert"
+BBCode: [font=courier new]&#9658;[/font]
+LsqUp 	Hex: 06
+Name: "Square Up"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/06h_LsqUp.gif[/img]
+LsqDown 	Hex: 07
+Name: "Square Down"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/07h_LsqDown.gif[/img]
+Lintegral 	Hex: 08
+Name: "Integral"
+BBCode: [font=courier new]&#8747;[/font]
+Lcross 	Hex: 09
+Name: "Cross"
+BBCode: [font=verdana]&#215;[/font]
+LboxIcon 	Hex: 0A
+Name: "Box Icon"
+BBCode: [font=courier new]&#9643;[/font]
+LcrossIcon 	Hex: 0B
+Name: "Cross Icon"
+BBCode: [font=arial][size=x]+[/size][/font] (?)
+LdotIcon 	Hex: 0C
+Name: "Dot Icon"
+BBCode: [font=courier new]&#183;[/font]
+LsubT 	Hex: 0D
+Name: "Subscript T"
+BBCode: [font=verdana][size=x]&#1090;[/size][/font] (?)
+LcubeR 	Hex: 0E
+Name: "Cube Root"
+BBCode: [font=verdana]&#179;[/font]
+LhexF 	Hex: 0F
+Name: "Hexadecimal F"
+BBCode: [font=verdana][b]F[/b][/font]
+Lroot 	Hex: 10
+Name: "Root"
+BBCode: [font=arial]&#8730;[/font]
+Linverse 	Hex: 11
+Name: "Inverse"
+BBCode: [font=courier new]&#8254;&#185;[/font]
+Lsquare 	Hex: 12
+Name: "Square"
+BBCode: [font=verdana]&#178;[/font]
+Langle 	Hex: 13
+Name: "Angle"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/13h_Langle.gif[/img]
+Ldegree 	Hex: 14
+Name: "Degree"
+BBCode: [font=times new roman]&#176;[/font]
+Lradian 	Hex: 15
+Name: "Radian"
+BBCode: [font=verdana][sup]r[/sup][/font]
+Ltranspose 	Hex: 16
+Name: "Transpose"
+BBCode: [font=arial][sup]&#1090;[/sup][/font]
+LLE 	Hex: 17
+Name: "Less Than or Equal To"
+BBCode: [font=verdana]&#8804;[/font]
+LNE 	Hex: 18
+Name: "Not Equal To"
+BBCode: [font=verdana]&#8800;[/font]
+LGE 	Hex: 19
+Name: "Greater Than or Equal To"
+BBCode: [font=verdana]&#8805;[/font]
+Lneg 	Hex: 1A
+Name: "Negation"
+BBCode: [font=courier new]&#8254;[/font]
+Lexponent 	Hex: 1B
+Name: "Exponent"
+BBCode: [font=verdana][size=x]E[/size][/font] (?)
+Lstore 	Hex: 1C
+Name: "Store"
+BBCode: [font=courier new]&#8594;[/font]
+Lten 	Hex: 1D
+Name: "Ten"
+BBCode: [font=courier new][size=x]10[/size][/font] (?)
+LupArrow 	Hex: 1E
+Name: "Up Arrow"
+BBCode: [font=times new roman]&#8593;[/font]
+LdownArrow 	Hex: 1F
+Name: "Down Arrow"
+BBCode: [font=times new roman]&#8595;[/font]
+Lspace 	Hex: 20
+Name: "Space"
+BBCode: [font=courier new]&#9617;[/font]
+Lexclam 	Hex: 21
+Name: "Exclamation Mark"
+BBCode: !
+Lquote 	Hex: 22
+Name: "Quotation Mark"
+BBCode: [font=verdana]"[/font]
+Lpound 	Hex: 23
+Name: "Pound Sign"
+BBCode: #
+Lfourth 	Hex: 24
+Name: "Fourth"
+BBCode: [font=verdana][sup]4[/sup][/font]
+Lpercent 	Hex: 25
+Name: "Percent Sign"
+BBCode: %
+Lampersand 	Hex: 26
+Name: "Ampersand"
+BBCode: [font=arial]&[/font]
+Lapostrophe 	Hex: 27
+Name: "Apostrophe"
+BBCode: &#39;
+LlParen 	Hex: 28
+Name: "Left Parenthesis"
+BBCode: (
+LrParen 	Hex: 29
+Name: "Right Parenthesis"
+BBCode: )
+Lasterisk 	Hex: 2A
+Name: "Asterisk"
+BBCode: [font=verdana]*[/font]
+LplusSign 	Hex: 2B
+Name: "Plus Sign"
+BBCode: +
+Lcomma 	Hex: 2C
+Name: "Comma"
+BBCode: [font=times new roman],[/font]
+Ldash 	Hex: 2D
+Name: "Dash"
+BBCode: &#8722;
+Lperiod 	Hex: 2E
+Name: "Period"
+BBCode: .
+Lslash 	Hex: 2F
+Name: "Slash"
+BBCode: /
+L0 	Hex: 30
+Name: "0"
+BBCode: 0
+L1 	Hex: 31
+Name: "1"
+BBCode: 1
+L2 	Hex: 32
+Name: "2"
+BBCode: 2
+L3 	Hex: 33
+Name: "3"
+BBCode: 3
+L4 	Hex: 34
+Name: "4"
+BBCode: 4
+L5 	Hex: 35
+Name: "5"
+BBCode: 5
+L6 	Hex: 36
+Name: "6"
+BBCode: 6
+L7 	Hex: 37
+Name: "7"
+BBCode: 7
+L8 	Hex: 38
+Name: "8"
+BBCode: 8
+L9 	Hex: 39
+Name: "9"
+BBCode: 9
+Lcolon 	Hex: 3A
+Name: "Colon"
+BBCode: :
+Lsemicolon 	Hex: 3B
+Name: "Semicolon"
+BBCode: [font=times new romain];[/font]
+LLT 	Hex: 3C
+Name: "Less Than"
+BBCode: <
+LEQ 	Hex: 3D
+Name: "Equal To"
+BBCode: =
+LGT 	Hex: 3E
+Name: "Greater Than"
+BBCode: >
+Lquestion 	Hex: 3F
+Name: "Question Mark"
+BBCode: ?
+LatSign 	Hex: 40
+Name: "At Sign"
+BBCode: [font=courier new]@[/font]
+LcapA 	Hex: 41
+Name: "Capital A"
+BBCode: A
+LcapB 	Hex: 42
+Name: "Capital B"
+BBCode: B
+LcapC 	Hex: 43
+Name: "Capital C"
+BBCode: C
+LcapD 	Hex: 44
+Name: "Capital D"
+BBCode: D
+LcapE 	Hex: 45
+Name: "Capital E"
+BBCode: E
+LcapF 	Hex: 46
+Name: "Capital F"
+BBCode: F
+LcapG 	Hex: 47
+Name: "Capital G"
+BBCode: G
+LcapH 	Hex: 48
+Name: "Capital H"
+BBCode: H
+LcapI 	Hex: 49
+Name: "Capital I"
+BBCode: I
+LcapJ 	Hex: 4A
+Name: "Capital J"
+BBCode: J
+LcapK 	Hex: 4B
+Name: "Capital K"
+BBCode: K
+LcapL 	Hex: 4C
+Name: "Capital L"
+BBCode: L
+LcapM 	Hex: 4D
+Name: "Capital M"
+BBCode: M
+LcapN 	Hex: 4E
+Name: "Capital N"
+BBCode: N
+LcapO 	Hex: 4F
+Name: "Capital O"
+BBCode: O
+LcapP 	Hex: 50
+Name: "Capital P"
+BBCode: P
+LcapQ 	Hex: 51
+Name: "Capital Q"
+BBCode: Q
+LcapR 	Hex: 52
+Name: "Capital R"
+BBCode: R
+LcapS 	Hex: 53
+Name: "Capital S"
+BBCode: S
+LcapT 	Hex: 54
+Name: "Capital T"
+BBCode: T
+LcapU 	Hex: 55
+Name: "Capital U"
+BBCode: U
+LcapV 	Hex: 56
+Name: "Capital V"
+BBCode: V
+LcapW 	Hex: 57
+Name: "Capital W"
+BBCode: W
+LcapX 	Hex: 58
+Name: "Capital X"
+BBCode: X
+LcapY 	Hex: 59
+Name: "Capital Y"
+BBCode: Y
+LcapZ 	Hex: 5A
+Name: "Capital Z"
+BBCode: Z
+Ltheta 	Hex: 5B
+Name: "Theta"
+BBCode: [font=arial][i]&#952;[/i][/font]
+Lbackslash 	Hex: 5C
+Name: "Backslash"
+BBCode: \
+LrBrack 	Hex: 5D
+Name: "Right Bracket"
+BBCode: ]
+Lcaret 	Hex: 5E
+Name: "Caret"
+BBCode: ^
+Lunderscore 	Hex: 5F
+Name: "Underscore"
+BBCode: _
+Lbackquote 	Hex: 60
+Name: "Backquote"
+BBCode: [font=verdana]&#8216;[/font]
+La 	Hex: 61
+Name: "Small A"
+BBCode: a
+Lb 	Hex: 62
+Name: "Small B"
+BBCode: b
+Lc 	Hex: 63
+Name: "Small C"
+BBCode: c
+Ld 	Hex: 64
+Name: "Small D"
+BBCode: d
+Le 	Hex: 65
+Name: "Small E"
+BBCode: e
+Lf 	Hex: 66
+Name: "Small F"
+BBCode: f
+Lg 	Hex: 67
+Name: "Small G"
+BBCode: g
+Lh 	Hex: 68
+Name: "Small H"
+BBCode: h
+Li 	Hex: 69
+Name: "Small I"
+BBCode: i
+Lj 	Hex: 6A
+Name: "Small J"
+BBCode: j
+Lk 	Hex: 6B
+Name: "Small K"
+BBCode: k
+Ll 	Hex: 6C
+Name: "Small L"
+BBCode: l
+Lm 	Hex: 6D
+Name: "Small M"
+BBCode: m
+Ln 	Hex: 6E
+Name: "Small N"
+BBCode: n
+Lo 	Hex: 6F
+Name: "Small O"
+BBCode: o
+Lp 	Hex: 70
+Name: "Small P"
+BBCode: p
+Lq 	Hex: 71
+Name: "Small Q"
+BBCode: q
+Lr 	Hex: 72
+Name: "Small R"
+BBCode: r
+Ls 	Hex: 73
+Name: "Small S"
+BBCode: s
+Lt 	Hex: 74
+Name: "Small T"
+BBCode: t
+Lu 	Hex: 75
+Name: "Small U"
+BBCode: u
+Lv 	Hex: 76
+Name: "Small V"
+BBCode: v
+Lw 	Hex: 77
+Name: "Small W"
+BBCode: w
+Lx 	Hex: 78
+Name: "Small X"
+BBCode: x
+Ly 	Hex: 79
+Name: "Small Y"
+BBCode: y
+Lz 	Hex: 7A
+Name: "Small Z"
+BBCode: z
+LlBrace 	Hex: 7B
+Name: "Left Brace"
+BBCode: {
+Lbar 	Hex: 7C
+Name: "Vertical Bar"
+BBCode: |
+LrBrace 	Hex: 7D
+Name: "Right Brace"
+BBCode: }
+Ltilde 	Hex: 7E
+Name: "Tilde"
+BBCode: [font=arial]~[/font]
+LinvEQ 	Hex: 7F
+Name: "Inverse Equal To"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/7Fh_LinvEQ.gif[/img]
+Lsub0 	Hex: 80
+Name: "Subscript 0"
+BBCode: [font=courier new][size=x]0[/size][/font] (?)
+Lsub1 	Hex: 81
+Name: "Subscript 1"
+BBCode: [font=courier new][size=x]1[/size][/font]
+Lsub2 	Hex: 82
+Name: "Subscript 2"
+BBCode: [font=courier new][size=x]2[/size][/font]
+Lsub3 	Hex: 83
+Name: "Subscript 3"
+BBCode: [font=courier new][size=x]3[/size][/font]
+Lsub4 	Hex: 84
+Name: "Subscript 4"
+BBCode: [font=courier new][size=x]4[/size][/font]
+Lsub5 	Hex: 85
+Name: "Subscript 5"
+BBCode: [font=courier new][size=x]5[/size][/font]
+Lsub6 	Hex: 86
+Name: "Subscript 6"
+BBCode: [font=courier new][size=x]6[/size][/font]
+Lsub7 	Hex: 87
+Name: "Subscript 7"
+BBCode: [font=courier new][size=x]7[/size][/font]
+Lsub8 	Hex: 88
+Name: "Subscript 8"
+BBCode: [font=courier new][size=x]8[/size][/font]
+Lsub9 	Hex: 89
+Name: "Subscript 9"
+BBCode: [font=courier new][size=x]9[/size][/font]
+LcapAAcute 	Hex: 8A
+Name: "Capital A Acute"
+BBCode: &#193;
+LcapAGrave 	Hex: 8B
+Name: "Capital A Grave"
+BBCode: &#192;
+LcapACaret 	Hex: 8C
+Name: "Capital A Caret"
+BBCode: &#194;
+LcapADier 	Hex: 8D
+Name: "Capital A Diaeresis"
+BBCode: &#196;
+LaAcute 	Hex: 8E
+Name: "Small A Acute"
+BBCode: &#225;
+LaGrave 	Hex: 8F
+Name: "Small A Grave"
+BBCode: &#224;
+LaCaret 	Hex: 90
+Name: "Small A Caret"
+BBCode: &#226;
+LaDier 	Hex: 91
+Name: "Small A Diaeresis"
+BBCode: &#228;
+LcapEAcute 	Hex: 92
+Name: "Capital E Acute"
+BBCode: &#201;
+LcapEGrave 	Hex: 93
+Name: "Capital E Grave"
+BBCode: &#200;
+LcapECaret 	Hex: 94
+Name: "Capital E Caret"
+BBCode: &#202;
+LcapEDier 	Hex: 95
+Name: "Capital E Diaeresis"
+BBCode: &#203;
+LeAcute 	Hex: 96
+Name: "Small E Acute"
+BBCode: &#233;
+LeGrave 	Hex: 97
+Name: "Small E Grave"
+BBCode: &#232;
+LeCaret 	Hex: 98
+Name: "Small E Caret"
+BBCode: &#234;
+LeDier 	Hex: 99
+Name: "Small E Diaeresis"
+BBCode: &#235;
+LcapIAcute 	Hex: 9A
+Name: "Capital I Acute"
+BBCode: &#205;
+LcapIGrave 	Hex: 9B
+Name: "Capital I Grave"
+BBCode: &#204;
+LcapICaret 	Hex: 9C
+Name: "Capital I Caret"
+BBCode: &#206;
+LcapIDier 	Hex: 9D
+Name: "Capital I Diaeresis"
+BBCode: &#207;
+LiAcute 	Hex: 9E
+Name: "Small I Acute"
+BBCode: &#237;
+LiGrave 	Hex: 9F
+Name: "Small I Grave"
+BBCode: &#236;
+LiCaret 	Hex: A0
+Name: "Small I Caret"
+BBCode: &#238;
+LiDier 	Hex: A1
+Name: "Small I Diaeresis"
+BBCode: &#239;
+LcapOAcute 	Hex: A2
+Name: "Capital O Acute"
+BBCode: &#211;
+LcapOGrave 	Hex: A3
+Name: "Capital O Grave"
+BBCode: &#210;
+LcapOCaret 	Hex: A4
+Name: "Capital O Caret"
+BBCode: &#212;
+LcapODier 	Hex: A5
+Name: "Capital O Diaeresis"
+BBCode: &#214;
+LoAcute 	Hex: A6
+Name: "Small O Acute"
+BBCode: &#243;
+LoGrave 	Hex: A7
+Name: "Small O Grave"
+BBCode: &#242;
+LoCaret 	Hex: A8
+Name: "Small O Caret"
+BBCode: &#244;
+LoDier 	Hex: A9
+Name: "Small O Diaeresis"
+BBCode: &#246;
+LcapUAcute 	Hex: AA
+Name: "Capital U Acute"
+BBCode: &#218;
+LcapUGrave 	Hex: AB
+Name: "Capital U Grave"
+BBCode: &#217;
+LcapUCaret 	Hex: AC
+Name: "Capital U Caret"
+BBCode: &#219;
+LcapUDier 	Hex: AD
+Name: "Capital U Diaeresis"
+BBCode: &#220;
+LuAcute 	Hex: AE
+Name: "Small U Acute"
+BBCode: &#250;
+LuGrave 	Hex: AF
+Name: "Small U Grave"
+BBCode: &#249;
+LuCaret 	Hex: B0
+Name: "Small U Caret"
+BBCode: &#251;
+LuDier 	Hex: B1
+Name: "Small U Diaeresis"
+BBCode: &#252;
+LcapCCed 	Hex: B2
+Name: "Capital C Cedilla"
+BBCode: &#199;
+LcCed 	Hex: B3
+Name: "Small C Cedilla"
+BBCode: &#231;
+LcapNTilde 	Hex: B4
+Name: "Capital N Tilde"
+BBCode: &#209;
+LnTilde 	Hex: B5
+Name: "Small N Tilde"
+BBCode: &#241;
+Laccent 	Hex: B6
+Name: "Accent"
+BBCode: [font=courier new]&#180;[/font]
+Lgrave 	Hex: B7
+Name: "Grave"
+BBCode: [font=courier new]&#96;[/font]
+Ldieresis 	Hex: B8
+Name: "Diaeresis"
+BBCode: [font=courier new]&#168;[/font]
+LquesDown 	Hex: B9
+Name: "Inverted Question Mark"
+BBCode: &#191;
+LexclamDown 	Hex: BA
+Name: "Inverted Exclamation Mark"
+BBCode: &#161;
+Lalpha 	Hex: BB
+Name: "Small Alpha"
+BBCode: [font=courier new]&#945;[/font]
+Lbeta 	Hex: BC
+Name: "Small Beta"
+BBCode: [font=verdana]&#946;[/font]
+Lgamma 	Hex: BD
+Name: "Small Gamma"
+BBCode: [font=times new roman]&#947;[/font]
+LcapDelta 	Hex: BE
+Name: "Capital Delta"
+BBCode: [font=times new roman][size=x]&#8710;[/size][/font] (?)
+Ldelta 	Hex: BF
+Name: "Small Delta"
+BBCode: [font=times new roman]&#948;[/font]
+Lepsilon 	Hex: C0
+Name: "Small Epsilon"
+BBCode: [font=verdana]&#949;[/font]
+LlBrack 	Hex: C1
+Name: "Left Bracket"
+BBCode: [
+Llambda 	Hex: C2
+Name: "Small Lambda"
+BBCode: [font=times new roman]&#955;[/font]
+Lmu 	Hex: C3
+Name: "Small Mu"
+BBCode: [font=verdana]&#956;[/font]
+Lpi 	Hex: C4
+Name: "Small Pi"
+BBCode: [font=times new roman]&#960;[/font]
+Lrho 	Hex: C5
+Name: "Small Rho"
+BBCode: [font=courier new]&#961;[/font]
+LcapSigma 	Hex: C6
+Name: "Capital Sigma"
+BBCode: [font=arial]&#931;[/font]
+Lsigma 	Hex: C7
+Name: "Small Sigma"
+BBCode: [font=arial]&#963;[/font]
+Ltau 	Hex: C8
+Name: "Small Tau"
+BBCode: [font=times new roman]&#964;[/font]
+Lphi 	Hex: C9
+Name: "Small Phi"
+BBCode: [font=times new roman]&#966;[/font]
+LcapOmega 	Hex: CA
+Name: "Capital Omega"
+BBCode: [font=times new roman]&#937;[/font]
+LxMean 	Hex: CB
+Name: "X Mean"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/CBh_LxMean.gif[/img]
+LyMean 	Hex: CC
+Name: "Y Mean"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/CCh_LyMean.gif[/img]
+LsupX 	Hex: CD
+Name: "Superscript X"
+BBCode: [font=times new roman][sup]&#215;[/sup][/font]
+Lellipsis 	Hex: CE
+Name: "Ellipsis"
+BBCode: [font=verdana]&#133;[/font]
+Lleft 	Hex: CF
+Name: "Left Pointing Triangle"
+BBCode: [font=courier new]&#9668;[/font]
+Lblock 	Hex: D0
+Name: "Block"
+BBCode: [font=courier new]&#9642;[/font]
+Lper 	Hex: D1
+Name: "Per"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/D1h_Lper.gif[/img]
+Lhyphen 	Hex: D2
+Name: "Hyphen"
+BBCode: -
+Larea 	Hex: D3
+Name: "Area"
+BBCode: [font=verdana]&#178;[/font]
+Ltemp 	Hex: D4
+Name: "Temperature"
+BBCode: [font=arial]&#176;[/font]
+Lcube 	Hex: D5
+Name: "Cube"
+BBCode: [font=verdana]&#179;[/font]
+Lenter 	Hex: D6
+Name: "Enter"
+BBCode: n/a
+LimagI 	Hex: D7
+Name: "Imaginary I"
+BBCode: [font=times new roman][i]i[/i][/font]
+Lphat 	Hex: D8
+Name: "P Hat"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/D8h_Lphat.gif[/img]
+Lchi 	Hex: D9
+Name: "Small Chi"
+BBCode: [font=times new roman]&#967;[/font]
+LstatF 	Hex: DA
+Name: "Stat F"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/DAh_LstatF.gif[/img]
+Llne 	Hex: DB
+Name: "Natural Logarithm E"
+BBCode: [font=times new roman][i]e[/i][/font]
+LlistL 	Hex: DC
+Name: "List Capital L"
+BBCode: [font=arial][size=x]L[/size][/font] (?)
+LfinanN 	Hex: DD
+Name: "Finance Capital N"
+BBCode: [font=arial][b]N[/b][/font]
+L2_r_paren 	Hex: DE
+Name: "Two Right Parentheses"
+BBCode: ))
+LblockArrow 	Hex: DF
+Name: "Block Arrow"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/DFh_LblockArrow.gif[/img]
+LcurO 	Hex: E0
+Name: "Cursor Overwrite"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/E0h_LcurO.gif[/img]
+LcurO2 	Hex: E1
+Name: "Cursor Overwrite Second"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/E1h_LcurO2.gif[/img]
+LcurOcapA 	Hex: E2
+Name: "Cursor Overwrite Capital A"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/E2h_LcurOcapA.gif[/img]
+LcurOa 	Hex: E3
+Name: "Cursor Overwrite Small A"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/E3h_LcurOa.gif[/img]
+LcurI 	Hex: E4
+Name: "Cursor Insert"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/E4h_LcurI.gif[/img]
+LcurI2 	Hex: E5
+Name: "Cursor Insert Second"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/E5h_LcurI2.gif[/img]
+LcurIcapA 	Hex: E6
+Name: "Cursor Insert Capital A"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/E6h_LcurIcapA.gif[/img]
+LcurIa 	Hex: E7
+Name: "Cursor Insert Small A"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/E7h_LcurIa.gif[/img]
+LGline 	Hex: E8
+Name: "Graph Line"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/E8h_LGline.gif[/img]
+LGthick 	Hex: E9
+Name: "Graph Thick"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/E9h_LGthick.gif[/img]
+LGabove 	Hex: EA
+Name: "Graph Above"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/EAh_LGabove.gif[/img]
+LGbelow 	Hex: EB
+Name: "Graph Below"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/EBh_LGbelow.gif[/img]
+LGpath 	Hex: EC
+Name: "Graph Path"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/ECh_LGpath.gif[/img]
+LGanimate 	Hex: ED
+Name: "Graph Animate"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/EDh_LGanimate.gif[/img]
+LGdot 	Hex: EE
+Name: "Graph Dot"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/EEh_LGdot.gif[/img]
+LUpBlk 	Hex: EF
+Name: "Up Block"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/EFh_LUpBlk.gif[/img]
+LDnBlk 	Hex: F0
+Name: "Down Block"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/F0h_LDnBlk.gif[/img]
+LcurFull 	Hex: F1
+Name: "Cursor Full"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/F1h_LcurFull.gif[/img]
+Ldollar 	Hex: F2
+Name: "Dollar Sign"
+BBCode: [font=arial]$[/font]
+LsqUp 	Hex: F3
+Name: "Square Up"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/F3h_LsqUp.gif[/img]
+LsharpS 	Hex: F4
+Name: "Sharp S"
+BBCode: [font=verdana][b]&#223;[/b][/font]
+LMPmixedFrac 	Hex: F5
+Name: "MathPrint Mixed Fraction Separator"
+BBCode: [font=verdana][b]&#765;[/b][/font]
+LMPfracSlash 	Hex: F6
+Name: "MathPrint Fraction Slash"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/F6h_LMPfracSlash.gif[/img]
+LMPentryBox 	Hex: F7
+Name: "MathPrint Entry Box"
+BBCode: [img]http://tibasicdev.wikidot.com/local--files/83lgfont/F7h_LMPentryBox.gif[/img]

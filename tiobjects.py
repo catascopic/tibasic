@@ -312,6 +312,8 @@ class TiString:
 
 	def __add__(self, other):
 		if isinstance(other, TiString):
+			if not self.tokens or not other.tokens:
+				raise ValueError(f"Cannot concatenate with an empty string (God knows why)!")
 			return TiString(self.tokens + other.tokens)
 		raise TiTypeError(f"Expected string but got {other}")
 

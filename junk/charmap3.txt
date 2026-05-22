@@ -1,0 +1,205 @@
+# TI-83 / TI-84 Charset →(U+2192) Unicode Approximation Mapping
+(U+A)
+(U+A)This mapping uses standard Unicode characters that visually or semantically approximate the TI charset glyphs as closely as possible.
+(U+A)
+(U+A)For ordinary ASCII characters, the mapping is identical.
+(U+A)
+(U+A)| Hex   | TI Name                    | Unicode Approximation
+(U+A)| ----- | -------------------------- | ---------------------
+(U+A)| 01    | Recursive n                | ⁿ(U+207F)                   
+(U+A)| 02    | Recursive u                | ᵘ(U+1D58)                   
+(U+A)| 03    | Recursive v                | ᵛ(U+1D5B)                   
+(U+A)| 04    | Recursive w                | ʷ(U+2B7)                   
+(U+A)| 05    | Convert                    | ▶(U+25B6)                  
+(U+A)| 06    | Square Up                  | 🮝(U+1FB9D)                   
+(U+A)| 07    | Square Down                | 🮟(U+1FB9F)                   
+(U+A)| 08    | Integral                   | ∫(U+222B)                   
+(U+A)| 09    | Cross                      | ×(U+D7)                   
+(U+A)| 0A    | Box Icon                   | □(U+25A1)                   
+(U+A)| 0B    | Cross Icon                 | ✚(U+271A)                  
+(U+A)| 0C    | Dot Icon                   | ·(U+B7)                   
+(U+A)| 0D    | Subscript T                | ₜ(U+209C)                    
+(U+A)| 0E    | Cube Root                  | ∛(U+221B)                  
+(U+A)| 0F    | Hexadecimal F              | 𝐅(U+1D405)                   
+(U+A)| 10    | Root                       | √(U+221A)                   
+(U+A)| 11    | Inverse                    | ⁻(U+207B)¹(U+B9)                  
+(U+A)| 12    | Square                     | ²(U+B2)                   
+(U+A)| 13    | Angle                      | ∠(U+2220)                   
+(U+A)| 14    | Degree                     | °(U+B0)                   
+(U+A)| 15    | Radian                     | ʳ(U+2B3)                   
+(U+A)| 16    | Transpose                  | ᵀ(U+1D40)                   
+(U+A)| 17    | Less Than or Equal To      | ≤(U+2264)                   
+(U+A)| 18    | Not Equal To               | ≠(U+2260)                   
+(U+A)| 19    | Greater Than or Equal To   | ≥(U+2265)                   
+(U+A)| 1A    | Negation                   | ‾(U+203E)                   
+(U+A)| 1B    | Exponent                   | ᴇ(U+1D07)                   
+(U+A)| 1C    | Store                      | →(U+2192)                   
+(U+A)| 1D    | Ten                        | ¹(U+B9)⁰(U+2070)                  
+(U+A)| 1E    | Up Arrow                   | ↑(U+2191)                   
+(U+A)| 1F    | Down Arrow                 | ↓(U+2193)                   
+(U+A)| 20    | Space                      | ␠(U+2420)                   
+(U+A)| 21    | Exclamation Mark           | !                   
+(U+A)| 22    | Quotation Mark             | "                   
+(U+A)| 23    | Pound Sign                 | #                   
+(U+A)| 24    | Fourth                     | ⁴(U+2074)                   
+(U+A)| 25    | Percent Sign               | %                   
+(U+A)| 26    | Ampersand                  | &                   
+(U+A)| 27    | Apostrophe                 | '                   
+(U+A)| 28    | Left Parenthesis           | (                   
+(U+A)| 29    | Right Parenthesis          | )                   
+(U+A)| 2A    | Asterisk                   | *                   
+(U+A)| 2B    | Plus Sign                  | +                   
+(U+A)| 2C    | Comma                      | ,                   
+(U+A)| 2D    | Dash                       | −(U+2212)                   
+(U+A)| 2E    | Period                     | .                   
+(U+A)| 2F    | Slash                      | /                   
+(U+A)| 30–(U+2013)39 | Digits                     | 0–(U+2013)9                 
+(U+A)| 3A    | Colon                      | :                   
+(U+A)| 3B    | Semicolon                  | ;                   
+(U+A)| 3C    | Less Than                  | <                   
+(U+A)| 3D    | Equal To                   | =                   
+(U+A)| 3E    | Greater Than               | >                   
+(U+A)| 3F    | Question Mark              | ?                   
+(U+A)| 40    | At Sign                    | @                   
+(U+A)| 41–(U+2013)5A | Capital Letters            | A–(U+2013)Z                 
+(U+A)| 5B    | Theta                      | θ(U+3B8)                   
+(U+A)| 5C    | Backslash                  | \                   
+(U+A)| 5D    | Right Bracket              | ]                   
+(U+A)| 5E    | Caret                      | ^                   
+(U+A)| 5F    | Underscore                 | _                   
+(U+A)| 60    | Backquote                  | `                   
+(U+A)| 61–(U+2013)7A | Small Letters              | a–(U+2013)z                 
+(U+A)| 7B    | Left Brace                 | {                   
+(U+A)| 7C    | Vertical Bar               |                     
+(U+A)| 7D    | Right Brace                | }                   
+(U+A)| 7E    | Tilde                      | ~                   
+(U+A)| 7F    | Inverse Equal To           | ≡(U+2261)̸(U+338)                  
+(U+A)| 80    | Subscript 0                | ₀(U+2080)                   
+(U+A)| 81    | Subscript 1                | ₁(U+2081)                   
+(U+A)| 82    | Subscript 2                | ₂(U+2082)                   
+(U+A)| 83    | Subscript 3                | ₃(U+2083)                   
+(U+A)| 84    | Subscript 4                | ₄(U+2084)                   
+(U+A)| 85    | Subscript 5                | ₅(U+2085)                   
+(U+A)| 86    | Subscript 6                | ₆(U+2086)                   
+(U+A)| 87    | Subscript 7                | ₇(U+2087)                   
+(U+A)| 88    | Subscript 8                | ₈(U+2088)                   
+(U+A)| 89    | Subscript 9                | ₉(U+2089)                   
+(U+A)| 8A    | Capital A Acute            | Á(U+C1)                   
+(U+A)| 8B    | Capital A Grave            | À(U+C0)                   
+(U+A)| 8C    | Capital A Caret            | Â(U+C2)                   
+(U+A)| 8D    | Capital A Diaeresis        | Ä(U+C4)                   
+(U+A)| 8E    | Small A Acute              | á(U+E1)                   
+(U+A)| 8F    | Small A Grave              | à(U+E0)                   
+(U+A)| 90    | Small A Caret              | â(U+E2)                   
+(U+A)| 91    | Small A Diaeresis          | ä(U+E4)                   
+(U+A)| 92    | Capital E Acute            | É(U+C9)                   
+(U+A)| 93    | Capital E Grave            | È(U+C8)                   
+(U+A)| 94    | Capital E Caret            | Ê(U+CA)                   
+(U+A)| 95    | Capital E Diaeresis        | Ë(U+CB)                   
+(U+A)| 96    | Small E Acute              | é(U+E9)                   
+(U+A)| 97    | Small E Grave              | è(U+E8)                   
+(U+A)| 98    | Small E Caret              | ê(U+EA)                   
+(U+A)| 99    | Small E Diaeresis          | ë(U+EB)                   
+(U+A)| 9A    | Capital I Acute            | Í(U+CD)                   
+(U+A)| 9B    | Capital I Grave            | Ì(U+CC)                   
+(U+A)| 9C    | Capital I Caret            | Î(U+CE)                   
+(U+A)| 9D    | Capital I Diaeresis        | Ï(U+CF)                   
+(U+A)| 9E    | Small I Acute              | í(U+ED)                   
+(U+A)| 9F    | Small I Grave              | ì(U+EC)                   
+(U+A)| A0    | Small I Caret              | î(U+EE)                   
+(U+A)| A1    | Small I Diaeresis          | ï(U+EF)                   
+(U+A)| A2    | Capital O Acute            | Ó(U+D3)                   
+(U+A)| A3    | Capital O Grave            | Ò(U+D2)                   
+(U+A)| A4    | Capital O Caret            | Ô(U+D4)                   
+(U+A)| A5    | Capital O Diaeresis        | Ö(U+D6)                   
+(U+A)| A6    | Small O Acute              | ó(U+F3)                   
+(U+A)| A7    | Small O Grave              | ò(U+F2)                   
+(U+A)| A8    | Small O Caret              | ô(U+F4)                   
+(U+A)| A9    | Small O Diaeresis          | ö(U+F6)                   
+(U+A)| AA    | Capital U Acute            | Ú(U+DA)                   
+(U+A)| AB    | Capital U Grave            | Ù(U+D9)                   
+(U+A)| AC    | Capital U Caret            | Û(U+DB)                   
+(U+A)| AD    | Capital U Diaeresis        | Ü(U+DC)                   
+(U+A)| AE    | Small U Acute              | ú(U+FA)                   
+(U+A)| AF    | Small U Grave              | ù(U+F9)                   
+(U+A)| B0    | Small U Caret              | û(U+FB)                   
+(U+A)| B1    | Small U Diaeresis          | ü(U+FC)                   
+(U+A)| B2    | Capital C Cedilla          | Ç(U+C7)                   
+(U+A)| B3    | Small C Cedilla            | ç(U+E7)                   
+(U+A)| B4    | Capital N Tilde            | Ñ(U+D1)                   
+(U+A)| B5    | Small N Tilde              | ñ(U+F1)                   
+(U+A)| B6    | Accent                     | ´(U+B4)                   
+(U+A)| B7    | Grave                      | `                   
+(U+A)| B8    | Diaeresis                  | ¨(U+A8)                   
+(U+A)| B9    | Inverted Question Mark     | ¿(U+BF)                   
+(U+A)| BA    | Inverted Exclamation Mark  | ¡(U+A1)                   
+(U+A)| BB    | Small Alpha                | α(U+3B1)                   
+(U+A)| BC    | Small Beta                 | β(U+3B2)                   
+(U+A)| BD    | Small Gamma                | γ(U+3B3)                   
+(U+A)| BE    | Capital Delta              | Δ(U+394)                   
+(U+A)| BF    | Small Delta                | δ(U+3B4)                   
+(U+A)| C0    | Small Epsilon              | ε(U+3B5)                   
+(U+A)| C1    | Left Bracket               | [                   
+(U+A)| C2    | Small Lambda               | λ(U+3BB)                   
+(U+A)| C3    | Small Mu                   | μ(U+3BC)                   
+(U+A)| C4    | Small Pi                   | π(U+3C0)                   
+(U+A)| C5    | Small Rho                  | ρ(U+3C1)                   
+(U+A)| C6    | Capital Sigma              | Σ(U+3A3)                   
+(U+A)| C7    | Small Sigma                | σ(U+3C3)                   
+(U+A)| C8    | Small Tau                  | τ(U+3C4)                   
+(U+A)| C9    | Small Phi                  | φ(U+3C6)                   
+(U+A)| CA    | Capital Omega              | Ω(U+3A9)                   
+(U+A)| CB    | X Mean                     | x̄(U+304)                  
+(U+A)| CC    | Y Mean                     | ȳ(U+304)                   
+(U+A)| CD    | Superscript X              | ˣ(U+2E3)                   
+(U+A)| CE    | Ellipsis                   | …(U+2026)                   
+(U+A)| CF    | Left Pointing Triangle     | ◀(U+25C0)                  
+(U+A)| D0    | Block                      | ■(U+25A0)                   
+(U+A)| D1    | Per                        | /                   
+(U+A)| D2    | Hyphen                     | -                   
+(U+A)| D3    | Area                       | ²(U+B2)                   
+(U+A)| D4    | Temperature                | °(U+B0)                   
+(U+A)| D5    | Cube                       | ³(U+B3)                   
+(U+A)| D6    | Enter                      | ↵(U+21B5)                   
+(U+A)| D7    | Imaginary I                | 𝑖(U+1D456)                   
+(U+A)| D8    | P Hat                      | p̂(U+302)                  
+(U+A)| D9    | Small Chi                  | χ(U+3C7)                   
+(U+A)| DA    | Stat F                     | 𝐅(U+1D405)                   
+(U+A)| DB    | Natural Logarithm E        | 𝑒(U+1D452)                   
+(U+A)| DC    | List Capital L             | 𝐋(U+1D40B)                   
+(U+A)| DD    | Finance Capital N          | 𝐍(U+1D40D)                   
+(U+A)| DE    | Two Right Parentheses      | ⸩(U+2E29)                   
+(U+A)| DF    | Block Arrow                | 🮞(U+1FB9E)                   
+(U+A)| E0    | Cursor Overwrite           | █(U+2588)                   
+(U+A)| E1    | Cursor Overwrite Second    | ▓(U+2593)                   
+(U+A)| E2    | Cursor Overwrite Capital A | 🅰(U+1F170)                  
+(U+A)| E3    | Cursor Overwrite Small A   | ⓐ(U+24D0)                  
+(U+A)| E4    | Cursor Insert              | ▏(U+258F)                    
+(U+A)| E5    | Cursor Insert Second       | ▎(U+258E)                    
+(U+A)| E6    | Cursor Insert Capital A    | 🄰(U+1F130)                   
+(U+A)| E7    | Cursor Insert Small A      | ⒜(U+249C)                  
+(U+A)| E8    | Graph Line                 | ─(U+2500)                   
+(U+A)| E9    | Graph Thick                | ═(U+2550)                   
+(U+A)| EA    | Graph Above                | ▔(U+2594)                  
+(U+A)| EB    | Graph Below                | ▁(U+2581)                  
+(U+A)| EC    | Graph Path                 | ∙(U+2219)                   
+(U+A)| ED    | Graph Animate              | ◎(U+25CE)                  
+(U+A)| EE    | Graph Dot                  | •(U+2022)                   
+(U+A)| EF    | Up Block                   | ▀(U+2580)                   
+(U+A)| F0    | Down Block                 | ▄(U+2584)                   
+(U+A)| F1    | Cursor Full                | █(U+2588)                   
+(U+A)| F2    | Dollar Sign                | $                   
+(U+A)| F3    | Square Up                  | 🮝(U+1FB9D)                   
+(U+A)| F4    | Sharp S                    | ß(U+DF)                   
+(U+A)| F5    | Mixed Fraction Separator   | ᳓(U+1CD3)                   
+(U+A)| F6    | Fraction Slash             | ⁄(U+2044)                   
+(U+A)| F7    | Entry Box                  | ☐(U+2610)                  
+(U+A)
+(U+A)## Notes
+(U+A)
+(U+A)* Some TI glyphs have no exact Unicode equivalent.
+(U+A)* Several graphing/cursor symbols are approximated using Unicode block-drawing characters.
+(U+A)* Mathematical italic/bold symbols use the Unicode Mathematical Alphanumeric Symbols block where useful.
+(U+A)* A few glyphs (especially cursor and graph icons) are fundamentally UI sprites rather than text characters.
+(U+A)* The Unicode Symbols for Legacy Computing block (`U+1FB00–(U+2013)U+1FBFF`) provides some unusually close matches for TI-style block graphics.
+(U+A)
