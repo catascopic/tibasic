@@ -3,14 +3,7 @@ The DEG symbol converts a number from radians to degrees if the calculator is in
 You can also write a number in DMS, but it must be a numeric literal, like 180DEG30'3". No expressions are allowed as any of the terms, not even parentheses. However, the terms don't need to be whole numbers.
 Also, trig functions actually do need access to the environment so they can see what mode the calculator is in!
 
-After realizing that I had to redo the eq/ne functions to handle strings, it made me realize that I should go back to my original strategy of using magic methods.
-I've implemented them, but can you take a look at my work? I especially want to know if the matrix operators look good.
-Is there anywhere else I can return NotImplemented to simplify the code?
-
 Make a special VarArray subclass for numerics that stores None as the default, but sets to 0 when you try to access a variable with value None
-
-TiList: change inner to data
-TiMatrix: change rows to data
 
 % operator
 
@@ -18,10 +11,6 @@ empty strings are usually invalid
 
 Instead of _make_variable, have the tokens create the variable. This would be easy since most variable tokens are created in a loop.
 Alternatively, set the variable in __post_init__ so that Variable actually has access to the token object
-
-Tell me about the logic behind if entry_type == 0x000d:
-Make sure new file read/write code makes sense!
-Do this myself with cemetech
 
 according to the nDeriv( page, nDeriv( can be nested up to one time.
 See the file in "webref/Error Conditions - TI-Basic Developer.htm"
@@ -33,6 +22,14 @@ rowswap, etc: better implementations that don't copy unnecessarily
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+Tell me about the logic behind if entry_type == 0x000d:
+Make sure new file read/write code makes sense!
+Do this myself with cemetech
+
+After realizing that I had to redo the eq/ne functions to handle strings, it made me realize that I should go back to my original strategy of using magic methods.
+I've implemented them, but can you take a look at my work? I especially want to know if the matrix operators look good.
+Is there anywhere else I can return NotImplemented to simplify the code?
 
 We actually need a TiString class that contains a list of tokens
 

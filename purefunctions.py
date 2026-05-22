@@ -76,7 +76,7 @@ def xor(a, b):
 def inv(x):
 	if isinstance(x, TiMatrix):
 		return x.inv()
-	return div(1, x)
+	return 1 / x
 
 
 # ── dim ───────────────────────────────────────────────────────────────────────────
@@ -210,9 +210,9 @@ def length(string):
 
 def sub_string(*args):
 	if len(args) == 1:
-		return require_number(args[0]) / 100
+		return require_num(args[0]) / 100
 	if len(args) == 3:
-		string, start, lenth = args
+		string, start, length = args
 		require_str(string)
 		start = require_int(start)
 		length = require_int(length)

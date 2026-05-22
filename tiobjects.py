@@ -16,7 +16,7 @@ def repr_num(value):
 
 def _require_type(value, tp):
 	if not isinstance(value, tp):
-		raise ValueError(f"Invalid value: {value!r}; required: {tp.__name__}")
+		raise TiTypeError(f"Invalid value: {value!r}; required: {tp.__name__}")
 	return value
 
 def require_num(value):
@@ -25,13 +25,13 @@ def require_num(value):
 def require_real(value):
 	require_num(value)
 	if isinstance(value, complex):
-		raise ValueError(f"Expected real number, got complex: {value}")
+		raise TiTypeError(f"Expected real number, got complex: {value}")
 	return value
 
 def require_int(value):
 	require_real(value)
 	if not value.is_integer():
-		raise ValueError(f"Expected integer, got {value}")
+		raise TiTypeError(f"Expected integer, got {value}")
 	return int(value)
 
 def require_list(value):
@@ -205,7 +205,7 @@ class TiMatrix:
 		return self.transform_zip(other, operator.sub) if isinstance(other, TiMatrix) else self.transform(lambda x: x - other)
 	
 	def __rsub__(self, other):
-		return other.transform_zip(self, operator.sub) if isinstance(other, TiMatrix) else self.transform(lambda x: other - x)
+		return self.transform(lambda x: other - x)
 
 	def __matmul__(self, other):
 		if self.cols != other.rows:
@@ -223,7 +223,7 @@ class TiMatrix:
 			return self.transform(lambda x: x * other)
 		if isinstance(other, TiMatrix):
 			return self @ other
-		raise ValueError(f"Cannot multiply matrix by {other}")
+		return NotImplemented
 	
 	def __rmul__(self, other):
 		if isinstance(other, Number):
@@ -249,17 +249,17 @@ class TiMatrix:
 	def __eq__(self, other):
 		if isinstance(other, TiMatrix):
 			return self.data == other.data
-		raise ValueError(f"Expected matrix, got {other}")
+		raise TiTypeError(f"Cannot compare matrix with {type(other).__name__}")
 	
 	# get __ne__ for free
 	
 	def __neg__(self):
-		return transform(operator.neg)
+		return self.transform(operator.neg)
 	
 	def inv(self):
 		n = self.rows
 		if self.cols != n:
-			raise ValueError(f"inv: matrix must be square, got {m.rows}×{m.cols}")
+			raise ValueError(f"inv: matrix must be square, got {self.rows}×{self.cols}")
 		
 		aug = [row.copy() + [1 if i == j else 0 for j in range(n)] for i, row in enumerate(self.data)]
 		for col in range(n):
@@ -301,12 +301,12 @@ class TiString:
 	def __add__(self, other):
 		if isinstance(other, TiString):
 			return TiString(self.tokens + other.tokens)
-		raise ValueError(f"Expected string but got {other}")
+		raise TiTypeError(f"Expected string but got {other}")
 
 	def __eq__(self, other):
 		if isinstance(other, TiString):
 			return self.tokens == other.tokens
-		raise ValueError(f"Expected string but got {other}")
+		raise TiTypeError(f"Expected string but got {other}")
 
 	def __str__(self):
 		return ''.join(t.text for t in self.tokens)

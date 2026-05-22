@@ -154,9 +154,9 @@ LIST_PREFIX = token(b'\xeb', '∟')
 RAD       = token(b'\x0a', 'ʳ',	postfix=lambda x: x)
 DEG       = token(b'\x0b', '°',	postfix=math.radians)
 INV       = token(b'\x0c', '⁻¹',	postfix=pf.inv)
-SQ        = token(b'\x0d', '²',	postfix=lambda x: pf.pow(x, 2))
+SQ        = token(b'\x0d', '²',	postfix=lambda x: x**2)
 TRANSPOSE = token(b'\x0e', 'ᵀ',	postfix=pf.transpose)
-CUBE      = token(b'\x0f', '³',	postfix=lambda x: pf.pow(x, 3))
+CUBE      = token(b'\x0f', '³',	postfix=lambda x: x**3)
 FACT      = token(b'\x2d', '!',	postfix=pf.factorial)
 
 # Binary operators
