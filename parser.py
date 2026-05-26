@@ -153,23 +153,40 @@ class Parser:
 		self._struct_depth -= 1
 		return TiMatrix(rows)
 
-	def _capture_inner(self, out: list[Token]) -> None:
-		"""Consume tokens into out until the matching closing paren (inclusive).
-		Used inside a nested function call where commas are interior, not delimiters."""
+	def _capture_opener(self, out: list[Token], closer: Token) -> None:
+		"""Consume tokens into out until `closer` is found (inclusive).
+		Recurses into any nested openers encountered on the way, so commas
+		inside nested delimiters are never mistaken for argument separators."""
 		while self.pos < len(self.tokens):
 			t = self.tokens[self.pos]
-			if t is R_PAREN:
+			if t is closer:
 				out.append(t)
 				self.pos += 1
 				return
 			out.append(t)
 			self.pos += 1
 			if t.function is not None or t is L_PAREN:
-				self._capture_inner(out)
+				self._capture_opener(out, R_PAREN)
+			elif t is L_BRACE:
+				self._capture_opener(out, R_BRACE)
+			elif t is L_BRACKET:
+				self._capture_opener(out, R_BRACKET)
+			elif t is QUOTE:
+				self._capture_string(out)
+
+	def _capture_string(self, out: list[Token]) -> None:
+		"""Consume tokens verbatim until (and including) the closing QUOTE."""
+		while self.pos < len(self.tokens):
+			t = self.tokens[self.pos]
+			out.append(t)
+			self.pos += 1
+			if t is QUOTE:
+				return
 
 	def _capture_subgroup(self, out: list[Token]) -> None:
-		"""Collect tokens into out until a top-level comma or unmatched ).
-		Correctly handles nested function calls (commas inside them are not delimiters)."""
+		"""Collect tokens into out until a top-level COMMA or R_PAREN.
+		Skips over nested function calls, list/matrix literals, and strings
+		so their interior commas are never mistaken for argument separators."""
 		while self.pos < len(self.tokens):
 			t = self.tokens[self.pos]
 			if t is COMMA or t is R_PAREN:
@@ -177,7 +194,13 @@ class Parser:
 			out.append(t)
 			self.pos += 1
 			if t.function is not None or t is L_PAREN:
-				self._capture_inner(out)
+				self._capture_opener(out, R_PAREN)
+			elif t is L_BRACE:
+				self._capture_opener(out, R_BRACE)
+			elif t is L_BRACKET:
+				self._capture_opener(out, R_BRACKET)
+			elif t is QUOTE:
+				self._capture_string(out)
 
 	def capture(self) -> Thunk:
 		"""Return a Thunk for the tokens up to the next top-level comma or )."""

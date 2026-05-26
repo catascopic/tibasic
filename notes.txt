@@ -27,6 +27,8 @@ Go through all commands, check to see if they're vectorized correctly
 
 use Token instead of string as nesting key
 
+_parse_inner might just need delimiter stack
+
 ********
 
 according to the nDeriv( page, nDeriv( can be nested up to one time.

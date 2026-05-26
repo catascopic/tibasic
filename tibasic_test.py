@@ -1079,3 +1079,40 @@ class TestIllegalNest:
 		assert env.ans == approx(3.0)
 		parse_line([T('expr('), str1, R_PAREN], env)   # second call — must not raise
 		assert env.ans == approx(3.0)
+
+
+# ── Thunk capture: commas inside nested delimiters ────────────────────────────
+
+class TestThunkCapture:
+	"""Verify that _capture_subgroup and _capture_opener correctly skip over
+	commas inside list literals, matrix literals, and string literals so they
+	are not mistaken for argument separators."""
+
+	def test_list_literal_in_seq_formula(self, env):
+		# seq({1,2,3}(X), X, 1, 3) — commas inside {} must not split the thunk
+		# {1,2,3}(X) indexes the list at position X: result is {1,2,3}
+		X = T('X')
+		parse_line(toks(
+			T('seq('), L_BRACE, 1, COMMA, 2, COMMA, 3, R_BRACE, L_PAREN, X, R_PAREN,
+			COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
+		), env)
+		assert env.ans == TiList([1, 2, 3])
+
+	def test_multi_arg_func_in_seq_formula(self, env):
+		# seq(max(X,10), X, 8, 12) — commas inside max(...) must not split the thunk
+		X = T('X')
+		parse_line(toks(
+			T('seq('), T('max('), X, COMMA, 10, R_PAREN,
+			COMMA, X, COMMA, 8, COMMA, 12, R_PAREN
+		), env)
+		assert env.ans == TiList([10, 10, 10, 11, 12])
+
+	def test_string_literal_in_seq_formula(self, env):
+		# seq(length("a,b"), X, 1, 3) — the comma in the string must not split the thunk
+		# "a,b" has length 3; result should be {3,3,3}
+		X = T('X')
+		parse_line(toks(
+			T('seq('), T('length('), QUOTE, T('a'), T(','), T('b'), QUOTE, R_PAREN,
+			COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
+		), env)
+		assert env.ans == TiList([3, 3, 3])
