@@ -10,12 +10,7 @@ Go through tokens, link any methods that are currently unlinked, such as augment
 
 Commands: no paren flag
 
-Implement expr
-Can you implement and link the following functions?
-getDate, getTmStr, getDtStr, dayOfWk, timeCnv, setTmFmt, setDtFmt, checkTmr, setTime, setDate, dbd
-I'm not sure how we should implement get/set time. Maybe have a field in Environment that's an offset from the system time?
-
-
+Can you implement expr, and also create a decorator for forms functions that only need the environment and don't need any special parsing?
 
 Write tests!
 
@@ -38,6 +33,12 @@ Full token overhaul: operators and bp are okay, everything else moved to dispatc
 move vectorized to tiobjects
 
 ********
+
+Can you implement expr, and also create a decorator for forms functions that only need the environment and don't need any special parsing?
+
+Can you implement and link the following functions?
+getDate, getTmStr, getDtStr, dayOfWk, timeCnv, setTmFmt, setDtFmt, checkTmr, setTime, setDate, dbd
+I'm not sure how we should implement get/set time. Maybe have a field in Environment that's an offset from the system time?
 
 I tested this on the calculator:
 In Radians mode:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 import operator
 import purefunctions
+from functools import wraps
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -8,7 +9,7 @@ if TYPE_CHECKING:
 	from tokens import Token
 
 from contextlib import contextmanager
-from tiobjects import TiList, TiMatrix, require_real
+from tiobjects import TiList, TiMatrix, require_real, require_str
 from environment import Variable
 
 
@@ -315,35 +316,51 @@ def fill(a: ArgParser):
 		raise ValueError(f"fill: expected list or matrix, got {type(lst).__name__}")
 
 
+# ── env_func decorator ────────────────────────────────────────────────────────
+
+def env_func(f):
+	"""Convert an (env, arg1, ...) function into an ArgParser handler."""
+	@wraps(f)
+	def wrapper(a: ArgParser):
+		return f(a.env, *a.parse_args())
+	return wrapper
+
+
+# ── expr( ─────────────────────────────────────────────────────────────────────
+
+@env_func
+def expr(env, string):
+	"""Evaluate a TiString as a TI-BASIC expression."""
+	from parser import Parser
+	return Parser(require_str(string).tokens, env).parse_expr()
+
+
 # ── Clock / date-time commands and functions ──────────────────────────────────
 
-def set_date(a: ArgParser) -> None:
-	a.env.set_date(a.expr(), a.expr(), a.expr())
-	a.end()
+@env_func
+def set_date(env, year, month, day):
+	env.set_date(year, month, day)
 
-def set_time(a: ArgParser) -> None:
-	a.env.set_time(a.expr(), a.expr(), a.expr())
-	a.end()
+@env_func
+def set_time(env, hour, minute, second):
+	env.set_time(hour, minute, second)
 
-def check_tmr(a: ArgParser):
-	start = a.expr()
-	a.end()
-	return a.env.check_tmr(start)
+@env_func
+def check_tmr(env, start):
+	return env.check_tmr(start)
 
-def set_dt_fmt(a: ArgParser) -> None:
-	a.env.set_dt_fmt(a.expr())
-	a.end()
+@env_func
+def set_dt_fmt(env, fmt):
+	env.set_dt_fmt(fmt)
 
-def set_tm_fmt(a: ArgParser) -> None:
-	a.env.set_tm_fmt(a.expr())
-	a.end()
+@env_func
+def set_tm_fmt(env, fmt):
+	env.set_tm_fmt(fmt)
 
-def get_dt_str(a: ArgParser):
-	fmt = a.expr()
-	a.end()
-	return a.env.get_dt_str(fmt)
+@env_func
+def get_dt_str(env, fmt):
+	return env.get_dt_str(fmt)
 
-def get_tm_str(a: ArgParser):
-	fmt = a.expr()
-	a.end()
-	return a.env.get_tm_str(fmt)
+@env_func
+def get_tm_str(env, fmt):
+	return env.get_tm_str(fmt)

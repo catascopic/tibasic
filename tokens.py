@@ -579,7 +579,7 @@ TOKENS: list[Token] = [
     token(b'\xbb\x27', 'imag(',   pure_func=pf.imag),
     token(b'\xbb\x28', 'angle(',  pure_func=pf.angle),
     token(b'\xbb\x29', 'cumSum(', pure_func=pf.cum_sum),
-    token(b'\xbb\x2a', 'expr('),
+    token(b'\xbb\x2a', 'expr(',     func=forms.expr),
     token(b'\xbb\x2b', 'length(', pure_func=pf.length),
     token(b'\xbb\x2c', 'ΔList(', pure_func=pf.delta_list),
     token(b'\xbb\x2d', 'ref(',  pure_func=pf.ref),
