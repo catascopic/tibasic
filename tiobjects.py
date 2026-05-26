@@ -199,13 +199,13 @@ class TiMatrix:
 		]
 
 	def get_row(self, r) -> list:
-		n = _check_int(r)
+		n = require_int(r)
 		if not (1 <= n <= self.rows):
 			raise IndexError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
 		return self.data[n - 1].copy()
 
 	def set_row(self, r, row: list) -> None:
-		n = _check_int(r)
+		n = require_int(r)
 		if not (1 <= n <= self.rows):
 			raise IndexError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
 		self.data[n - 1] = row

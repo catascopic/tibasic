@@ -6,11 +6,12 @@ Environment: screen
 96 columns, 64 rows
 What's the best data structure for this?
 
-Go through tokens, link any methods that are currently unlinked, such as augment
+Commands: no paren flag? Or use argparser to do it manually
 
-Commands: no paren flag
+Make sure deg symbol vs D/M/S format is working
 
-Can you implement expr, and also create a decorator for forms functions that only need the environment and don't need any special parsing?
+can you change timecnv to use divmod?
+Also, in general, please don't use semicolons in python to separate statements! I prefer to put everything on its own line. I'm fine with sometimes aligning columns with whitespace.
 
 Write tests!
 
@@ -21,6 +22,8 @@ Alternatively, set the variable in __post_init__ so that Variable actually has a
 
 according to the nDeriv( page, nDeriv( can be nested up to one time.
 See the file in "webref/Error Conditions - TI-Basic Developer.htm"
+expr can't be nested at all.
+What's the best way to handle this?
 
 add a peek method for ArgParser that just calles _parser.peek()
 
@@ -33,6 +36,10 @@ Full token overhaul: operators and bp are okay, everything else moved to dispatc
 move vectorized to tiobjects
 
 ********
+
+
+Go through tokens, link any methods that are currently unlinked, such as augment
+Can you implement expr, and also create a decorator for forms functions that only need the environment and don't need any special parsing?
 
 Can you implement expr, and also create a decorator for forms functions that only need the environment and don't need any special parsing?
 
