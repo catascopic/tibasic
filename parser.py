@@ -33,6 +33,9 @@ class Parser:
 		self.pos = 0
 		self.env = env
 		self._struct_depth = 0
+	
+	def __repr__(self):
+		return f"tokens={self.tokens}, pos={self.pos}"
 
 	# ── Primitives ─────────────────────────────────────────────────────────────
 
@@ -174,7 +177,7 @@ class Parser:
 				raise ParseError(f"Unexpected {t.text!r} inside function arguments")
 			elif t is QUOTE:
 				in_string = True
-			elif not stack and (t is COMMA or t is R_PAREN):
+			elif not stack and t in {COMMA, R_PAREN}:
 				break
 			elif stack and t is stack[-1]:
 				stack.pop()
@@ -245,8 +248,8 @@ class Parser:
 			self.close_delimiter(R_PAREN)
 			return val
 
+		# special case: this is the only prefix unary operator
 		if t is NEG:
-			# special case: this is the only prefix unary operator
 			return -self.parse_expr(65)
 
 		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ3 = 1000, ᴇ−3 = 0.001)
@@ -311,21 +314,18 @@ class Parser:
 				lhs = self.env.to_degrees(lhs)
 				continue
 
-			t = self.peek()
-
 			# ᴇ (scientific notation): RHS must be a numeric literal, not a general expression.
 			# No min_bp guard needed — the RHS is always a bare literal, never a sub-expression,
 			# so ᴇ binds maximally tight (tighter than ^) with no Pratt conflict to worry about.
-			if t is SCI_E:
-				self.advance()
+			if self.eat_if(SCI_E):
 				lhs = lhs * 10 ** self.parse_sci_e_exp()
 				continue
+
+			t = self.peek()
 
 			# Postfix operators
 			# make a .eat_if_flag method if I make flags for tokens after decoupling from functions
 			if t.postfix:
-				if 80 <= min_bp:  # currently never true, consider removing after design is finalized
-					break
 				self.advance()
 				lhs = t.postfix(lhs)
 				continue
@@ -490,43 +490,46 @@ if __name__ == '__main__':
 			if isinstance(obj, Token):
 				tokens.append(obj)
 			elif isinstance(obj, int):
-				tokens.append(digits[obj])
+				for c in str(obj):
+					tokens.append(str_to_token[c])
 			elif isinstance(obj, str):
-				if obj.startswith('&'):
-					tokens.append(str_to_token[obj[1:]])
-				else:
+				try:
+					tokens.append(str_to_token[obj])
+				except KeyError:
 					for c in obj:
 						tokens.append(str_to_token[c])
 			else:
 				tokens.append(TOKEN_TABLE[obj])
+
 		print('>>', ''.join(t.text for t in tokens))
 		parse_line(tokens, env)
 		print('<<', env.ans)
 
 	env.angle_mode = 'DEG'
 	
-	# test('&⑽^(', '{1,10')
+	test('{1,2,3}(2)')
+	# test('⑽^(', '{1,10')
 	# test('5°')
 	# test('5°5\'5"')
-	test('2^3',SCI_E,2)
-	# test('"a',STORE,'&Str1')
+	# test('2^3',SCI_E,2)
+	# test('"a',STORE,'Str1')
 	# test('1°ʳ')
-	# test('([[1,2][3,4',STORE,'&[A]')
-	# test('&[A]','+[[5,6],[7,8]]')
-	# test('&[A]','^4')
-	# test('&[A]')
-	# test('&length(', '"', '& or ')
+	# test('([[1,2][3,4',STORE,'[A]')
+	# test('[A]','+[[5,6],[7,8]]')
+	# test('[A]','^4')
+	# test('[A]')
+	# test('length(', '"', ' or ')
 	# test('{1,2,3}',SCI_E,'{1,2,3}')
-	# test('[[2','&dim(','{1,2,3]')
-	# test('&rand', '(5')
-	# test('[[1:[[','&Ans','(1,1')
-	# test('{5,5',STORE,'&dim(',(0x5C,0))
+	# test('[[2','dim(','{1,2,3]')
+	# test('rand', '(5')
+	# test('[[1:[[','Ans','(1,1')
+	# test('{5,5',STORE,'dim(',(0x5C,0))
 	# test('{5',STORE,LIST_PREFIX,'AB')
-	# test(0,STORE,'&dim(',(0x5D,0))
+	# test(0,STORE,'dim(',(0x5D,0))
 	# test(1,STORE,'A:3',STORE,'B')
 	# test('[[1,2.5],[π,4]]')
-	# test('&randM(','3,4')
-	# test('&Ans',STORE,(0x5C,0))
+	# test('randM(','3,4')
+	# test('Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
 	# print(env.numerics)
 	env.dump()

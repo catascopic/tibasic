@@ -11,7 +11,6 @@ Also, trig functions actually do need access to the environment so they can see 
 Instead of _make_variable, have the tokens create the variable. This would be easy since most variable tokens are created in a loop.
 Alternatively, set the variable in __post_init__ so that Variable actually has access to the token object
 
-
 add a peek method for ArgParser that just calles _parser.peek()
 
 rowswap, etc: better implementations that don't copy unnecessarily
@@ -26,6 +25,33 @@ move vectorized to tiobjects
 Go through all commands, check to see if they're vectorized correctly
 
 use Token instead of string as nesting key
+
+ASCII token lookup
+get ascii
+getDtStr/getTmStr
+should use hard-coded tokens!
+
+tests:
+freq_list
+time test: could tests fail if the clock is right between seconds?
+I like how the toks utility method tries to full-match strings before parsing them as chars, but can we leverage that more in the tests?
+For example, instead of:
+parse_line(toks(T('sum('), T('seq('), X, COMMA, X, COMMA, 1, COMMA, 4, R_PAREN, R_PAREN), env)
+We can just do:
+parse_line(toks('sum(', 'seq(', 'X,X,1,4))'), env)
+The T() function should probably not be necessary.
+But can we cut down on the boilerplate even more? Instead of parse_line(toks(...), env) is there a way to just do: run('2X', STORE, 'A') or something like that?
+Run would have a varargs of token-parseable objects and a kwarg for env. Is this doable in the test framework?
+Remember, `TiList == ...` does not return a boolean! To check the value of a TiList, you have to do `ti_list.data == ...` or `list(ti_list)`
+
+new function paradigm: decorators for everything
+
+check that date/time formats are correct
+
+enum for RADIAN/DEGREE
+make them IntEnums for easier testing?
+
+Not sure what to do about tokens/text
 
 ********
 

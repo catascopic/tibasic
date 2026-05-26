@@ -131,6 +131,16 @@ def token(
 
 # ── Named syntactic tokens (referenced by identity in the parser) ──────────────
 
+DIGITS   = [token(bytes([0x30 + i]), chr(0x30 + i))        for i in range(10)]
+LETTERS  = [token(bytes([0x41 + i]), chr(0x41 + i))        for i in range(26)]
+THETA    = token(b'\x5b', 'θ')
+MATRICES = [token(bytes([0x5c, i]), f'[{chr(0x41 + i)}]')  for i in range(10)]
+LISTS    = [token(bytes([0x5d, i]), f'L{chr(0x2081 + i)}') for i in range(6) ]
+PICTURES = [token(bytes([0x60, i]), f'Pic{(i + 1) % 10}')  for i in range(10)]
+GDBS     = [token(bytes([0x61, i]), f'GDB{(i + 1) % 10}')  for i in range(10)]
+STRINGS  = [token(bytes([0xaa, i]), f'Str{(i + 1) % 10}')  for i in range(10)]
+
+
 # Structural / delimiter
 STORE       = token(b'\x04', '→')
 L_BRACKET   = token(b'\x06', '[')
@@ -231,7 +241,7 @@ TOKENS: list[Token] = [
     FACT,
     token(b'\x2e', 'CubicReg '),
     token(b'\x2f', 'QuartReg '),
-    *[token(bytes([0x30 + i]), chr(0x30 + i)) for i in range(10)],
+    *DIGITS,
     DOT, 
 	SCI_E, 
 	OR, 
@@ -239,9 +249,8 @@ TOKENS: list[Token] = [
 	COLON, 
 	NEWLINE, 
 	AND,
-    # Variables A–Z (0x41–0x5A)
-    *[token(bytes([0x41 + i]), chr(0x41 + i)) for i in range(26)],
-    token(b'\x5b', 'θ'),
+    *LETTERS,
+    THETA,
     PRGM,
     token(b'\x64', 'Radian'),
     token(b'\x65', 'Degree'),
@@ -395,33 +404,17 @@ TOKENS: list[Token] = [
     token(b'\xfd', 'xyLine'),
     token(b'\xfe', 'Scatter'),
     token(b'\xff', 'LinReg(ax+b) '),
-
-    # Two-byte: Matrix variables 0x5C xx
-    *[token(bytes([0x5c, i]), f'[{chr(0x41 + i)}]') for i in range(10)],
-
-    # Two-byte: List variables 0x5D xx
-    *[token(bytes([0x5d, i]), f'L{chr(0x2081 + i)}') for i in range(0, 6)],
-
-    # Two-byte: Y= equation variables 0x5E xx
+    *MATRICES,
+	*LISTS,
     *[token(bytes([0x5e, 0x10 + i]), f'Y{chr(0x2080 + (i + 1) % 10)}') for i in range(10)], 
     *[token(bytes([0x5e, 0x20 + i]), f'{x}{chr(0x2080 + n)}ₜ') for i, (n, x) in enumerate(itertools.product(range(1, 7), 'XY'))],
-
     *[token(bytes([0x5e, 0x40 + i]), f'r{chr(0x2081 + i)}') for i in range(6)],
-
-    token(b'\x5e\x80', 'u'),
-    token(b'\x5e\x81', 'v'),
-    token(b'\x5e\x82', 'w'),
-
-    # Two-byte: Picture variables 0x60 xx
-    *[token(bytes([0x60, i]), f'Pic{(i + 1) % 10}') for i in range(10)],
-
-    # Two-byte: GDB variables 0x61 xx
-    *[token(bytes([0x61, i]), f'GDB{(i + 1) % 10}') for i in range(10)],
-
-    # Two-byte: String variables 0xAA xx (Str1=0x00 … Str9=0x08, Str0=0x09)
-    *[token(bytes([0xaa, i]), f'Str{(i + 1) % 10}') for i in range(10)],
-
-    # Two-byte: Statistics variables 0x62 xx
+    token(b'\x5e\x80', '𝑢'),
+    token(b'\x5e\x81', '𝑣'),
+    token(b'\x5e\x82', '𝑤'),
+	*PICTURES,
+	*GDBS,
+	*STRINGS,
     token(b'\x62\x01', 'RegEq'),
     token(b'\x62\x02', 'n'),
     token(b'\x62\x03', 'ẍ'),
@@ -464,7 +457,7 @@ TOKENS: list[Token] = [
     token(b'\x62\x28', 'ṕ'),
     token(b'\x62\x29', 'ṕ₁'),
     token(b'\x62\x2a', 'ṕ₂'),
-    token(b'\x62\x2b', 'ẍ'),
+    token(b'\x62\x2b', 'ẍ₁'),
     token(b'\x62\x2c', 'Sx₁'),
     token(b'\x62\x2d', 'n₁'),
     token(b'\x62\x2e', 'ẍ₂'),
@@ -683,7 +676,7 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x98', 'Ñ'),
 	token(b'\xbb\x99', 'ñ'),
     token(b'\xbb\x9a', '´'),
-    token(b'\xbb\x9b', '`'),
+    token(b'\xbb\x9b', 'ˋ'),  # "Combining grave accent"
     token(b'\xbb\x9c', '¨'),
     token(b'\xbb\x9d', '¿'),
     token(b'\xbb\x9e', '¡'),
@@ -695,14 +688,14 @@ TOKENS: list[Token] = [
     token(b'\xbb\xa4', 'ε'),
     token(b'\xbb\xa5', 'λ'),
     token(b'\xbb\xa6', 'μ'),
-    token(b'\xbb\xa7', 'π'),
+    token(b'\xbb\xa7', '𝛑'),  # bold pi
     token(b'\xbb\xa8', 'ρ'),
     token(b'\xbb\xa9', 'Σ'),
     token(b'\xbb\xab', 'φ'),
     token(b'\xbb\xac', 'Ω'),
     token(b'\xbb\xad', 'ψ'),
     token(b'\xbb\xae', 'χ'),
-    token(b'\xbb\xaf', '𝐅'),
+    token(b'\xbb\xaf', '𝟊'),  # Using digamma symbol
 	token(b'\xbb\xb0', 'a'),
 	token(b'\xbb\xb1', 'b'),
 	token(b'\xbb\xb2', 'c'),
@@ -760,8 +753,8 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xe8', '₈'),
 	token(b'\xbb\xe9', '₉'),
 	token(b'\xbb\xea', '⑽'),
-    token(b'\xbb\xeb', '←'),
-    token(b'\xbb\xec', '→'),
+    token(b'\xbb\xeb', '◄'),
+    token(b'\xbb\xec', '🡆'),
     token(b'\xbb\xed', '↑'),
     token(b'\xbb\xee', '↓'),
     token(b'\xbb\xf0', '𝑥'),  # italic x to differentiate
@@ -772,8 +765,8 @@ TOKENS: list[Token] = [
     token(b'\xbb\xf5', '≛'),
 
     # Two-byte: TI-84+ extended tokens 0xEF xx
-    token(b'\xef\x00', 'setDate(',   cmd=forms.set_date),
-    token(b'\xef\x01', 'setTime(',   cmd=forms.set_time),
+    token(b'\xef\x00', 'setDate(',  cmd=forms.set_date),
+    token(b'\xef\x01', 'setTime(',  cmd=forms.set_time),
     token(b'\xef\x02', 'checkTmr(', func=forms.check_tmr),
     token(b'\xef\x03', 'setDtFmt(', cmd=forms.set_dt_fmt),
     token(b'\xef\x04', 'setTmFmt(', cmd=forms.set_tm_fmt),
@@ -787,8 +780,8 @@ TOKENS: list[Token] = [
     token(b'\xef\x0c', 'getDtFmt',  nullary=Environment.get_dt_fmt),
     token(b'\xef\x0d', 'getTmFmt',  nullary=Environment.get_tm_fmt),
     token(b'\xef\x0e', 'isClockOn', nullary=Environment.is_clock_on),
-    token(b'\xef\x0f', 'ClockOff', cmd=lambda a: setattr(a.env, 'clock_on', False)),
-    token(b'\xef\x10', 'ClockOn',  cmd=lambda a: setattr(a.env, 'clock_on', True)),
+    token(b'\xef\x0f', 'ClockOff',  cmd=Environment.clock_off),
+    token(b'\xef\x10', 'ClockOn',   cmd=Environment.clock_on),
     token(b'\xef\x11', 'OpenLib('),
     token(b'\xef\x12', 'ExecLib'),
     token(b'\xef\x13', 'invT(',     pure_func=pf.invt),
@@ -864,6 +857,13 @@ TOKEN_TABLE = TokenTable(TOKENS)
 
 
 if __name__ == '__main__':
+	
+	lookup = {}
+
 	for token in TOKENS:
-		if not token.text.isascii():
-			print(token)
+		try:
+			dup = lookup[token.text]
+		except KeyError:
+			lookup[token.text] = token
+			continue
+		print(dup, token)

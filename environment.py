@@ -166,66 +166,62 @@ class Environment:
 		return x / (math.pi / 180) if self.angle_mode == 'DEG' else x
 
 	def set_random_seed(self, value):
-		random.seed(value)
+		random.seed(require_int(value))
 
 	# ── Virtual clock ────────────────────────────────────────────────────────────
 
-	def _virtual_now(self) -> datetime:
+	def _now(self) -> datetime:
 		"""Current datetime adjusted by any offset set via setDate/setTime."""
 		return datetime.now() + self._datetime_offset
 
 	def set_date(self, year, month, day):
 		now = datetime.now()
 		v = now + self._datetime_offset
-		new_v = datetime(require_int(year), require_int(month), require_int(day),
-		                 v.hour, v.minute, v.second)
+		new_v = datetime(require_int(year), require_int(month), require_int(day), v.hour, v.minute, v.second)
 		self._datetime_offset = new_v - now
 
 	def set_time(self, hour, minute, second):
 		now = datetime.now()
 		v = now + self._datetime_offset
-		new_v = datetime(v.year, v.month, v.day,
-		                 require_int(hour), require_int(minute), require_int(second))
+		new_v = datetime(v.year, v.month, v.day, require_int(hour), require_int(minute), require_int(second))
 		self._datetime_offset = new_v - now
 
 	def check_tmr(self, start):
-		return int(self._virtual_now().timestamp()) - int(require_real(start))
+		return int(self._now().timestamp()) - int(require_real(start))
 
 	def set_dt_fmt(self, fmt):
-		self.dt_fmt = require_int(fmt)
+		fmt = require_int(fmt)
+		if fmt not in {1, 2, 3}:
+			raise ValueError(f"setDtFmt: expected 1, 2, or 3; got {fmt}")
+		self.dt_fmt = fmt
 
 	def set_tm_fmt(self, fmt):
 		fmt = require_int(fmt)
-		if fmt not in (12, 24):
-			raise ValueError(f"setTmFmt: expected 12 or 24, got {fmt}")
+		if fmt not in {12, 24}:
+			raise ValueError(f"setTmFmt: expected 12 or 24; got {fmt}")
 		self.tm_fmt = fmt
 
 	def get_dt_str(self, fmt):
-		d = self._virtual_now().date()
 		fmt = require_int(fmt)
-		yy = f"{d.year % 100:02d}"
-		if fmt == 1:
-			s = f"{d.month}/{d.day}/{yy}"
-		elif fmt == 2:
-			s = f"{d.day}/{d.month}/{yy}"
-		elif fmt == 3:
-			s = f"{yy}/{d.month}/{d.day}"
-		else:
+		if fmt not in {1, 2, 3}:
 			raise ValueError(f"getDtStr: invalid format {fmt}")
-		return TiString.from_str(s)
+		return TiString.from_str(self._now().strftime(['%m/%d/%y', '%d/%m/%y', '%y/%m/%d'][fmt - 1]))
 
 	def get_tm_str(self, fmt):
-		t = self._virtual_now().time()
 		fmt = require_int(fmt)
 		if fmt == 24:
-			s = f"{t.hour:02d}:{t.minute:02d}:{t.second:02d}"
+			fmt_str = '%H:%M:%S'
 		elif fmt == 12:
-			h = t.hour % 12 or 12
-			ampm = "AM" if t.hour < 12 else "PM"
-			s = f"{h}:{t.minute:02d}:{t.second:02d}{ampm}"
+			fmt_str = '%I:%M:%S %p'
 		else:
 			raise ValueError(f"getTmStr: invalid format {fmt}")
-		return TiString.from_str(s)
+		return TiString.from_str(self._now().strftime(fmt_str))
+
+	def clock_on(self):
+		self.clock_on = True
+	
+	def clock_off(self):
+		self.clock_on = False
 
 	# ── Nullary helpers (used by nullary= fields in tokens) ──────────────────────
 
@@ -233,15 +229,15 @@ class Environment:
 		return self.ans
 
 	def get_date(self):
-		d = self._virtual_now().date()
+		d = self._now()
 		return TiList([d.year, d.month, d.day])
 
 	def get_time(self):
-		t = self._virtual_now().time()
+		t = self._now()
 		return TiList([t.hour, t.minute, t.second])
 
 	def start_tmr(self):
-		return int(self._virtual_now().timestamp())
+		return int(self._now().timestamp())
 
 	def get_dt_fmt(self):
 		return self.dt_fmt
@@ -250,7 +246,7 @@ class Environment:
 		return self.tm_fmt
 
 	def is_clock_on(self):
-		return int(self.clock_on)
+		return self.clock_on
 
 	def get_key(self):
 		return self.key_code
@@ -258,7 +254,7 @@ class Environment:
 	def rand(self):
 		return random.random()
 
-	def iter_values(self):
+	def _iter_values(self):
 		for field in ('numerics', 'lists', 'matrices', 'strings'):
 			yield from getattr(self, field).iter_values()
 		for name, lst in self.user_lists.items():
@@ -266,5 +262,5 @@ class Environment:
 		yield "Ans", self.ans
 
 	def dump(self):
-		for name, value in self.iter_values():
+		for name, value in self._iter_values():
 			print(f"{name:8}= {value!r}")

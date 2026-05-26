@@ -8,7 +8,7 @@ import purefunctions as pf
 from environment import Environment
 from parser import parse_line, ParseError
 from tokens import (
-	TOKENS, Token,
+	TOKENS, Token, TOKEN_TABLE,
 	STORE, COMMA, QUOTE, COLON, DOT, NEG, DEG, APOS, SCI_E,
 	ADD, SUB, MUL, DIV, POW, XROOT, FACT, NPR, NCR,
 	EQ, LT, GT, LE, GE, NE, AND, OR, XOR,
@@ -20,34 +20,38 @@ from tiobjects import TiList, TiMatrix, TiString
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-_by_text = {t.text: t for t in reversed(TOKENS)}
+text_to_token = {t.text: t for t in reversed(TOKENS)}
 
 def T(text: str) -> Token:
 	"""Look up a token by its display text."""
-	return _by_text[text]
+	return text_to_token[text]
 
-def toks(*items) -> list[Token]:
+def _iter_chars(obj):
+	for c in str(obj):
+		yield text_to_token[c]
+
+def _iter_tokens(line):
+	for obj in line:
+		if isinstance(obj, Token):
+			yield obj
+		elif isinstance(obj, (int, float)):
+			yield from _iter_chars(str(obj))
+		elif isinstance(obj, str):
+			try:
+				yield text_to_token[obj]
+			except KeyError:
+				yield from _iter_chars(obj)
+		else:
+			yield TOKEN_TABLE[obj]
+
+def toks(*line) -> list[Token]:
 	"""Build a token list.
 	- Token     → used directly
 	- int ≥ 0  → tokenised digit-by-digit
 	- str in token table → that token
 	- other str → each character looked up individually
 	"""
-	result = []
-	for item in items:
-		if isinstance(item, Token):
-			result.append(item)
-		elif isinstance(item, int) and item >= 0:
-			for c in str(item):
-				result.append(_by_text[c])
-		elif isinstance(item, str):
-			tok = _by_text.get(item)
-			if tok is not None:
-				result.append(tok)
-			else:
-				for c in item:
-					result.append(_by_text[c])
-	return result
+	return list(_iter_tokens(line))
 
 def calc(*items, env: Environment | None = None):
 	"""Evaluate a token sequence and return Ans."""
@@ -558,17 +562,17 @@ class TestDateTime:
 	def test_dt_str_fmt1(self):
 		e = Environment()
 		e.set_date(2020, 6, 15)
-		assert str(e.get_dt_str(1)) == "6/15/20"
+		assert str(e.get_dt_str(1)) == "06/15/20"
 
 	def test_dt_str_fmt2(self):
 		e = Environment()
 		e.set_date(2020, 6, 15)
-		assert str(e.get_dt_str(2)) == "15/6/20"
+		assert str(e.get_dt_str(2)) == "15/06/20"
 
 	def test_dt_str_fmt3(self):
 		e = Environment()
 		e.set_date(2020, 6, 15)
-		assert str(e.get_dt_str(3)) == "20/6/15"
+		assert str(e.get_dt_str(3)) == "20/06/15"
 
 	def test_tm_str_24h(self):
 		e = Environment()
@@ -578,12 +582,12 @@ class TestDateTime:
 	def test_tm_str_12h_pm(self):
 		e = Environment()
 		e.set_time(14, 30, 5)
-		assert str(e.get_tm_str(12)) == "2:30:05PM"
+		assert str(e.get_tm_str(12)) == "02:30:05 PM"
 
 	def test_tm_str_12h_am(self):
 		e = Environment()
 		e.set_time(9, 5, 0)
-		assert str(e.get_tm_str(12)) == "9:05:00AM"
+		assert str(e.get_tm_str(12)) == "09:05:00 AM"
 
 	def test_check_tmr(self):
 		e = Environment()
@@ -619,15 +623,17 @@ class TestParserFeatures:
 		assert env.ans == 2.0
 
 	def test_matrix_literal(self):
-		result = calc(L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
-		              L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET)
+		result = calc(
+			L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
+			L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET)
 		assert isinstance(result, TiMatrix)
 		assert result.data == [[1.0, 2.0], [3.0, 4.0]]
 
 	def test_matrix_index(self, env):
 		ma = T('[A]')
-		parse_line(toks(L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
-		               L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET, STORE, ma), env)
+		parse_line(toks(
+			L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET, 
+			L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET, STORE, ma), env)
 		parse_line(toks(ma, L_PAREN, 2, COMMA, 1, R_PAREN), env)
 		assert env.ans == 3.0
 
@@ -658,16 +664,18 @@ class TestParserFeatures:
 
 	def test_inv_postfix(self):
 		# [[1,2][3,4]]¹ gives the inverse
-		mat_toks = toks(L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
-		                L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET)
+		mat_toks = toks(
+			L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
+			L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET)
 		result = calc(*mat_toks, INV)
 		assert isinstance(result, TiMatrix)
 		assert result.data[0][0] == approx(-2)
 		assert result.data[1][1] == approx(-0.5)
 
 	def test_transpose_postfix(self):
-		mat_toks = toks(L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
-		                L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET)
+		mat_toks = toks(
+			L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
+			L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET)
 		result = calc(*mat_toks, TRANSPOSE)
 		assert result.data == [[1.0, 3.0], [2.0, 4.0]]
 
@@ -777,8 +785,7 @@ class TestColonStatements:
 	def test_colon_list_then_index(self, env):
 		# {10,20,30}→L₁:L₁(2)  →  Ans=20
 		l1 = T('L₁')
-		parse_line(toks(L_BRACE, 10, COMMA, 20, COMMA, 30, R_BRACE, STORE, l1,
-		                COLON, l1, L_PAREN, 2, R_PAREN), env)
+		parse_line(toks(L_BRACE, 10, COMMA, 20, COMMA, 30, R_BRACE, STORE, l1, COLON, l1, L_PAREN, 2, R_PAREN), env)
 		assert env.ans == 20.0
 
 
@@ -796,8 +803,7 @@ class TestImplicitClose:
 
 	def test_unclosed_matrix(self):
 		# [[1,2][3,4  →  2×2 matrix (both ] omitted)
-		result = calc(L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
-		              L_BRACKET, 3, COMMA, 4)
+		result = calc(L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET, L_BRACKET, 3, COMMA, 4)
 		assert isinstance(result, TiMatrix)
 		assert result.data == [[1.0, 2.0], [3.0, 4.0]]
 
@@ -833,47 +839,38 @@ class TestStoreDim:
 		# 5→dim(L₁)  →  L₁ becomes {0,0,0,0,0}
 		l1 = T('L₁')
 		parse_line(toks(5, STORE, DIM, l1), env)
-		lst = l1.variable.get(env)
-		assert len(lst) == 5
-		assert all(x == 0 for x in lst)
+		assert l1.variable.get(env).data == [0, 0, 0, 0, 0]
 
 	def test_store_dim_list_expand(self, env):
 		# {1,2,3}→L₁ : 5→dim(L₁)  →  L₁ = {1,2,3,0,0}
 		l1 = T('L₁')
 		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, R_BRACE, STORE, l1), env)
 		parse_line(toks(5, STORE, DIM, l1), env)
-		lst = l1.variable.get(env)
-		assert len(lst) == 5
-		assert list(lst)[:3] == [1.0, 2.0, 3.0]
-		assert list(lst)[3:] == [0, 0]
+		assert l1.variable.get(env).data == [1, 2, 3, 0, 0]
 
 	def test_store_dim_list_shrink(self, env):
 		# {1,2,3,4,5}→L₁ : 3→dim(L₁)  →  L₁ = {1,2,3}
 		l1 = T('L₁')
 		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, COMMA, 4, COMMA, 5, R_BRACE, STORE, l1), env)
 		parse_line(toks(3, STORE, DIM, l1), env)
-		assert len(l1.variable.get(env)) == 3
+		assert l1.variable.get(env).data == [1, 2, 3]
 
 	def test_store_dim_matrix_create(self, env):
 		# {2,3}→dim([A])  →  [A] becomes 2×3 of zeros
 		ma = T('[A]')
 		parse_line(toks(L_BRACE, 2, COMMA, 3, R_BRACE, STORE, DIM, ma), env)
-		mat = ma.variable.get(env)
-		assert mat.rows == 2
-		assert mat.cols == 3
-		assert all(mat.data[r][c] == 0 for r in range(2) for c in range(3))
+		assert ma.variable.get(env).data == 2 * [3 * [0]]
 
 	def test_store_dim_matrix_resize_preserves(self, env):
 		# Build [[1,2][3,4]], then resize to 3×3; original values survive, new cells = 0
 		ma = T('[A]')
-		parse_line(toks(L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
-		                L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET, STORE, ma), env)
-		parse_line(toks(L_BRACE, 3, COMMA, 3, R_BRACE, STORE, DIM, ma), env)
-		mat = ma.variable.get(env)
-		assert mat.rows == 3 and mat.cols == 3
-		assert mat.data[0][0] == 1.0
-		assert mat.data[1][1] == 4.0
-		assert mat.data[2][2] == 0.0
+		parse_line(toks('[[1,2][3,4', STORE, ma), env)
+		parse_line(toks('{3,3', STORE, DIM, ma), env)
+		assert ma.variable.get(env).data == [
+			[1, 2, 0],
+			[3, 4, 0],
+			[0, 0, 0],
+		]
 
 	def test_dim_read_list(self, env):
 		# dim({1,2,3,4}) = 4  (reading, not storing)
@@ -882,9 +879,8 @@ class TestStoreDim:
 
 	def test_dim_read_matrix(self, env):
 		# dim([[1,2,3][4,5,6]]) = {2,3}
-		result = calc(DIM, L_BRACKET, L_BRACKET, 1, COMMA, 2, COMMA, 3, R_BRACKET,
-		              L_BRACKET, 4, COMMA, 5, COMMA, 6, R_BRACKET, R_BRACKET)
-		assert list(result) == [2.0, 3.0]
+		result = calc(DIM, '[[1,2,3][4,5,6')
+		assert result.data == [2.0, 3.0]
 
 
 # ── Nesting and combinations ──────────────────────────────────────────────────
@@ -921,13 +917,13 @@ class TestNesting:
 		assert result == approx(30)
 
 	def test_nderiv(self):
-		# nDeriv(X²,X,3)  ≈  6  (derivative of x² at x=3)
+		# nDeriv(X²,X,3) ≈ 6  (derivative of x² at x=3)
 		X = T('X')
 		result = calc(T('nDeriv('), X, SQ, COMMA, X, COMMA, 3, R_PAREN)
 		assert result == approx(6.0, rel=1e-4)
 
 	def test_fnint(self):
-		# fnInt(X²,X,0,3)  ≈  9  (∫₀³ x² dx = 9)
+		# fnInt(X²,X,0,3) ≈ 9  (∫₀³ x² dx = 9)
 		X = T('X')
 		result = calc(T('fnInt('), X, SQ, COMMA, X, COMMA, 0, COMMA, 3, R_PAREN)
 		assert result == approx(9.0, rel=1e-4)
@@ -953,8 +949,7 @@ class TestNesting:
 
 	def test_matrix_power_then_det(self):
 		# det([[1,1][0,1]]²)  =  det([[1,2][0,1]])  =  1
-		mat_toks = toks(L_BRACKET, L_BRACKET, 1, COMMA, 1, R_BRACKET,
-		                L_BRACKET, 0, COMMA, 1, R_BRACKET, R_BRACKET)
+		mat_toks = toks(L_BRACKET, L_BRACKET, 1, COMMA, 1, R_BRACKET, L_BRACKET, 0, COMMA, 1, R_BRACKET, R_BRACKET)
 		result = calc(T('det('), *mat_toks, POW, 2, R_PAREN)
 		assert result == approx(1.0)
 
@@ -991,17 +986,15 @@ class TestNesting:
 
 	def test_ans_index_matrix(self, env):
 		# [[1,2][3,4]]→Ans, then Ans(2,1) = 3
-		parse_line(toks(L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
-		                L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET), env)
-		parse_line(toks(ANS, L_PAREN, 2, COMMA, 1, R_PAREN), env)
+		parse_line(toks('[[1,2][3,4'), env)
+		parse_line(toks(ANS, '(2,1'), env)
 		assert env.ans == 3.0
 
 	def test_seq_preserves_variable(self, env):
 		# X=99 before seq; seq restores X=99 afterward
 		parse_line(toks(99, STORE, 'X'), env)
-		X = T('X')
-		parse_line(toks(T('seq('), X, COMMA, X, COMMA, 1, COMMA, 3, R_PAREN), env)
-		parse_line(toks(T('X')), env)
+		parse_line(toks('seq(', 'X,X,1,3'), env)
+		parse_line(toks('X'), env)
 		assert env.ans == 99.0
 
 
@@ -1012,17 +1005,12 @@ class TestIllegalNest:
 
 	def test_seq_no_self_nest(self, env):
 		# seq( inside its own formula → ERR:ILLEGAL NEST
-		X = T('X')
 		with pytest.raises(ValueError, match="ILLEGAL NEST"):
-			parse_line(toks(
-				T('seq('), T('seq('), X, COMMA, X, COMMA, 1, COMMA, 2, R_PAREN,
-				COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
-			), env)
+			parse_line(toks('seq(', 'seq(', 'X,X,1,2),X,1,3)'), env)
 
 	def test_seq_allows_normal_nesting(self, env):
 		# sum(seq(...)) is fine — only seq inside seq is forbidden
-		X = T('X')
-		parse_line(toks(T('sum('), T('seq('), X, COMMA, X, COMMA, 1, COMMA, 4, R_PAREN, R_PAREN), env)
+		parse_line(toks('sum(', 'seq(', 'X,X,1,4))'), env)
 		assert env.ans == approx(10)
 
 	def test_sigma_no_self_nest(self, env):
@@ -1089,49 +1077,35 @@ class TestThunkCapture:
 	are not mistaken for argument separators."""
 
 	def test_list_literal_in_seq_formula(self, env):
-		# seq({1,2,3}(X), X, 1, 3) — commas inside {} must not split the thunk
-		# {1,2,3}(X) indexes the list at position X: result is {1,2,3}
-		X = T('X')
-		parse_line(toks(
-			T('seq('), L_BRACE, 1, COMMA, 2, COMMA, 3, R_BRACE, L_PAREN, X, R_PAREN,
-			COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
-		), env)
-		assert env.ans == TiList([1, 2, 3])
+		# seq(sum({1,2,X}),X,1,3) — commas inside {} must not split the thunk
+		parse_line(toks('seq(', 'sum(', '{1,2,X}),X,1,3'), env)
+		assert env.ans.data == [4, 5, 6]
+
+	def test_matrix_literal_in_seq_formula(self, env):
+		# seq(sum({1,2,X}),X,1,3) — commas inside {} must not split the thunk
+		parse_line(toks('seq(', 'det(', '[[1,2][X,4]]),X,1,3'), env)
+		assert env.ans.data == [2, 0, -2]
 
 	def test_multi_arg_func_in_seq_formula(self, env):
 		# seq(max(X,10), X, 8, 12) — commas inside max(...) must not split the thunk
-		X = T('X')
-		parse_line(toks(
-			T('seq('), T('max('), X, COMMA, 10, R_PAREN,
-			COMMA, X, COMMA, 8, COMMA, 12, R_PAREN
-		), env)
-		assert env.ans == TiList([10, 10, 10, 11, 12])
+		parse_line(toks('seq(', 'max(', 'X,10),X,8,12)'), env)
+		assert env.ans.data == [10, 10, 10, 11, 12]
 
 	def test_string_literal_in_seq_formula(self, env):
 		# seq(length("a,b"), X, 1, 3) — the comma in the string must not split the thunk
 		# "a,b" has length 3; result should be {3,3,3}
-		X = T('X')
-		parse_line(toks(
-			T('seq('), T('length('), QUOTE, T('a'), T(','), T('b'), QUOTE, R_PAREN,
-			COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
-		), env)
-		assert env.ans == TiList([3, 3, 3])
+		parse_line(toks('seq(', 'length(', '"a,b"),X,1,3'), env)
+		assert env.ans.data == [3, 3, 3]
 
 	def test_colon_inside_thunk_raises(self, env):
 		# seq(X:5, X, 1, 3) — colon crosses a statement boundary; rejected at capture time
-		X = T('X')
 		with pytest.raises(ParseError, match="arguments"):
-			parse_line(toks(
-				T('seq('), X, COLON, 5, COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
-			), env)
+			parse_line(toks('seq(', 'X:5,X,1,3)'), env)
 
 	def test_store_inside_thunk_raises(self, env):
 		# store inside a formula is a statement-level construct; rejected at capture time
-		X = T('X')
 		with pytest.raises(ParseError, match="arguments"):
-			parse_line(toks(
-				T('seq('), X, STORE, T('A'), COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
-			), env)
+			parse_line(toks('seq(', '5', STORE, 'A,X,1,3)'), env)
 
 
 class TestSeqIncrement:

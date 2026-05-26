@@ -628,7 +628,7 @@ def _parse_dbd_date(d):
 			raise ValueError(f"dbd: too many decimal places in DDMM.YY date {d!r}")
 		day, month = divmod(int_part, 100)
 	else:
-		raise ValueError(f"dbd: invalid date {d!r} (integer part {int_part} is ambiguous — must be ≤12 or ≥100)")
+		raise ValueError(f"dbd: invalid date {d!r} (integer part {int_part} is ambiguous: must be ≤12 or ≥100)")
 
 	year = (2000 if yy < 50 else 1900) + yy
 	return date(year, month, day)
