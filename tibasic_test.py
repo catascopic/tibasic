@@ -1118,10 +1118,46 @@ class TestThunkCapture:
 		assert env.ans == TiList([3, 3, 3])
 
 	def test_colon_inside_thunk_raises(self, env):
-		# seq(X:5, X, 1, 3) — a colon inside the formula crosses a statement
-		# boundary and must be rejected at capture time.
+		# seq(X:5, X, 1, 3) — colon crosses a statement boundary; rejected at capture time
 		X = T('X')
-		with pytest.raises(Exception, match="COLON|:|statement|arguments"):
+		with pytest.raises(ParseError, match="arguments"):
 			parse_line(toks(
 				T('seq('), X, COLON, 5, COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
 			), env)
+
+	def test_store_inside_thunk_raises(self, env):
+		# store inside a formula is a statement-level construct; rejected at capture time
+		X = T('X')
+		with pytest.raises(ParseError, match="arguments"):
+			parse_line(toks(
+				T('seq('), X, STORE, T('A'), COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
+			), env)
+
+
+class TestSeqIncrement:
+	"""seq( raises a clear error when start/end/step are inconsistent."""
+
+	def test_zero_step_raises(self, env):
+		X = T('X')
+		with pytest.raises(ValueError, match="zero"):
+			parse_line(toks(T('seq('), X, COMMA, X, COMMA, 1, COMMA, 5, COMMA, 0, R_PAREN), env)
+
+	def test_positive_step_start_after_end_raises(self, env):
+		X = T('X')
+		with pytest.raises(ValueError, match="start.*end|end.*start"):
+			parse_line(toks(T('seq('), X, COMMA, X, COMMA, 5, COMMA, 1, R_PAREN), env)
+
+	def test_negative_step_start_before_end_raises(self, env):
+		X = T('X')
+		with pytest.raises(ValueError, match="start.*end|end.*start"):
+			parse_line(toks(T('seq('), X, COMMA, X, COMMA, 1, COMMA, 5, COMMA, NEG, 1, R_PAREN), env)
+
+	def test_equal_start_end_is_fine(self, env):
+		X = T('X')
+		parse_line(toks(T('seq('), X, COMMA, X, COMMA, 3, COMMA, 3, R_PAREN), env)
+		assert env.ans == TiList([3])
+
+	def test_negative_step_descending_is_fine(self, env):
+		X = T('X')
+		parse_line(toks(T('seq('), X, COMMA, X, COMMA, 3, COMMA, 1, COMMA, NEG, 1, R_PAREN), env)
+		assert env.ans == TiList([3, 2, 1])

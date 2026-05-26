@@ -20,7 +20,10 @@ class Thunk:
 	env: Environment
 
 	def eval(self):
-		return Parser(self.tokens, self.env).parse_expr()
+		parser = Parser(self.tokens, self.env)
+		value = parser.parse_expr()
+		parser.expect(EOF_TOKEN)
+		return value
 
 
 class Parser:
@@ -157,8 +160,8 @@ class Parser:
 		"""Return a Thunk for the tokens up to the next top-level COMMA or R_PAREN.
 		Tracks open delimiters on a stack so interior commas in nested
 		groups (function calls, {…}, [[…]], "…") are not mistaken for
-		argument separators. Raises on statement boundaries (COLON/NEWLINE)
-		— a thunk must not span statements."""
+		argument separators. Raises on COLON, NEWLINE, and STORE — statement-
+		level tokens that must not appear inside a formula argument."""
 		start = self.pos
 		stack: list[Token] = []   # expected closers, innermost on top
 		in_string = False
@@ -167,7 +170,7 @@ class Parser:
 			if in_string:
 				if t is QUOTE:
 					in_string = False
-			elif t is COLON:
+			elif t in {STORE, COLON, NEWLINE}:
 				raise ParseError(f"Unexpected {t.text!r} inside function arguments")
 			elif t is QUOTE:
 				in_string = True

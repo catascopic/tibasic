@@ -145,10 +145,16 @@ def seq(a: ArgParser) -> TiList:
 	a.end()
 	n = start
 	result = []
+	if step == 0:
+		raise ValueError("seq: step cannot be zero")
 	if step > 0:
+		if start > end + 1e-10:
+			raise ValueError(f"seq: step is positive but start ({start}) > end ({end})")
 		op = operator.le
 		end += 1e-10
 	else:
+		if start < end - 1e-10:
+			raise ValueError(f"seq: step is negative but start ({start}) < end ({end})")
 		op = operator.ge
 		end -= 1e-10
 	variable = var.variable
