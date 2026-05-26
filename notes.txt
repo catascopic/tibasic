@@ -1,4 +1,4 @@
-SCI_E can only take a numeric literal as its exponent (rhs). However, that numeric literal can be in DMS format, indicating that it was the right call to integrate that logic into the numeric literal parser
+I tried this on the calculator: SCI_E can only take a numeric literal as its exponent (rhs). However, that numeric literal can be in DMS format, indicating that it was the right call to integrate that logic into the numeric literal parser. Can you change the parser to fix this?
 
 Improve matrix methods
 
@@ -9,11 +9,6 @@ What's the best data structure for this?
 Commands: no paren flag? Or use argparser to do it manually
 
 Make sure deg symbol vs D/M/S format is working
-
-can you change timecnv to use divmod?
-Also, in general, please don't use semicolons in python to separate statements! I prefer to put everything on its own line. I'm fine with sometimes aligning columns with whitespace.
-
-Write tests!
 
 Also, trig functions actually do need access to the environment so they can see what mode the calculator is in!
 

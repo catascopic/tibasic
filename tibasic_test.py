@@ -408,11 +408,45 @@ class TestDateTime:
 	def test_dayofwk_sunday(self):
 		assert pf.dayofwk(2023, 1, 1) == 1     # Sunday
 
-	def test_dbd(self):
-		assert pf.dbd(12.2524, 12.3124) == 6.0     # Dec 25 → Dec 31 2024
+	def test_dbd_mmddyy(self):
+		# MM.DDYY: Dec 25 → Dec 31 2024
+		assert pf.dbd(12.2524, 12.3124) == 6.0
 
 	def test_dbd_negative(self):
-		assert pf.dbd(12.3124, 12.2524) == -6.0    # reversed
+		assert pf.dbd(12.3124, 12.2524) == -6.0
+
+	def test_dbd_ddmmyy_leap(self):
+		# DDMM.YY: Jan 17 1996 → Jan 17 1997 (1996 is a leap year → 366 days)
+		assert pf.dbd(1701.96, 1701.97) == 366.0
+
+	def test_dbd_mmddyy_leap(self):
+		# MM.DDYY same dates — formats can be mixed or used separately
+		assert pf.dbd(1.1796, 1.1797) == 366.0
+
+	def test_dbd_mixed_formats(self):
+		# Doc example: dbd(612.07, 2512.07) = 19
+		# DDMM.YY: 612.07 → Dec 6 2007; 2512.07 → Dec 25 2007
+		assert pf.dbd(612.07, 2512.07) == 19.0
+
+	def test_dbd_mmddyy_doc_example(self):
+		# Doc example: dbd(1.0207, 1.0107) = -1
+		# MM.DDYY: Jan 2 2007 → Jan 1 2007
+		assert pf.dbd(1.0207, 1.0107) == -1.0
+
+	def test_dbd_too_many_decimals_mmddyy(self):
+		# 5 decimal places in MM.DDYY → ERR:DOMAIN
+		with pytest.raises(ValueError, match="too many decimal places"):
+			pf.dbd(1.01075, 1.0107)
+
+	def test_dbd_too_many_decimals_ddmmyy(self):
+		# 3 decimal places in DDMM.YY → ERR:DOMAIN
+		with pytest.raises(ValueError, match="too many decimal places"):
+			pf.dbd(1701.961, 1701.97)
+
+	def test_dbd_ambiguous_integer(self):
+		# Integer part 13–99 is invalid
+		with pytest.raises(ValueError, match="ambiguous"):
+			pf.dbd(50.0101, 51.0101)
 
 	def test_setdate_getdate(self):
 		e = Environment()

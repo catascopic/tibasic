@@ -585,14 +585,12 @@ def rand_bin(n, p, simulations=None):
 
 def timecnv(seconds):
 	"""Convert a number of seconds into {days, hours, minutes, seconds}."""
-	seconds = int(require_real(seconds))
-	neg = seconds < 0
-	s = abs(seconds)
-	days    = s // 86400;  s %= 86400
-	hours   = s // 3600;   s %= 3600
-	minutes = s // 60;     s %= 60
-	sign = -1 if neg else 1
-	return TiList([sign * days, sign * hours, sign * minutes, sign * s])
+	seconds = require_int(seconds)
+	sign = -1 if seconds < 0 else 1
+	s, secs = divmod(abs(seconds), 60)
+	s, minutes = divmod(s, 60)
+	days, hours = divmod(s, 24)
+	return sign * TiList([days, hours, minutes, secs])
 
 
 def dayofwk(year, month, day):
@@ -602,19 +600,42 @@ def dayofwk(year, month, day):
 
 
 def _parse_dbd_date(d):
-	"""Parse a MM.DDYY float (TI Finance format) into a date object.
-	YY 00-49 → 2000-2049; 50-99 → 1950-1999."""
+	"""Parse a TI Finance date float into a date object.
+
+	Two formats (can be mixed in the same dbd call):
+	  MM.DDYY  — integer part is month (1–12); decimal encodes 4 digits DDYY
+	  DDMM.YY  — integer part is DDMM (≥100); decimal encodes 2 digits YY
+	YY 00–49 → 2000–2049; 50–99 → 1950–1999.
+	ERR:DOMAIN if the integer part is 13–99, or the decimal has too many digits.
+	"""
 	d = require_real(d)
-	month = int(d)
-	frac  = builtins.round((d - month) * 10000)  # use builtins.round; pf.round returns float
-	day   = frac // 100
-	yy    = frac % 100
-	year  = 2000 + yy if yy < 50 else 1900 + yy
+	int_part = int(d)
+	frac_part = d - int_part
+
+	if int_part <= 12:
+		# MM.DDYY: 4 decimal digits expected
+		raw = frac_part * 10000
+		ddyy = builtins.round(raw)
+		if abs(raw - ddyy) > 1e-6:
+			raise ValueError(f"dbd: too many decimal places in MM.DDYY date {d!r}")
+		month = int_part
+		day, yy = divmod(ddyy, 100)
+	elif int_part >= 100:
+		# DDMM.YY: 2 decimal digits expected
+		raw = frac_part * 100
+		yy  = builtins.round(raw)
+		if abs(raw - yy) > 1e-6:
+			raise ValueError(f"dbd: too many decimal places in DDMM.YY date {d!r}")
+		day, month = divmod(int_part, 100)
+	else:
+		raise ValueError(f"dbd: invalid date {d!r} (integer part {int_part} is ambiguous — must be ≤12 or ≥100)")
+
+	year = (2000 if yy < 50 else 1900) + yy
 	return date(year, month, day)
 
 
 def dbd(date1, date2):
-	"""Days between two dates given in MM.DDYY format."""
+	"""Days between two dates in TI Finance format (MM.DDYY or DDMM.YY)."""
 	return float((_parse_dbd_date(date2) - _parse_dbd_date(date1)).days)
 
 
