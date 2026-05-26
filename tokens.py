@@ -635,7 +635,7 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x6a', 'Asm('),
 	token(b'\xbb\x6b', 'AsmComp('),
 	token(b'\xbb\x6c', 'AsmPrgm'),
-	token(b'\xbb\x6d', 'compiled asm'),
+	# token(b'\xbb\x6d', 'compiled asm'),
 	token(b'\xbb\x6e', 'Á'),
 	token(b'\xbb\x6f', 'À'),
 	token(b'\xbb\x70', 'Â'),

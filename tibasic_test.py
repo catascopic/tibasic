@@ -10,7 +10,7 @@ from parser import parse_line, ParseError
 from tokens import (
 	TOKENS, Token, TOKEN_TABLE, ASCII, TOKENS_BY_TEXT,
 	STORE, COMMA, QUOTE, COLON, DOT, NEG, DEG, APOS, SCI_E,
-	ADD, SUB, MUL, DIV, POW, XROOT, FACT, NPR, NCR,
+	ADD, SUB, MUL, DIV, POW, XTH_ROOT, FACT, NPR, NCR,
 	EQ, LT, GT, LE, GE, NE, AND, OR, XOR,
 	L_PAREN, R_PAREN, L_BRACE, R_BRACE, L_BRACKET, R_BRACKET,
 	ANS, INV, SQ, TRANSPOSE, RAND, DIM,
@@ -80,7 +80,7 @@ class TestArithmetic:
 	def test_pow(self):          assert calc(2, POW, 10) == 1024.0
 	def test_negation(self):     assert calc(NEG, 5) == -5.0
 	def test_sq_postfix(self):   assert calc(7, SQ) == 49.0
-	def test_xroot(self):        assert calc(3, XROOT, 8) == approx(2)
+	def test_xroot(self):        assert calc(4, XTH_ROOT, 256) == approx(4)
 	def test_sci_e(self):        assert calc(1, SCI_E, 3) == 1000.0
 	def test_implicit_mul(self): assert calc(2, L_PAREN, 3, ADD, 4, R_PAREN) == 14.0
 
