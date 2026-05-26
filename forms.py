@@ -119,7 +119,7 @@ def ans_index_or_mul(a: ArgParser):
 	(arg,) = args
 	if isinstance(ans, TiList):
 		return ans[arg]
-	return purefunctions.mul(ans, arg)
+	return ans * arg
 
 
 def seq(a: ArgParser) -> TiList:
