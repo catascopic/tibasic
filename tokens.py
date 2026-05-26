@@ -76,7 +76,9 @@ class Token:
 	    return f'{self.code.hex().upper()}:{self.text}'
 
 
+# TODO: remove code after transition to flags
 EOF_TOKEN = Token(b'\x00', None, '<END-OF-INPUT>')
+
 
 _SEEN: set[bytes] = set()
 
@@ -108,14 +110,14 @@ def token(
 	ascii: str = None,
 	*,
 	bp: tuple[int, int] | None = None,
-	operator: Callable | None = None,
-	postfix: Callable | None = None,
-	func:     Callable | None = None,
+	operator:  Callable | None = None,
+	postfix:   Callable | None = None,
+	func:      Callable | None = None,
 	pure_func: Callable | None = None,
-	cmd:     Callable | None = None,
-	nullary: Callable | None = None,
+	cmd:       Callable | None = None,
+	nullary:   Callable | None = None,
 	converter: Callable | None = None,
-	variable: Variable | None = None,
+	variable:  Variable | None = None,
 ) -> Token:
 
 	if code in _SEEN:
@@ -191,7 +193,7 @@ NPR         = token(b'\x94', 'nPr',     bp=(60, 61), operator=pf.npr)
 NCR         = token(b'\x95', 'nCr',     bp=(60, 61), operator=pf.ncr)
 RAND        = token(b'\xab', 'rand', nullary=Environment.rand, pure_func=pf.rand_list)
 POW         = token(b'\xf0', ascii='^', bp=(70, 69), operator=op.pow)
-XROOT       = token(b'\xf1', 'ˣ√',      bp=(60, 61), operator=pf.xth_root)
+XTH_ROOT    = token(b'\xf1', 'ˣ√',      bp=(60, 61), operator=pf.xth_root)
 
 # ── Token list ─────────────────────────────────────────────────────────────────
 
@@ -391,7 +393,7 @@ TOKENS: list[Token] = [
 	token(b'\xed', 'Plot2('),
 	token(b'\xee', 'Plot3('),
 	POW,
-	XROOT,
+	XTH_ROOT,
 	token(b'\xf2', '1-Var Stats '),
 	token(b'\xf3', '2-Var Stats '),
 	token(b'\xf4', 'LinReg(a+bx) '),
