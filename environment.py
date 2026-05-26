@@ -1,8 +1,8 @@
 import math
 import random
 
-from datetime import datetime, date
-from tiobjects import TiList, TiMatrix, TiString, TiTypeError, require_num, require_list, require_matrix, require_str
+from datetime import datetime, date, timedelta
+from tiobjects import TiList, TiMatrix, TiString, TiTypeError, require_num, require_real, require_int, require_list, require_matrix, require_str
 
 
 class _VarArray:
@@ -150,12 +150,13 @@ class Environment:
 		self.stat       = _VarArray(0x3D, None, repr)                         # stat vars
 		self.window     = _VarArray(0x37, None, repr)                         # window vars
 		self.user_lists = {}                                               # ∟NAME lists
-		self.ans        = 0
-		self.angle_mode = 'RAD'
-		self.dt_fmt     = 1
-		self.tm_fmt     = 12
-		self.clock_on   = True
-		self.key_code   = 0
+		self.ans              = 0
+		self.angle_mode       = 'RAD'
+		self.dt_fmt           = 1
+		self.tm_fmt           = 12
+		self.clock_on         = True
+		self.key_code         = 0
+		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
 
 	def to_radians(self, x):
 		return x / (180 / math.pi) if self.angle_mode == 'RAD' else x
@@ -166,21 +167,80 @@ class Environment:
 	def set_random_seed(self, value):
 		random.seed(value)
 
+	# ── Virtual clock ────────────────────────────────────────────────────────────
+
+	def _virtual_now(self) -> datetime:
+		"""Current datetime adjusted by any offset set via setDate/setTime."""
+		return datetime.now() + self._datetime_offset
+
+	def set_date(self, year, month, day):
+		now = datetime.now()
+		v = now + self._datetime_offset
+		new_v = datetime(require_int(year), require_int(month), require_int(day),
+		                 v.hour, v.minute, v.second)
+		self._datetime_offset = new_v - now
+
+	def set_time(self, hour, minute, second):
+		now = datetime.now()
+		v = now + self._datetime_offset
+		new_v = datetime(v.year, v.month, v.day,
+		                 require_int(hour), require_int(minute), require_int(second))
+		self._datetime_offset = new_v - now
+
+	def check_tmr(self, start):
+		return int(self._virtual_now().timestamp()) - int(require_real(start))
+
+	def set_dt_fmt(self, fmt):
+		self.dt_fmt = require_int(fmt)
+
+	def set_tm_fmt(self, fmt):
+		fmt = require_int(fmt)
+		if fmt not in (12, 24):
+			raise ValueError(f"setTmFmt: expected 12 or 24, got {fmt}")
+		self.tm_fmt = fmt
+
+	def get_dt_str(self, fmt):
+		d = self._virtual_now().date()
+		fmt = require_int(fmt)
+		yy = f"{d.year % 100:02d}"
+		if fmt == 1:
+			s = f"{d.month}/{d.day}/{yy}"
+		elif fmt == 2:
+			s = f"{d.day}/{d.month}/{yy}"
+		elif fmt == 3:
+			s = f"{yy}/{d.month}/{d.day}"
+		else:
+			raise ValueError(f"getDtStr: invalid format {fmt}")
+		return TiString.from_str(s)
+
+	def get_tm_str(self, fmt):
+		t = self._virtual_now().time()
+		fmt = require_int(fmt)
+		if fmt == 24:
+			s = f"{t.hour:02d}:{t.minute:02d}:{t.second:02d}"
+		elif fmt == 12:
+			h = t.hour % 12 or 12
+			ampm = "AM" if t.hour < 12 else "PM"
+			s = f"{h}:{t.minute:02d}:{t.second:02d}{ampm}"
+		else:
+			raise ValueError(f"getTmStr: invalid format {fmt}")
+		return TiString.from_str(s)
+
 	# ── Nullary helpers (used by nullary= fields in tokens) ──────────────────────
 
 	def get_ans(self):
 		return self.ans
 
 	def get_date(self):
-		t = date.today()
-		return TiList([t.year, t.month, t.day])
+		d = self._virtual_now().date()
+		return TiList([d.year, d.month, d.day])
 
 	def get_time(self):
-		t = datetime.now()
+		t = self._virtual_now().time()
 		return TiList([t.hour, t.minute, t.second])
 
 	def start_tmr(self):
-		return int(datetime.now().timestamp())
+		return int(self._virtual_now().timestamp())
 
 	def get_dt_fmt(self):
 		return self.dt_fmt

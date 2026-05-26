@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 	from tokens import Token
 
 from contextlib import contextmanager
-from tiobjects import TiList, TiMatrix
+from tiobjects import TiList, TiMatrix, require_real
 from environment import Variable
 
 
@@ -313,3 +313,37 @@ def fill(a: ArgParser):
 				row[i] = x
 	else:
 		raise ValueError(f"fill: expected list or matrix, got {type(lst).__name__}")
+
+
+# ── Clock / date-time commands and functions ──────────────────────────────────
+
+def set_date(a: ArgParser) -> None:
+	a.env.set_date(a.expr(), a.expr(), a.expr())
+	a.end()
+
+def set_time(a: ArgParser) -> None:
+	a.env.set_time(a.expr(), a.expr(), a.expr())
+	a.end()
+
+def check_tmr(a: ArgParser):
+	start = a.expr()
+	a.end()
+	return a.env.check_tmr(start)
+
+def set_dt_fmt(a: ArgParser) -> None:
+	a.env.set_dt_fmt(a.expr())
+	a.end()
+
+def set_tm_fmt(a: ArgParser) -> None:
+	a.env.set_tm_fmt(a.expr())
+	a.end()
+
+def get_dt_str(a: ArgParser):
+	fmt = a.expr()
+	a.end()
+	return a.env.get_dt_str(fmt)
+
+def get_tm_str(a: ArgParser):
+	fmt = a.expr()
+	a.end()
+	return a.env.get_tm_str(fmt)

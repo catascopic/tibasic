@@ -11,9 +11,10 @@ Go through tokens, link any methods that are currently unlinked, such as augment
 Commands: no paren flag
 
 Implement expr
-
-getDate, getTmStr, getDtStr, dayOfWk, timeCnv, setTmFmt, setDtFmt, checkTmr, setTime, setDate
+Can you implement and link the following functions?
+getDate, getTmStr, getDtStr, dayOfWk, timeCnv, setTmFmt, setDtFmt, checkTmr, setTime, setDate, dbd
 I'm not sure how we should implement get/set time. Maybe have a field in Environment that's an offset from the system time?
+
 
 
 Write tests!

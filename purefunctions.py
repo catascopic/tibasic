@@ -4,6 +4,7 @@ import math
 import operator
 import random
 import sys
+from datetime import date
 from fractions import Fraction
 from functools import wraps
 from itertools import accumulate, pairwise, chain, repeat, batched
@@ -578,6 +579,43 @@ def rand_bin(n, p, simulations=None):
 	if simulations is None:
 		return builtins.sum(1 for _ in range(n) if random.random() < p)
 	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(require_int(simulations))])
+
+
+# ── Date / time utilities ────────────────────────────────────────────────────
+
+def timecnv(seconds):
+	"""Convert a number of seconds into {days, hours, minutes, seconds}."""
+	seconds = int(require_real(seconds))
+	neg = seconds < 0
+	s = abs(seconds)
+	days    = s // 86400;  s %= 86400
+	hours   = s // 3600;   s %= 3600
+	minutes = s // 60;     s %= 60
+	sign = -1 if neg else 1
+	return TiList([sign * days, sign * hours, sign * minutes, sign * s])
+
+
+def dayofwk(year, month, day):
+	"""Day of week: 1=Sunday, 2=Monday, …, 7=Saturday."""
+	d = date(require_int(year), require_int(month), require_int(day))
+	return d.isoweekday() % 7 + 1
+
+
+def _parse_dbd_date(d):
+	"""Parse a MM.DDYY float (TI Finance format) into a date object.
+	YY 00-49 → 2000-2049; 50-99 → 1950-1999."""
+	d = require_real(d)
+	month = int(d)
+	frac  = builtins.round((d - month) * 10000)  # use builtins.round; pf.round returns float
+	day   = frac // 100
+	yy    = frac % 100
+	year  = 2000 + yy if yy < 50 else 1900 + yy
+	return date(year, month, day)
+
+
+def dbd(date1, date2):
+	"""Days between two dates given in MM.DDYY format."""
+	return float((_parse_dbd_date(date2) - _parse_dbd_date(date1)).days)
 
 
 # ── Probability distributions ────────────────────────────────────────────────
