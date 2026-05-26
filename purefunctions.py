@@ -634,9 +634,10 @@ def _parse_dbd_date(d):
 	return date(year, month, day)
 
 
-def dbd(date1, date2):
+@vectorized
+def dbd(date1: float, date2: float):
 	"""Days between two dates in TI Finance format (MM.DDYY or DDMM.YY)."""
-	return float((_parse_dbd_date(date2) - _parse_dbd_date(date1)).days)
+	return (_parse_dbd_date(date2) - _parse_dbd_date(date1)).days
 
 
 # ── Probability distributions ────────────────────────────────────────────────

@@ -93,6 +93,74 @@ class TestArithmetic:
 		assert calc(2, POW, 3, POW, 2) == 512.0
 
 
+# ── Scientific notation (ᴇ) ───────────────────────────────────────────────────
+
+class TestSciE:
+	# ── Positive cases ────────────────────────────────────────────────────────
+
+	def test_infix_basic(self):
+		# 1ᴇ3 = 1000
+		assert calc(1, SCI_E, 3) == 1000.0
+
+	def test_prefix_basic(self):
+		# ᴇ3 = 10^3 = 1000  (no left operand → implicit 1)
+		assert calc(SCI_E, 3) == 1000.0
+
+	def test_infix_zero_exp(self):
+		# 5ᴇ0 = 5
+		assert calc(5, SCI_E, 0) == 5.0
+
+	def test_infix_decimal_exp(self):
+		# 1ᴇ1.5 = 10^1.5
+		assert calc(1, SCI_E, 1, DOT, 5) == approx(10 ** 1.5)
+
+	def test_infix_multi_digit_exp(self):
+		# 2ᴇ10 = 2048 (not 2*(10^1)*0 or anything weird)
+		assert calc(2, SCI_E, 10) == approx(2 * 10 ** 10)
+
+	def test_infix_dms_exp(self):
+		# 1ᴇ1°30' — exponent is 1.5 decimal degrees → 10^1.5
+		assert calc(1, SCI_E, 1, DEG, 30, APOS) == approx(10 ** 1.5)
+
+	def test_precedence_over_add(self):
+		# 2 + 3ᴇ2 = 2 + 300 = 302  (ᴇ binds tighter than +)
+		assert calc(2, ADD, 3, SCI_E, 2) == 302.0
+
+	def test_precedence_over_mul(self):
+		# 2 * 3ᴇ2 = 2 * 300 = 600  (ᴇ binds tighter than *)
+		assert calc(2, MUL, 3, SCI_E, 2) == 600.0
+
+	def test_neg_before_sci_e(self):
+		# −1ᴇ3: on TI, negation has lower precedence → -(1ᴇ3) = -1000
+		assert calc(NEG, 1, SCI_E, 3) == -1000.0
+
+	def test_in_larger_expression(self):
+		# (1ᴇ3 + 1ᴇ2) = 1100
+		assert calc(L_PAREN, 1, SCI_E, 3, ADD, 1, SCI_E, 2, R_PAREN) == 1100.0
+
+	# ── Negative cases ────────────────────────────────────────────────────────
+
+	def test_rejects_paren_expr(self):
+		# 1ᴇ(3) — parenthesised expression is not a numeric literal
+		with pytest.raises(ParseError):
+			calc(1, SCI_E, L_PAREN, 3, R_PAREN)
+
+	def test_rejects_variable(self):
+		# 1ᴇA — variable is not a numeric literal
+		with pytest.raises(ParseError):
+			calc(1, SCI_E, 'A')
+
+	def test_rejects_expression_rhs(self):
+		# 1ᴇ2+1 must parse as (1ᴇ2)+1 = 101, not 1ᴇ(2+1) = 1000
+		# (confirms the RHS stops at the literal boundary)
+		assert calc(1, SCI_E, 2, ADD, 1) == 101.0
+
+	def test_rejects_ans_as_exponent(self):
+		# 1ᴇAns — Ans is not a numeric literal
+		with pytest.raises(ParseError):
+			calc(1, SCI_E, ANS)
+
+
 # ── Numeric functions ─────────────────────────────────────────────────────────
 
 class TestNumericFunctions:

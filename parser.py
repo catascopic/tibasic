@@ -227,9 +227,11 @@ class Parser:
 			# special case: this is the only prefix unary operator
 			return -self.parse_expr(65)
 
-		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ10 = 10^10)
+		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ3 = 1000)
 		if t is SCI_E:
-			return SCI_E.operator(1, self.parse_expr(SCI_E.bp[1]))
+			if not self.peek_digit_or_dot():
+				raise ParseError("ᴇ requires a numeric literal exponent")
+			return 10 ** self.parse_num_literal(self.advance())
 
 		# Nullary constants (π, e, rand, Ans, getDate, etc.)
 		# Checked before function so tokens with both can dispatch on whether ( follows.
@@ -290,6 +292,16 @@ class Parser:
 				continue
 
 			t = self.peek()
+
+			# ᴇ (scientific notation): RHS must be a numeric literal, not a general expression
+			if t is SCI_E:
+				if 65 <= min_bp:
+					break
+				self.advance()
+				if not self.peek_digit_or_dot():
+					raise ParseError("ᴇ requires a numeric literal exponent")
+				lhs = lhs * 10 ** self.parse_num_literal(self.advance())
+				continue
 
 			# Postfix operators
 			# make a .eat_if_flag method if I make flags for tokens after decoupling from functions

@@ -161,7 +161,7 @@ CUBE      = token(b'\x0f', '³',	postfix=lambda x: x**3)
 FACT      = token(b'\x2d', '!',	postfix=pf.factorial)
 
 # Binary operators
-SCI_E = token(b'\x3b', 'ᴇ',     bp=(65, 66), operator=lambda a, b: a * 10 ** b)
+SCI_E = token(b'\x3b', 'ᴇ')
 OR    = token(b'\x3c', ' or ',  bp=(20, 21), operator=pf.or_)
 XOR   = token(b'\x3d', ' xor ', bp=(20, 21), operator=pf.xor)
 AND   = token(b'\x40', ' and ', bp=(30, 31), operator=pf.and_)

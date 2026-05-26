@@ -30,6 +30,8 @@ Full token overhaul: operators and bp are okay, everything else moved to dispatc
 
 move vectorized to tiobjects
 
+Go through all commands, check to see if they're vectorized correctly
+
 ********
 
 
