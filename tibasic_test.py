@@ -131,8 +131,12 @@ class TestSciE:
 		assert calc(2, MUL, 3, SCI_E, 2) == 600.0
 
 	def test_neg_before_sci_e(self):
-		# −1ᴇ3: on TI, negation has lower precedence → -(1ᴇ3) = -1000
+		# −1ᴇ3 = −1000  (negation of the whole scientific-notation number)
 		assert calc(NEG, 1, SCI_E, 3) == -1000.0
+
+	def test_pow_rhs_is_sci_e(self):
+		# 2^3ᴇ2: ᴇ binds tighter than ^, so exponent is 3ᴇ2=300 → 2^300
+		assert calc(2, POW, 3, SCI_E, 2) == approx(2 ** 300)
 
 	def test_in_larger_expression(self):
 		# (1ᴇ3 + 1ᴇ2) = 1100
@@ -159,6 +163,31 @@ class TestSciE:
 		# 1ᴇAns — Ans is not a numeric literal
 		with pytest.raises(ParseError):
 			calc(1, SCI_E, ANS)
+
+	def test_infix_negative_exp(self):
+		# 1ᴇ−3 = 0.001
+		assert calc(1, SCI_E, NEG, 3) == approx(0.001)
+
+	def test_prefix_negative_exp(self):
+		# ᴇ−3 = 10^−3 = 0.001
+		assert calc(SCI_E, NEG, 3) == approx(0.001)
+
+	def test_negative_exp_decimal(self):
+		# 1ᴇ−1.5 = 10^−1.5
+		assert calc(1, SCI_E, NEG, 1, DOT, 5) == approx(10 ** -1.5)
+
+	def test_negative_exp_in_expression(self):
+		# 2 + 3ᴇ−2 = 2 + 0.03 = 2.03
+		assert calc(2, ADD, 3, SCI_E, NEG, 2) == approx(2.03)
+
+	def test_neg_literal_neg_exp(self):
+		# −2ᴇ−3 = −0.002
+		assert calc(NEG, 2, SCI_E, NEG, 3) == approx(-0.002)
+
+	def test_rejects_double_neg_exp(self):
+		# 1ᴇ−−3 — two negations is not a valid literal
+		with pytest.raises(ParseError):
+			calc(1, SCI_E, NEG, NEG, 3)
 
 
 # ── Numeric functions ─────────────────────────────────────────────────────────

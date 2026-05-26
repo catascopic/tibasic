@@ -177,6 +177,14 @@ class Parser:
 		t = self.peek()
 		return t.is_digit() or t is DOT
 
+	def parse_sci_e_exp(self) -> float:
+		"""Parse the exponent of a ᴇ expression: an optional − followed by a numeric literal."""
+		neg = self.eat_if(NEG)
+		if not self.peek_digit_or_dot():
+			raise ParseError("ᴇ requires a numeric literal exponent")
+		exp = self.parse_num_literal(self.advance())
+		return -exp if neg else exp
+
 	def parse_label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name."""
 		t = self.advance()
@@ -227,11 +235,9 @@ class Parser:
 			# special case: this is the only prefix unary operator
 			return -self.parse_expr(65)
 
-		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ3 = 1000)
+		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ3 = 1000, ᴇ−3 = 0.001)
 		if t is SCI_E:
-			if not self.peek_digit_or_dot():
-				raise ParseError("ᴇ requires a numeric literal exponent")
-			return 10 ** self.parse_num_literal(self.advance())
+			return 10 ** self.parse_sci_e_exp()
 
 		# Nullary constants (π, e, rand, Ans, getDate, etc.)
 		# Checked before function so tokens with both can dispatch on whether ( follows.
@@ -293,14 +299,12 @@ class Parser:
 
 			t = self.peek()
 
-			# ᴇ (scientific notation): RHS must be a numeric literal, not a general expression
+			# ᴇ (scientific notation): RHS must be a numeric literal, not a general expression.
+			# No min_bp guard needed — the RHS is always a bare literal, never a sub-expression,
+			# so ᴇ binds maximally tight (tighter than ^) with no Pratt conflict to worry about.
 			if t is SCI_E:
-				if 65 <= min_bp:
-					break
 				self.advance()
-				if not self.peek_digit_or_dot():
-					raise ParseError("ᴇ requires a numeric literal exponent")
-				lhs = lhs * 10 ** self.parse_num_literal(self.advance())
+				lhs = lhs * 10 ** self.parse_sci_e_exp()
 				continue
 
 			# Postfix operators
@@ -488,8 +492,9 @@ if __name__ == '__main__':
 	env.angle_mode = 'DEG'
 	
 	# test('&⑽^(', '{1,10')
-	test('5°')
-	test('5°5\'5"')
+	# test('5°')
+	# test('5°5\'5"')
+	test('2^3',SCI_E,2)
 	# test('"a',STORE,'&Str1')
 	# test('1°ʳ')
 	# test('([[1,2][3,4',STORE,'&[A]')
