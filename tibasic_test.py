@@ -8,7 +8,7 @@ import purefunctions as pf
 from environment import Environment
 from parser import parse_line, ParseError
 from tokens import (
-	TOKENS, Token, TOKEN_TABLE,
+	TOKENS, Token, TOKEN_TABLE, ASCII, TOKENS_BY_TEXT,
 	STORE, COMMA, QUOTE, COLON, DOT, NEG, DEG, APOS, SCI_E,
 	ADD, SUB, MUL, DIV, POW, XROOT, FACT, NPR, NCR,
 	EQ, LT, GT, LE, GE, NE, AND, OR, XOR,
@@ -20,15 +20,13 @@ from tiobjects import TiList, TiMatrix, TiString
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-text_to_token = {t.text: t for t in reversed(TOKENS)}
-
 def T(text: str) -> Token:
 	"""Look up a token by its display text."""
-	return text_to_token[text]
+	return TOKENS_BY_TEXT[text]
 
 def _iter_chars(obj):
 	for c in str(obj):
-		yield text_to_token[c]
+		yield TOKENS_BY_TEXT[c]
 
 def _iter_tokens(line):
 	for obj in line:
@@ -38,7 +36,7 @@ def _iter_tokens(line):
 			yield from _iter_chars(str(obj))
 		elif isinstance(obj, str):
 			try:
-				yield text_to_token[obj]
+				yield TOKENS_BY_TEXT[obj]
 			except KeyError:
 				yield from _iter_chars(obj)
 		else:
