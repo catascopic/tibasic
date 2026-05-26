@@ -153,8 +153,23 @@ class Parser:
 		self._struct_depth -= 1
 		return TiMatrix(rows)
 
+	def _capture_inner(self, out: list[Token]) -> None:
+		"""Consume tokens into out until the matching closing paren (inclusive).
+		Used inside a nested function call where commas are interior, not delimiters."""
+		while self.pos < len(self.tokens):
+			t = self.tokens[self.pos]
+			if t is R_PAREN:
+				out.append(t)
+				self.pos += 1
+				return
+			out.append(t)
+			self.pos += 1
+			if t.function is not None or t is L_PAREN:
+				self._capture_inner(out)
+
 	def _capture_subgroup(self, out: list[Token]) -> None:
-		"""Collect tokens into out until a top-level comma or unmatched ), recursing into sub-groups."""
+		"""Collect tokens into out until a top-level comma or unmatched ).
+		Correctly handles nested function calls (commas inside them are not delimiters)."""
 		while self.pos < len(self.tokens):
 			t = self.tokens[self.pos]
 			if t is COMMA or t is R_PAREN:
@@ -162,10 +177,7 @@ class Parser:
 			out.append(t)
 			self.pos += 1
 			if t.function is not None or t is L_PAREN:
-				self._capture_subgroup(out)
-				if self.pos < len(self.tokens) and self.tokens[self.pos] is R_PAREN:
-					out.append(self.tokens[self.pos])
-					self.pos += 1
+				self._capture_inner(out)
 
 	def capture(self) -> Thunk:
 		"""Return a Thunk for the tokens up to the next top-level comma or )."""

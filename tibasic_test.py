@@ -1003,3 +1003,79 @@ class TestNesting:
 		parse_line(toks(T('seq('), X, COMMA, X, COMMA, 1, COMMA, 3, R_PAREN), env)
 		parse_line(toks(T('X')), env)
 		assert env.ans == 99.0
+
+
+# ── Illegal nesting (ERR:ILLEGAL NEST) ───────────────────────────────────────
+
+class TestIllegalNest:
+	"""Each restricted function raises ValueError if nested beyond its limit."""
+
+	def test_seq_no_self_nest(self, env):
+		# seq( inside its own formula → ERR:ILLEGAL NEST
+		X = T('X')
+		with pytest.raises(ValueError, match="ILLEGAL NEST"):
+			parse_line(toks(
+				T('seq('), T('seq('), X, COMMA, X, COMMA, 1, COMMA, 2, R_PAREN,
+				COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
+			), env)
+
+	def test_seq_allows_normal_nesting(self, env):
+		# sum(seq(...)) is fine — only seq inside seq is forbidden
+		X = T('X')
+		parse_line(toks(T('sum('), T('seq('), X, COMMA, X, COMMA, 1, COMMA, 4, R_PAREN, R_PAREN), env)
+		assert env.ans == approx(10)
+
+	def test_sigma_no_self_nest(self, env):
+		# Σ( inside its own formula → ERR:ILLEGAL NEST
+		X = T('X')
+		with pytest.raises(ValueError, match="ILLEGAL NEST"):
+			parse_line(toks(
+				T('Σ('), T('Σ('), X, COMMA, X, COMMA, 1, COMMA, 2, R_PAREN,
+				COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
+			), env)
+
+	def test_fnint_no_self_nest(self, env):
+		# fnInt( inside its own integrand → ERR:ILLEGAL NEST
+		X = T('X')
+		with pytest.raises(ValueError, match="ILLEGAL NEST"):
+			parse_line(toks(
+				T('fnInt('), T('fnInt('), X, COMMA, X, COMMA, 0, COMMA, 1, R_PAREN,
+				COMMA, X, COMMA, 0, COMMA, 1, R_PAREN
+			), env)
+
+	def test_nderiv_one_level_ok(self, env):
+		# nDeriv( inside nDeriv( once is allowed
+		X = T('X')
+		parse_line(toks(
+			T('nDeriv('), T('nDeriv('), X, SQ, COMMA, X, COMMA, X, R_PAREN,
+			COMMA, X, COMMA, 1, R_PAREN
+		), env)
+		assert env.ans == approx(2.0, rel=1e-3)
+
+	def test_nderiv_two_levels_raises(self, env):
+		# nDeriv( inside nDeriv( inside nDeriv( → ERR:ILLEGAL NEST
+		X = T('X')
+		with pytest.raises(ValueError, match="ILLEGAL NEST"):
+			parse_line(toks(
+				T('nDeriv('),
+				T('nDeriv('), T('nDeriv('), X, COMMA, X, COMMA, X, R_PAREN,
+				COMMA, X, COMMA, X, R_PAREN,
+				COMMA, X, COMMA, 1, R_PAREN
+			), env)
+
+	def test_expr_no_self_nest(self, env):
+		# expr( evaluating a string that itself calls expr( → ERR:ILLEGAL NEST
+		str1 = T('Str1')
+		# Directly store TiString([expr(, Str1, )]) in Str1 — evaluating it calls expr again
+		str1.variable.set(env, TiString([T('expr('), str1, R_PAREN]))
+		with pytest.raises(ValueError, match="ILLEGAL NEST"):
+			parse_line([T('expr('), str1, R_PAREN], env)
+
+	def test_expr_nest_depth_resets(self, env):
+		# After a successful expr( call, the guard is back to 0 — can call again
+		str1 = T('Str1')
+		parse_line([QUOTE, T('1'), ADD, T('2'), QUOTE, STORE, str1], env)
+		parse_line([T('expr('), str1, R_PAREN], env)
+		assert env.ans == approx(3.0)
+		parse_line([T('expr('), str1, R_PAREN], env)   # second call — must not raise
+		assert env.ans == approx(3.0)

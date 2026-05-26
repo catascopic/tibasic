@@ -15,7 +15,8 @@
       "Bash(python _strip_alt_key.py)",
       "Bash(python -c \"import tokens; print\\('OK, tokens loaded, count:', len\\(tokens.TOKENS\\)\\)\")",
       "Bash(python -m pytest tibasic_test.py -q --tb=short)",
-      "Bash(python -m pytest tibasic_test.py -q)"
+      "Bash(python -m pytest tibasic_test.py -q)",
+      "Bash(python -m pytest tibasic_test.py::TestIllegalNest -v)"
     ]
   }
 }

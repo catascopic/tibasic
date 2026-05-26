@@ -157,6 +157,7 @@ class Environment:
 		self.clock_on         = True
 		self.key_code         = 0
 		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
+		self._nest_depth: dict[str, int] = {}  # tracks nesting depth for ILLEGAL NEST guards
 
 	def to_radians(self, x):
 		return x / (180 / math.pi) if self.angle_mode == 'RAD' else x

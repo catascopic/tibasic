@@ -14,6 +14,20 @@ from environment import Variable
 
 
 @contextmanager
+def _nest_guard(env, name: str, max_depth: int = 0):
+	"""Raise ERR:ILLEGAL NEST if this function is already nested deeper than max_depth."""
+	depth = env._nest_depth
+	current = depth.get(name, 0)
+	if current > max_depth:
+		raise ValueError(f"ERR:ILLEGAL NEST ({name})")
+	depth[name] = current + 1
+	try:
+		yield
+	finally:
+		depth[name] = current
+
+
+@contextmanager
 def _scoped_var(env, variable):
 	saved = variable.get(env)
 	try:
@@ -138,7 +152,7 @@ def seq(a: ArgParser) -> TiList:
 		op = operator.ge
 		end -= 1e-10
 	variable = var.variable
-	with _scoped_var(a.env, variable):
+	with _nest_guard(a.env, 'seq'), _scoped_var(a.env, variable):
 		while op(n, end):
 			variable.set(a.env, n)
 			result.append(formula.eval())
@@ -155,7 +169,7 @@ def sigma(a: ArgParser) -> float:
 	total = 0
 	n = start
 	variable = var.variable
-	with _scoped_var(a.env, variable):
+	with _nest_guard(a.env, 'sigma'), _scoped_var(a.env, variable):
 		while n <= end:
 			variable.set(a.env, n)
 			total += formula.eval()
@@ -170,7 +184,7 @@ def n_deriv(a: ArgParser) -> float:
 	h = a.expr(optional=True, default=0.001)
 	a.end()
 	variable = var.variable
-	with _scoped_var(a.env, variable):
+	with _nest_guard(a.env, 'nDeriv', max_depth=1), _scoped_var(a.env, variable):
 		variable.set(a.env, val + h)
 		fwd = formula.eval()
 		variable.set(a.env, val - h)
@@ -227,7 +241,7 @@ def fn_int(a: ArgParser) -> float:
 	tol = a.expr(optional=True, default=1e-5)
 	a.end()
 	variable = var.variable
-	with _scoped_var(a.env, variable):
+	with _nest_guard(a.env, 'fnInt'), _scoped_var(a.env, variable):
 		def f(x):
 			variable.set(a.env, x)
 			return formula.eval()
@@ -328,11 +342,13 @@ def env_func(f):
 
 # ── expr( ─────────────────────────────────────────────────────────────────────
 
-@env_func
-def expr(env, string):
+def expr(a: ArgParser):
 	"""Evaluate a TiString as a TI-BASIC expression."""
 	from parser import Parser
-	return Parser(require_str(string).tokens, env).parse_expr()
+	string = a.expr()
+	a.end()
+	with _nest_guard(a.env, 'expr'):
+		return Parser(require_str(string).tokens, a.env).parse_expr()
 
 
 # ── Clock / date-time commands and functions ──────────────────────────────────
