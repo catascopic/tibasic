@@ -107,7 +107,6 @@ class Parser:
 				value = value + minutes / 60 + seconds / 3600
 			else:
 				value = self.env.to_radians(value)
-			return value
 		return value
 
 	def parse_string_literal(self) -> TiString:

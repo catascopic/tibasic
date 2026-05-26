@@ -1,22 +1,24 @@
-Change unitsPerEm to 1400
-
-Check which tokens have non-ascii characters
-
 SCI_E can only take a numeric literal as its exponent (rhs). However, that numeric literal can be in DMS format, indicating that it was the right call to integrate that logic into the numeric literal parser
-IS THIS TRUE???
 
-Also, on the calculator:
-In Radians mode:
-5° gives you 0.0872... when in degree mode, and 5°5'5" gives you 5.0847...
-In Degrees mode:
-5° gives you 5, 5°5'5" also gives you 5.0847
-So DMS format ignores the mode and always interprets as degrees. I fixed this in the parser, but I'm wondering if there's a better way. In theory, we could have the DEG postfix handle it somehow, but that would require peeking ahead by two tokens, I think, so this way seems easier.
+Improve matrix methods
+
+Environment: screen
+96 columns, 64 rows
+What's the best data structure for this?
+
+Go through tokens, link any methods that are currently unlinked, such as augment
+
+Commands: no paren flag
+
+Implement expr
+
+getDate, getTmStr, getDtStr, dayOfWk, timeCnv, setTmFmt, setDtFmt, checkTmr, setTime, setDate
+I'm not sure how we should implement get/set time. Maybe have a field in Environment that's an offset from the system time?
+
 
 Write tests!
 
 Also, trig functions actually do need access to the environment so they can see what mode the calculator is in!
-
-empty strings are usually invalid
 
 Instead of _make_variable, have the tokens create the variable. This would be easy since most variable tokens are created in a loop.
 Alternatively, set the variable in __post_init__ so that Variable actually has access to the token object
@@ -35,6 +37,13 @@ Full token overhaul: operators and bp are okay, everything else moved to dispatc
 move vectorized to tiobjects
 
 ********
+
+I tested this on the calculator:
+In Radians mode:
+5° gives you 0.0872... when in degree mode, and 5°5'5" gives you 5.0847...
+In Degrees mode:
+5° gives you 5, 5°5'5" also gives you 5.0847
+So DMS format ignores the mode and always interprets as degrees. I fixed this in the parser, but I'm wondering if there's a better way. In theory, we could have the DEG postfix handle it somehow, but that would require peeking ahead by two tokens, I think, so this way seems easier.
 
 Can you implement the degree symbol?
 DEG converts a number from radians to degrees if the calculator is in radians mode (should be a setting in the environment).
