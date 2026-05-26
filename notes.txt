@@ -27,9 +27,11 @@ Go through all commands, check to see if they're vectorized correctly
 
 use Token instead of string as nesting key
 
-_parse_inner might just need delimiter stack
-
 ********
+
+I'm switching you to using Opus to think about this problem:
+Can you take a look at this parser at the big-picture level and tell me if you think it's the right approach? Keep in mind that this parser models how the TI-84 calculator works, and I feel like none of the calculator's behavior should be too difficult to model, given that it's also a piece of software that's (mostly) well-written and well-tested. Specifically, I'm hoping there's a way to do the Thunk parsing that's more elegant than what I currently have. How do you think the calculator is capturing the formula of a seq( call?
+Two things to consider: braces/brackets can't be nested. Does that simplify things? Also, _capture_opener might just need a delimiter stack of some sort, rather than trying to be a recursive function. I feel like the logic of _capture_opener/_capture_subgroup could at least be combined somehow.
 
 according to the nDeriv( page, nDeriv( can be nested up to one time.
 See the file in "webref/Error Conditions - TI-Basic Developer.htm"

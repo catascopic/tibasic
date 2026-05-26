@@ -1116,3 +1116,12 @@ class TestThunkCapture:
 			COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
 		), env)
 		assert env.ans == TiList([3, 3, 3])
+
+	def test_colon_inside_thunk_raises(self, env):
+		# seq(X:5, X, 1, 3) — a colon inside the formula crosses a statement
+		# boundary and must be rejected at capture time.
+		X = T('X')
+		with pytest.raises(Exception, match="COLON|:|statement|arguments"):
+			parse_line(toks(
+				T('seq('), X, COLON, 5, COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
+			), env)
