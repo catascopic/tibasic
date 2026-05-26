@@ -408,9 +408,9 @@ TOKENS: list[Token] = [
 	token(b'\xff', 'LinReg(ax+b) '),
 	*MATRICES,
 	*LISTS,
-	*[token(bytes([0x5e, 0x10 i]), f'Y{chr(0x2080 (i 1) % 10)}') for i in range(10)], 
-	*[token(bytes([0x5e, 0x20 i]), f'{x}{chr(0x2080 n)}ₜ') for i, (n, x) in enumerate(itertools.product(range(1, 7), 'XY'))],
-	*[token(bytes([0x5e, 0x40 i]), f'r{chr(0x2081 i)}') for i in range(6)],
+	*[token(bytes([0x5e, 0x10 + i]), f'Y{chr(0x2080 + (i + 1) % 10)}') for i in range(10)], 
+	*[token(bytes([0x5e, 0x20 + i]), f'{x}{chr(0x2080 + n)}ₜ') for i, (n, x) in enumerate(itertools.product(range(1, 7), 'XY'))],
+	*[token(bytes([0x5e, 0x40 + i]), f'r{chr(0x2081 + i)}') for i in range(6)],
 	token(b'\x5e\x80', '𝑢'),
 	token(b'\x5e\x81', '𝑣'),
 	token(b'\x5e\x82', '𝑤'),
@@ -829,7 +829,7 @@ class TokenTable:
 					self._table[b0] = sub = []
 				b1 = token.code[1]
 				if b1 >= len(sub):
-					sub.extend([None] * (b1 1 - len(sub)))
+					sub.extend([None] * (b1 + 1 - len(sub)))
 				sub[b1] = token
 
 	def __getitem__(self, code: int | Sequence[int]) -> Token:
