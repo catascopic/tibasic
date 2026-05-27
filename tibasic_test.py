@@ -576,8 +576,8 @@ class TestDateTime:
 
 	def test_tm_str_24h(self):
 		e = Environment()
-		e.set_time(14, 30, 5)
-		assert str(e.get_tm_str(24)) == "14:30"
+		e.set_time(2, 30, 5)
+		assert str(e.get_tm_str(24)) == "02:30"
 
 	def test_tm_str_12h_pm(self):
 		e = Environment()

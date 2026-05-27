@@ -209,13 +209,14 @@ class Environment:
 
 	def get_tm_str(self, fmt):
 		fmt = require_int(fmt)
+		now = self._now()
 		if fmt == 24:
-			fmt_str = '%H:%M'
+			time_str = now.strftime('%H:%M')
 		elif fmt == 12:
-			fmt_str = '%I:%M %p'
+			time_str = now.strftime('%I:%M %p').lstrip('0')
 		else:
 			raise ValueError(f"getTmStr: invalid format {fmt}")
-		return TiString.from_ascii(self._now().strftime(fmt_str).lstrip('0'))
+		return TiString.from_ascii(time_str)
 
 	def clock_on(self):
 		self.clock_on = True
