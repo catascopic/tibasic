@@ -77,26 +77,26 @@ def deg():
 # ── Arithmetic ────────────────────────────────────────────────────────────────
 
 class TestArithmetic:
-	def test_add(self):          assert calc('1+2') == 3.0
-	def test_sub(self):          assert calc('5-3') == 2.0
-	def test_mul(self):          assert calc('3*4') == 12.0
+	def test_add(self):          assert calc('1+2') == 3
+	def test_sub(self):          assert calc('5-3') == 2
+	def test_mul(self):          assert calc('3*4') == 12
 	def test_div(self):          assert calc('7/2') == 3.5
-	def test_pow(self):          assert calc('2^10') == 1024.0
-	def test_negation(self):     assert calc('~5') == -5.0
-	def test_sq_postfix(self):   assert calc(7, SQ) == 49.0
+	def test_pow(self):          assert calc('2^10') == 1024
+	def test_negation(self):     assert calc('~5') == -5
+	def test_sq_postfix(self):   assert calc(7, SQ) == 49
 	def test_xroot(self):        assert calc(4, XTH_ROOT, 256) == approx(4)
-	def test_sci_e(self):        assert calc('1E3') == 1000.0
-	def test_implicit_mul(self): assert calc('2(3+4)') == 14.0
+	def test_sci_e(self):        assert calc('1E3') == 1000
+	def test_implicit_mul(self): assert calc('2(3+4)') == 14
 
 	def test_precedence_mul_over_add(self):
-		assert calc('2+3*4') == 14.0
+		assert calc('2+3*4') == 14
 
 	def test_precedence_parens(self):
-		assert calc('(2+3)*4') == 20.0
+		assert calc('(2+3)*4') == 20
 
 	def test_pow_right_assoc(self):
 		# 2^3^2 = 2^(3^2) = 2^9 = 512 (right-associative)
-		assert calc('2^3^2') == 512.0
+		assert calc('2^3^2') == 512
 
 
 # ── Scientific notation (ᴇ) ───────────────────────────────────────────────────
@@ -106,15 +106,15 @@ class TestSciE:
 
 	def test_infix_basic(self):
 		# 1ᴇ3 = 1000
-		assert calc('1E3') == 1000.0
+		assert calc('1E3') == 1000
 
 	def test_prefix_basic(self):
 		# ᴇ3 = 10^3 = 1000  (no left operand → implicit 1)
-		assert calc('E3') == 1000.0
+		assert calc('E3') == 1000
 
 	def test_infix_zero_exp(self):
 		# 5ᴇ0 = 5
-		assert calc('5E0') == 5.0
+		assert calc('5E0') == 5
 
 	def test_infix_decimal_exp(self):
 		# 1ᴇ1.5 = 10^1.5
@@ -130,15 +130,15 @@ class TestSciE:
 
 	def test_precedence_over_add(self):
 		# 2 + 3ᴇ2 = 2 + 300 = 302  (ᴇ binds tighter than +)
-		assert calc('2+3E2') == 302.0
+		assert calc('2+3E2') == 302
 
 	def test_precedence_over_mul(self):
 		# 2 * 3ᴇ2 = 2 * 300 = 600  (ᴇ binds tighter than *)
-		assert calc('2*3E2') == 600.0
+		assert calc('2*3E2') == 600
 
 	def test_neg_before_sci_e(self):
 		# ~1ᴇ3 = ~1000  (negation of the whole scientific-notation number)
-		assert calc('~1E3') == -1000.0
+		assert calc('~1E3') == -1000
 
 	def test_pow_rhs_is_sci_e(self):
 		# 2^3ᴇ2: ᴇ binds tighter than ^, so exponent is 3ᴇ2=300 → 2^300
@@ -146,7 +146,7 @@ class TestSciE:
 
 	def test_in_larger_expression(self):
 		# (1ᴇ3 + 1ᴇ2) = 1100
-		assert calc('(1E3+1E2)') == 1100.0
+		assert calc('(1E3+1E2)') == 1100
 
 	# ── Negative cases ────────────────────────────────────────────────────────
 
@@ -163,7 +163,7 @@ class TestSciE:
 	def test_rejects_expression_rhs(self):
 		# 1ᴇ2+1 must parse as (1ᴇ2)+1 = 101, not 1ᴇ(2+1) = 1000
 		# (confirms the RHS stops at the literal boundary)
-		assert calc('1E2+1') == 101.0
+		assert calc('1E2+1') == 101
 
 	def test_rejects_ans_as_exponent(self):
 		# 1ᴇAns — Ans is not a numeric literal
@@ -255,9 +255,9 @@ class TestCombinatorics:
 	def test_remainder(self):  assert pf.remainder(17, 5) == 2
 
 	# Through the parser (NPR/NCR are binary operators; FACT is postfix)
-	def test_fact_parser(self): assert calc('5!') == 120.0
-	def test_npr_parser(self):  assert calc(5, 'nPr', 3) == 60.0
-	def test_ncr_parser(self):  assert calc(5, 'nCr', 3) == 10.0
+	def test_fact_parser(self): assert calc('5!') == 120
+	def test_npr_parser(self):  assert calc(5, 'nPr', 3) == 60
+	def test_ncr_parser(self):  assert calc(5, 'nCr', 3) == 10
 
 
 # ── List operations ───────────────────────────────────────────────────────────
@@ -313,7 +313,7 @@ class TestListOperations:
 		assert list(TiList([1, 2, 3]) + TiList([4, 5, 6])) == [5, 7, 9]
 
 	def test_vectorized_scalar(self):
-		assert list(TiList([2, 4, 6]) / 2) == [1.0, 2.0, 3.0]
+		assert list(TiList([2, 4, 6]) / 2) == [1, 2, 3]
 
 
 # ── Matrix operations ─────────────────────────────────────────────────────────
@@ -441,13 +441,13 @@ class TestDistributions:
 		assert pf.binompdf(10, 0.5, 5) == approx(252 / 1024)
 
 	def test_binomcdf_all(self):
-		assert pf.binomcdf(10, 0.5, 10) == approx(1.0)
+		assert pf.binomcdf(10, 0.5, 10) == approx(1)
 
 	def test_poissonpdf(self):
 		assert pf.poissonpdf(3, 3) == approx(math.exp(-3) * 27 / 6)
 
 	def test_poissoncdf_all(self):
-		assert pf.poissoncdf(3, 50) == approx(1.0)
+		assert pf.poissoncdf(3, 50) == approx(1)
 
 	def test_geometpdf_first(self):
 		# P(X=1) = p
@@ -461,7 +461,7 @@ class TestDistributions:
 		assert pf.tcdf(-1e9, 0, df=10) == approx(0.5, rel=1e-4)
 
 	def test_chi2cdf_zero(self):
-		assert pf.chi2cdf(0, 0, df=5) == approx(0.0, abs=1e-6)
+		assert pf.chi2cdf(0, 0, df=5) == approx(0, abs=1e-6)
 
 	def test_invt_roundtrip(self):
 		from purefunctions import invt
@@ -512,28 +512,28 @@ class TestDateTime:
 
 	def test_dbd_mmddyy(self):
 		# MM.DDYY: Dec 25 → Dec 31 2024
-		assert pf.dbd(12.2524, 12.3124) == 6.0
+		assert pf.dbd(12.2524, 12.3124) == 6
 
 	def test_dbd_negative(self):
-		assert pf.dbd(12.3124, 12.2524) == -6.0
+		assert pf.dbd(12.3124, 12.2524) == -6
 
 	def test_dbd_ddmmyy_leap(self):
 		# DDMM.YY: Jan 17 1996 → Jan 17 1997 (1996 is a leap year → 366 days)
-		assert pf.dbd(1701.96, 1701.97) == 366.0
+		assert pf.dbd(1701.96, 1701.97) == 366
 
 	def test_dbd_mmddyy_leap(self):
 		# MM.DDYY same dates — formats can be mixed or used separately
-		assert pf.dbd(1.1796, 1.1797) == 366.0
+		assert pf.dbd(1.1796, 1.1797) == 366
 
 	def test_dbd_mixed_formats(self):
 		# Doc example: dbd(612.07, 2512.07) = 19
 		# DDMM.YY: 612.07 → Dec 6 2007; 2512.07 → Dec 25 2007
-		assert pf.dbd(612.07, 2512.07) == 19.0
+		assert pf.dbd(612.07, 2512.07) == 19
 
 	def test_dbd_mmddyy_doc_example(self):
 		# Doc example: dbd(1.0207, 1.0107) = -1
 		# MM.DDYY: Jan 2 2007 → Jan 1 2007
-		assert pf.dbd(1.0207, 1.0107) == -1.0
+		assert pf.dbd(1.0207, 1.0107) == -1
 
 	def test_dbd_too_many_decimals_mmddyy(self):
 		# 5 decimal places in MM.DDYY → ERR:DOMAIN
@@ -601,31 +601,31 @@ class TestDateTime:
 class TestParserFeatures:
 	def test_variable_store_retrieve(self, env):
 		calc('3@A', env=env)
-		assert calc('A', env=env) == 3.0
+		assert calc('A', env=env) == 3
 
 	def test_ans(self, env):
 		calc(5, env=env)
 		calc('Ans', '+1', env=env)
-		assert env.ans == 6.0
+		assert env.ans == 6
 
 	def test_colon_separator(self, env):
-		assert calc('3@A:A*2', env=env) == 6.0
+		assert calc('3@A:A*2', env=env) == 6
 
 	def test_list_literal(self):
-		assert list(calc('{1,2,3')) == [1.0, 2.0, 3.0]
+		assert list(calc('{1,2,3')) == [1, 2, 3]
 
 	def test_list_index(self, env):
 		calc('{1,2,3@', L1, env=env)
-		assert calc(L1, '(2', env=env) == 2.0
+		assert calc(L1, '(2', env=env) == 2
 
 	def test_matrix_literal(self):
 		result = calc('[[1,2][3,4]]')
 		assert isinstance(result, TiMatrix)
-		assert result.data == [[1.0, 2.0], [3.0, 4.0]]
+		assert result.data == [[1, 2], [3, 4]]
 
 	def test_matrix_index(self, env):
 		calc('[[1,2][3,4]]@', MAT_A, env=env)
-		assert calc(MAT_A, '(2,1', env=env) == 3.0
+		assert calc(MAT_A, '(2,1', env=env) == 3
 
 	def test_string_literal(self, env):
 		calc('"HI"', env=env)
@@ -637,7 +637,7 @@ class TestParserFeatures:
 
 	def test_dms_degree_in_deg_mode(self, deg):
 		# 90° in degree mode = 90 (no conversion)
-		assert calc('90°', env=deg) == 90.0
+		assert calc('90°', env=deg) == 90
 
 	def test_dms_literal_minutes(self):
 		# 1°30' = 1.5 decimal degrees (DMS literals always return decimal degrees, no mode conversion)
@@ -661,7 +661,7 @@ class TestParserFeatures:
 
 	def test_transpose_postfix(self):
 		result = calc('[[1,2][3,4]]', TRANSPOSE)
-		assert result.data == [[1.0, 3.0], [2.0, 4.0]]
+		assert result.data == [[1, 3], [2, 4]]
 
 
 # ── rand ─────────────────────────────────────────────────────────────────────────
@@ -671,14 +671,14 @@ class TestRand:
 		# bare rand produces a single float in [0, 1)
 		result = calc('rand')
 		assert isinstance(result, float)
-		assert 0.0 <= result < 1.0
+		assert 0 <= result < 1
 
 	def test_rand_with_parens_returns_list(self):
 		# rand(5) returns a TiList of 5 floats
 		result = calc('rand', '(5)')
 		assert isinstance(result, TiList)
 		assert len(result) == 5
-		assert all(0.0 <= x < 1.0 for x in result)
+		assert all(0 <= x < 1 for x in result)
 
 	def test_rand_with_parens_no_close(self):
 		# Trailing ) may be omitted
@@ -735,36 +735,36 @@ class TestColonStatements:
 	def test_colon_ans_is_last(self, env):
 		# 1→A:2  →  Ans=2, A=1
 		calc('1@A', ':', 2, env=env)
-		assert env.ans == 2.0
-		assert VAR_A.variable.get(env) == 1.0
+		assert env.ans == 2
+		assert VAR_A.variable.get(env) == 1
 
 	def test_colon_store_then_read(self, env):
 		# 5→A:A*3  →  Ans=15
-		assert calc('5@A:A*3', env=env) == 15.0
+		assert calc('5@A:A*3', env=env) == 15
 
 	def test_colon_two_stores(self, env):
 		# 1→A:3→B  →  A=1, B=3, Ans=3
 		calc('1@A:3@B', env=env)
-		assert VAR_A.variable.get(env) == 1.0
-		assert VAR_B.variable.get(env) == 3.0
-		assert env.ans == 3.0
+		assert VAR_A.variable.get(env) == 1
+		assert VAR_B.variable.get(env) == 3
+		assert env.ans == 3
 
 	def test_colon_three_segments(self, env):
 		# 1:2:3  →  Ans=3
-		assert calc('1:2:3', env=env) == 3.0
+		assert calc('1:2:3', env=env) == 3
 
 	def test_colon_ans_carries_across(self, env):
 		# 7:Ans+1  →  Ans=8  (Ans from segment 1 is visible in segment 2)
-		assert calc('7:', 'Ans', '+1', env=env) == 8.0
+		assert calc('7:', 'Ans', '+1', env=env) == 8
 
 	def test_colon_store_does_not_clobber_a(self, env):
 		# 1→A:2  →  A must still be 1 after Ans becomes 2
 		calc('1@A:2', env=env)
-		assert calc('A', env=env) == 1.0
+		assert calc('A', env=env) == 1
 
 	def test_colon_list_then_index(self, env):
 		# {10,20,30}→L₁:L₁(2)  →  Ans=20
-		assert calc('{10,20,30@', L1, ':', L1, '(2', env=env) == 20.0
+		assert calc('{10,20,30@', L1, ':', L1, '(2', env=env) == 20
 
 
 # ── Implicit delimiter closing ────────────────────────────────────────────────
@@ -772,41 +772,41 @@ class TestColonStatements:
 class TestImplicitClose:
 	def test_unclosed_paren(self):
 		# (1+2  →  3 (trailing ) omitted)
-		assert calc('(1+2') == 3.0
+		assert calc('(1+2') == 3
 
 	def test_unclosed_list(self):
 		# {1,2,3  →  TiList [1,2,3]
 		result = calc('{1,2,3')
-		assert list(result) == [1.0, 2.0, 3.0]
+		assert list(result) == [1, 2, 3]
 
 	def test_unclosed_matrix(self):
 		# [[1,2][3,4  →  2×2 matrix (both ] omitted)
 		result = calc('[[1,2][3,4')
 		assert isinstance(result, TiMatrix)
-		assert result.data == [[1.0, 2.0], [3.0, 4.0]]
+		assert result.data == [[1, 2], [3, 4]]
 
 	def test_unclosed_matrix_single_element(self):
 		# [[1  →  1×1 matrix
 		result = calc('[[1')
 		assert isinstance(result, TiMatrix)
-		assert result.data == [[1.0]]
+		assert result.data == [[1]]
 
 	def test_unclosed_matrix_then_colon_index(self, env):
-		# [[1:Ans(1,1  →  first segment produces [[1]], second indexes it → 1.0
+		# [[1:Ans(1,1  →  first segment produces [[1]], second indexes it → 1
 		parse_line(toks('[[1:', 'Ans', '(1,1'), env)
-		assert env.ans == 1.0
+		assert env.ans == 1
 
 	def test_unclosed_list_then_colon_sum(self, env):
 		# {1,2,3:sum(Ans  →  Ans=6
-		assert calc('{1,2,3:', 'sum(', 'Ans', env=env) == 6.0
+		assert calc('{1,2,3:', 'sum(', 'Ans', env=env) == 6
 
 	def test_unclosed_fn_args(self):
 		# max(3,7  →  7 (trailing ) omitted)
-		assert calc('max(', '3,7') == 7.0
+		assert calc('max(', '3,7') == 7
 
 	def test_nested_unclosed(self):
 		# abs(~(3+4  →  7
-		assert calc('abs(', '~(3+4') == 7.0
+		assert calc('abs(', '~(3+4') == 7
 
 
 # ── Storing to dim( ───────────────────────────────────────────────────────────
@@ -847,12 +847,12 @@ class TestStoreDim:
 	def test_dim_read_list(self, env):
 		# dim({1,2,3,4}) = 4  (reading, not storing)
 		result = calc('dim(', '{1,2,3,4}')
-		assert result == 4.0
+		assert result == 4
 
 	def test_dim_read_matrix(self, env):
 		# dim([[1,2,3][4,5,6]]) = {2,3}
 		result = calc('dim(', '[[1,2,3][4,5,6')
-		assert result.data == [2.0, 3.0]
+		assert result.data == [2, 3]
 
 
 # ── Nesting and combinations ──────────────────────────────────────────────────
@@ -880,19 +880,19 @@ class TestNesting:
 
 	def test_nderiv(self):
 		# nDeriv(X²,X,3) ≈ 6  (derivative of x² at x=3)
-		assert calc('nDeriv(', 'X^2,X,3') == approx(6.0, rel=1e-4)
+		assert calc('nDeriv(', 'X^2,X,3') == approx(6, rel=1e-4)
 
 	def test_fnint(self):
 		# fnInt(X²,X,0,3) ≈ 9  (∫₀³ x² dx = 9)
-		assert calc('fnInt(', 'X^2,X,0,3') == approx(9.0, rel=1e-4)
+		assert calc('fnInt(', 'X^2,X,0,3') == approx(9, rel=1e-4)
 
 	def test_abs_of_neg_expr(self):
 		# abs(~(3+4))  =  7
-		assert calc('abs(', '~(3+4') == 7.0
+		assert calc('abs(', '~(3+4') == 7
 
 	def test_max_of_list_expr(self):
 		# max({3,1,4,1,5})  =  5
-		assert calc('max(', '{3,1,4,1,5') == 5.0
+		assert calc('max(', '{3,1,4,1,5') == 5
 
 	def test_nested_arithmetic_functions(self):
 		# round(1/6, 3)  =  0.167
@@ -901,50 +901,50 @@ class TestNesting:
 	def test_list_arithmetic_then_sum(self, env):
 		# {1,2,3}*2  =  {2,4,6}, then sum({2,4,6}) = 12
 		calc('{1,2,3}*2@', L1, env=env)
-		assert calc('sum(', L1, env=env) == 12.0
+		assert calc('sum(', L1, env=env) == 12
 
 	def test_matrix_power_then_det(self):
 		# det([[1,1][0,1]]²)  =  det([[1,2][0,1]])  =  1
-		assert calc('det(', '[[1,1][0,1]]^2') == approx(1.0)
+		assert calc('det(', '[[1,1][0,1]]^2') == approx(1)
 
 	def test_string_concat_then_length(self, env):
 		# "AB"+"CD" stored in Str1, then length(Str1) = 4
 		calc('"AB"+"CD"@', 'Str1', env=env)
-		assert calc('length(', 'Str1', env=env) == 4.0
+		assert calc('length(', 'Str1', env=env) == 4
 
 	def test_cumsum_then_max(self):
 		# max(cumSum({1,2,3,4}))  =  max({1,3,6,10})  =  10
-		assert calc('max(', 'cumSum(', '{1,2,3,4') == 10.0
+		assert calc('max(', 'cumSum(', '{1,2,3,4') == 10
 
 	def test_expr_evaluates_string(self, env):
 		# Build "2+3" dynamically as a string stored in Str1, then expr(Str1) = 5
 		calc('"2+3"@', 'Str1', env=env)
-		assert calc('expr(', 'Str1', env=env) == approx(5.0)
+		assert calc('expr(', 'Str1', env=env) == approx(5)
 
 	def test_ans_index_or_mul_list(self, env):
 		# {10,20,30}→Ans  (via plain eval), then Ans(2)  =  20
 		parse_line(toks('{10,20,30}'), env)
 		parse_line(toks('Ans', '(2)'), env)
-		assert env.ans == 20.0
+		assert env.ans == 20
 
 	def test_ans_index_or_mul_scalar(self, env):
 		# 7→Ans, then Ans(3)  =  21  (scalar * 3)
 		parse_line(toks(7), env)
 		parse_line(toks('Ans', '(3)'), env)
-		assert env.ans == 21.0
+		assert env.ans == 21
 
 	def test_ans_index_matrix(self, env):
 		# [[1,2][3,4]]→Ans, then Ans(2,1) = 3
 		parse_line(toks('[[1,2][3,4'), env)
 		parse_line(toks('Ans', '(2,1'), env)
-		assert env.ans == 3.0
+		assert env.ans == 3
 
 	def test_seq_preserves_variable(self, env):
 		# X=99 before seq; seq restores X=99 afterward
 		parse_line(toks('99@X'), env)
 		parse_line(toks('seq(', 'X,X,1,3'), env)
 		parse_line(toks('X'), env)
-		assert env.ans == 99.0
+		assert env.ans == 99
 
 
 # ── Illegal nesting (ERR:ILLEGAL NEST) ───────────────────────────────────────
@@ -975,7 +975,7 @@ class TestIllegalNest:
 	def test_nderiv_one_level_ok(self, env):
 		# nDeriv( inside nDeriv( once is allowed
 		parse_line(toks('nDeriv(', 'nDeriv(', 'X²,X,X),X,1'), env)
-		assert env.ans == approx(2.0, rel=1e-3)
+		assert env.ans == approx(2, rel=1e-3)
 
 	def test_nderiv_two_levels_raises(self, env):
 		# nDeriv( inside nDeriv( inside nDeriv( → ERR:ILLEGAL NEST
@@ -992,8 +992,8 @@ class TestIllegalNest:
 	def test_expr_nest_depth_resets(self, env):
 		# After a successful expr( call, the guard is back to 0 — can call again
 		calc('"1+2"@', STR_1, env=env)
-		assert calc('expr(', STR_1, env=env) == approx(3.0)
-		assert calc('expr(', STR_1, env=env) == approx(3.0)   # second call — must not raise
+		assert calc('expr(', STR_1, env=env) == approx(3)
+		assert calc('expr(', STR_1, env=env) == approx(3)   # second call — must not raise
 
 
 # ── Thunk capture: commas inside nested delimiters ────────────────────────────
