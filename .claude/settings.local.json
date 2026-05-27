@@ -16,7 +16,8 @@
       "Bash(python -c \"import tokens; print\\('OK, tokens loaded, count:', len\\(tokens.TOKENS\\)\\)\")",
       "Bash(python -m pytest tibasic_test.py -q --tb=short)",
       "Bash(python -m pytest tibasic_test.py -q)",
-      "Bash(python -m pytest tibasic_test.py::TestIllegalNest -v)"
+      "Bash(python -m pytest tibasic_test.py::TestIllegalNest -v)",
+      "Bash(python -c \"import tokens; print\\(f'Loaded {len\\(tokens.ALL_TOKENS\\)} tokens'\\)\")"
     ]
   }
 }
