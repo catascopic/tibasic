@@ -9,21 +9,25 @@ from environment import Environment
 from parser import parse_line, ParseError
 from tokens import (
 	ALL_TOKENS, Token, TOKEN_TABLE, ASCII,
-	STORE, COMMA, QUOTE, COLON, DOT, NEG, DEG, APOS, SCI_E,
-	ADD, SUB, MUL, DIV, POW, XTH_ROOT, FACT, nPr, nCr,
-	EQ, LT, GT, LE, GE, NE, and_, or_, xor,
-	L_PAREN, R_PAREN, L_BRACE, R_BRACE, L_BRACKET, R_BRACKET,
-	Ans, INV, SQ, TRANSPOSE, rand, dim,
-	VAR_A, VAR_B, L1, MAT_A, STR_1,
+	STORE, DEG, APOS, SCI_E, XTH_ROOT, NEG, APOS, QUOTE,
+	EQ, LT, GT, LE, GE, NE,
+	Ans, INV, SQ, TRANSPOSE,
+	LISTS, MATRICES, STRINGS,
+	VAR_A, VAR_B,
 )
 from tiobjects import TiList, TiMatrix, TiString
 
+L1 = LISTS[0]
+MAT_A = MATRICES[0]
+STR_1 = STRINGS[0]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-# TODO: Don't use −
 
 tokens_by_text = {_t.text: _t for _t in ALL_TOKENS}
+tokens_by_text['~'] = NEG
+tokens_by_text['@'] = STORE
+
 
 def _iter_chars(obj):
 	for c in str(obj):
@@ -74,26 +78,26 @@ def deg():
 # ── Arithmetic ────────────────────────────────────────────────────────────────
 
 class TestArithmetic:
-	def test_add(self):          assert calc(1, ADD, 2) == 3.0
-	def test_sub(self):          assert calc(5, SUB, 3) == 2.0
-	def test_mul(self):          assert calc(3, MUL, 4) == 12.0
-	def test_div(self):          assert calc(7, DIV, 2) == 3.5
-	def test_pow(self):          assert calc(2, POW, 10) == 1024.0
-	def test_negation(self):     assert calc(NEG, 5) == -5.0
+	def test_add(self):          assert calc('1+2') == 3.0
+	def test_sub(self):          assert calc('5-3') == 2.0
+	def test_mul(self):          assert calc('3*4') == 12.0
+	def test_div(self):          assert calc('7/2') == 3.5
+	def test_pow(self):          assert calc('2^10') == 1024.0
+	def test_negation(self):     assert calc('~5') == -5.0
 	def test_sq_postfix(self):   assert calc(7, SQ) == 49.0
 	def test_xroot(self):        assert calc(4, XTH_ROOT, 256) == approx(4)
 	def test_sci_e(self):        assert calc(1, SCI_E, 3) == 1000.0
-	def test_implicit_mul(self): assert calc(2, L_PAREN, 3, ADD, 4, R_PAREN) == 14.0
+	def test_implicit_mul(self): assert calc('2(3+4)') == 14.0
 
 	def test_precedence_mul_over_add(self):
-		assert calc(2, ADD, 3, MUL, 4) == 14.0
+		assert calc('2+3*4') == 14.0
 
 	def test_precedence_parens(self):
-		assert calc(L_PAREN, 2, ADD, 3, R_PAREN, MUL, 4) == 20.0
+		assert calc('(2+3)*4') == 20.0
 
 	def test_pow_right_assoc(self):
 		# 2^3^2 = 2^(3^2) = 2^9 = 512 (right-associative)
-		assert calc(2, POW, 3, POW, 2) == 512.0
+		assert calc('2^3^2') == 512.0
 
 
 # ── Scientific notation (ᴇ) ───────────────────────────────────────────────────
@@ -115,7 +119,7 @@ class TestSciE:
 
 	def test_infix_decimal_exp(self):
 		# 1ᴇ1.5 = 10^1.5
-		assert calc(1, SCI_E, 1, DOT, 5) == approx(10 ** 1.5)
+		assert calc(1, SCI_E, '1.5') == approx(10 ** 1.5)
 
 	def test_infix_multi_digit_exp(self):
 		# 2ᴇ10 = 2048 (not 2*(10^1)*0 or anything weird)
@@ -127,30 +131,30 @@ class TestSciE:
 
 	def test_precedence_over_add(self):
 		# 2 + 3ᴇ2 = 2 + 300 = 302  (ᴇ binds tighter than +)
-		assert calc(2, ADD, 3, SCI_E, 2) == 302.0
+		assert calc('2+3', SCI_E, 2) == 302.0
 
 	def test_precedence_over_mul(self):
 		# 2 * 3ᴇ2 = 2 * 300 = 600  (ᴇ binds tighter than *)
-		assert calc(2, MUL, 3, SCI_E, 2) == 600.0
+		assert calc('2*3', SCI_E, 2) == 600.0
 
 	def test_neg_before_sci_e(self):
-		# −1ᴇ3 = −1000  (negation of the whole scientific-notation number)
-		assert calc(NEG, 1, SCI_E, 3) == -1000.0
+		# ~1ᴇ3 = ~1000  (negation of the whole scientific-notation number)
+		assert calc('~1', SCI_E, 3) == -1000.0
 
 	def test_pow_rhs_is_sci_e(self):
 		# 2^3ᴇ2: ᴇ binds tighter than ^, so exponent is 3ᴇ2=300 → 2^300
-		assert calc(2, POW, 3, SCI_E, 2) == approx(2 ** 300)
+		assert calc('2^3', SCI_E, 2) == approx(2 ** 300)
 
 	def test_in_larger_expression(self):
 		# (1ᴇ3 + 1ᴇ2) = 1100
-		assert calc(L_PAREN, 1, SCI_E, 3, ADD, 1, SCI_E, 2, R_PAREN) == 1100.0
+		assert calc('(1', SCI_E, '3+1', SCI_E, '2)') == 1100.0
 
 	# ── Negative cases ────────────────────────────────────────────────────────
 
 	def test_rejects_paren_expr(self):
 		# 1ᴇ(3) — parenthesised expression is not a numeric literal
 		with pytest.raises(ParseError):
-			calc(1, SCI_E, L_PAREN, 3, R_PAREN)
+			calc(1, SCI_E, '(3)')
 
 	def test_rejects_variable(self):
 		# 1ᴇA — variable is not a numeric literal
@@ -160,7 +164,7 @@ class TestSciE:
 	def test_rejects_expression_rhs(self):
 		# 1ᴇ2+1 must parse as (1ᴇ2)+1 = 101, not 1ᴇ(2+1) = 1000
 		# (confirms the RHS stops at the literal boundary)
-		assert calc(1, SCI_E, 2, ADD, 1) == 101.0
+		assert calc(1, SCI_E, '2+1') == 101.0
 
 	def test_rejects_ans_as_exponent(self):
 		# 1ᴇAns — Ans is not a numeric literal
@@ -168,23 +172,23 @@ class TestSciE:
 			calc(1, SCI_E, Ans)
 
 	def test_infix_negative_exp(self):
-		# 1ᴇ−3 = 0.001
-		assert calc(1, SCI_E, NEG, 3) == approx(0.001)
+		# 1ᴇ~3 = 0.001
+		assert calc(1, SCI_E, '~3') == approx(0.001)
 
 	def test_prefix_negative_exp(self):
-		# ᴇ−3 = 10^−3 = 0.001
-		assert calc(SCI_E, NEG, 3) == approx(0.001)
+		# ᴇ~3 = 10^−3 = 0.001
+		assert calc(SCI_E, '~3') == approx(0.001)
 
 	def test_negative_exp_decimal(self):
-		# 1ᴇ−1.5 = 10^−1.5
-		assert calc(1, SCI_E, NEG, 1, DOT, 5) == approx(10 ** -1.5)
+		# 1ᴇ~1.5 = 10^−1.5
+		assert calc(1, SCI_E, '~1.5') == approx(10 ** -1.5)
 
 	def test_negative_exp_in_expression(self):
-		# 2 + 3ᴇ−2 = 2 + 0.03 = 2.03
-		assert calc(2, ADD, 3, SCI_E, NEG, 2) == approx(2.03)
+		# 2 + 3ᴇ~2 = 2 + 0.03 = 2.03
+		assert calc('2+3', SCI_E, '~2') == approx(2.03)
 
 	def test_neg_literal_neg_exp(self):
-		# −2ᴇ−3 = −0.002
+		# ~2ᴇ~3 = ~0.002
 		assert calc(NEG, 2, SCI_E, NEG, 3) == approx(-0.002)
 
 	def test_rejects_double_neg_exp(self):
@@ -253,9 +257,9 @@ class TestCombinatorics:
 	def test_remainder(self):  assert pf.remainder(17, 5) == 2
 
 	# Through the parser (NPR/NCR are binary operators; FACT is postfix)
-	def test_fact_parser(self): assert calc(5, FACT) == 120.0
-	def test_npr_parser(self):  assert calc(5, nPr, 3) == 60.0
-	def test_ncr_parser(self):  assert calc(5, nCr, 3) == 10.0
+	def test_fact_parser(self): assert calc('5!') == 120.0
+	def test_npr_parser(self):  assert calc(5, 'nPr', 3) == 60.0
+	def test_ncr_parser(self):  assert calc(5, 'nCr', 3) == 10.0
 
 
 # ── List operations ───────────────────────────────────────────────────────────
@@ -603,11 +607,11 @@ class TestParserFeatures:
 
 	def test_ans(self, env):
 		calc(5, env=env)
-		calc(Ans, ADD, 1, env=env)
+		calc(Ans, '+1', env=env)
 		assert env.ans == 6.0
 
 	def test_colon_separator(self, env):
-		assert calc(3, STORE, 'A', COLON, 'A', MUL, 2, env=env) == 6.0
+		assert calc('3@A:A*2', env=env) == 6.0
 
 	def test_list_literal(self):
 		assert list(calc('{1,2,3')) == [1.0, 2.0, 3.0]
@@ -652,19 +656,13 @@ class TestParserFeatures:
 
 	def test_inv_postfix(self):
 		# [[1,2][3,4]]¹ gives the inverse
-		mat_toks = toks(
-			L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
-			L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET)
-		result = calc(*mat_toks, INV)
+		result = calc('[[1,2][3,4]]', INV)
 		assert isinstance(result, TiMatrix)
 		assert result.data[0][0] == approx(-2)
 		assert result.data[1][1] == approx(-0.5)
 
 	def test_transpose_postfix(self):
-		mat_toks = toks(
-			L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
-			L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET)
-		result = calc(*mat_toks, TRANSPOSE)
+		result = calc('[[1,2][3,4]]', TRANSPOSE)
 		assert result.data == [[1.0, 3.0], [2.0, 4.0]]
 
 
@@ -673,62 +671,62 @@ class TestParserFeatures:
 class TestRand:
 	def test_rand_no_parens_in_range(self):
 		# bare rand produces a single float in [0, 1)
-		result = calc(rand)
+		result = calc('rand')
 		assert isinstance(result, float)
 		assert 0.0 <= result < 1.0
 
 	def test_rand_with_parens_returns_list(self):
 		# rand(5) returns a TiList of 5 floats
-		result = calc(rand, L_PAREN, 5, R_PAREN)
+		result = calc('rand', '(5)')
 		assert isinstance(result, TiList)
 		assert len(result) == 5
 		assert all(0.0 <= x < 1.0 for x in result)
 
 	def test_rand_with_parens_no_close(self):
 		# Trailing ) may be omitted
-		result = calc(rand, L_PAREN, 3)
+		result = calc('rand', '(3')
 		assert isinstance(result, TiList)
 		assert len(result) == 3
 
 	def test_rand_seed_reproducible(self, env):
 		# Store a seed → rand, then same seed → rand again; must match
-		parse_line(toks(1, STORE, rand), env)
-		parse_line(toks(rand), env)
+		parse_line(toks(1, STORE, 'rand'), env)
+		parse_line(toks('rand'), env)
 		first = env.ans
-		parse_line(toks(1, STORE, rand), env)
-		parse_line(toks(rand), env)
+		parse_line(toks(1, STORE, 'rand'), env)
+		parse_line(toks('rand'), env)
 		assert env.ans == first
 
 	def test_rand_implicit_multiply(self, env):
 		# 2rand  ≡  2 * rand()  — result must be in [0, 2)
-		parse_line(toks(1, STORE, rand), env)   # fix seed
-		parse_line(toks(rand), env)
+		parse_line(toks(1, STORE, 'rand'), env)   # fix seed
+		parse_line(toks('rand'), env)
 		single = env.ans
-		parse_line(toks(1, STORE, rand), env)   # reset seed
-		parse_line(toks(2, rand), env)          # implicit multiply
+		parse_line(toks(1, STORE, 'rand'), env)   # reset seed
+		parse_line(toks(2, 'rand'), env)          # implicit multiply
 		assert env.ans == approx(2 * single)
 
 	def test_rand_int(self):
 		# randInt(1,6) returns an integer value in [1, 6]
-		result = calc('randInt(', 1, COMMA, 6, R_PAREN)
+		result = calc('randInt(', '1,6)')
 		assert result == int(result)
 		assert 1 <= result <= 6
 
 	def test_rand_int_list(self):
 		# randInt(1,6,10) returns a TiList of 10 ints
-		result = calc('randInt(', 1, COMMA, 6, COMMA, 10, R_PAREN)
+		result = calc('randInt(', '1,6,10)')
 		assert isinstance(result, TiList)
 		assert len(result) == 10
 		assert all(1 <= x <= 6 for x in result)
 
 	def test_rand_norm(self):
 		# randNorm(0,1) returns a float (no guaranteed range, just check type)
-		result = calc('randNorm(', 0, COMMA, 1, R_PAREN)
+		result = calc('randNorm(', '0,1)')
 		assert isinstance(result, float)
 
 	def test_rand_norm_list(self):
 		# randNorm(0,1,5) returns a TiList of 5 floats
-		result = calc('randNorm(', 0, COMMA, 1, COMMA, 5, R_PAREN)
+		result = calc('randNorm(', '0,1,5)')
 		assert isinstance(result, TiList)
 		assert len(result) == 5
 
@@ -738,37 +736,37 @@ class TestRand:
 class TestColonStatements:
 	def test_colon_ans_is_last(self, env):
 		# 1→A:2  →  Ans=2, A=1
-		calc(1, STORE, 'A', COLON, 2, env=env)
+		calc(1, STORE, 'A', ':', 2, env=env)
 		assert env.ans == 2.0
 		assert VAR_A.variable.get(env) == 1.0
 
 	def test_colon_store_then_read(self, env):
 		# 5→A:A*3  →  Ans=15
-		assert calc(5, STORE, 'A', COLON, 'A', MUL, 3, env=env) == 15.0
+		assert calc('5@A:A*3', env=env) == 15.0
 
 	def test_colon_two_stores(self, env):
 		# 1→A:3→B  →  A=1, B=3, Ans=3
-		calc(1, STORE, 'A', COLON, 3, STORE, 'B', env=env)
+		calc('1@A:3@B', env=env)
 		assert VAR_A.variable.get(env) == 1.0
 		assert VAR_B.variable.get(env) == 3.0
 		assert env.ans == 3.0
 
 	def test_colon_three_segments(self, env):
 		# 1:2:3  →  Ans=3
-		assert calc(1, COLON, 2, COLON, 3, env=env) == 3.0
+		assert calc('1:2:3', env=env) == 3.0
 
 	def test_colon_ans_carries_across(self, env):
 		# 7:Ans+1  →  Ans=8  (Ans from segment 1 is visible in segment 2)
-		assert calc(7, COLON, Ans, ADD, 1, env=env) == 8.0
+		assert calc('7:', Ans, '+1', env=env) == 8.0
 
 	def test_colon_store_does_not_clobber_a(self, env):
 		# 1→A:2  →  A must still be 1 after Ans becomes 2
-		calc(1, STORE, 'A', COLON, 2, env=env)
+		calc(1, STORE, 'A:2', env=env)
 		assert calc('A', env=env) == 1.0
 
 	def test_colon_list_then_index(self, env):
 		# {10,20,30}→L₁:L₁(2)  →  Ans=20
-		assert calc('{10,20,30', STORE, L1, COLON, L1, '(2', env=env) == 20.0
+		assert calc('{10,20,30', STORE, L1, ':', L1, '(2', env=env) == 20.0
 
 
 # ── Implicit delimiter closing ────────────────────────────────────────────────
@@ -776,37 +774,37 @@ class TestColonStatements:
 class TestImplicitClose:
 	def test_unclosed_paren(self):
 		# (1+2  →  3 (trailing ) omitted)
-		assert calc(L_PAREN, 1, ADD, 2) == 3.0
+		assert calc('(1+2') == 3.0
 
 	def test_unclosed_list(self):
 		# {1,2,3  →  TiList [1,2,3]
-		result = calc(L_BRACE, 1, COMMA, 2, COMMA, 3)
+		result = calc('{1,2,3')
 		assert list(result) == [1.0, 2.0, 3.0]
 
 	def test_unclosed_matrix(self):
 		# [[1,2][3,4  →  2×2 matrix (both ] omitted)
-		result = calc(L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET, L_BRACKET, 3, COMMA, 4)
+		result = calc('[[1,2][3,4')
 		assert isinstance(result, TiMatrix)
 		assert result.data == [[1.0, 2.0], [3.0, 4.0]]
 
 	def test_unclosed_matrix_single_element(self):
 		# [[1  →  1×1 matrix
-		result = calc(L_BRACKET, L_BRACKET, 1)
+		result = calc('[[1')
 		assert isinstance(result, TiMatrix)
 		assert result.data == [[1.0]]
 
 	def test_unclosed_matrix_then_colon_index(self, env):
 		# [[1:Ans(1,1  →  first segment produces [[1]], second indexes it → 1.0
-		parse_line(toks(L_BRACKET, L_BRACKET, 1, COLON, Ans, L_PAREN, 1, COMMA, 1), env)
+		parse_line(toks('[[1:', 'Ans', '(1,1'), env)
 		assert env.ans == 1.0
 
 	def test_unclosed_list_then_colon_sum(self, env):
 		# {1,2,3:sum(Ans  →  Ans=6
-		assert calc('{1,2,3', COLON, 'sum(', Ans, env=env) == 6.0
+		assert calc('{1,2,3:', 'sum(', 'Ans', env=env) == 6.0
 
 	def test_unclosed_fn_args(self):
 		# max(3,7  →  7 (trailing ) omitted)
-		assert calc('max(', 3, COMMA, 7) == 7.0
+		assert calc('max(', '3,7') == 7.0
 
 	def test_nested_unclosed(self):
 		# abs(−(3+4  →  7
@@ -818,30 +816,30 @@ class TestImplicitClose:
 class TestStoreDim:
 	def test_store_dim_list_create(self, env):
 		# 5→dim(L₁)  →  L₁ becomes {0,0,0,0,0}
-		calc(5, STORE, dim, L1, env=env)
+		calc(5, STORE, 'dim(', L1, env=env)
 		assert L1.variable.get(env).data == [0, 0, 0, 0, 0]
 
 	def test_store_dim_list_expand(self, env):
 		# {1,2,3}→L₁ : 5→dim(L₁)  →  L₁ = {1,2,3,0,0}
 		calc('{1,2,3', STORE, L1, env=env)
-		calc(5, STORE, dim, L1, env=env)
+		calc(5, STORE, 'dim(', L1, env=env)
 		assert L1.variable.get(env).data == [1, 2, 3, 0, 0]
 
 	def test_store_dim_list_shrink(self, env):
 		# {1,2,3,4,5}→L₁ : 3→dim(L₁)  →  L₁ = {1,2,3}
 		calc('{1,2,3,4,5', STORE, L1, env=env)
-		calc(3, STORE, dim, L1, env=env)
+		calc(3, STORE, 'dim(', L1, env=env)
 		assert L1.variable.get(env).data == [1, 2, 3]
 
 	def test_store_dim_matrix_create(self, env):
 		# {2,3}→dim([A])  →  [A] becomes 2×3 of zeros
-		calc('{2,3', STORE, dim, MAT_A, env=env)
+		calc('{2,3', STORE, 'dim(', MAT_A, env=env)
 		assert MAT_A.variable.get(env).data == 2 * [3 * [0]]
 
 	def test_store_dim_matrix_resize_preserves(self, env):
 		# Build [[1,2][3,4]], then resize to 3×3; original values survive, new cells = 0
 		calc('[[1,2][3,4', STORE, MAT_A, env=env)
-		calc('{3,3', STORE, dim, MAT_A, env=env)
+		calc('{3,3', STORE, 'dim(', MAT_A, env=env)
 		assert MAT_A.variable.get(env).data == [
 			[1, 2, 0],
 			[3, 4, 0],
@@ -850,12 +848,12 @@ class TestStoreDim:
 
 	def test_dim_read_list(self, env):
 		# dim({1,2,3,4}) = 4  (reading, not storing)
-		result = calc(dim, L_BRACE, 1, COMMA, 2, COMMA, 3, COMMA, 4, R_BRACE)
+		result = calc('dim(', '{1,2,3,4}')
 		assert result == 4.0
 
 	def test_dim_read_matrix(self, env):
 		# dim([[1,2,3][4,5,6]]) = {2,3}
-		result = calc(dim, '[[1,2,3][4,5,6')
+		result = calc('dim(', '[[1,2,3][4,5,6')
 		assert result.data == [2.0, 3.0]
 
 
@@ -927,14 +925,14 @@ class TestNesting:
 
 	def test_ans_index_or_mul_list(self, env):
 		# {10,20,30}→Ans  (via plain eval), then Ans(2)  =  20
-		parse_line(toks(L_BRACE, 10, COMMA, 20, COMMA, 30, R_BRACE), env)
-		parse_line(toks(Ans, L_PAREN, 2, R_PAREN), env)
+		parse_line(toks('{10,20,30}'), env)
+		parse_line(toks(Ans, '(2)'), env)
 		assert env.ans == 20.0
 
 	def test_ans_index_or_mul_scalar(self, env):
 		# 7→Ans, then Ans(3)  =  21  (scalar * 3)
 		parse_line(toks(7), env)
-		parse_line(toks(Ans, L_PAREN, 3, R_PAREN), env)
+		parse_line(toks(Ans, '(3)'), env)
 		assert env.ans == 21.0
 
 	def test_ans_index_matrix(self, env):
@@ -989,7 +987,7 @@ class TestIllegalNest:
 	def test_expr_no_self_nest(self, env):
 		# expr( evaluating a string that itself calls expr( → ERR:ILLEGAL NEST
 		# Directly store TiString([expr(, Str1, )]) in Str1 — evaluating it calls expr again
-		STR_1.variable.set(env, TiString([tokens_by_text['expr('], STR_1, R_PAREN]))
+		STR_1.variable.set(env, TiString(toks('expr(', 'Str1', ')')))
 		with pytest.raises(ValueError, match="ILLEGAL NEST"):
 			calc('expr(', STR_1, env=env)
 

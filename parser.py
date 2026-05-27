@@ -4,8 +4,8 @@ from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
-	QUOTE, COMMA, DOT, COLON, NEWLINE, prgm, NEG, LIST_PREFIX,
-	rand, dim, SCI_E, DEG, RAD, APOS
+	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, NEG, LIST_PREFIX,
+	RAND, DIM, SCI_E, DEG, RAD, APOS
 )
 from environment import Environment, Variable, UserListVar
 from forms import ArgParser
@@ -378,10 +378,10 @@ class Parser:
 		elif t.variable is not None:
 			t.variable.set(self.env, value)
 
-		elif t is dim:
+		elif t is DIM:
 			self.parse_store_dim(value)
 			
-		elif t is rand:
+		elif t is RAND:
 			self.env.set_random_seed(value)
 
 		else:
@@ -448,7 +448,7 @@ class Parser:
 			if self.at_end():
 				return
 
-			if self.eat_if(prgm):
+			if self.eat_if(PRGM):
 				name = self._read_name()
 				val = self.env.programs[name].execute()
 
