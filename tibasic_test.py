@@ -7,9 +7,10 @@ from pytest import approx
 import purefunctions as pf
 from environment import Environment
 from parser import parse_line, ParseError
+import tokens
 from tokens import (
 	ALL_TOKENS, Token, TOKEN_TABLE, ASCII,
-	STORE, DEG, APOS, SCI_E, XTH_ROOT, NEG, APOS, QUOTE,
+	STORE, SCI_E, XTH_ROOT,
 	EQ, LT, GT, LE, GE, NE,
 	Ans, INV, SQ, TRANSPOSE,
 	LISTS, MATRICES, STRINGS,
@@ -25,8 +26,8 @@ STR_1 = STRINGS[0]
 
 
 tokens_by_text = {_t.text: _t for _t in ALL_TOKENS}
-tokens_by_text['~'] = NEG
-tokens_by_text['@'] = STORE
+tokens_by_text['~'] = tokens.NEG
+tokens_by_text['@'] = tokens.STORE
 
 
 def _iter_chars(obj):
@@ -127,7 +128,7 @@ class TestSciE:
 
 	def test_infix_dms_exp(self):
 		# 1ᴇ1°30' — exponent is 1.5 decimal degrees → 10^1.5
-		assert calc(1, SCI_E, 1, DEG, 30, APOS) == approx(10 ** 1.5)
+		assert calc(1, SCI_E, "1°30'") == approx(10 ** 1.5)
 
 	def test_precedence_over_add(self):
 		# 2 + 3ᴇ2 = 2 + 300 = 302  (ᴇ binds tighter than +)
@@ -176,11 +177,11 @@ class TestSciE:
 		assert calc(1, SCI_E, '~3') == approx(0.001)
 
 	def test_prefix_negative_exp(self):
-		# ᴇ~3 = 10^−3 = 0.001
+		# ᴇ~3 = 10^~3 = 0.001
 		assert calc(SCI_E, '~3') == approx(0.001)
 
 	def test_negative_exp_decimal(self):
-		# 1ᴇ~1.5 = 10^−1.5
+		# 1ᴇ~1.5 = 10^~1.5
 		assert calc(1, SCI_E, '~1.5') == approx(10 ** -1.5)
 
 	def test_negative_exp_in_expression(self):
@@ -189,12 +190,11 @@ class TestSciE:
 
 	def test_neg_literal_neg_exp(self):
 		# ~2ᴇ~3 = ~0.002
-		assert calc(NEG, 2, SCI_E, NEG, 3) == approx(-0.002)
+		assert calc('~2', SCI_E, '~3') == approx(-0.002)
 
 	def test_rejects_double_neg_exp(self):
-		# 1ᴇ−−3 — two negations is not a valid literal
-		with pytest.raises(ParseError):
-			calc(1, SCI_E, NEG, NEG, 3)
+		# 1ᴇ~~3 — two negations is actually a valid literal
+		assert calc(SCI_E, '~~3') == approx(1000)
 
 
 # ── Numeric functions ─────────────────────────────────────────────────────────
@@ -635,19 +635,19 @@ class TestParserFeatures:
 
 	def test_dms_degree_in_rad_mode(self):
 		# 90° in radian mode = π/2
-		assert calc(90, DEG) == approx(math.pi / 2)
+		assert calc('90°') == approx(math.pi / 2)
 
 	def test_dms_degree_in_deg_mode(self, deg):
 		# 90° in degree mode = 90 (no conversion)
-		assert calc(90, DEG, env=deg) == 90.0
+		assert calc('90°', env=deg) == 90.0
 
 	def test_dms_literal_minutes(self):
 		# 1°30' = 1.5 decimal degrees (DMS literals always return decimal degrees, no mode conversion)
-		assert calc(1, DEG, 30, APOS) == approx(1.5)
+		assert calc("1°30'") == approx(1.5)
 
 	def test_dms_literal_seconds(self):
 		# 0°0'36" = 0.01 decimal degrees (36/3600 = 0.01)
-		assert calc(0, DEG, 0, APOS, 36, QUOTE) == approx(0.01)
+		assert calc('0°0\'36"') == approx(0.01)
 
 	def test_expr(self, env):
 		# expr("1+2") evaluates the string as code
@@ -807,8 +807,8 @@ class TestImplicitClose:
 		assert calc('max(', '3,7') == 7.0
 
 	def test_nested_unclosed(self):
-		# abs(−(3+4  →  7
-		assert calc('abs(', '−(3+4') == 7.0
+		# abs(~(3+4  →  7
+		assert calc('abs(', '~(3+4') == 7.0
 
 
 # ── Storing to dim( ───────────────────────────────────────────────────────────
@@ -869,8 +869,8 @@ class TestNesting:
 		assert list(calc('seq(', 'X,X,1,9,2')) == approx([1, 3, 5, 7, 9])
 
 	def test_seq_negative_step(self):
-		# seq(X,X,5,1,−1)  =  {5,4,3,2,1}
-		assert list(calc('seq(', 'X,X,5,1,−1')) == approx([5, 4, 3, 2, 1])
+		# seq(X,X,5,1,~1)  =  {5,4,3,2,1}
+		assert list(calc('seq(', 'X,X,5,1,~1')) == approx([5, 4, 3, 2, 1])
 
 	def test_sigma(self):
 		# Σ(X,X,1,10)  =  55
@@ -889,8 +889,8 @@ class TestNesting:
 		assert calc('fnInt(', 'X²,X,0,3') == approx(9.0, rel=1e-4)
 
 	def test_abs_of_neg_expr(self):
-		# abs(−(3+4))  =  7
-		assert calc('abs(', '−(3+4') == 7.0
+		# abs(~(3+4))  =  7
+		assert calc('abs(', '~(3+4') == 7.0
 
 	def test_max_of_list_expr(self):
 		# max({3,1,4,1,5})  =  5
@@ -1050,10 +1050,10 @@ class TestSeqIncrement:
 
 	def test_negative_step_start_before_end_raises(self, env):
 		with pytest.raises(ValueError, match="start.*end|end.*start"):
-			calc('seq(', 'X,X,1,5,−1', env=env)
+			calc('seq(', 'X,X,1,5,~1', env=env)
 
 	def test_equal_start_end_is_fine(self, env):
 		assert list(calc('seq(', 'X,X,3,3', env=env)) == [3]
 
 	def test_negative_step_descending_is_fine(self, env):
-		assert list(calc('seq(', 'X,X,3,1,−1', env=env)) == [3, 2, 1]
+		assert list(calc('seq(', 'X,X,3,1,~1', env=env)) == [3, 2, 1]

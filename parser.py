@@ -195,12 +195,13 @@ class Parser:
 		return t.is_digit() or t is DOT
 
 	def parse_sci_e_exp(self) -> float:
-		"""Parse the exponent of a ᴇ expression: an optional − followed by a numeric literal."""
-		neg = self.eat_if(NEG)
+		"""Parse the exponent of a ᴇ expression: an optional ~ followed by a numeric literal."""
+		sign = 1
+		while self.eat_if(NEG):
+			sign *= -1
 		if not self.peek_digit_or_dot():
 			raise ParseError("ᴇ requires a numeric literal exponent")
-		exp = self.parse_num_literal(self.advance())
-		return -exp if neg else exp
+		return sign * self.parse_num_literal(self.advance())
 
 	def parse_label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name."""
@@ -252,7 +253,7 @@ class Parser:
 		if t is NEG:
 			return -self.parse_expr(65)
 
-		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ3 = 1000, ᴇ−3 = 0.001)
+		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ3 = 1000, ᴇ~3 = 0.001)
 		if t is SCI_E:
 			return 10 ** self.parse_sci_e_exp()
 

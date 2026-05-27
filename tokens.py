@@ -14,7 +14,7 @@ import forms
 @dataclass(slots=True, eq=False)
 class Token:
 	code: bytes
-	ascii: str | None
+	char: str | None
 	text: str
 	bp: tuple[int, int] | None = None # (left_bp, right_bp) for binary operators
 	operator:  Callable | None = None # (lhs, rhs) -> value
@@ -99,7 +99,7 @@ def _make_variable(code: bytes) -> Variable | None:
 def token(
 	code: bytes,
 	text: str = None,
-	ascii: str = None,
+	char: str = None,
 	*,
 	bp: tuple[int, int] | None = None,
 	operator:  Callable | None = None,
@@ -122,7 +122,7 @@ def token(
 	if variable is None and nullary is None:
 		variable = _make_variable(code)
 
-	t = Token(code, ascii, text or ascii, bp, operator, postfix, func, cmd, nullary, converter, variable)
+	t = Token(code, char, text or char, bp, operator, postfix, func, cmd, nullary, converter, variable)
 	ALL_TOKENS.append(t)
 	return t
 
@@ -135,18 +135,18 @@ STORE = token(b'\x04', '→')
 
 token(b'\x05', 'Boxplot')
 
-L_BRACKET = token(b'\x06', ascii='[')
-R_BRACKET = token(b'\x07', ascii=']')
-L_BRACE   = token(b'\x08', ascii='{')
-R_BRACE   = token(b'\x09', ascii='}')
+L_BRACKET = token(b'\x06', char='[')
+R_BRACKET = token(b'\x07', char=']')
+L_BRACE   = token(b'\x08', char='{')
+R_BRACE   = token(b'\x09', char='}')
 RAD       = token(b'\x0a', 'ʳ')           # postfix; needs env, handled specially
-DEG       = token(b'\x0b', '°')           # ditto
+DEG       = token(b'\x0b', char='°')      # ditto
 INV       = token(b'\x0c', '¹',  postfix=pf.inv)
-SQ        = token(b'\x0d', '²',  postfix=lambda x: x**2)
+SQ        = token(b'\x0d', char='²',  postfix=lambda x: x**2)
 TRANSPOSE = token(b'\x0e', 'ᵀ',  postfix=pf.transpose)
-CUBE      = token(b'\x0f', '³',  postfix=lambda x: x**3)
-L_PAREN   = token(b'\x10', ascii='(')
-R_PAREN   = token(b'\x11', ascii=')')
+CUBE      = token(b'\x0f', char='³',  postfix=lambda x: x**3)
+L_PAREN   = token(b'\x10', char='(')
+R_PAREN   = token(b'\x11', char=')')
 
 token(b'\x12', 'round(',       pure_func=pf.round)
 token(b'\x13', 'pxl-Test(')
@@ -170,26 +170,26 @@ token(b'\x24', 'fnInt(',       func=forms.fn_int)
 token(b'\x25', 'nDeriv(',      func=forms.n_deriv)
 token(b'\x27', 'fMin(')
 token(b'\x28', 'fMax(')
-token(b'\x29', ascii=' ')
+token(b'\x29', char=' ')
 
-QUOTE  = token(b'\x2a', ascii='"')
-COMMA  = token(b'\x2b', ascii=',')
-IMAG_I = token(b'\x2c', '𝑖', nullary=lambda env: 1j)
-FACT   = token(b'\x2d', ascii='!',      postfix=pf.factorial)
+QUOTE  = token(b'\x2a', char='"')
+COMMA  = token(b'\x2b', char=',')
+IMAG_I = token(b'\x2c', char='𝑖', nullary=lambda env: 1j)
+FACT   = token(b'\x2d', char='!',      postfix=pf.factorial)
 
 token(b'\x2e', 'CubicReg ')
 token(b'\x2f', 'QuartReg ')
 
-DIGITS = tuple(token(bytes([0x30 + i]), ascii=chr(0x30 + i)) for i in range(10))
+DIGITS = tuple(token(bytes([0x30 + i]), char=chr(0x30 + i)) for i in range(10))
 
-DOT       = token(b'\x3a', ascii='.')
+DOT       = token(b'\x3a', char='.')
 SCI_E     = token(b'\x3b', 'ᴇ')
 
 token(b'\x3c', ' or ',    bp=(20, 21), operator=pf.or_)
 token(b'\x3d', ' xor ',   bp=(20, 21), operator=pf.xor)
 
-COLON     = token(b'\x3e', ascii=':')
-NEWLINE   = token(b'\x3f', ascii='\n')
+COLON     = token(b'\x3e', char=':')
+NEWLINE   = token(b'\x3f', char='\n')
 
 token(b'\x40', ' and ',   bp=(30, 31), operator=pf.and_)
 
@@ -197,9 +197,9 @@ token(b'\x40', ' and ',   bp=(30, 31), operator=pf.and_)
 	VAR_A, VAR_B, VAR_C, VAR_D, VAR_E, VAR_F, VAR_G, VAR_H, VAR_I, VAR_J, 
 	VAR_K, VAR_L, VAR_M, VAR_N, VAR_O, VAR_P, VAR_Q, VAR_R, VAR_S, VAR_T, 
 	VAR_U, VAR_V, VAR_W, VAR_X, VAR_Y, VAR_Z) = LETTERS = tuple(
-	token(bytes([0x41 + i]), ascii=chr(0x41 + i)) for i in range(26)
+	token(bytes([0x41 + i]), char=chr(0x41 + i)) for i in range(26)
 )
-VAR_THETA = token(b'\x5b', 'θ')
+VAR_THETA = token(b'\x5b', char='θ')
 
 # ── 0x5C xx: matrix variables ([A]–[J]) ──────────────────────────────────────
 
@@ -332,14 +332,14 @@ token(b'\x67', 'Sci')
 token(b'\x68', 'Eng')
 token(b'\x69', 'Float')
 
-EQ  = token(b'\x6a', ascii='=', bp=(40, 41), operator=op.eq)
-LT  = token(b'\x6b', ascii='<', bp=(40, 41), operator=op.lt)
-GT  = token(b'\x6c', ascii='>', bp=(40, 41), operator=op.gt)
-LE  = token(b'\x6d', '≤',       bp=(40, 41), operator=op.le)
-GE  = token(b'\x6e', '≥',       bp=(40, 41), operator=op.ge)
-NE  = token(b'\x6f', '≠',       bp=(40, 41), operator=op.ne)
-ADD = token(b'\x70', ascii='+', bp=(50, 51), operator=op.add)
-SUB = token(b'\x71', ascii='-', bp=(50, 51), operator=op.sub)
+EQ  = token(b'\x6a', char='=', bp=(40, 41), operator=op.eq)
+LT  = token(b'\x6b', char='<', bp=(40, 41), operator=op.lt)
+GT  = token(b'\x6c', char='>', bp=(40, 41), operator=op.gt)
+LE  = token(b'\x6d', char='≤', bp=(40, 41), operator=op.le)
+GE  = token(b'\x6e', char='≥', bp=(40, 41), operator=op.ge)
+NE  = token(b'\x6f', char='≠', bp=(40, 41), operator=op.ne)
+ADD = token(b'\x70', char='+', bp=(50, 51), operator=op.add)
+SUB = token(b'\x71', char='-', bp=(50, 51), operator=op.sub)
 Ans = token(b'\x72', 'Ans',  nullary=Environment.get_ans, func=forms.ans_index_or_mul)
 
 token(b'\x73', 'Fix')
@@ -380,8 +380,8 @@ token(b'\x7f', '▫')
 token(b'\x80', '﹢')
 token(b'\x81', '·')
 
-MUL = token(b'\x82', ascii='*', bp=(60, 61), operator=op.mul)
-DIV = token(b'\x83', ascii='/', bp=(60, 61), operator=op.truediv)
+MUL = token(b'\x82', char='*', bp=(60, 61), operator=op.mul)
+DIV = token(b'\x83', char='/', bp=(60, 61), operator=op.truediv)
 
 token(b'\x84', 'Trace')
 token(b'\x85', 'ClrDraw')
@@ -429,22 +429,24 @@ token(b'\xa9', 'DrawF ')
 STRINGS = tuple(token(bytes([0xaa, i]), f'Str{(i + 1) % 10}') for i in range(10))
 
 RAND = token(b'\xab', 'rand', nullary=Environment.rand, pure_func=pf.rand_list)
-token(b'\xac', 'π',    nullary=lambda env: math.pi)
+token(b'\xac', char='π', nullary=lambda env: math.pi)
 token(b'\xad', 'getKey', nullary=Environment.get_key)
-APOS     = token(b'\xae', ascii="'")
-token(b'\xaf', ascii='?')
-NEG      = token(b'\xb0', '−')
+APOS = token(b'\xae', char="'")
+token(b'\xaf', char='?')
+NEG  = token(b'\xb0', '⁻')
 
-token(b'\xb1', 'int(',     pure_func=pf.int_)
-token(b'\xb2', 'abs(',     pure_func=pf.abs)
-token(b'\xb3', 'det(',     pure_func=pf.det)
+token(b'\xb1', 'int(', pure_func=pf.int_)
+token(b'\xb2', 'abs(', pure_func=pf.abs)
+token(b'\xb3', 'det(', pure_func=pf.det)
 token(b'\xb4', 'identity(', pure_func=pf.identity)
-DIM = token(b'\xb5', 'dim(',     pure_func=pf.dim)
-token(b'\xb6', 'sum(',     pure_func=pf.sum)
-token(b'\xb7', 'prod(',    pure_func=pf.prod)
-token(b'\xb8', 'not(',     pure_func=pf.not_)
-token(b'\xb9', 'iPart(',   pure_func=pf.i_part)
-token(b'\xba', 'fPart(',   pure_func=pf.f_part)
+
+DIM = token(b'\xb5', 'dim(', pure_func=pf.dim)
+
+token(b'\xb6', 'sum(', pure_func=pf.sum)
+token(b'\xb7', 'prod(', pure_func=pf.prod)
+token(b'\xb8', 'not(', pure_func=pf.not_)
+token(b'\xb9', 'iPart(', pure_func=pf.i_part)
+token(b'\xba', 'fPart(', pure_func=pf.f_part)
 
 # ── 0xBB xx: extended tokens ──────────────────────────────────────────────────
 
@@ -549,94 +551,94 @@ token(b'\xbb\x69', 'UnArchive ')
 token(b'\xbb\x6a', 'Asm(')
 token(b'\xbb\x6b', 'AsmComp(')
 token(b'\xbb\x6c', 'AsmPrgm')
-token(b'\xbb\x6e', 'Á')
-token(b'\xbb\x6f', 'À')
-token(b'\xbb\x70', 'Â')
-token(b'\xbb\x71', 'Ä')
-token(b'\xbb\x72', 'á')
-token(b'\xbb\x73', 'à')
-token(b'\xbb\x74', 'â')
-token(b'\xbb\x75', 'ä')
-token(b'\xbb\x76', 'É')
-token(b'\xbb\x77', 'È')
-token(b'\xbb\x78', 'Ê')
-token(b'\xbb\x79', 'Ë')
-token(b'\xbb\x7a', 'é')
-token(b'\xbb\x7b', 'è')
-token(b'\xbb\x7c', 'ê')
-token(b'\xbb\x7d', 'ë')
-token(b'\xbb\x7f', 'Ì')
-token(b'\xbb\x80', 'Î')
-token(b'\xbb\x81', 'Ï')
-token(b'\xbb\x82', 'í')
-token(b'\xbb\x83', 'ì')
-token(b'\xbb\x84', 'î')
-token(b'\xbb\x85', 'ï')
-token(b'\xbb\x86', 'Ó')
-token(b'\xbb\x87', 'Ò')
-token(b'\xbb\x88', 'Ô')
-token(b'\xbb\x89', 'Ö')
-token(b'\xbb\x8a', 'ó')
-token(b'\xbb\x8b', 'ò')
-token(b'\xbb\x8c', 'ô')
-token(b'\xbb\x8d', 'ö')
-token(b'\xbb\x8e', 'Ú')
-token(b'\xbb\x8f', 'Ù')
-token(b'\xbb\x90', 'Û')
-token(b'\xbb\x91', 'Ü')
-token(b'\xbb\x92', 'ú')
-token(b'\xbb\x93', 'ù')
-token(b'\xbb\x94', 'û')
-token(b'\xbb\x95', 'ü')
-token(b'\xbb\x96', 'Ç')
-token(b'\xbb\x97', 'ç')
-token(b'\xbb\x98', 'Ñ')
-token(b'\xbb\x99', 'ñ')
+token(b'\xbb\x6e', char='Á')
+token(b'\xbb\x6f', char='À')
+token(b'\xbb\x70', char='Â')
+token(b'\xbb\x71', char='Ä')
+token(b'\xbb\x72', char='á')
+token(b'\xbb\x73', char='à')
+token(b'\xbb\x74', char='â')
+token(b'\xbb\x75', char='ä')
+token(b'\xbb\x76', char='É')
+token(b'\xbb\x77', char='È')
+token(b'\xbb\x78', char='Ê')
+token(b'\xbb\x79', char='Ë')
+token(b'\xbb\x7a', char='é')
+token(b'\xbb\x7b', char='è')
+token(b'\xbb\x7c', char='ê')
+token(b'\xbb\x7d', char='ë')
+token(b'\xbb\x7f', char='Ì')
+token(b'\xbb\x80', char='Î')
+token(b'\xbb\x81', char='Ï')
+token(b'\xbb\x82', char='í')
+token(b'\xbb\x83', char='ì')
+token(b'\xbb\x84', char='î')
+token(b'\xbb\x85', char='ï')
+token(b'\xbb\x86', char='Ó')
+token(b'\xbb\x87', char='Ò')
+token(b'\xbb\x88', char='Ô')
+token(b'\xbb\x89', char='Ö')
+token(b'\xbb\x8a', char='ó')
+token(b'\xbb\x8b', char='ò')
+token(b'\xbb\x8c', char='ô')
+token(b'\xbb\x8d', char='ö')
+token(b'\xbb\x8e', char='Ú')
+token(b'\xbb\x8f', char='Ù')
+token(b'\xbb\x90', char='Û')
+token(b'\xbb\x91', char='Ü')
+token(b'\xbb\x92', char='ú')
+token(b'\xbb\x93', char='ù')
+token(b'\xbb\x94', char='û')
+token(b'\xbb\x95', char='ü')
+token(b'\xbb\x96', char='Ç')
+token(b'\xbb\x97', char='ç')
+token(b'\xbb\x98', char='Ñ')
+token(b'\xbb\x99', char='ñ')
 token(b'\xbb\x9a', '´')
 token(b'\xbb\x9b', 'ˋ')
 token(b'\xbb\x9c', '¨')
-token(b'\xbb\x9d', '¿')
-token(b'\xbb\x9e', '¡')
-token(b'\xbb\x9f', 'α')
-token(b'\xbb\xa0', 'β')
-token(b'\xbb\xa1', 'γ')
-token(b'\xbb\xa2', 'Δ')
-token(b'\xbb\xa3', 'δ')
-token(b'\xbb\xa4', 'ε')
-token(b'\xbb\xa5', 'λ')
-token(b'\xbb\xa6', 'μ')
+token(b'\xbb\x9d', char='¿')
+token(b'\xbb\x9e', char='¡')
+token(b'\xbb\x9f', char='α')
+token(b'\xbb\xa0', char='β')
+token(b'\xbb\xa1', char='γ')
+token(b'\xbb\xa2', char='Δ')
+token(b'\xbb\xa3', char='δ')
+token(b'\xbb\xa4', char='ε')
+token(b'\xbb\xa5', char='λ')
+token(b'\xbb\xa6', char='μ')
 token(b'\xbb\xa7', '𝛑')  # alternate pi
-token(b'\xbb\xa8', 'ρ')
-token(b'\xbb\xa9', 'Σ')
-token(b'\xbb\xab', 'φ')
-token(b'\xbb\xac', 'Ω')
-token(b'\xbb\xad', 'ψ')
-token(b'\xbb\xae', 'χ')
+token(b'\xbb\xa8', char='ρ')
+token(b'\xbb\xa9', char='Σ')
+token(b'\xbb\xab', char='φ')
+token(b'\xbb\xac', char='Ω')
+token(b'\xbb\xad', char='ψ')
+token(b'\xbb\xae', char='χ')
 token(b'\xbb\xaf', '𝟊')
 
 for i in range(11):
-	token(bytes([0xbb, 0xb0 + i]), ascii=chr(0x61 + i))
+	token(bytes([0xbb, 0xb0 + i]), char=chr(0x61 + i))
 for i in range(15):
-	token(bytes([0xbb, 0xbc + i]), ascii=chr(0x6c + i)) 
+	token(bytes([0xbb, 0xbc + i]), char=chr(0x6c + i)) 
 
-token(b'\xbb\xcb', 'σ')
-token(b'\xbb\xcc', 'τ')
-token(b'\xbb\xcd', 'Í')
+token(b'\xbb\xcb', char='σ')
+token(b'\xbb\xcc', char='τ')
+token(b'\xbb\xcd', char='Í')
 token(b'\xbb\xce', 'GarbageCollect')
-token(b'\xbb\xcf', ascii='~')
-token(b'\xbb\xd1', ascii='@')
-token(b'\xbb\xd2', ascii='#')
-token(b'\xbb\xd3', ascii='$')
-token(b'\xbb\xd4', ascii='&')
-token(b'\xbb\xd5', ascii='`')
-token(b'\xbb\xd6', ascii=';')
-token(b'\xbb\xd7', ascii='\\')
-token(b'\xbb\xd8', ascii='|')
-token(b'\xbb\xd9', ascii='_')
-token(b'\xbb\xda', ascii='%', postfix=lambda x: x / 100)
-token(b'\xbb\xdb', '…')
-token(b'\xbb\xdc', '∠')
-token(b'\xbb\xdd', 'ß')
+token(b'\xbb\xcf', char='~')
+token(b'\xbb\xd1', char='@')
+token(b'\xbb\xd2', char='#')
+token(b'\xbb\xd3', char='$')
+token(b'\xbb\xd4', char='&')
+token(b'\xbb\xd5', char='`')
+token(b'\xbb\xd6', char=';')
+token(b'\xbb\xd7', char='\\')
+token(b'\xbb\xd8', char='|')
+token(b'\xbb\xd9', char='_')
+token(b'\xbb\xda', char='%', postfix=lambda x: x / 100)
+token(b'\xbb\xdb', char='…')
+token(b'\xbb\xdc', char='∠')
+token(b'\xbb\xdd', char='ß')
 token(b'\xbb\xde', 'ˣ')
 token(b'\xbb\xdf', 'ₜ')
 token(b'\xbb\xe0', '₀')
@@ -655,7 +657,7 @@ token(b'\xbb\xec', '🡆')
 token(b'\xbb\xed', '↑')
 token(b'\xbb\xee', '↓')
 token(b'\xbb\xf0', '𝑥')
-token(b'\xbb\xf1', '∫')
+token(b'\xbb\xf1', char='∫')
 token(b'\xbb\xf2', '🡅')
 token(b'\xbb\xf3', '🡇')
 token(b'\xbb\xf4', '√')
@@ -762,7 +764,7 @@ token(b'\xef\x3d', 'FRAC-APPROX')
 
 # ── 0xF0–0xFF: power operators and regression commands ───────────────────────
 
-POW      = token(b'\xf0', ascii='^', bp=(70, 69), operator=op.pow)
+POW      = token(b'\xf0', char='^', bp=(70, 69), operator=op.pow)
 XTH_ROOT = token(b'\xf1', 'ˣ√',      bp=(60, 61), operator=pf.xth_root)
 
 token(b'\xf2', '1-Var Stats ')
@@ -822,7 +824,7 @@ class TokenTable:
 
 
 TOKEN_TABLE    = TokenTable(ALL_TOKENS)
-_by_ascii      = {t.ascii: t for t in ALL_TOKENS if t.ascii}
+_by_ascii      = {t.char: t for t in ALL_TOKENS if t.char}
 _by_text       = {t.text: t for t in ALL_TOKENS} | _by_ascii
 
 # Backward-compatible aliases
@@ -832,5 +834,5 @@ TOKENS_BY_TEXT = _by_text
 
 
 if __name__ == '__main__':
-	for token in sorted(ASCII.values(), key=lambda t: t.ascii):
-		print(ord(token.ascii), token)
+	for token in sorted(ASCII.values(), key=lambda t: t.char):
+		print(ord(token.char), token)
