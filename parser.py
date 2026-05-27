@@ -535,35 +535,19 @@ class ArgParser:
 
 
 if __name__ == '__main__':
-	import tokens
+	from tibasic_test import toks
 
 	env = Environment()
-	str_to_token = {t.text: t for t in reversed(tokens.ALL_TOKENS)}
 
 	def test(*line):
-		tokens = []
-		for obj in line:
-			if isinstance(obj, Token):
-				tokens.append(obj)
-			elif isinstance(obj, int):
-				for c in str(obj):
-					tokens.append(str_to_token[c])
-			elif isinstance(obj, str):
-				try:
-					tokens.append(str_to_token[obj])
-				except KeyError:
-					for c in obj:
-						tokens.append(str_to_token[c])
-			else:
-				tokens.append(tokens.get_token(obj))
-
+		tokens = toks(*line)
 		print('>>', ''.join(t.text for t in tokens))
 		parse_line(tokens, env)
 		print('<<', env.ans)
 
 	env.angle_mode = 'DEG'
-	
-	test('{1,2,3}(2)')
+
+	test('Matr►list(', '[[1,2][3,4]],', 'L1', ',', 'L2')
 	# test('⑽^(', '{1,10')
 	# test('5°')
 	# test('5°5\'5"')

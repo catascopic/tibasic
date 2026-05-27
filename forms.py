@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from tiobjects import TiList, TiMatrix, require_real, require_str
+from tiobjects import TiList, TiMatrix, require_real, require_int, require_str
 from environment import Variable, Environment
 
 
@@ -146,7 +146,7 @@ def matr_to_list(a: ArgParser) -> None:
 	mat = a.expr()
 	if not isinstance(mat, TiMatrix):
 		raise ValueError("Matr►list: first argument must be a matrix")
-	if a.next_is_list_var():
+	if a.peek().is_list_start():
 		list_refs = [a.list_var()]
 		while a.has_next_arg():
 			list_refs.append(a.list_var())
@@ -154,7 +154,7 @@ def matr_to_list(a: ArgParser) -> None:
 		for col, ref in enumerate(list_refs):
 			ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))
 	else:
-		col = int(a.expr()) - 1
+		col = require_int(a.expr()) - 1
 		ref = a.list_var()
 		a.end()
 		ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))

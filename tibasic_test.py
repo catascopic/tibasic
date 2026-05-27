@@ -26,6 +26,9 @@ lookup = {_t.text: _t for _t in ALL_TOKENS}
 lookup['~'] = tokens.NEG
 lookup['@'] = tokens.STORE
 lookup['E'] = tokens.SCI_E  # make sure not to use variable E
+lookup['$'] = tokens.LIST_PREFIX
+for i, ls in enumerate(tokens.LISTS, start=1):
+	lookup[f"L{i}"] = ls
 
 
 def _iter_chars(obj):
@@ -318,6 +321,83 @@ class TestListOperations:
 
 	def test_vectorized_scalar(self):
 		assert list(TiList([2, 4, 6]) / 2) == [1, 2, 3]
+
+
+# ── Stat functions with freq_list ─────────────────────────────────────────────
+
+class TestStatWithFreqList:
+	"""mean, median, variance, stddev all accept an optional freq_list second arg."""
+
+	# ── mean ──────────────────────────────────────────────────────────────────
+
+	def test_mean_uniform(self):
+		# Uniform weights → same result as plain mean
+		assert pf.mean(TiList([1, 2, 3]), TiList([1, 1, 1])) == approx(2.0)
+
+	def test_mean_weighted(self):
+		# [0,0,0,10] → mean = 10/4 = 2.5
+		assert pf.mean(TiList([0, 10]), TiList([3, 1])) == approx(2.5)
+
+	def test_mean_integer_counts(self):
+		# [1,1,1,2,3,3] → mean = (3+2+6)/6 = 11/6
+		assert pf.mean(TiList([1, 2, 3]), TiList([3, 1, 2])) == approx(11 / 6)
+
+	# ── median ────────────────────────────────────────────────────────────────
+
+	def test_median_odd_total(self):
+		# Expanded: [10,10,20,30,30] → middle element is 20
+		assert pf.median(TiList([10, 20, 30]), TiList([2, 1, 2])) == 20
+
+	def test_median_even_total(self):
+		# Expanded: [10,10,30,30] → (10+30)/2 = 20
+		assert pf.median(TiList([10, 30]), TiList([2, 2])) == approx(20.0)
+
+	def test_median_unsorted_input(self):
+		# Must sort by value: {3:1,1:2,2:1} → [1,1,2,3] → (1+2)/2 = 1.5
+		assert pf.median(TiList([3, 1, 2]), TiList([1, 2, 1])) == approx(1.5)
+
+	def test_median_uniform_matches_plain(self):
+		plain    = pf.median(TiList([1, 2, 3, 4, 5]))
+		weighted = pf.median(TiList([1, 2, 3, 4, 5]), TiList([1, 1, 1, 1, 1]))
+		assert weighted == approx(plain)
+
+	def test_median_dim_mismatch(self):
+		with pytest.raises(ValueError):
+			pf.median(TiList([1, 2, 3]), TiList([1, 1]))
+
+	# ── variance ──────────────────────────────────────────────────────────────
+
+	def test_variance_weighted(self):
+		# mean=1; 3*(0-1)² + 1*(4-1)² = 3+9=12; 12/(4-1) = 4.0
+		assert pf.variance(TiList([0, 4]), TiList([3, 1])) == approx(4.0)
+
+	def test_variance_uniform_matches_plain(self):
+		plain    = pf.variance(TiList([2, 4, 6]))
+		weighted = pf.variance(TiList([2, 4, 6]), TiList([1, 1, 1]))
+		assert weighted == approx(plain)
+
+	def test_variance_total_freq_le_one(self):
+		# total freq = 1 → denominator (n-1) = 0
+		with pytest.raises(ValueError, match="total frequency"):
+			pf.variance(TiList([5]), TiList([1]))
+
+	def test_variance_dim_mismatch(self):
+		with pytest.raises(ValueError):
+			pf.variance(TiList([1, 2, 3]), TiList([1, 1]))
+
+	# ── stddev ────────────────────────────────────────────────────────────────
+
+	def test_stddev_weighted(self):
+		assert pf.stddev(TiList([0, 4]), TiList([3, 1])) == approx(2.0)
+
+	def test_stddev_uniform_matches_plain(self):
+		plain    = pf.stddev(TiList([2, 4, 4, 4, 5, 5, 7, 9]))
+		weighted = pf.stddev(TiList([2, 4, 4, 4, 5, 5, 7, 9]), TiList([1, 1, 1, 1, 1, 1, 1, 1]))
+		assert weighted == approx(plain)
+
+	def test_stddev_dim_mismatch(self):
+		with pytest.raises(ValueError):
+			pf.stddev(TiList([1, 2]), TiList([1]))
 
 
 # ── Matrix operations ─────────────────────────────────────────────────────────

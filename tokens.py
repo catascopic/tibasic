@@ -35,6 +35,9 @@ class Token:
 	def is_list_var(self) -> bool:
 		return self.code[0] == 0x5D
 
+	def is_list_start(self):
+		return self.code[0] in {0x5D, 0xEB}
+
 	def is_matrix_var(self) -> bool:
 		return self.code[0] == 0x5C
 
@@ -311,7 +314,7 @@ token(0x623C, 'Error MS')
 
 # ── 0x63 xx: window and finance variables ─────────────────────────────────────
 
-token(0x6302, 'Xscl', var=WindowVar(0))
+token(0x6302, 'Xscl', var=WindowVar(0))  # TODO: WindowVarAuto
 token(0x6303, 'Yscl', var=WindowVar(1))
 token(0x630A, 'Xmin', var=WindowVar(2))
 token(0x630B, 'Xmax', var=WindowVar(3))

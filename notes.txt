@@ -1,19 +1,9 @@
 Do we need a purefunctions equivalent for Environment?
 
-Improve matrix methods
-
 Make sure deg symbol vs D/M/S format is working
 
 Also, trig functions actually do need access to the environment so they can see what mode the calculator is in!
 
-Instead of _make_variable, have the tokens create the variable. This would be easy since most variable tokens are created in a loop.
-Alternatively, set the variable in __post_init__ so that Variable actually has access to the token object
-
-add a peek method for ArgParser that just calles _parser.peek()
-
-rowswap, etc: better implementations that don't copy unnecessarily
-
-Add aliases to any token that has a character that can't be typed on the keyboard
 
 Full token overhaul: operators and bp are okay, everything else moved to dispatcher
 Commands: no paren flag? Or use argparser to do it manually
@@ -25,7 +15,6 @@ Go through all commands, check to see if they're vectorized correctly
 use Token instead of string as nesting key
 
 tests:
-freq_list
 matr_to_list/list_to_matr
 
 new function paradigm: decorators for everything
@@ -33,7 +22,17 @@ new function paradigm: decorators for everything
 enum for RADIAN/DEGREE
 make them IntEnums for easier testing?
 
+Add aliases to any token that has a character that can't be typed on the keyboard
+
 ********
+
+freq_list
+
+add a peek method for ArgParser that just calles _parser.peek()
+Improve matrix methods
+rowswap, etc: better implementations that don't copy unnecessarily
+
+Instead of _make_variable, have the tokens create the variable. This would be easy since most variable tokens are created in a loop.
 
 check that date/time formats are correct
 
