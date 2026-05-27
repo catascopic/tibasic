@@ -74,6 +74,10 @@ def deg():
 	return e
 
 
+def approx_mat(matrix, **kwargs):
+	return [pytest.approx(row, **kwargs) for row in matrix]
+
+
 # ── Arithmetic ────────────────────────────────────────────────────────────────
 
 class TestArithmetic:
@@ -341,8 +345,7 @@ class TestMatrixOperations:
 	def test_inv_roundtrip(self):
 		mat = TiMatrix([[1, 2], [3, 4]])
 		product = mat * mat.inv()
-		assert product.data[0] == approx([1, 0])
-		assert product.data[1] == approx([0, 1])
+		assert product.data == approx_mat([[1, 0], [0, 1]])
 
 	def test_dim_matrix(self):
 		assert list(pf.dim(TiMatrix([[1, 2, 3], [4, 5, 6]]))) == [2, 3]
@@ -355,8 +358,7 @@ class TestMatrixOperations:
 	def test_rref_solve(self):
 		# 2x + y = 5, x - y = 1  →  x=2, y=1
 		result = pf.rref(TiMatrix([[2, 1, 5], [1, -1, 1]]))
-		assert result.data[0] == approx([1, 0, 2])
-		assert result.data[1] == approx([0, 1, 1])
+		assert result.data == approx_mat([[1, 0, 2], [0, 1, 1]])
 
 
 class TestMatrixRowOps:
@@ -365,21 +367,20 @@ class TestMatrixRowOps:
 
 	def test_rowswap(self):
 		result = pf.rowswap(self.mat, 1, 3)
-		assert result.data[0] == [5, 6]
-		assert result.data[2] == [1, 2]
-		assert self.mat.data[0] == [1, 2]   # original unchanged
+		assert result.data == [[5, 6], [3, 4], [1, 2]]
+		assert self.mat.data == [[1, 2], [3, 4], [5, 6]]  # original unchanged
 
 	def test_row_plus(self):
 		result = pf.row_plus(self.mat, 1, 2)
-		assert result.data[1] == [4, 6]     # row2 += row1
+		assert result.data == [[1, 2], [4, 6], [5, 6]]
 
 	def test_times_row(self):
 		result = pf.times_row(3, self.mat, 1)
-		assert result.data[0] == [3, 6]
+		assert result.data == [[3, 6], [3, 4], [5, 6]]
 
 	def test_times_row_plus(self):
 		result = pf.times_row_plus(2, self.mat, 1, 2)
-		assert result.data[1] == [5, 8]     # row2 += 2*row1
+		assert result.data == [[1, 2], [5, 8], [5, 6]]
 
 
 # ── Complex numbers ───────────────────────────────────────────────────────────
@@ -655,10 +656,8 @@ class TestParserFeatures:
 	def test_inv_postfix(self):
 		# [[1,2][3,4]]¹ gives the inverse
 		result = calc('[[1,2][3,4]]', INV)
-		assert isinstance(result, TiMatrix)
-		assert result.data[0][0] == approx(-2)
-		assert result.data[1][1] == approx(-0.5)
-
+		assert result.data == approx_mat([[-2, 1], [1.5, -0.5]])
+		
 	def test_transpose_postfix(self):
 		result = calc('[[1,2][3,4]]', TRANSPOSE)
 		assert result.data == [[1, 3], [2, 4]]
@@ -838,11 +837,7 @@ class TestStoreDim:
 		# Build [[1,2][3,4]], then resize to 3×3; original values survive, new cells = 0
 		calc('[[1,2][3,4@', MAT_A, env=env)
 		calc('{3,3@', 'dim(', MAT_A, env=env)
-		assert MAT_A.variable.get(env).data == [
-			[1, 2, 0],
-			[3, 4, 0],
-			[0, 0, 0],
-		]
+		assert MAT_A.variable.get(env).data == [[1, 2, 0], [3, 4, 0], [0, 0, 0]]
 
 	def test_dim_read_list(self, env):
 		# dim({1,2,3,4}) = 4  (reading, not storing)
@@ -987,13 +982,13 @@ class TestIllegalNest:
 		# Directly store TiString([expr(, Str1, )]) in Str1 — evaluating it calls expr again
 		STR_1.variable.set(env, TiString(toks('expr(', 'Str1', ')')))
 		with pytest.raises(IllegalNestError):
-			calc('expr(', STR_1, env=env)
+			calc('expr(', 'Str1', env=env)
 
 	def test_expr_nest_depth_resets(self, env):
 		# After a successful expr( call, the guard is back to 0 — can call again
-		calc('"1+2"@', STR_1, env=env)
-		assert calc('expr(', STR_1, env=env) == approx(3)
-		assert calc('expr(', STR_1, env=env) == approx(3)   # second call — must not raise
+		calc('"1+2"@', 'Str1', env=env)
+		assert calc('expr(', 'Str1', env=env) == 3
+		assert calc('expr(', 'Str1', env=env) == 3   # second call — must not raise
 
 
 # ── Thunk capture: commas inside nested delimiters ────────────────────────────
