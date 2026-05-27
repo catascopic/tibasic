@@ -1,4 +1,4 @@
-﻿from collections.abc import Callable, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import operator as op
 from typing import Any
@@ -24,15 +24,6 @@ class Token:
 	nullary:   Callable | None = None # (env) -> value for read-only computed constants
 	converter: Callable | None = None # (value) -> value for ►DMS, ►Dec, ►Frac and others
 	variable:  Callable | None = None # Variable instance for storable typed variables
-	
-	# type TiValue = Number | TiList | TiMatrix | TiString
-	# operator: Callable[[TiValue, TiValue], TiValue] | None = None
-	# postfix: Callable[[TiValue], TiValue] | None = None
-	# function: Callable[[ArgParser], TiValue] | None = None
-	# command: Callable[[ArgParser], TiValue] | None = None
-	# nullary: Callable[[], TiValue] | None = None
-	# converter: Callable[[TiValue], TiValue] | None = None
-	# atom: bool = False
 
 	# ── Token type predicates ──────────────────────────────────────────────────
 
@@ -71,7 +62,7 @@ class Token:
 	        or self.function is not None
 	        or self in {DOT, L_PAREN, L_BRACE, L_BRACKET, QUOTE, NEG, LIST_PREFIX}
 	    )
-	
+
 	def __repr__(self):
 	    return f'{self.code.hex().upper()}:{self.text}'
 
@@ -80,6 +71,7 @@ class Token:
 EOF_TOKEN = Token(b'\x00', None, '<END-OF-INPUT>')
 
 
+ALL_TOKENS: list['Token'] = []
 _SEEN: set[bytes] = set()
 
 def _make_pure_func(f):
@@ -130,55 +122,99 @@ def token(
 	if variable is None and nullary is None:
 	    variable = _make_variable(code)
 
-	return Token(code, ascii, text or ascii, bp, operator, postfix, func, cmd, nullary, converter, variable)
+	t = Token(code, ascii, text or ascii, bp, operator, postfix, func, cmd, nullary, converter, variable)
+	ALL_TOKENS.append(t)
+	return t
 
 
-# ── Named syntactic tokens (referenced by identity in the parser) ──────────────
+# ── Digit / letter / variable-group tokens ────────────────────────────────────
 
-DIGITS   = [token(bytes([0x30 + i]), ascii=chr(0x30 + i)) for i in range(10)]
-LETTERS  = [token(bytes([0x41 + i]), ascii=chr(0x41 + i)) for i in range(26)]
-THETA    = token(b'\x5b', 'θ')
-MATRICES = [token(bytes([0x5c, i]), f'[{chr(0x41 + i)}]') for i in range(10)]
-LISTS    = [token(bytes([0x5d, i]), f'L{chr(0x2081 + i)}') for i in range(6)]
-PICTURES = [token(bytes([0x60, i]), f'Pic{(i + 1) % 10}') for i in range(10)]
-GDBS     = [token(bytes([0x61, i]), f'GDB{(i + 1) % 10}') for i in range(10)]
-STRINGS  = [token(bytes([0xaa, i]), f'Str{(i + 1) % 10}') for i in range(10)]
+D0, D1, D2, D3, D4, D5, D6, D7, D8, D9 = DIGITS = tuple(
+	token(bytes([0x30 + i]), ascii=chr(0x30 + i)) for i in range(10)
+)
+(VAR_A, VAR_B, VAR_C, VAR_D, VAR_E, VAR_F, VAR_G, VAR_H, VAR_I, VAR_J,
+ VAR_K, VAR_L, VAR_M, VAR_N, VAR_O, VAR_P, VAR_Q, VAR_R, VAR_S, VAR_T,
+ VAR_U, VAR_V, VAR_W, VAR_X, VAR_Y, VAR_Z) = LETTERS = tuple(
+	token(bytes([0x41 + i]), ascii=chr(0x41 + i)) for i in range(26)
+)
+VAR_THETA = token(b'\x5b', 'θ')
+MAT_A, MAT_B, MAT_C, MAT_D, MAT_E, MAT_F, MAT_G, MAT_H, MAT_I, MAT_J = MATRICES = tuple(
+	token(bytes([0x5c, i]), f'[{chr(0x41 + i)}]') for i in range(10)
+)
+L1, L2, L3, L4, L5, L6 = LISTS = tuple(
+	token(bytes([0x5d, i]), f'L{chr(0x2081 + i)}') for i in range(6)
+)
+PICTURES = tuple(token(bytes([0x60, i]), f'Pic{(i + 1) % 10}') for i in range(10))
+GDBS     = tuple(token(bytes([0x61, i]), f'GDB{(i + 1) % 10}') for i in range(10))
+STR_1, STR_2, STR_3, STR_4, STR_5, STR_6, STR_7, STR_8, STR_9, STR_0 = STRINGS = tuple(
+	token(bytes([0xaa, i]), f'Str{(i + 1) % 10}') for i in range(10)
+)
 
 
-# Structural / delimiter
+# ── Structural / delimiter tokens ─────────────────────────────────────────────
+
+TO_DMS      = token(b'\x01', '►DMS',  converter=pf.to_dms)
+TO_DEC      = token(b'\x02', '►Dec',  converter=pf.to_dec)
+TO_FRAC     = token(b'\x03', '►Frac', converter=pf.to_frac)
 STORE       = token(b'\x04', '→')
+Boxplot     = token(b'\x05', 'Boxplot')
 L_BRACKET   = token(b'\x06', ascii='[')
 R_BRACKET   = token(b'\x07', ascii=']')
 L_BRACE     = token(b'\x08', ascii='{')
 R_BRACE     = token(b'\x09', ascii='}')
+
+# ── Postfix operators ─────────────────────────────────────────────────────────
+
+RAD         = token(b'\x0a', 'ʳ')           # postfix; needs env, handled specially
+DEG         = token(b'\x0b', '°')           # ditto
+INV         = token(b'\x0c', '¹',  postfix=pf.inv)
+SQ          = token(b'\x0d', '²',  postfix=lambda x: x**2)
+TRANSPOSE   = token(b'\x0e', 'ᵀ',  postfix=pf.transpose)
+CUBE        = token(b'\x0f', '³',  postfix=lambda x: x**3)
+
+# ── One-byte function tokens ──────────────────────────────────────────────────
+
 L_PAREN     = token(b'\x10', ascii='(')
 R_PAREN     = token(b'\x11', ascii=')')
+Round       = token(b'\x12', 'round(',       pure_func=pf.round)
+PxlTest     = token(b'\x13', 'pxl-Test(')
+augment     = token(b'\x14', 'augment(',     pure_func=pf.augment)
+rowSwap     = token(b'\x15', 'rowSwap(',     pure_func=pf.rowswap)
+rowPlus     = token(b'\x16', 'row+(',        pure_func=pf.row_plus)
+timesRow    = token(b'\x17', '*row(',        pure_func=pf.times_row)
+timesRowPlus= token(b'\x18', '*row+(',       pure_func=pf.times_row_plus)
+Max         = token(b'\x19', 'max(',         pure_func=pf.max)
+Min         = token(b'\x1a', 'min(',         pure_func=pf.min)
+R_Pr        = token(b'\x1b', 'R►Pr(',        pure_func=pf.r_pr)
+R_Ptheta    = token(b'\x1c', 'R►Pθ(',        pure_func=pf.r_ptheta)
+P_Rx        = token(b'\x1d', 'P►Rx(',        pure_func=pf.p_rx)
+P_Ry        = token(b'\x1e', 'P►Ry(',        pure_func=pf.p_ry)
+median      = token(b'\x1f', 'median(',      pure_func=pf.median)
+randM       = token(b'\x20', 'randM(',       pure_func=pf.rand_m)
+mean        = token(b'\x21', 'mean(',        pure_func=pf.mean)
+solve       = token(b'\x22', 'solve(')
+seq         = token(b'\x23', 'seq(',         func=forms.seq)
+fnInt       = token(b'\x24', 'fnInt(',       func=forms.fn_int)
+nDeriv      = token(b'\x25', 'nDeriv(',      func=forms.n_deriv)
+fMin        = token(b'\x27', 'fMin(')
+fMax        = token(b'\x28', 'fMax(')
+SPACE       = token(b'\x29', ascii=' ')
 QUOTE       = token(b'\x2a', ascii='"')
 COMMA       = token(b'\x2b', ascii=',')
+IMAG_I      = token(b'\x2c', '𝑖', nullary=lambda env: 1j)
+FACT        = token(b'\x2d', ascii='!',      postfix=pf.factorial)
+CubicReg    = token(b'\x2e', 'CubicReg ')
+QuartReg    = token(b'\x2f', 'QuartReg ')
+
+# ── Binary operators ──────────────────────────────────────────────────────────
+
 DOT         = token(b'\x3a', ascii='.')
+SCI_E       = token(b'\x3b', 'ᴇ')
+or_         = token(b'\x3c', ' or ',    bp=(20, 21), operator=pf.or_)
+xor         = token(b'\x3d', ' xor ',   bp=(20, 21), operator=pf.xor)
 COLON       = token(b'\x3e', ascii=':')
 NEWLINE     = token(b'\x3f', ascii='\n')
-PRGM        = token(b'\x5f', 'prgm')
-ANS         = token(b'\x72', 'Ans', nullary=Environment.get_ans, func=forms.ans_index_or_mul)
-NEG         = token(b'\xb0', ascii='−')
-APOS        = token(b'\xae', ascii="'")
-DIM         = token(b'\xb5', 'dim(', pure_func=pf.dim)
-LIST_PREFIX = token(b'\xeb', '∟')
-
-# Postfix operators
-RAD         = token(b'\x0a', 'ʳ') # postfix operator that needs env, so gets a special case
-DEG         = token(b'\x0b', '°') # ditto
-INV         = token(b'\x0c', '¹', postfix=pf.inv)
-SQ          = token(b'\x0d', '²', postfix=lambda x: x**2)
-TRANSPOSE   = token(b'\x0e', 'ᵀ', postfix=pf.transpose)
-CUBE        = token(b'\x0f', '³', postfix=lambda x: x**3)
-FACT        = token(b'\x2d', ascii='!', postfix=pf.factorial)
-
-# Binary operators
-SCI_E       = token(b'\x3b', 'ᴇ')
-OR          = token(b'\x3c', ' or ',    bp=(20, 21), operator=pf.or_)
-XOR         = token(b'\x3d', ' xor ',   bp=(20, 21), operator=pf.xor)
-AND         = token(b'\x40', ' and ',   bp=(30, 31), operator=pf.and_)
+and_        = token(b'\x40', ' and ',   bp=(30, 31), operator=pf.and_)
 EQ          = token(b'\x6a', ascii='=', bp=(40, 41), operator=op.eq)
 LT          = token(b'\x6b', ascii='<', bp=(40, 41), operator=op.lt)
 GT          = token(b'\x6c', ascii='>', bp=(40, 41), operator=op.gt)
@@ -189,632 +225,581 @@ ADD         = token(b'\x70', ascii='+', bp=(50, 51), operator=op.add)
 SUB         = token(b'\x71', ascii='-', bp=(50, 51), operator=op.sub)
 MUL         = token(b'\x82', ascii='*', bp=(60, 61), operator=op.mul)
 DIV         = token(b'\x83', ascii='/', bp=(60, 61), operator=op.truediv)
-NPR         = token(b'\x94', 'nPr',     bp=(60, 61), operator=pf.npr)
-NCR         = token(b'\x95', 'nCr',     bp=(60, 61), operator=pf.ncr)
-RAND        = token(b'\xab', 'rand', nullary=Environment.rand, pure_func=pf.rand_list)
+nPr         = token(b'\x94', 'nPr',     bp=(60, 61), operator=pf.npr)
+nCr         = token(b'\x95', 'nCr',     bp=(60, 61), operator=pf.ncr)
 POW         = token(b'\xf0', ascii='^', bp=(70, 69), operator=op.pow)
 XTH_ROOT    = token(b'\xf1', 'ˣ√',      bp=(60, 61), operator=pf.xth_root)
 
-# ── Token list ─────────────────────────────────────────────────────────────────
+# ── One-byte nullary / misc ───────────────────────────────────────────────────
 
-TOKENS: list[Token] = [
-	# One-byte tokens
-	token(b'\x01', '►DMS', converter=pf.to_dms),
-	token(b'\x02', '►Dec', converter=pf.to_dec),
-	token(b'\x03', '►Frac', converter=pf.to_frac),
-	STORE,
-	token(b'\x05', 'Boxplot'),
-	L_BRACKET,
-	R_BRACKET,
-	L_BRACE,
-	R_BRACE,
-	RAD,
-	DEG,
-	INV,
-	SQ,
-	TRANSPOSE,
-	CUBE,
-	L_PAREN,
-	R_PAREN,
-	token(b'\x12', 'round(', pure_func=pf.round),
-	token(b'\x13', 'pxl-Test('),
-	token(b'\x14', 'augment(', pure_func=pf.augment),
-	token(b'\x15', 'rowSwap(', pure_func=pf.rowswap),
-	token(b'\x16', 'row+(', pure_func=pf.row_plus),
-	token(b'\x17', '*row(', pure_func=pf.times_row),
-	token(b'\x18', '*row+(', pure_func=pf.times_row_plus),
-	token(b'\x19', 'max(', pure_func=pf.max),
-	token(b'\x1a', 'min(', pure_func=pf.min),
-	token(b'\x1b', 'R►Pr(', pure_func=pf.r_pr),
-	token(b'\x1c', 'R►Pθ(', pure_func=pf.r_ptheta),
-	token(b'\x1d', 'P►Rx(', pure_func=pf.p_rx),
-	token(b'\x1e', 'P►Ry(', pure_func=pf.p_ry),
-	token(b'\x1f', 'median(', pure_func=pf.median),
-	token(b'\x20', 'randM(', pure_func=pf.rand_m),
-	token(b'\x21', 'mean(', pure_func=pf.mean),
-	token(b'\x22', 'solve('),
-	token(b'\x23', 'seq(', func=forms.seq),
-	token(b'\x24', 'fnInt(', func=forms.fn_int),
-	token(b'\x25', 'nDeriv(', func=forms.n_deriv),
-	token(b'\x27', 'fMin('),
-	token(b'\x28', 'fMax('),
-	token(b'\x29', ascii=' '),
-	QUOTE,
-	COMMA,
-	token(b'\x2c', '𝑖', nullary=lambda env: 1j),
-	FACT,
-	token(b'\x2e', 'CubicReg '),
-	token(b'\x2f', 'QuartReg '),
-	*DIGITS,
-	DOT, 
-	SCI_E, 
-	OR, 
-	XOR, 
-	COLON, 
-	NEWLINE, 
-	AND,
-	*LETTERS,
-	THETA,
-	PRGM,
-	token(b'\x64', 'Radian'),
-	token(b'\x65', 'Degree'),
-	token(b'\x66', 'Normal'),
-	token(b'\x67', 'Sci'),
-	token(b'\x68', 'Eng'),
-	token(b'\x69', 'Float'),
-	EQ,
-	LT,
-	GT,
-	LE,
-	GE,
-	NE,
-	ADD,
-	SUB,
-	ANS,
-	token(b'\x73', 'Fix'),
-	token(b'\x74', 'Horiz'),
-	token(b'\x75', 'Full'),
-	token(b'\x76', 'Func'),
-	token(b'\x77', 'Param'),
-	token(b'\x78', 'Polar'),
-	token(b'\x79', 'Seq'),
-	token(b'\x7a', 'IndpntAuto'),
-	token(b'\x7b', 'IndpntAsk'),
-	token(b'\x7c', 'DependAuto'),
-	token(b'\x7d', 'DependAsk'),
-	token(b'\x7f', '▫'),
-	token(b'\x80', '﹢'),
-	token(b'\x81', '·'),
-	MUL,
-	DIV,
-	token(b'\x84', 'Trace'),
-	token(b'\x85', 'ClrDraw'),
-	token(b'\x86', 'ZStandard'),
-	token(b'\x87', 'ZTrig'),
-	token(b'\x88', 'ZBox'),
-	token(b'\x89', 'Zoom In'),
-	token(b'\x8a', 'Zoom Out'),
-	token(b'\x8b', 'ZSquare'),
-	token(b'\x8c', 'ZInteger'),
-	token(b'\x8d', 'ZPrevious'),
-	token(b'\x8e', 'ZDecimal'),
-	token(b'\x8f', 'ZoomStat'),
-	token(b'\x90', 'ZoomRcl'),
-	token(b'\x91', 'PrintScreen'),
-	token(b'\x92', 'ZoomSto'),
-	token(b'\x93', 'Text('),
-	NPR,
-	NCR,
-	token(b'\x96', 'FnOn '),
-	token(b'\x97', 'FnOff '),
-	token(b'\x98', 'StorePic '),
-	token(b'\x99', 'RecallPic '),
-	token(b'\x9a', 'StoreGDB '),
-	token(b'\x9b', 'RecallGDB '),
-	token(b'\x9c', 'Line('),
-	token(b'\x9d', 'Vertical '),
-	token(b'\x9e', 'Pt-On('),
-	token(b'\x9f', 'Pt-Off('),
-	token(b'\xa0', 'Pt-Change('),
-	token(b'\xa1', 'Pxl-On('),
-	token(b'\xa2', 'Pxl-Off('),
-	token(b'\xa3', 'Pxl-Change('),
-	token(b'\xa4', 'Shade('),
-	token(b'\xa5', 'Circle('),
-	token(b'\xa6', 'Horizontal '),
-	token(b'\xa7', 'Tangent('),
-	token(b'\xa8', 'DrawInv '),
-	token(b'\xa9', 'DrawF '),
-	RAND,
-	token(b'\xac', 'π', nullary=lambda env: math.pi),
-	token(b'\xad', 'getKey', nullary=Environment.get_key),
-	APOS,
-	token(b'\xaf', ascii='?'),
-	NEG,
-	token(b'\xb1', 'int(', pure_func=pf.int_),
-	token(b'\xb2', 'abs(', pure_func=pf.abs),
-	token(b'\xb3', 'det(', pure_func=pf.det),
-	token(b'\xb4', 'identity(', pure_func=pf.identity),
-	DIM,
-	token(b'\xb6', 'sum(', pure_func=pf.sum),
-	token(b'\xb7', 'prod(', pure_func=pf.prod),
-	token(b'\xb8', 'not(', pure_func=pf.not_),
-	token(b'\xb9', 'iPart(', pure_func=pf.i_part),
-	token(b'\xba', 'fPart(', pure_func=pf.f_part),
-	token(b'\xbc', '√(', pure_func=pf.sqrt),
-	token(b'\xbd', '³√(', pure_func=pf.cbrt),
-	token(b'\xbe', 'ln(', pure_func=pf.ln),
-	token(b'\xbf', '𝑒^(', pure_func=pf.exp),
-	token(b'\xc0', 'log(', pure_func=pf.log),
-	token(b'\xc1', '⑽^(', pure_func=pf.pow10),
-	token(b'\xc2', 'sin(', pure_func=pf.sin),
-	token(b'\xc3', 'sin¹(', pure_func=pf.asin),
-	token(b'\xc4', 'cos(', pure_func=pf.cos),
-	token(b'\xc5', 'cos¹(', pure_func=pf.acos),
-	token(b'\xc6', 'tan(', pure_func=pf.tan),
-	token(b'\xc7', 'tan¹(', pure_func=pf.atan),
-	token(b'\xc8', 'sinh(', pure_func=pf.sinh),
-	token(b'\xc9', 'sinh¹(', pure_func=pf.asinh),
-	token(b'\xca', 'cosh(', pure_func=pf.cosh),
-	token(b'\xcb', 'cosh¹(', pure_func=pf.acosh),
-	token(b'\xcc', 'tanh(', pure_func=pf.tanh),
-	token(b'\xcd', 'tanh¹(', pure_func=pf.atanh),
-	token(b'\xce', 'If '),
-	token(b'\xcf', 'Then'),
-	token(b'\xd0', 'Else'),
-	token(b'\xd1', 'While '),
-	token(b'\xd2', 'Repeat '),
-	token(b'\xd3', 'For('),
-	token(b'\xd4', 'End'),
-	token(b'\xd5', 'Return'),
-	token(b'\xd6', 'Lbl '),
-	token(b'\xd7', 'Goto '),
-	token(b'\xd8', 'Pause '),
-	token(b'\xd9', 'Stop'),
-	token(b'\xda', 'IS>('),
-	token(b'\xdb', 'DS<('),
-	token(b'\xdc', 'Input '),
-	token(b'\xdd', 'Prompt '),
-	token(b'\xde', 'Disp '),
-	token(b'\xdf', 'DispGraph'),
-	token(b'\xe0', 'Output('),
-	token(b'\xe1', 'ClrHome'),
-	token(b'\xe2', 'Fill('),
-	token(b'\xe3', 'SortA('),
-	token(b'\xe4', 'SortD('),
-	token(b'\xe5', 'DispTable'),
-	token(b'\xe6', 'Menu('),
-	token(b'\xe7', 'Send('),
-	token(b'\xe8', 'Get('),
-	token(b'\xe9', 'PlotsOn'),
-	token(b'\xea', 'PlotsOff'),
-	LIST_PREFIX,
-	token(b'\xec', 'Plot1('),
-	token(b'\xed', 'Plot2('),
-	token(b'\xee', 'Plot3('),
-	POW,
-	XTH_ROOT,
-	token(b'\xf2', '1-Var Stats '),
-	token(b'\xf3', '2-Var Stats '),
-	token(b'\xf4', 'LinReg(a+bx) '),
-	token(b'\xf5', 'ExpReg '),
-	token(b'\xf6', 'LnReg '),
-	token(b'\xf7', 'PwrReg '),
-	token(b'\xf8', 'Med-Med '),
-	token(b'\xf9', 'QuadReg '),
-	token(b'\xfa', 'ClrList '),
-	token(b'\xfb', 'ClrTable'),
-	token(b'\xfc', 'Histogram'),
-	token(b'\xfd', 'xyLine'),
-	token(b'\xfe', 'Scatter'),
-	token(b'\xff', 'LinReg(ax+b) '),
-	*MATRICES,
-	*LISTS,
-	*[token(bytes([0x5e, 0x10 + i]), f'Y{chr(0x2080 + (i + 1) % 10)}') for i in range(10)], 
-	*[token(bytes([0x5e, 0x20 + i]), f'{x}{chr(0x2080 + n)}ₜ') for i, (n, x) in enumerate(itertools.product(range(1, 7), 'XY'))],
-	*[token(bytes([0x5e, 0x40 + i]), f'r{chr(0x2081 + i)}') for i in range(6)],
-	token(b'\x5e\x80', '𝑢'),
-	token(b'\x5e\x81', '𝑣'),
-	token(b'\x5e\x82', '𝑤'),
-	*PICTURES,
-	*GDBS,
-	*STRINGS,
-	token(b'\x62\x01', 'RegEq'),
-	token(b'\x62\x02', 'n'),
-	token(b'\x62\x03', 'ẍ'),
-	token(b'\x62\x04', 'Σx'),
-	token(b'\x62\x05', 'Σx²'),
-	token(b'\x62\x06', 'Sx'),
-	token(b'\x62\x07', 'σx'),
-	token(b'\x62\x08', 'minX'),
-	token(b'\x62\x09', 'maxX'),
-	token(b'\x62\x0a', 'minY'),
-	token(b'\x62\x0b', 'maxY'),
-	token(b'\x62\x0c', 'ȳ'),
-	token(b'\x62\x0d', 'Σy'),
-	token(b'\x62\x0e', 'Σy²'),
-	token(b'\x62\x0f', 'Sy'),
-	token(b'\x62\x10', 'σy'),
-	token(b'\x62\x11', 'Σxy'),
-	token(b'\x62\x12', 'r'),
-	token(b'\x62\x13', 'Med'),
-	token(b'\x62\x14', 'Q1'),
-	token(b'\x62\x15', 'Q3'),
-	token(b'\x62\x16', 'a'),
-	token(b'\x62\x17', 'b'),
-	token(b'\x62\x18', 'c'),
-	token(b'\x62\x19', 'd'),
-	token(b'\x62\x1a', 'e'),
-	token(b'\x62\x1b', 'x₁'),
-	token(b'\x62\x1c', 'x₂'),
-	token(b'\x62\x1d', 'x₃'),
-	token(b'\x62\x1e', 'y₁'),
-	token(b'\x62\x1f', 'y₂'),
-	token(b'\x62\x20', 'y₃'),
-	token(b'\x62\x21', '𝑛'),
-	token(b'\x62\x22', 'p'),
-	token(b'\x62\x23', 'z'),
-	token(b'\x62\x24', 't'),
-	token(b'\x62\x25', 'χ²'),
-	token(b'\x62\x26', '𝐅'),
-	token(b'\x62\x27', 'df'),
-	token(b'\x62\x28', 'ṕ'),
-	token(b'\x62\x29', 'ṕ₁'),
-	token(b'\x62\x2a', 'ṕ₂'),
-	token(b'\x62\x2b', 'ẍ₁'),
-	token(b'\x62\x2c', 'Sx₁'),
-	token(b'\x62\x2d', 'n₁'),
-	token(b'\x62\x2e', 'ẍ₂'),
-	token(b'\x62\x2f', 'Sx₂'),
-	token(b'\x62\x30', 'n₂'),
-	token(b'\x62\x31', 'Sxp'),
-	token(b'\x62\x32', 'lower'),
-	token(b'\x62\x33', 'upper'),
-	token(b'\x62\x34', 's'),
-	token(b'\x62\x35', 'r²'),
-	token(b'\x62\x36', 'R²'),
-	token(b'\x62\x37', 'Factor df'),
-	token(b'\x62\x38', 'Factor SS'),
-	token(b'\x62\x39', 'Factor MS'),
-	token(b'\x62\x3a', 'Error df'),
-	token(b'\x62\x3b', 'Error SS'),
-	token(b'\x62\x3c', 'Error MS'),
+Ans         = token(b'\x72', 'Ans',  nullary=Environment.get_ans, func=forms.ans_index_or_mul)
+pi          = token(b'\xac', 'π',    nullary=lambda env: math.pi)
+getKey      = token(b'\xad', 'getKey', nullary=Environment.get_key)
+APOS        = token(b'\xae', ascii="'")
+QUESTION    = token(b'\xaf', ascii='?')
+NEG         = token(b'\xb0', ascii='−')
+rand        = token(b'\xab', 'rand', nullary=Environment.rand, pure_func=pf.rand_list)
 
-	# Two-byte: Window / Finance variables 0x63 xx
-	token(b'\x63\x02', 'Xscl'),
-	token(b'\x63\x03', 'Yscl'),
-	token(b'\x63\x0a', 'Xmin'),
-	token(b'\x63\x0b', 'Xmax'),
-	token(b'\x63\x0c', 'Ymin'),
-	token(b'\x63\x0d', 'Ymax'),
-	token(b'\x63\x0e', 'Tmin'),
-	token(b'\x63\x0f', 'Tmax'),
-	token(b'\x63\x10', 'θmin'),
-	token(b'\x63\x11', 'θmax'),
-	token(b'\x63\x1a', 'TblStart'),
-	token(b'\x63\x1b', 'PlotStart'),
-	token(b'\x63\x1d', 'nMax'),
-	token(b'\x63\x1f', 'nMin'),
-	token(b'\x63\x21', 'ΔTbl'),
-	token(b'\x63\x22', 'Tstep'),
-	token(b'\x63\x23', 'θstep'),
-	token(b'\x63\x26', 'ΔX'),
-	token(b'\x63\x27', 'ΔY'),
-	token(b'\x63\x28', 'XFact'),
-	token(b'\x63\x29', 'YFact'),
-	token(b'\x63\x2b', '𝐍'),
-	token(b'\x63\x2c', 'I%'),
-	token(b'\x63\x2d', 'PV'),
-	token(b'\x63\x2e', 'PMT'),
-	token(b'\x63\x2f', 'FV'),
-	token(b'\x63\x30', 'P/Y'),
-	token(b'\x63\x31', 'C/Y'),
-	token(b'\x63\x34', 'PlotStep'),
-	token(b'\x63\x36', 'Xres'),
+# ── One-byte math functions ───────────────────────────────────────────────────
 
-	# Two-byte: Graph format tokens 0x7E xx
-	token(b'\x7e\x00', 'Sequential'),
-	token(b'\x7e\x01', 'Simul'),
-	token(b'\x7e\x02', 'PolarGC'),
-	token(b'\x7e\x03', 'RectGC'),
-	token(b'\x7e\x04', 'CoordOn'),
-	token(b'\x7e\x05', 'CoordOff'),
-	token(b'\x7e\x06', 'Connected'),
-	token(b'\x7e\x07', 'Dot'),
-	token(b'\x7e\x08', 'AxesOn'),
-	token(b'\x7e\x09', 'AxesOff'),
-	token(b'\x7e\x0a', 'GridOn'),
-	token(b'\x7e\x0b', 'GridOff'),
-	token(b'\x7e\x0c', 'LabelOn'),
-	token(b'\x7e\x0d', 'LabelOff'),
-	token(b'\x7e\x0e', 'Web'),
-	token(b'\x7e\x0f', 'Time'),
-	token(b'\x7e\x10', 'uvAxes'),
-	token(b'\x7e\x11', 'vwAxes'),
-	token(b'\x7e\x12', 'uwAxes'),
+int_        = token(b'\xb1', 'int(',     pure_func=pf.int_)
+abs         = token(b'\xb2', 'abs(',     pure_func=pf.abs)
+det         = token(b'\xb3', 'det(',     pure_func=pf.det)
+identity    = token(b'\xb4', 'identity(', pure_func=pf.identity)
+dim         = token(b'\xb5', 'dim(',     pure_func=pf.dim)
+sum         = token(b'\xb6', 'sum(',     pure_func=pf.sum)
+prod        = token(b'\xb7', 'prod(',    pure_func=pf.prod)
+Not         = token(b'\xb8', 'not(',     pure_func=pf.not_)
+iPart       = token(b'\xb9', 'iPart(',   pure_func=pf.i_part)
+fPart       = token(b'\xba', 'fPart(',   pure_func=pf.f_part)
+sqrt        = token(b'\xbc', '√(',       pure_func=pf.sqrt)
+cbrt        = token(b'\xbd', '³√(',      pure_func=pf.cbrt)
+ln          = token(b'\xbe', 'ln(',      pure_func=pf.ln)
+e_pow       = token(b'\xbf', '𝑒^(',     pure_func=pf.exp)
+log         = token(b'\xc0', 'log(',     pure_func=pf.log)
+pow10       = token(b'\xc1', '⑽^(',     pure_func=pf.pow10)
+sin         = token(b'\xc2', 'sin(',     pure_func=pf.sin)
+asin        = token(b'\xc3', 'sin¹(',   pure_func=pf.asin)
+cos         = token(b'\xc4', 'cos(',     pure_func=pf.cos)
+acos        = token(b'\xc5', 'cos¹(',   pure_func=pf.acos)
+tan         = token(b'\xc6', 'tan(',     pure_func=pf.tan)
+atan        = token(b'\xc7', 'tan¹(',   pure_func=pf.atan)
+sinh        = token(b'\xc8', 'sinh(',    pure_func=pf.sinh)
+asinh       = token(b'\xc9', 'sinh¹(',  pure_func=pf.asinh)
+cosh        = token(b'\xca', 'cosh(',    pure_func=pf.cosh)
+acosh       = token(b'\xcb', 'cosh¹(',  pure_func=pf.acosh)
+tanh        = token(b'\xcc', 'tanh(',    pure_func=pf.tanh)
+atanh       = token(b'\xcd', 'tanh¹(',  pure_func=pf.atanh)
 
-	# Two-byte: Miscellaneous tokens 0xBB xx
-	token(b'\xbb\x00', 'npv('),
-	token(b'\xbb\x01', 'irr('),
-	token(b'\xbb\x02', 'bal('),
-	token(b'\xbb\x03', 'Σprn('),
-	token(b'\xbb\x04', 'ΣInt('),
-	token(b'\xbb\x05', '►Nom('),
-	token(b'\xbb\x06', '►Eff('),
-	token(b'\xbb\x07', 'dbd(', pure_func=pf.dbd),
-	token(b'\xbb\x08', 'lcm(', pure_func=pf.lcm),
-	token(b'\xbb\x09', 'gcd(', pure_func=pf.gcd),
-	token(b'\xbb\x0a', 'randInt(', pure_func=pf.rand_int),
-	token(b'\xbb\x0b', 'randBin(', pure_func=pf.rand_bin),
-	token(b'\xbb\x0c', 'sub(', pure_func=pf.sub_string),
-	token(b'\xbb\x0d', 'stdDev(', pure_func=pf.stddev),
-	token(b'\xbb\x0e', 'variance(', pure_func=pf.variance),
-	token(b'\xbb\x0f', 'inString(', pure_func=pf.in_string),
-	token(b'\xbb\x10', 'normalcdf(', pure_func=pf.normalcdf),
-	token(b'\xbb\x11', 'invNorm(', pure_func=pf.invnorm),
-	token(b'\xbb\x12', 'tcdf(', pure_func=pf.tcdf),
-	token(b'\xbb\x13', 'χ²cdf(', pure_func=pf.chi2cdf),
-	token(b'\xbb\x14', 'Fcdf(', pure_func=pf.fcdf),
-	token(b'\xbb\x15', 'binompdf(', pure_func=pf.binompdf),
-	token(b'\xbb\x16', 'binomcdf(', pure_func=pf.binomcdf),
-	token(b'\xbb\x17', 'poissonpdf(', pure_func=pf.poissonpdf),
-	token(b'\xbb\x18', 'poissoncdf(', pure_func=pf.poissoncdf),
-	token(b'\xbb\x19', 'geometpdf(', pure_func=pf.geometpdf),
-	token(b'\xbb\x1a', 'geometcdf(', pure_func=pf.geometcdf),
-	token(b'\xbb\x1b', 'normalpdf(', pure_func=pf.normalpdf),
-	token(b'\xbb\x1c', 'tpdf(', pure_func=pf.tpdf),
-	token(b'\xbb\x1d', 'χ²pdf(', pure_func=pf.chi2pdf),
-	token(b'\xbb\x1e', 'Fpdf(', pure_func=pf.fpdf),
-	token(b'\xbb\x1f', 'randNorm(', pure_func=pf.rand_norm),
-	token(b'\xbb\x20', 'tvm_Pmt'),
-	token(b'\xbb\x21', 'tvm_I%'),
-	token(b'\xbb\x22', 'tvm_PV'),
-	token(b'\xbb\x23', 'tvm_N'),
-	token(b'\xbb\x24', 'tvm_FV'),
-	token(b'\xbb\x25', 'conj(', pure_func=pf.conj),
-	token(b'\xbb\x26', 'real(', pure_func=pf.real),
-	token(b'\xbb\x27', 'imag(', pure_func=pf.imag),
-	token(b'\xbb\x28', 'angle(', pure_func=pf.angle),
-	token(b'\xbb\x29', 'cumSum(', pure_func=pf.cum_sum),
-	token(b'\xbb\x2a', 'expr(', func=forms.expr),
-	token(b'\xbb\x2b', 'length(', pure_func=pf.length),
-	token(b'\xbb\x2c', 'ΔList(', pure_func=pf.delta_list),
-	token(b'\xbb\x2d', 'ref(', pure_func=pf.ref),
-	token(b'\xbb\x2e', 'rref(', pure_func=pf.rref),
-	token(b'\xbb\x2f', '►Rect'),
-	token(b'\xbb\x30', '►Polar'),
-	token(b'\xbb\x31', '𝑒', nullary=lambda env: math.e),
-	token(b'\xbb\x32', 'SinReg '),
-	token(b'\xbb\x33', 'Logistic '),
-	token(b'\xbb\x34', 'LinRegTTest '),
-	token(b'\xbb\x35', 'ShadeNorm('),
-	token(b'\xbb\x36', 'Shade_t('),
-	token(b'\xbb\x37', 'Shadeχ²('),
-	token(b'\xbb\x38', 'ShadeF('),
-	token(b'\xbb\x39', 'Matr►list(', cmd=forms.matr_to_list),
-	token(b'\xbb\x3a', 'List►matr(', cmd=forms.list_to_matr),
-	token(b'\xbb\x3b', 'Z-Test('),
-	token(b'\xbb\x3c', 'T-Test'),
-	token(b'\xbb\x3d', '2-SampZTest('),
-	token(b'\xbb\x3e', '1-PropZTest('),
-	token(b'\xbb\x3f', '2-PropZTest('),
-	token(b'\xbb\x40', 'χ²-Test('),
-	token(b'\xbb\x41', 'ZInterval '),
-	token(b'\xbb\x42', '2-SampZInt('),
-	token(b'\xbb\x43', '1-PropZInt('),
-	token(b'\xbb\x44', '2-PropZInt('),
-	token(b'\xbb\x45', 'GraphStyle('),
-	token(b'\xbb\x46', '2-SampTTest '),
-	token(b'\xbb\x47', '2-SampFTest '),
-	token(b'\xbb\x48', 'TInterval '),
-	token(b'\xbb\x49', '2-SampTInt '),
-	token(b'\xbb\x4a', 'SetUpEditor '),
-	token(b'\xbb\x4b', 'Pmt_End'),
-	token(b'\xbb\x4c', 'Pmt_Bgn'),
-	token(b'\xbb\x4d', 'Real'),
-	token(b'\xbb\x4e', 're^θi'),
-	token(b'\xbb\x4f', 'a+bi'),
-	token(b'\xbb\x50', 'ExprOn'),
-	token(b'\xbb\x51', 'ExprOff'),
-	token(b'\xbb\x52', 'ClrAllLists'),
-	token(b'\xbb\x53', 'GetCalc('),
-	token(b'\xbb\x54', 'DelVar '),
-	token(b'\xbb\x55', 'Equ►String('),
-	token(b'\xbb\x56', 'String►Equ('),
-	token(b'\xbb\x57', 'Clear Entries'),
-	token(b'\xbb\x58', 'Select('),
-	token(b'\xbb\x59', 'ANOVA('),
-	token(b'\xbb\x5a', 'ModBoxplot'),
-	token(b'\xbb\x5b', 'NormProbPlot'),
-	token(b'\xbb\x64', 'G-T'),
-	token(b'\xbb\x65', 'ZoomFit'),
-	token(b'\xbb\x66', 'DiagnosticOn'),
-	token(b'\xbb\x67', 'DiagnosticOff'),
-	token(b'\xbb\x68', 'Archive '),
-	token(b'\xbb\x69', 'UnArchive '),
-	token(b'\xbb\x6a', 'Asm('),
-	token(b'\xbb\x6b', 'AsmComp('),
-	token(b'\xbb\x6c', 'AsmPrgm'),
-	# token(b'\xbb\x6d', 'compiled asm'),
-	token(b'\xbb\x6e', 'Á'),
-	token(b'\xbb\x6f', 'À'),
-	token(b'\xbb\x70', 'Â'),
-	token(b'\xbb\x71', 'Ä'),
-	token(b'\xbb\x72', 'á'),
-	token(b'\xbb\x73', 'à'),
-	token(b'\xbb\x74', 'â'),
-	token(b'\xbb\x75', 'ä'),
-	token(b'\xbb\x76', 'É'),
-	token(b'\xbb\x77', 'È'),
-	token(b'\xbb\x78', 'Ê'),
-	token(b'\xbb\x79', 'Ë'),
-	token(b'\xbb\x7a', 'é'),
-	token(b'\xbb\x7b', 'è'),
-	token(b'\xbb\x7c', 'ê'),
-	token(b'\xbb\x7d', 'ë'),
-	token(b'\xbb\x7f', 'Ì'),
-	token(b'\xbb\x80', 'Î'),
-	token(b'\xbb\x81', 'Ï'),
-	token(b'\xbb\x82', 'í'),
-	token(b'\xbb\x83', 'ì'),
-	token(b'\xbb\x84', 'î'),
-	token(b'\xbb\x85', 'ï'),
-	token(b'\xbb\x86', 'Ó'),
-	token(b'\xbb\x87', 'Ò'),
-	token(b'\xbb\x88', 'Ô'),
-	token(b'\xbb\x89', 'Ö'),
-	token(b'\xbb\x8a', 'ó'),
-	token(b'\xbb\x8b', 'ò'),
-	token(b'\xbb\x8c', 'ô'),
-	token(b'\xbb\x8d', 'ö'),
-	token(b'\xbb\x8e', 'Ú'),
-	token(b'\xbb\x8f', 'Ù'),
-	token(b'\xbb\x90', 'Û'),
-	token(b'\xbb\x91', 'Ü'),
-	token(b'\xbb\x92', 'ú'),
-	token(b'\xbb\x93', 'ù'),
-	token(b'\xbb\x94', 'û'),
-	token(b'\xbb\x95', 'ü'),
-	token(b'\xbb\x96', 'Ç'),
-	token(b'\xbb\x97', 'ç'),
-	token(b'\xbb\x98', 'Ñ'),
-	token(b'\xbb\x99', 'ñ'),
-	token(b'\xbb\x9a', '´'),
-	token(b'\xbb\x9b', 'ˋ'), # "Combining grave accent"
-	token(b'\xbb\x9c', '¨'),
-	token(b'\xbb\x9d', '¿'),
-	token(b'\xbb\x9e', '¡'),
-	token(b'\xbb\x9f', 'α'),
-	token(b'\xbb\xa0', 'β'),
-	token(b'\xbb\xa1', 'γ'),
-	token(b'\xbb\xa2', 'Δ'),
-	token(b'\xbb\xa3', 'δ'),
-	token(b'\xbb\xa4', 'ε'),
-	token(b'\xbb\xa5', 'λ'),
-	token(b'\xbb\xa6', 'μ'),
-	token(b'\xbb\xa7', '𝛑'), # bold pi
-	token(b'\xbb\xa8', 'ρ'),
-	token(b'\xbb\xa9', 'Σ'),
-	token(b'\xbb\xab', 'φ'),
-	token(b'\xbb\xac', 'Ω'),
-	token(b'\xbb\xad', 'ψ'),
-	token(b'\xbb\xae', 'χ'),
-	token(b'\xbb\xaf', '𝟊'), # Using digamma symbol
-	token(b'\xbb\xb0', ascii='a'),
-	token(b'\xbb\xb1', ascii='b'),
-	token(b'\xbb\xb2', ascii='c'),
-	token(b'\xbb\xb3', ascii='d'),
-	token(b'\xbb\xb4', ascii='e'),
-	token(b'\xbb\xb5', ascii='f'),
-	token(b'\xbb\xb6', ascii='g'),
-	token(b'\xbb\xb7', ascii='h'),
-	token(b'\xbb\xb8', ascii='i'),
-	token(b'\xbb\xb9', ascii='j'),
-	token(b'\xbb\xba', ascii='k'),
-	token(b'\xbb\xbc', ascii='l'),
-	token(b'\xbb\xbd', ascii='m'),
-	token(b'\xbb\xbe', ascii='n'),
-	token(b'\xbb\xbf', ascii='o'),
-	token(b'\xbb\xc0', ascii='p'),
-	token(b'\xbb\xc1', ascii='q'),
-	token(b'\xbb\xc2', ascii='r'),
-	token(b'\xbb\xc3', ascii='s'),
-	token(b'\xbb\xc4', ascii='t'),
-	token(b'\xbb\xc5', ascii='u'),
-	token(b'\xbb\xc6', ascii='v'),
-	token(b'\xbb\xc7', ascii='w'),
-	token(b'\xbb\xc8', ascii='x'),
-	token(b'\xbb\xc9', ascii='y'),
-	token(b'\xbb\xca', ascii='z'),
-	token(b'\xbb\xcb', 'σ'),
-	token(b'\xbb\xcc', 'τ'),
-	token(b'\xbb\xcd', 'Í'),
-	token(b'\xbb\xce', 'GarbageCollect'),
-	token(b'\xbb\xcf', ascii='~'),
-	token(b'\xbb\xd1', ascii='@'),
-	token(b'\xbb\xd2', ascii='#'),
-	token(b'\xbb\xd3', ascii='$'),
-	token(b'\xbb\xd4', ascii='&'),
-	token(b'\xbb\xd5', ascii='`'),
-	token(b'\xbb\xd6', ascii=';'),
-	token(b'\xbb\xd7', ascii='\\'),
-	token(b'\xbb\xd8', ascii='|'),
-	token(b'\xbb\xd9', ascii='_'),
-	token(b'\xbb\xda', ascii='%', postfix=lambda x: x / 100),
-	token(b'\xbb\xdb', '…'),
-	token(b'\xbb\xdc', '∠'),
-	token(b'\xbb\xdd', 'ß'),
-	token(b'\xbb\xde', 'ˣ'),
-	token(b'\xbb\xdf', 'ₜ'),
-	token(b'\xbb\xe0', '₀'),
-	token(b'\xbb\xe1', '₁'),
-	token(b'\xbb\xe2', '₂'),
-	token(b'\xbb\xe3', '₃'),
-	token(b'\xbb\xe4', '₄'),
-	token(b'\xbb\xe5', '₅'),
-	token(b'\xbb\xe6', '₆'),
-	token(b'\xbb\xe7', '₇'),
-	token(b'\xbb\xe8', '₈'),
-	token(b'\xbb\xe9', '₉'),
-	token(b'\xbb\xea', '⑽'),
-	token(b'\xbb\xeb', '◄'),
-	token(b'\xbb\xec', '🡆'),
-	token(b'\xbb\xed', '↑'),
-	token(b'\xbb\xee', '↓'),
-	token(b'\xbb\xf0', '𝑥'), # italic x to differentiate
-	token(b'\xbb\xf1', '∫'),
-	token(b'\xbb\xf2', '🡅'),
-	token(b'\xbb\xf3', '🡇'),
-	token(b'\xbb\xf4', '√'),
-	token(b'\xbb\xf5', '≛'),
+# ── Control flow ──────────────────────────────────────────────────────────────
 
-	# Two-byte: TI-84+ extended tokens 0xEF xx
-	token(b'\xef\x00', 'setDate(', cmd=forms.set_date),
-	token(b'\xef\x01', 'setTime(', cmd=forms.set_time),
-	token(b'\xef\x02', 'checkTmr(', func=forms.check_tmr),
-	token(b'\xef\x03', 'setDtFmt(', cmd=forms.set_dt_fmt),
-	token(b'\xef\x04', 'setTmFmt(', cmd=forms.set_tm_fmt),
-	token(b'\xef\x05', 'timeCnv(', pure_func=pf.timecnv),
-	token(b'\xef\x06', 'dayOfWk(', pure_func=pf.dayofwk),
-	token(b'\xef\x07', 'getDtStr(', func=forms.get_dt_str),
-	token(b'\xef\x08', 'getTmStr(', func=forms.get_tm_str),
-	token(b'\xef\x09', 'getDate', nullary=Environment.get_date),
-	token(b'\xef\x0a', 'getTime', nullary=Environment.get_time),
-	token(b'\xef\x0b', 'startTmr', nullary=Environment.start_tmr),
-	token(b'\xef\x0c', 'getDtFmt', nullary=Environment.get_dt_fmt),
-	token(b'\xef\x0d', 'getTmFmt', nullary=Environment.get_tm_fmt),
-	token(b'\xef\x0e', 'isClockOn', nullary=Environment.is_clock_on),
-	token(b'\xef\x0f', 'ClockOff', cmd=Environment.clock_off),
-	token(b'\xef\x10', 'ClockOn', cmd=Environment.clock_on),
-	token(b'\xef\x11', 'OpenLib('),
-	token(b'\xef\x12', 'ExecLib'),
-	token(b'\xef\x13', 'invT(', pure_func=pf.invt),
-	token(b'\xef\x14', 'χ²GOF-Test('),
-	token(b'\xef\x15', 'LinRegTInt '),
-	token(b'\xef\x16', 'Manual-Fit '),
-	token(b'\xef\x17', 'ZQuadrant1'),
-	token(b'\xef\x18', 'ZFrac1/2'),
-	token(b'\xef\x19', 'ZFrac1/3'),
-	token(b'\xef\x1a', 'ZFrac1/4'),
-	token(b'\xef\x1b', 'ZFrac1/5'),
-	token(b'\xef\x1c', 'ZFrac1/8'),
-	token(b'\xef\x1d', 'ZFrac1/10'),
-	token(b'\xef\x1e', 'mathprintbox'),
-	token(b'\xef\x30', '►n/d◄►Un/d'),
-	token(b'\xef\x31', '►F◄►D'),
-	token(b'\xef\x32', 'remainder(', pure_func=pf.remainder),
-	token(b'\xef\x33', 'Σ(', func=forms.sigma),
-	token(b'\xef\x34', 'logBASE(', pure_func=pf.log_base),
-	token(b'\xef\x35', 'randIntNoRep(', pure_func=pf.rand_int_no_rep),
-	token(b'\xef\x36', 'MATHPRINT'),
-	token(b'\xef\x37', 'CLASSIC'),
-	token(b'\xef\x38', 'n/d'),
-	token(b'\xef\x39', 'Un/d'),
-	token(b'\xef\x3a', 'AUTO'),
-	token(b'\xef\x3b', 'DEC'),
-	token(b'\xef\x3c', 'FRAC'),
-	token(b'\xef\x3d', 'FRAC-APPROX'),
-]
+If          = token(b'\xce', 'If ')
+Then        = token(b'\xcf', 'Then')
+Else        = token(b'\xd0', 'Else')
+While       = token(b'\xd1', 'While ')
+Repeat      = token(b'\xd2', 'Repeat ')
+For         = token(b'\xd3', 'For(')
+End         = token(b'\xd4', 'End')
+Return      = token(b'\xd5', 'Return')
+Lbl         = token(b'\xd6', 'Lbl ')
+Goto        = token(b'\xd7', 'Goto ')
+Pause       = token(b'\xd8', 'Pause ')
+Stop        = token(b'\xd9', 'Stop')
+IS_gt       = token(b'\xda', 'IS>(')
+DS_lt       = token(b'\xdb', 'DS<(')
+prgm        = token(b'\x5f', 'prgm')
+
+# ── I/O ───────────────────────────────────────────────────────────────────────
+
+Input       = token(b'\xdc', 'Input ')
+Prompt      = token(b'\xdd', 'Prompt ')
+Disp        = token(b'\xde', 'Disp ')
+DispGraph   = token(b'\xdf', 'DispGraph')
+Output      = token(b'\xe0', 'Output(')
+ClrHome     = token(b'\xe1', 'ClrHome')
+
+# ── List / matrix commands ────────────────────────────────────────────────────
+
+Fill        = token(b'\xe2', 'Fill(')
+SortA       = token(b'\xe3', 'SortA(')
+SortD       = token(b'\xe4', 'SortD(')
+DispTable   = token(b'\xe5', 'DispTable')
+Menu        = token(b'\xe6', 'Menu(')
+Send        = token(b'\xe7', 'Send(')
+Get         = token(b'\xe8', 'Get(')
+PlotsOn     = token(b'\xe9', 'PlotsOn')
+PlotsOff    = token(b'\xea', 'PlotsOff')
+LIST_PREFIX = token(b'\xeb', '∟')
+Plot1       = token(b'\xec', 'Plot1(')
+Plot2       = token(b'\xed', 'Plot2(')
+Plot3       = token(b'\xee', 'Plot3(')
+
+# ── Statistics ────────────────────────────────────────────────────────────────
+
+OneVarStats  = token(b'\xf2', '1-Var Stats ')
+TwoVarStats  = token(b'\xf3', '2-Var Stats ')
+LinReg_abx   = token(b'\xf4', 'LinReg(a+bx) ')
+ExpReg       = token(b'\xf5', 'ExpReg ')
+LnReg        = token(b'\xf6', 'LnReg ')
+PwrReg       = token(b'\xf7', 'PwrReg ')
+MedMed       = token(b'\xf8', 'Med-Med ')
+QuadReg      = token(b'\xf9', 'QuadReg ')
+ClrList      = token(b'\xfa', 'ClrList ')
+ClrTable     = token(b'\xfb', 'ClrTable')
+Histogram    = token(b'\xfc', 'Histogram')
+xyLine       = token(b'\xfd', 'xyLine')
+Scatter      = token(b'\xfe', 'Scatter')
+LinReg_axb   = token(b'\xff', 'LinReg(ax+b) ')
+
+# ── Mode settings ─────────────────────────────────────────────────────────────
+
+Radian      = token(b'\x64', 'Radian')
+Degree      = token(b'\x65', 'Degree')
+Normal      = token(b'\x66', 'Normal')
+Sci         = token(b'\x67', 'Sci')
+Eng         = token(b'\x68', 'Eng')
+Float       = token(b'\x69', 'Float')
+Fix         = token(b'\x73', 'Fix')
+Horiz       = token(b'\x74', 'Horiz')
+Full        = token(b'\x75', 'Full')
+Func        = token(b'\x76', 'Func')
+Param       = token(b'\x77', 'Param')
+Polar       = token(b'\x78', 'Polar')
+Seq         = token(b'\x79', 'Seq')
+IndpntAuto  = token(b'\x7a', 'IndpntAuto')
+IndpntAsk   = token(b'\x7b', 'IndpntAsk')
+DependAuto  = token(b'\x7c', 'DependAuto')
+DependAsk   = token(b'\x7d', 'DependAsk')
+SQUARE_MARK = token(b'\x7f', '▫')
+CROSS_MARK  = token(b'\x80', '﹢')
+DOT_MARK    = token(b'\x81', '·')
+
+# ── Graph / draw commands ─────────────────────────────────────────────────────
+
+Trace       = token(b'\x84', 'Trace')
+ClrDraw     = token(b'\x85', 'ClrDraw')
+ZStandard   = token(b'\x86', 'ZStandard')
+ZTrig       = token(b'\x87', 'ZTrig')
+ZBox        = token(b'\x88', 'ZBox')
+ZoomIn      = token(b'\x89', 'Zoom In')
+ZoomOut     = token(b'\x8a', 'Zoom Out')
+ZSquare     = token(b'\x8b', 'ZSquare')
+ZInteger    = token(b'\x8c', 'ZInteger')
+ZPrevious   = token(b'\x8d', 'ZPrevious')
+ZDecimal    = token(b'\x8e', 'ZDecimal')
+ZoomStat    = token(b'\x8f', 'ZoomStat')
+ZoomRcl     = token(b'\x90', 'ZoomRcl')
+PrintScreen = token(b'\x91', 'PrintScreen')
+ZoomSto     = token(b'\x92', 'ZoomSto')
+Text        = token(b'\x93', 'Text(')
+FnOn        = token(b'\x96', 'FnOn ')
+FnOff       = token(b'\x97', 'FnOff ')
+StorePic    = token(b'\x98', 'StorePic ')
+RecallPic   = token(b'\x99', 'RecallPic ')
+StoreGDB    = token(b'\x9a', 'StoreGDB ')
+RecallGDB   = token(b'\x9b', 'RecallGDB ')
+Line        = token(b'\x9c', 'Line(')
+Vertical    = token(b'\x9d', 'Vertical ')
+PtOn        = token(b'\x9e', 'Pt-On(')
+PtOff       = token(b'\x9f', 'Pt-Off(')
+PtChange    = token(b'\xa0', 'Pt-Change(')
+PxlOn       = token(b'\xa1', 'Pxl-On(')
+PxlOff      = token(b'\xa2', 'Pxl-Off(')
+PxlChange   = token(b'\xa3', 'Pxl-Change(')
+Shade       = token(b'\xa4', 'Shade(')
+Circle      = token(b'\xa5', 'Circle(')
+Horizontal  = token(b'\xa6', 'Horizontal ')
+Tangent     = token(b'\xa7', 'Tangent(')
+DrawInv     = token(b'\xa8', 'DrawInv ')
+DrawF       = token(b'\xa9', 'DrawF ')
+
+# ── Equation / sequence variable tokens 0x5E xx ──────────────────────────────
+
+Y1, Y2, Y3, Y4, Y5, Y6, Y7, Y8, Y9, Y0 = Y_EQUATIONS = tuple(
+	token(bytes([0x5e, 0x10 + i]), f'Y{chr(0x2080 + (i + 1) % 10)}') for i in range(10)
+)
+X1t, Y1t, X2t, Y2t, X3t, Y3t, X4t, Y4t, X5t, Y5t, X6t, Y6t = PARAM_EQUATIONS = tuple(
+	token(bytes([0x5e, 0x20 + i]), f'{x}{chr(0x2080 + n)}ₜ')
+	for i, (n, x) in enumerate(itertools.product(range(1, 7), 'XY'))
+)
+r1, r2, r3, r4, r5, r6 = POLAR_EQUATIONS = tuple(
+	token(bytes([0x5e, 0x40 + i]), f'r{chr(0x2081 + i)}') for i in range(6)
+)
+u_seq = token(b'\x5e\x80', '𝑢')
+v_seq = token(b'\x5e\x81', '𝑣')
+w_seq = token(b'\x5e\x82', '𝑤')
+
+# ── Statistical result variables 0x62 xx ─────────────────────────────────────
+
+RegEq    = token(b'\x62\x01', 'RegEq')
+StatN    = token(b'\x62\x02', 'n')
+XBar     = token(b'\x62\x03', 'ẍ')
+SumX     = token(b'\x62\x04', 'Σx')
+SumX2    = token(b'\x62\x05', 'Σx²')
+Sx       = token(b'\x62\x06', 'Sx')
+SigmaX   = token(b'\x62\x07', 'σx')
+MinX     = token(b'\x62\x08', 'minX')
+MaxX     = token(b'\x62\x09', 'maxX')
+MinY     = token(b'\x62\x0a', 'minY')
+MaxY     = token(b'\x62\x0b', 'maxY')
+YBar     = token(b'\x62\x0c', 'ȳ')
+SumY     = token(b'\x62\x0d', 'Σy')
+SumY2    = token(b'\x62\x0e', 'Σy²')
+Sy       = token(b'\x62\x0f', 'Sy')
+SigmaY   = token(b'\x62\x10', 'σy')
+SumXY    = token(b'\x62\x11', 'Σxy')
+StatR    = token(b'\x62\x12', 'r')
+StatMed  = token(b'\x62\x13', 'Med')
+Q1       = token(b'\x62\x14', 'Q1')
+Q3       = token(b'\x62\x15', 'Q3')
+StatA    = token(b'\x62\x16', 'a')
+StatB    = token(b'\x62\x17', 'b')
+StatC    = token(b'\x62\x18', 'c')
+StatD    = token(b'\x62\x19', 'd')
+StatE    = token(b'\x62\x1a', 'e')
+StatX1   = token(b'\x62\x1b', 'x₁')
+StatX2   = token(b'\x62\x1c', 'x₂')
+StatX3   = token(b'\x62\x1d', 'x₃')
+StatY1   = token(b'\x62\x1e', 'y₁')
+StatY2   = token(b'\x62\x1f', 'y₂')
+StatY3   = token(b'\x62\x20', 'y₃')
+StatN2   = token(b'\x62\x21', '𝑛')
+StatP    = token(b'\x62\x22', 'p')
+StatZ    = token(b'\x62\x23', 'z')
+StatT    = token(b'\x62\x24', 't')
+ChiSqStat= token(b'\x62\x25', 'χ²')
+StatF    = token(b'\x62\x26', '𝐅')
+StatDF   = token(b'\x62\x27', 'df')
+Phat     = token(b'\x62\x28', 'ṕ')
+Phat1    = token(b'\x62\x29', 'ṕ₁')
+Phat2    = token(b'\x62\x2a', 'ṕ₂')
+XBar1    = token(b'\x62\x2b', 'ẍ₁')
+Sx1      = token(b'\x62\x2c', 'Sx₁')
+N1       = token(b'\x62\x2d', 'n₁')
+XBar2    = token(b'\x62\x2e', 'ẍ₂')
+Sx2      = token(b'\x62\x2f', 'Sx₂')
+N2       = token(b'\x62\x30', 'n₂')
+Sxp      = token(b'\x62\x31', 'Sxp')
+Lower    = token(b'\x62\x32', 'lower')
+Upper    = token(b'\x62\x33', 'upper')
+StatS    = token(b'\x62\x34', 's')
+R2       = token(b'\x62\x35', 'r²')
+CapR2    = token(b'\x62\x36', 'R²')
+FactorDF = token(b'\x62\x37', 'Factor df')
+FactorSS = token(b'\x62\x38', 'Factor SS')
+FactorMS = token(b'\x62\x39', 'Factor MS')
+ErrorDF  = token(b'\x62\x3a', 'Error df')
+ErrorSS  = token(b'\x62\x3b', 'Error SS')
+ErrorMS  = token(b'\x62\x3c', 'Error MS')
+
+# ── Window / finance variables 0x63 xx ───────────────────────────────────────
+
+Xscl      = token(b'\x63\x02', 'Xscl')
+Yscl      = token(b'\x63\x03', 'Yscl')
+Xmin      = token(b'\x63\x0a', 'Xmin')
+Xmax      = token(b'\x63\x0b', 'Xmax')
+Ymin      = token(b'\x63\x0c', 'Ymin')
+Ymax      = token(b'\x63\x0d', 'Ymax')
+Tmin      = token(b'\x63\x0e', 'Tmin')
+Tmax      = token(b'\x63\x0f', 'Tmax')
+ThetaMin  = token(b'\x63\x10', 'θmin')
+ThetaMax  = token(b'\x63\x11', 'θmax')
+TblStart  = token(b'\x63\x1a', 'TblStart')
+PlotStart = token(b'\x63\x1b', 'PlotStart')
+NMax      = token(b'\x63\x1d', 'nMax')
+NMin      = token(b'\x63\x1f', 'nMin')
+DeltaTbl  = token(b'\x63\x21', 'ΔTbl')
+Tstep     = token(b'\x63\x22', 'Tstep')
+ThetaStep = token(b'\x63\x23', 'θstep')
+DeltaX    = token(b'\x63\x26', 'ΔX')
+DeltaY    = token(b'\x63\x27', 'ΔY')
+XFact     = token(b'\x63\x28', 'XFact')
+YFact     = token(b'\x63\x29', 'YFact')
+FinN      = token(b'\x63\x2b', '𝐍')
+FinI      = token(b'\x63\x2c', 'I%')
+FinPV     = token(b'\x63\x2d', 'PV')
+FinPMT    = token(b'\x63\x2e', 'PMT')
+FinFV     = token(b'\x63\x2f', 'FV')
+FinPY     = token(b'\x63\x30', 'P/Y')
+FinCY     = token(b'\x63\x31', 'C/Y')
+PlotStep  = token(b'\x63\x34', 'PlotStep')
+Xres      = token(b'\x63\x36', 'Xres')
+
+# ── Graph format tokens 0x7E xx ──────────────────────────────────────────────
+
+Sequential = token(b'\x7e\x00', 'Sequential')
+Simul      = token(b'\x7e\x01', 'Simul')
+PolarGC    = token(b'\x7e\x02', 'PolarGC')
+RectGC     = token(b'\x7e\x03', 'RectGC')
+CoordOn    = token(b'\x7e\x04', 'CoordOn')
+CoordOff   = token(b'\x7e\x05', 'CoordOff')
+Connected  = token(b'\x7e\x06', 'Connected')
+Dot        = token(b'\x7e\x07', 'Dot')
+AxesOn     = token(b'\x7e\x08', 'AxesOn')
+AxesOff    = token(b'\x7e\x09', 'AxesOff')
+GridOn     = token(b'\x7e\x0a', 'GridOn')
+GridOff    = token(b'\x7e\x0b', 'GridOff')
+LabelOn    = token(b'\x7e\x0c', 'LabelOn')
+LabelOff   = token(b'\x7e\x0d', 'LabelOff')
+Web        = token(b'\x7e\x0e', 'Web')
+TimeAxis   = token(b'\x7e\x0f', 'Time')
+uvAxes     = token(b'\x7e\x10', 'uvAxes')
+vwAxes     = token(b'\x7e\x11', 'vwAxes')
+uwAxes     = token(b'\x7e\x12', 'uwAxes')
+
+# ── Miscellaneous extended tokens 0xBB xx ────────────────────────────────────
+
+npv          = token(b'\xbb\x00', 'npv(')
+irr          = token(b'\xbb\x01', 'irr(')
+bal          = token(b'\xbb\x02', 'bal(')
+SumPrn       = token(b'\xbb\x03', 'Σprn(')
+SumInt       = token(b'\xbb\x04', 'ΣInt(')
+ToNom        = token(b'\xbb\x05', '►Nom(')
+ToEff        = token(b'\xbb\x06', '►Eff(')
+dbd          = token(b'\xbb\x07', 'dbd(',           pure_func=pf.dbd)
+lcm          = token(b'\xbb\x08', 'lcm(',           pure_func=pf.lcm)
+gcd          = token(b'\xbb\x09', 'gcd(',           pure_func=pf.gcd)
+randInt      = token(b'\xbb\x0a', 'randInt(',       pure_func=pf.rand_int)
+randBin      = token(b'\xbb\x0b', 'randBin(',       pure_func=pf.rand_bin)
+sub          = token(b'\xbb\x0c', 'sub(',           pure_func=pf.sub_string)
+stdDev       = token(b'\xbb\x0d', 'stdDev(',        pure_func=pf.stddev)
+variance     = token(b'\xbb\x0e', 'variance(',      pure_func=pf.variance)
+inString     = token(b'\xbb\x0f', 'inString(',      pure_func=pf.in_string)
+normalcdf    = token(b'\xbb\x10', 'normalcdf(',     pure_func=pf.normalcdf)
+invNorm      = token(b'\xbb\x11', 'invNorm(',       pure_func=pf.invnorm)
+tcdf         = token(b'\xbb\x12', 'tcdf(',          pure_func=pf.tcdf)
+ChiSqCdf     = token(b'\xbb\x13', 'χ²cdf(',         pure_func=pf.chi2cdf)
+Fcdf         = token(b'\xbb\x14', 'Fcdf(',          pure_func=pf.fcdf)
+binompdf     = token(b'\xbb\x15', 'binompdf(',      pure_func=pf.binompdf)
+binomcdf     = token(b'\xbb\x16', 'binomcdf(',      pure_func=pf.binomcdf)
+poissonpdf   = token(b'\xbb\x17', 'poissonpdf(',    pure_func=pf.poissonpdf)
+poissoncdf   = token(b'\xbb\x18', 'poissoncdf(',    pure_func=pf.poissoncdf)
+geometpdf    = token(b'\xbb\x19', 'geometpdf(',     pure_func=pf.geometpdf)
+geometcdf    = token(b'\xbb\x1a', 'geometcdf(',     pure_func=pf.geometcdf)
+normalpdf    = token(b'\xbb\x1b', 'normalpdf(',     pure_func=pf.normalpdf)
+tpdf         = token(b'\xbb\x1c', 'tpdf(',          pure_func=pf.tpdf)
+ChiSqPdf     = token(b'\xbb\x1d', 'χ²pdf(',         pure_func=pf.chi2pdf)
+Fpdf         = token(b'\xbb\x1e', 'Fpdf(',          pure_func=pf.fpdf)
+randNorm     = token(b'\xbb\x1f', 'randNorm(',      pure_func=pf.rand_norm)
+tvm_Pmt      = token(b'\xbb\x20', 'tvm_Pmt')
+tvm_I        = token(b'\xbb\x21', 'tvm_I%')
+tvm_PV       = token(b'\xbb\x22', 'tvm_PV')
+tvm_N        = token(b'\xbb\x23', 'tvm_N')
+tvm_FV       = token(b'\xbb\x24', 'tvm_FV')
+conj         = token(b'\xbb\x25', 'conj(',          pure_func=pf.conj)
+real         = token(b'\xbb\x26', 'real(',          pure_func=pf.real)
+imag         = token(b'\xbb\x27', 'imag(',          pure_func=pf.imag)
+angle        = token(b'\xbb\x28', 'angle(',         pure_func=pf.angle)
+cumSum       = token(b'\xbb\x29', 'cumSum(',        pure_func=pf.cum_sum)
+Expr         = token(b'\xbb\x2a', 'expr(',          func=forms.expr)
+length       = token(b'\xbb\x2b', 'length(',        pure_func=pf.length)
+DeltaList    = token(b'\xbb\x2c', 'ΔList(',         pure_func=pf.delta_list)
+ref          = token(b'\xbb\x2d', 'ref(',           pure_func=pf.ref)
+rref         = token(b'\xbb\x2e', 'rref(',          pure_func=pf.rref)
+TO_RECT      = token(b'\xbb\x2f', '►Rect')
+TO_POLAR     = token(b'\xbb\x30', '►Polar')
+Euler_e      = token(b'\xbb\x31', '𝑒', nullary=lambda env: math.e)
+SinReg       = token(b'\xbb\x32', 'SinReg ')
+Logistic     = token(b'\xbb\x33', 'Logistic ')
+LinRegTTest  = token(b'\xbb\x34', 'LinRegTTest ')
+ShadeNorm    = token(b'\xbb\x35', 'ShadeNorm(')
+Shade_t      = token(b'\xbb\x36', 'Shade_t(')
+ShadeChiSq   = token(b'\xbb\x37', 'Shadeχ²(')
+ShadeF       = token(b'\xbb\x38', 'ShadeF(')
+MatrToList   = token(b'\xbb\x39', 'Matr►list(', cmd=forms.matr_to_list)
+ListToMatr   = token(b'\xbb\x3a', 'List►matr(', cmd=forms.list_to_matr)
+ZTest        = token(b'\xbb\x3b', 'Z-Test(')
+TTest        = token(b'\xbb\x3c', 'T-Test')
+TwoSampZTest = token(b'\xbb\x3d', '2-SampZTest(')
+OnePropZTest = token(b'\xbb\x3e', '1-PropZTest(')
+TwoPropZTest = token(b'\xbb\x3f', '2-PropZTest(')
+ChiSqTest    = token(b'\xbb\x40', 'χ²-Test(')
+ZInterval    = token(b'\xbb\x41', 'ZInterval ')
+TwoSampZInt  = token(b'\xbb\x42', '2-SampZInt(')
+OnePropZInt  = token(b'\xbb\x43', '1-PropZInt(')
+TwoPropZInt  = token(b'\xbb\x44', '2-PropZInt(')
+GraphStyle   = token(b'\xbb\x45', 'GraphStyle(')
+TwoSampTTest = token(b'\xbb\x46', '2-SampTTest ')
+TwoSampFTest = token(b'\xbb\x47', '2-SampFTest ')
+TInterval    = token(b'\xbb\x48', 'TInterval ')
+TwoSampTInt  = token(b'\xbb\x49', '2-SampTInt ')
+SetUpEditor  = token(b'\xbb\x4a', 'SetUpEditor ')
+Pmt_End      = token(b'\xbb\x4b', 'Pmt_End')
+Pmt_Bgn      = token(b'\xbb\x4c', 'Pmt_Bgn')
+RealMode     = token(b'\xbb\x4d', 'Real')
+re_pow_Theta_i = token(b'\xbb\x4e', 're^θi')
+a_plus_bi    = token(b'\xbb\x4f', 'a+bi')
+ExprOn       = token(b'\xbb\x50', 'ExprOn')
+ExprOff      = token(b'\xbb\x51', 'ExprOff')
+ClrAllLists  = token(b'\xbb\x52', 'ClrAllLists')
+GetCalc      = token(b'\xbb\x53', 'GetCalc(')
+DelVar       = token(b'\xbb\x54', 'DelVar ')
+EquToStr     = token(b'\xbb\x55', 'Equ►String(')
+StrToEqu     = token(b'\xbb\x56', 'String►Equ(')
+ClearEntries = token(b'\xbb\x57', 'Clear Entries')
+Select       = token(b'\xbb\x58', 'Select(')
+ANOVA        = token(b'\xbb\x59', 'ANOVA(')
+ModBoxplot   = token(b'\xbb\x5a', 'ModBoxplot')
+NormProbPlot = token(b'\xbb\x5b', 'NormProbPlot')
+G_T          = token(b'\xbb\x64', 'G-T')
+ZoomFit      = token(b'\xbb\x65', 'ZoomFit')
+DiagnosticOn = token(b'\xbb\x66', 'DiagnosticOn')
+DiagnosticOff= token(b'\xbb\x67', 'DiagnosticOff')
+Archive      = token(b'\xbb\x68', 'Archive ')
+UnArchive    = token(b'\xbb\x69', 'UnArchive ')
+Asm          = token(b'\xbb\x6a', 'Asm(')
+AsmComp      = token(b'\xbb\x6b', 'AsmComp(')
+AsmPrgm      = token(b'\xbb\x6c', 'AsmPrgm')
+
+# ── International / accented characters 0xBB 6E–9E ───────────────────────────
+
+A_acute    = token(b'\xbb\x6e', 'Á')
+A_grave    = token(b'\xbb\x6f', 'À')
+A_circum   = token(b'\xbb\x70', 'Â')
+A_umlaut   = token(b'\xbb\x71', 'Ä')
+a_acute    = token(b'\xbb\x72', 'á', ascii='á')
+a_grave    = token(b'\xbb\x73', 'à', ascii='à')
+a_circum   = token(b'\xbb\x74', 'â', ascii='â')
+a_umlaut   = token(b'\xbb\x75', 'ä', ascii='ä')
+E_acute    = token(b'\xbb\x76', 'É')
+E_grave    = token(b'\xbb\x77', 'È')
+E_circum   = token(b'\xbb\x78', 'Ê')
+E_umlaut   = token(b'\xbb\x79', 'Ë')
+e_acute    = token(b'\xbb\x7a', 'é', ascii='é')
+e_grave    = token(b'\xbb\x7b', 'è', ascii='è')
+e_circum   = token(b'\xbb\x7c', 'ê', ascii='ê')
+e_umlaut   = token(b'\xbb\x7d', 'ë', ascii='ë')
+I_grave    = token(b'\xbb\x7f', 'Ì')
+I_circum   = token(b'\xbb\x80', 'Î')
+I_umlaut   = token(b'\xbb\x81', 'Ï')
+i_acute    = token(b'\xbb\x82', 'í', ascii='í')
+i_grave    = token(b'\xbb\x83', 'ì', ascii='ì')
+i_circum   = token(b'\xbb\x84', 'î', ascii='î')
+i_umlaut   = token(b'\xbb\x85', 'ï', ascii='ï')
+O_acute    = token(b'\xbb\x86', 'Ó')
+O_grave    = token(b'\xbb\x87', 'Ò')
+O_circum   = token(b'\xbb\x88', 'Ô')
+O_umlaut   = token(b'\xbb\x89', 'Ö')
+o_acute    = token(b'\xbb\x8a', 'ó', ascii='ó')
+o_grave    = token(b'\xbb\x8b', 'ò', ascii='ò')
+o_circum   = token(b'\xbb\x8c', 'ô', ascii='ô')
+o_umlaut   = token(b'\xbb\x8d', 'ö', ascii='ö')
+U_acute    = token(b'\xbb\x8e', 'Ú')
+U_grave    = token(b'\xbb\x8f', 'Ù')
+U_circum   = token(b'\xbb\x90', 'Û')
+U_umlaut   = token(b'\xbb\x91', 'Ü')
+u_acute    = token(b'\xbb\x92', 'ú', ascii='ú')
+u_grave    = token(b'\xbb\x93', 'ù', ascii='ù')
+u_circum   = token(b'\xbb\x94', 'û', ascii='û')
+u_umlaut   = token(b'\xbb\x95', 'ü', ascii='ü')
+C_cedilla  = token(b'\xbb\x96', 'Ç')
+c_cedilla  = token(b'\xbb\x97', 'ç', ascii='ç')
+N_tilde    = token(b'\xbb\x98', 'Ñ')
+n_tilde    = token(b'\xbb\x99', 'ñ', ascii='ñ')
+ACUTE      = token(b'\xbb\x9a', '´')
+GRAVE      = token(b'\xbb\x9b', 'ˋ')
+DIAERESIS  = token(b'\xbb\x9c', '¨')
+INV_QUESTION = token(b'\xbb\x9d', '¿')
+INV_EXCLAIM  = token(b'\xbb\x9e', '¡')
+
+# ── Greek letters 0xBB 9F–AF ─────────────────────────────────────────────────
+
+alpha      = token(b'\xbb\x9f', 'α', ascii='α')
+beta       = token(b'\xbb\xa0', 'β', ascii='β')
+gamma      = token(b'\xbb\xa1', 'γ', ascii='γ')
+Delta      = token(b'\xbb\xa2', 'Δ')
+delta      = token(b'\xbb\xa3', 'δ', ascii='δ')
+epsilon    = token(b'\xbb\xa4', 'ε', ascii='ε')
+lam        = token(b'\xbb\xa5', 'λ', ascii='λ')   # lambda is a Python keyword
+mu         = token(b'\xbb\xa6', 'μ', ascii='μ')
+pi_alt     = token(b'\xbb\xa7', '𝛑')
+rho        = token(b'\xbb\xa8', 'ρ', ascii='ρ')
+Sigma      = token(b'\xbb\xa9', 'Σ')
+phi        = token(b'\xbb\xab', 'φ', ascii='φ')
+Omega      = token(b'\xbb\xac', 'Ω')
+psi        = token(b'\xbb\xad', 'ψ', ascii='ψ')
+chi        = token(b'\xbb\xae', 'χ', ascii='χ')
+digamma    = token(b'\xbb\xaf', '𝟊')
+
+# ── Lowercase ASCII string characters 0xBB B0–CA ────────────────────────────
+
+low_a, low_b, low_c, low_d, low_e, low_f, low_g, low_h, low_i, low_j, low_k = tuple(
+	token(bytes([0xbb, 0xb0 + i]), ascii=chr(0x61 + i)) for i in range(11)
+)
+low_l, low_m, low_n, low_o, low_p, low_q, low_r, low_s, low_t, low_u, low_v, low_w, low_x, low_y, low_z = tuple(
+	token(bytes([0xbb, 0xbc + i]), ascii=chr(0x6c + i)) for i in range(15)
+)
+
+# ── Misc symbols 0xBB CB–F5 ──────────────────────────────────────────────────
+sigma        = token(b'\xbb\xcb', 'σ', ascii='σ')
+tau          = token(b'\xbb\xcc', 'τ', ascii='τ')
+I_acute      = token(b'\xbb\xcd', 'Í')
+GarbageCollect = token(b'\xbb\xce', 'GarbageCollect')
+TILDE       = token(b'\xbb\xcf', ascii='~')
+AT          = token(b'\xbb\xd1', ascii='@')
+HASH        = token(b'\xbb\xd2', ascii='#')
+DOLLAR      = token(b'\xbb\xd3', ascii='$')
+AMPERSAND   = token(b'\xbb\xd4', ascii='&')
+BACKTICK    = token(b'\xbb\xd5', ascii='`')
+SEMICOLON   = token(b'\xbb\xd6', ascii=';')
+BACKSLASH   = token(b'\xbb\xd7', ascii='\\')
+PIPE        = token(b'\xbb\xd8', ascii='|')
+UNDERSCORE  = token(b'\xbb\xd9', ascii='_')
+PERCENT     = token(b'\xbb\xda', ascii='%', postfix=lambda x: x / 100)
+ELLIPSIS    = token(b'\xbb\xdb', '…')
+ANGLE_SYM   = token(b'\xbb\xdc', '∠')
+SHARP_S     = token(b'\xbb\xdd', 'ß', ascii='ß')
+SUP_X       = token(b'\xbb\xde', 'ˣ')
+SUB_T       = token(b'\xbb\xdf', 'ₜ')
+SUB_0       = token(b'\xbb\xe0', '₀')
+SUB_1       = token(b'\xbb\xe1', '₁')
+SUB_2       = token(b'\xbb\xe2', '₂')
+SUB_3       = token(b'\xbb\xe3', '₃')
+SUB_4       = token(b'\xbb\xe4', '₄')
+SUB_5       = token(b'\xbb\xe5', '₅')
+SUB_6       = token(b'\xbb\xe6', '₆')
+SUB_7       = token(b'\xbb\xe7', '₇')
+SUB_8       = token(b'\xbb\xe8', '₈')
+SUB_9       = token(b'\xbb\xe9', '₉')
+SUB_10      = token(b'\xbb\xea', '⑽')
+REV_CONVERT = token(b'\xbb\xeb', '◄')
+RIGHT_ARROW = token(b'\xbb\xec', '🡆')
+UP_ARROW    = token(b'\xbb\xed', '↑')
+DOWN_ARROW  = token(b'\xbb\xee', '↓')
+ITALIC_X    = token(b'\xbb\xf0', '𝑥')
+INTEGRAL    = token(b'\xbb\xf1', '∫')
+SCROLL_UP   = token(b'\xbb\xf2', '🡅')
+SCROLL_DN   = token(b'\xbb\xf3', '🡇')
+RADICAL     = token(b'\xbb\xf4', '√')
+EQ_ON       = token(b'\xbb\xf5', '≛')
+
+# ── TI-84+ extended tokens 0xEF xx ───────────────────────────────────────────
+
+setDate      = token(b'\xef\x00', 'setDate(',    cmd=forms.set_date)
+setTime      = token(b'\xef\x01', 'setTime(',    cmd=forms.set_time)
+checkTmr     = token(b'\xef\x02', 'checkTmr(',   func=forms.check_tmr)
+setDtFmt     = token(b'\xef\x03', 'setDtFmt(',   cmd=forms.set_dt_fmt)
+setTmFmt     = token(b'\xef\x04', 'setTmFmt(',   cmd=forms.set_tm_fmt)
+timeCnv      = token(b'\xef\x05', 'timeCnv(',    pure_func=pf.timecnv)
+dayOfWk      = token(b'\xef\x06', 'dayOfWk(',    pure_func=pf.dayofwk)
+getDtStr     = token(b'\xef\x07', 'getDtStr(',   func=forms.get_dt_str)
+getTmStr     = token(b'\xef\x08', 'getTmStr(',   func=forms.get_tm_str)
+getDate      = token(b'\xef\x09', 'getDate',     nullary=Environment.get_date)
+getTime      = token(b'\xef\x0a', 'getTime',     nullary=Environment.get_time)
+startTmr     = token(b'\xef\x0b', 'startTmr',   nullary=Environment.start_tmr)
+getDtFmt     = token(b'\xef\x0c', 'getDtFmt',    nullary=Environment.get_dt_fmt)
+getTmFmt     = token(b'\xef\x0d', 'getTmFmt',    nullary=Environment.get_tm_fmt)
+isClockOn    = token(b'\xef\x0e', 'isClockOn',   nullary=Environment.is_clock_on)
+ClockOff     = token(b'\xef\x0f', 'ClockOff',    cmd=Environment.clock_off)
+ClockOn      = token(b'\xef\x10', 'ClockOn',     cmd=Environment.clock_on)
+OpenLib      = token(b'\xef\x11', 'OpenLib(')
+ExecLib      = token(b'\xef\x12', 'ExecLib')
+invT         = token(b'\xef\x13', 'invT(',       pure_func=pf.invt)
+ChiSqGofTest = token(b'\xef\x14', 'χ²GOF-Test(')
+LinRegTInt   = token(b'\xef\x15', 'LinRegTInt ')
+ManualFit    = token(b'\xef\x16', 'Manual-Fit ')
+ZQuadrant1   = token(b'\xef\x17', 'ZQuadrant1')
+ZFrac1_2     = token(b'\xef\x18', 'ZFrac1/2')
+ZFrac1_3     = token(b'\xef\x19', 'ZFrac1/3')
+ZFrac1_4     = token(b'\xef\x1a', 'ZFrac1/4')
+ZFrac1_5     = token(b'\xef\x1b', 'ZFrac1/5')
+ZFrac1_8     = token(b'\xef\x1c', 'ZFrac1/8')
+ZFrac1_10    = token(b'\xef\x1d', 'ZFrac1/10')
+MathprintBox = token(b'\xef\x1e', 'mathprintbox')
+ToNd_UnD     = token(b'\xef\x30', '►n/d◄►Un/d')
+ToF_D        = token(b'\xef\x31', '►F◄►D')
+remainder    = token(b'\xef\x32', 'remainder(',  pure_func=pf.remainder)
+SIGMA        = token(b'\xef\x33', 'Σ(',          func=forms.sigma)
+logBASE      = token(b'\xef\x34', 'logBASE(',    pure_func=pf.log_base)
+randIntNoRep = token(b'\xef\x35', 'randIntNoRep(', pure_func=pf.rand_int_no_rep)
+MATHPRINT    = token(b'\xef\x36', 'MATHPRINT')
+CLASSIC      = token(b'\xef\x37', 'CLASSIC')
+N_D          = token(b'\xef\x38', 'n/d')
+UN_D         = token(b'\xef\x39', 'Un/d')
+AUTO         = token(b'\xef\x3a', 'AUTO')
+DEC          = token(b'\xef\x3b', 'DEC')
+FRAC         = token(b'\xef\x3c', 'FRAC')
+FRAC_APPROX  = token(b'\xef\x3d', 'FRAC-APPROX')
 
 
 class TokenTable:
@@ -847,34 +832,19 @@ class TokenTable:
 				raise KeyError(code)
 			table = sub
 			idx = code[1]
-			
+
 		token = table[idx] if idx < len(table) else None
 		if token is None:
 			raise KeyError(code)
 		return token
-	
+
 	def __repr__(self):
 		return repr(self._table)
 
 
-TOKEN_TABLE = TokenTable(TOKENS)
-
-ASCII = {t.ascii: t for t in TOKENS if t.ascii}
-
-TOKENS_BY_TEXT = {t.text: t for t in TOKENS} | ASCII
+TOKEN_TABLE = TokenTable(ALL_TOKENS)
+ASCII = {t.ascii: t for t in ALL_TOKENS if t.ascii}
 
 
 if __name__ == '__main__':
-	
-	# lookup = {}
-
-	# for token in TOKENS:
-		# try:
-			# dup = lookup[token.text]
-		# except KeyError:
-			# lookup[token.text] = token
-			# continue
-		# print(dup, token)
-
-	for i in range(32, 127):
-		print(i, TOKENS_BY_TEXT[chr(i)])
+	print(len(ALL))

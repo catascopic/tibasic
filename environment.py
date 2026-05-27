@@ -205,7 +205,7 @@ class Environment:
 		fmt = require_int(fmt)
 		if fmt not in {1, 2, 3}:
 			raise ValueError(f"getDtStr: invalid format {fmt}")
-		return TiString.from_str(self._now().strftime(['%m/%d/%y', '%d/%m/%y', '%y/%m/%d'][fmt - 1]))
+		return TiString.from_ascii(self._now().strftime(['%m/%d/%y', '%d/%m/%y', '%y/%m/%d'][fmt - 1]))
 
 	def get_tm_str(self, fmt):
 		fmt = require_int(fmt)
@@ -215,7 +215,7 @@ class Environment:
 			fmt_str = '%I:%M:%S %p'
 		else:
 			raise ValueError(f"getTmStr: invalid format {fmt}")
-		return TiString.from_str(self._now().strftime(fmt_str))
+		return TiString.from_ascii(self._now().strftime(fmt_str))
 
 	def clock_on(self):
 		self.clock_on = True

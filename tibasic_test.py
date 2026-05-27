@@ -8,25 +8,27 @@ import purefunctions as pf
 from environment import Environment
 from parser import parse_line, ParseError
 from tokens import (
-	TOKENS, Token, TOKEN_TABLE, ASCII, TOKENS_BY_TEXT,
+	ALL_TOKENS, Token, TOKEN_TABLE, ASCII,
 	STORE, COMMA, QUOTE, COLON, DOT, NEG, DEG, APOS, SCI_E,
-	ADD, SUB, MUL, DIV, POW, XTH_ROOT, FACT, NPR, NCR,
-	EQ, LT, GT, LE, GE, NE, AND, OR, XOR,
+	ADD, SUB, MUL, DIV, POW, XTH_ROOT, FACT, nPr, nCr,
+	EQ, LT, GT, LE, GE, NE, and_, or_, xor,
 	L_PAREN, R_PAREN, L_BRACE, R_BRACE, L_BRACKET, R_BRACKET,
-	ANS, INV, SQ, TRANSPOSE, RAND, DIM,
+	Ans, INV, SQ, TRANSPOSE, rand, dim,
 )
 from tiobjects import TiList, TiMatrix, TiString
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+tokens_by_text = {_t.text: _t for _t in ALL_TOKENS}
+
 def T(text: str) -> Token:
 	"""Look up a token by its display text."""
-	return TOKENS_BY_TEXT[text]
+	return tokens_by_text[text]
 
 def _iter_chars(obj):
 	for c in str(obj):
-		yield TOKENS_BY_TEXT[c]
+		yield tokens_by_text[c]
 
 def _iter_tokens(line):
 	for obj in line:
@@ -36,7 +38,7 @@ def _iter_tokens(line):
 			yield from _iter_chars(str(obj))
 		elif isinstance(obj, str):
 			try:
-				yield TOKENS_BY_TEXT[obj]
+				yield tokens_by_text[obj]
 			except KeyError:
 				yield from _iter_chars(obj)
 		else:
@@ -164,7 +166,7 @@ class TestSciE:
 	def test_rejects_ans_as_exponent(self):
 		# 1ᴇAns — Ans is not a numeric literal
 		with pytest.raises(ParseError):
-			calc(1, SCI_E, ANS)
+			calc(1, SCI_E, Ans)
 
 	def test_infix_negative_exp(self):
 		# 1ᴇ−3 = 0.001
@@ -253,8 +255,8 @@ class TestCombinatorics:
 
 	# Through the parser (NPR/NCR are binary operators; FACT is postfix)
 	def test_fact_parser(self): assert calc(5, FACT) == 120.0
-	def test_npr_parser(self):  assert calc(5, NPR, 3) == 60.0
-	def test_ncr_parser(self):  assert calc(5, NCR, 3) == 10.0
+	def test_npr_parser(self):  assert calc(5, nPr, 3) == 60.0
+	def test_ncr_parser(self):  assert calc(5, nCr, 3) == 10.0
 
 
 # ── List operations ───────────────────────────────────────────────────────────
@@ -469,22 +471,22 @@ class TestDistributions:
 
 class TestStrings:
 	def test_length(self):
-		assert pf.length(TiString.from_str("HELLO")) == 5
+		assert pf.length(TiString.from_ascii("HELLO")) == 5
 
 	def test_length_empty(self):
-		assert pf.length(TiString.from_str("")) == 0
+		assert pf.length(TiString.from_ascii("")) == 0
 
 	def test_in_string_found(self):
-		assert pf.in_string(TiString.from_str("HELLO"), TiString.from_str("ELL")) == 2
+		assert pf.in_string(TiString.from_ascii("HELLO"), TiString.from_ascii("ELL")) == 2
 
 	def test_in_string_not_found(self):
-		assert pf.in_string(TiString.from_str("HELLO"), TiString.from_str("XYZ")) == 0
+		assert pf.in_string(TiString.from_ascii("HELLO"), TiString.from_ascii("XYZ")) == 0
 
 	def test_in_string_with_start(self):
-		assert pf.in_string(TiString.from_str("ABAB"), TiString.from_str("AB"), 3) == 3
+		assert pf.in_string(TiString.from_ascii("ABAB"), TiString.from_ascii("AB"), 3) == 3
 
 	def test_sub_string(self):
-		result = pf.sub_string(TiString.from_str("HELLO"), 2, 3)
+		result = pf.sub_string(TiString.from_ascii("HELLO"), 2, 3)
 		assert str(result) == "ELL"
 
 
@@ -603,7 +605,7 @@ class TestParserFeatures:
 
 	def test_ans(self, env):
 		parse_line(toks(5), env)
-		parse_line(toks(ANS, ADD, 1), env)
+		parse_line(toks(Ans, ADD, 1), env)
 		assert env.ans == 6.0
 
 	def test_colon_separator(self, env):
@@ -683,39 +685,39 @@ class TestParserFeatures:
 class TestRand:
 	def test_rand_no_parens_in_range(self):
 		# bare rand produces a single float in [0, 1)
-		result = calc(RAND)
+		result = calc(rand)
 		assert isinstance(result, float)
 		assert 0.0 <= result < 1.0
 
 	def test_rand_with_parens_returns_list(self):
 		# rand(5) returns a TiList of 5 floats
-		result = calc(RAND, L_PAREN, 5, R_PAREN)
+		result = calc(rand, L_PAREN, 5, R_PAREN)
 		assert isinstance(result, TiList)
 		assert len(result) == 5
 		assert all(0.0 <= x < 1.0 for x in result)
 
 	def test_rand_with_parens_no_close(self):
 		# Trailing ) may be omitted
-		result = calc(RAND, L_PAREN, 3)
+		result = calc(rand, L_PAREN, 3)
 		assert isinstance(result, TiList)
 		assert len(result) == 3
 
 	def test_rand_seed_reproducible(self, env):
 		# Store a seed → rand, then same seed → rand again; must match
-		parse_line(toks(1, STORE, RAND), env)
-		parse_line(toks(RAND), env)
+		parse_line(toks(1, STORE, rand), env)
+		parse_line(toks(rand), env)
 		first = env.ans
-		parse_line(toks(1, STORE, RAND), env)
-		parse_line(toks(RAND), env)
+		parse_line(toks(1, STORE, rand), env)
+		parse_line(toks(rand), env)
 		assert env.ans == first
 
 	def test_rand_implicit_multiply(self, env):
 		# 2rand  ≡  2 * rand()  — result must be in [0, 2)
-		parse_line(toks(1, STORE, RAND), env)   # fix seed
-		parse_line(toks(RAND), env)
+		parse_line(toks(1, STORE, rand), env)   # fix seed
+		parse_line(toks(rand), env)
 		single = env.ans
-		parse_line(toks(1, STORE, RAND), env)   # reset seed
-		parse_line(toks(2, RAND), env)          # implicit multiply
+		parse_line(toks(1, STORE, rand), env)   # reset seed
+		parse_line(toks(2, rand), env)          # implicit multiply
 		assert env.ans == approx(2 * single)
 
 	def test_rand_int(self):
@@ -771,7 +773,7 @@ class TestColonStatements:
 
 	def test_colon_ans_carries_across(self, env):
 		# 7:Ans+1  →  Ans=8  (Ans from segment 1 is visible in segment 2)
-		parse_line(toks(7, COLON, ANS, ADD, 1), env)
+		parse_line(toks(7, COLON, Ans, ADD, 1), env)
 		assert env.ans == 8.0
 
 	def test_colon_store_does_not_clobber_a(self, env):
@@ -813,12 +815,12 @@ class TestImplicitClose:
 
 	def test_unclosed_matrix_then_colon_index(self, env):
 		# [[1:Ans(1,1  →  first segment produces [[1]], second indexes it → 1.0
-		parse_line(toks(L_BRACKET, L_BRACKET, 1, COLON, ANS, L_PAREN, 1, COMMA, 1), env)
+		parse_line(toks(L_BRACKET, L_BRACKET, 1, COLON, Ans, L_PAREN, 1, COMMA, 1), env)
 		assert env.ans == 1.0
 
 	def test_unclosed_list_then_colon_sum(self, env):
 		# {1,2,3:sum(Ans  →  Ans=6
-		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, COLON, T('sum('), ANS), env)
+		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, COLON, T('sum('), Ans), env)
 		assert env.ans == 6.0
 
 	def test_unclosed_fn_args(self):
@@ -836,34 +838,34 @@ class TestStoreDim:
 	def test_store_dim_list_create(self, env):
 		# 5→dim(L₁)  →  L₁ becomes {0,0,0,0,0}
 		l1 = T('L₁')
-		parse_line(toks(5, STORE, DIM, l1), env)
+		parse_line(toks(5, STORE, dim, l1), env)
 		assert l1.variable.get(env).data == [0, 0, 0, 0, 0]
 
 	def test_store_dim_list_expand(self, env):
 		# {1,2,3}→L₁ : 5→dim(L₁)  →  L₁ = {1,2,3,0,0}
 		l1 = T('L₁')
 		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, R_BRACE, STORE, l1), env)
-		parse_line(toks(5, STORE, DIM, l1), env)
+		parse_line(toks(5, STORE, dim, l1), env)
 		assert l1.variable.get(env).data == [1, 2, 3, 0, 0]
 
 	def test_store_dim_list_shrink(self, env):
 		# {1,2,3,4,5}→L₁ : 3→dim(L₁)  →  L₁ = {1,2,3}
 		l1 = T('L₁')
 		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, COMMA, 4, COMMA, 5, R_BRACE, STORE, l1), env)
-		parse_line(toks(3, STORE, DIM, l1), env)
+		parse_line(toks(3, STORE, dim, l1), env)
 		assert l1.variable.get(env).data == [1, 2, 3]
 
 	def test_store_dim_matrix_create(self, env):
 		# {2,3}→dim([A])  →  [A] becomes 2×3 of zeros
 		ma = T('[A]')
-		parse_line(toks(L_BRACE, 2, COMMA, 3, R_BRACE, STORE, DIM, ma), env)
+		parse_line(toks(L_BRACE, 2, COMMA, 3, R_BRACE, STORE, dim, ma), env)
 		assert ma.variable.get(env).data == 2 * [3 * [0]]
 
 	def test_store_dim_matrix_resize_preserves(self, env):
 		# Build [[1,2][3,4]], then resize to 3×3; original values survive, new cells = 0
 		ma = T('[A]')
 		parse_line(toks('[[1,2][3,4', STORE, ma), env)
-		parse_line(toks('{3,3', STORE, DIM, ma), env)
+		parse_line(toks('{3,3', STORE, dim, ma), env)
 		assert ma.variable.get(env).data == [
 			[1, 2, 0],
 			[3, 4, 0],
@@ -872,12 +874,12 @@ class TestStoreDim:
 
 	def test_dim_read_list(self, env):
 		# dim({1,2,3,4}) = 4  (reading, not storing)
-		result = calc(DIM, L_BRACE, 1, COMMA, 2, COMMA, 3, COMMA, 4, R_BRACE)
+		result = calc(dim, L_BRACE, 1, COMMA, 2, COMMA, 3, COMMA, 4, R_BRACE)
 		assert result == 4.0
 
 	def test_dim_read_matrix(self, env):
 		# dim([[1,2,3][4,5,6]]) = {2,3}
-		result = calc(DIM, '[[1,2,3][4,5,6')
+		result = calc(dim, '[[1,2,3][4,5,6')
 		assert result.data == [2.0, 3.0]
 
 
@@ -973,19 +975,19 @@ class TestNesting:
 	def test_ans_index_or_mul_list(self, env):
 		# {10,20,30}→Ans  (via plain eval), then Ans(2)  =  20
 		parse_line(toks(L_BRACE, 10, COMMA, 20, COMMA, 30, R_BRACE), env)
-		parse_line(toks(ANS, L_PAREN, 2, R_PAREN), env)
+		parse_line(toks(Ans, L_PAREN, 2, R_PAREN), env)
 		assert env.ans == 20.0
 
 	def test_ans_index_or_mul_scalar(self, env):
 		# 7→Ans, then Ans(3)  =  21  (scalar * 3)
 		parse_line(toks(7), env)
-		parse_line(toks(ANS, L_PAREN, 3, R_PAREN), env)
+		parse_line(toks(Ans, L_PAREN, 3, R_PAREN), env)
 		assert env.ans == 21.0
 
 	def test_ans_index_matrix(self, env):
 		# [[1,2][3,4]]→Ans, then Ans(2,1) = 3
 		parse_line(toks('[[1,2][3,4'), env)
-		parse_line(toks(ANS, '(2,1'), env)
+		parse_line(toks(Ans, '(2,1'), env)
 		assert env.ans == 3.0
 
 	def test_seq_preserves_variable(self, env):

@@ -12,23 +12,6 @@ def repr_num(value):
 	return repr(int(value) if value.is_integer() else value)
 
 
-class _Char:
-	"""Lightweight token-like object wrapping a single character for runtime-generated TiStrings."""
-	__slots__ = ('text',)
-
-	def __init__(self, text: str):
-		self.text = text
-
-	def __eq__(self, other):
-		return isinstance(other, _Char) and self.text == other.text
-
-	def __hash__(self):
-		return hash(self.text)
-
-	def __repr__(self):
-		return self.text
-
-
 class DMS(float):
 	"""A float in decimal degrees that displays as degrees°minutes'seconds\"."""
 	def __repr__(self):
@@ -325,9 +308,10 @@ class TiString:
 		self.tokens = tokens
 
 	@classmethod
-	def from_str(cls, s: str) -> 'TiString':
+	def from_ascii(cls, s: str) -> 'TiString':
 		"""Create a TiString from a plain Python string."""
-		return cls([_Char(c) for c in s])
+		from tokens import ASCII
+		return cls([ASCII[c] for c in s])
 
 	def __len__(self):
 		return len(self.tokens)

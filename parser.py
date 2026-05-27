@@ -4,8 +4,8 @@ from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
 	Token, EOF_TOKEN,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
-	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, ANS, NEG, LIST_PREFIX,
-	RAND, DIM, SCI_E, DEG, RAD, APOS
+	QUOTE, COMMA, DOT, COLON, NEWLINE, prgm, NEG, LIST_PREFIX,
+	rand, dim, SCI_E, DEG, RAD, APOS
 )
 from environment import Environment, Variable, UserListVar
 from forms import ArgParser
@@ -378,10 +378,10 @@ class Parser:
 		elif t.variable is not None:
 			t.variable.set(self.env, value)
 
-		elif t is DIM:
+		elif t is dim:
 			self.parse_store_dim(value)
 			
-		elif t is RAND:
+		elif t is rand:
 			self.env.set_random_seed(value)
 
 		else:
@@ -448,7 +448,7 @@ class Parser:
 			if self.at_end():
 				return
 
-			if self.eat_if(PRGM):
+			if self.eat_if(prgm):
 				name = self._read_name()
 				val = self.env.programs[name].execute()
 
@@ -478,11 +478,10 @@ def parse_line(tokens: list[Token], env: Environment):
 
 
 if __name__ == '__main__':
-	from tokens import *
+	import tokens
 
 	env = Environment()
-	digits = TOKENS[0x2E:0x37]
-	str_to_token = {t.text: t for t in reversed(TOKENS)}
+	str_to_token = {t.text: t for t in reversed(tokens.ALL_TOKENS)}
 
 	def test(*line):
 		tokens = []
