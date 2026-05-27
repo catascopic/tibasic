@@ -510,10 +510,10 @@ class ArgParser:
 		return self._parser.capture()
 
 	@_parse_method
-	def real_var(self) -> Token:
+	def numeric_var(self) -> Token:
 		tok = self._parser.advance()
 		if not tok.is_numeric_var():
-			raise ValueError(f"Expected a real variable, got {tok.text!r}")
+			raise ValueError(f"Expected a numeric variable, got {tok.text!r}")
 		return tok
 
 	@_parse_method

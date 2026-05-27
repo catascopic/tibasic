@@ -4,7 +4,7 @@ import operator as op
 from typing import Any
 import math, itertools
 from environment import (
-	Environment, Variable, NumericVar, ListVar, MatrixVar, StringVar, StatVar, WindowVar,
+	Environment, Variable, NumericVar, ListVar, MatrixVar, StringVar, StatVar, WindowVar, RealVar,
 )
 import purefunctions as pf
 import forms
@@ -22,7 +22,7 @@ class Token:
 	command:   Callable | None = None # (ArgParser) -> None for command tokens
 	nullary:   Callable | None = None # (env) -> value for read-only computed constants
 	converter: Callable | None = None # (value) -> value for ►DMS, ►Dec, ►Frac and others
-	variable:  Callable | None = None # Variable instance for storable typed variables
+	variable:  Variable | None = None # Variable instance for storable typed variables
 
 	# ── Token type predicates ──────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ class Token:
 		return 0x30 <= self.code[0] <= 0x39
 
 	def is_numeric_var(self) -> bool:
-		return 0x41 <= self.code[0] < 0x5C
+		return 0x41 <= self.code[0] < 0x5C or self.code == b'\x62\x21'
 
 	def is_list_var(self) -> bool:
 		return self.code[0] == 0x5D
@@ -70,7 +70,7 @@ CHARS = {}
 
 def get_token(code: int | Sequence[int]) -> Token:
 	if isinstance(code, int):
-		code = (code,)
+		code = code.to_bytes(1 + (code > 0xFF))
 	b0 = code[0]
 	if len(code) == 1:
 		tbl = _TABLE
@@ -164,7 +164,7 @@ R_PAREN   = token(0x11, char=')')
 token(0x12, 'round(',       pure=pf.round)
 token(0x13, 'pxl-Test(')
 token(0x14, 'augment(',     pure=pf.augment)
-token(0x15, 'rowSwap(',     pure=pf.rowswap)
+token(0x15, 'rowSwap(',     pure=pf.row_swap)
 token(0x16, 'row+(',        pure=pf.row_plus)
 token(0x17, '*row(',        pure=pf.times_row)
 token(0x18, '*row+(',       pure=pf.times_row_plus)
@@ -280,7 +280,7 @@ token(0x621D, 'x₃')
 token(0x621E, 'y₁')
 token(0x621F, 'y₂')
 token(0x6220, 'y₃')
-token(0x6221, '𝑛')
+token(0x6221, '𝑛', var=RealVar('n'))
 token(0x6222, 'p')
 token(0x6223, 'z')
 token(0x6224, 't')
@@ -414,7 +414,7 @@ token(0x8D, 'ZPrevious')
 token(0x8E, 'ZDecimal')
 token(0x8F, 'ZoomStat')
 token(0x90, 'ZoomRcl')
-token(0x91, 'PrintScreen')
+token(0x91, 'PrintScreen', cmd=Environment.print_screen)
 token(0x92, 'ZoomSto')
 token(0x93, 'Text(')
 
@@ -485,9 +485,9 @@ token(0xBB0D, 'stdDev(',        pure=pf.stddev)
 token(0xBB0E, 'variance(',      pure=pf.variance)
 token(0xBB0F, 'inString(',      pure=pf.in_string)
 token(0xBB10, 'normalcdf(',     pure=pf.normalcdf)
-token(0xBB11, 'invNorm(',       pure=pf.invnorm)
+token(0xBB11, 'invNorm(',       pure=pf.inv_norm)
 token(0xBB12, 'tcdf(',          pure=pf.tcdf)
-token(0xBB13, 'χ²cdf(',         pure=pf.chi2cdf)
+token(0xBB13, 'χ²cdf(',         pure=pf.chi_sq_cdf)
 token(0xBB14, 'Fcdf(',          pure=pf.fcdf)
 token(0xBB15, 'binompdf(',      pure=pf.binompdf)
 token(0xBB16, 'binomcdf(',      pure=pf.binomcdf)
@@ -497,8 +497,8 @@ token(0xBB19, 'geometpdf(',     pure=pf.geometpdf)
 token(0xBB1A, 'geometcdf(',     pure=pf.geometcdf)
 token(0xBB1B, 'normalpdf(',     pure=pf.normalpdf)
 token(0xBB1C, 'tpdf(',          pure=pf.tpdf)
-token(0xBB1D, 'χ²pdf(',         pure=pf.chi2pdf)
-token(0xBB1E, 'Fpdf(',          pure=pf.fpdf)
+token(0xBB1D, 'χ²pdf(',         pure=pf.chi_sq_pdf)
+token(0xBB1E, 'Fpdf(',          pure=pf.f_pdf)
 token(0xBB1F, 'randNorm(',      pure=pf.rand_norm)
 token(0xBB20, 'tvm_Pmt')
 token(0xBB21, 'tvm_I%')
@@ -569,6 +569,7 @@ token(0xBB69, 'UnArchive ')
 token(0xBB6A, 'Asm(')
 token(0xBB6B, 'AsmComp(')
 token(0xBB6C, 'AsmPrgm')
+token(0xBB6D, 'compiled asm')
 token(0xBB6E, char='Á')
 token(0xBB6F, char='À')
 token(0xBB70, char='Â')
@@ -822,5 +823,4 @@ token(0xFF, 'LinReg(ax+b) ')
 
 
 if __name__ == '__main__':
-	for token in ALL_TOKENS:
-		print(token)
+	print(len(ALL_TOKENS))

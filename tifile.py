@@ -2,10 +2,10 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from tokens import Token, TOKENS, get_token
+from tokens import Token, ALL_TOKENS, get_token
 
 
-_TWO_BYTE_PREFIXES = {t.code[0] for t in TOKENS if len(t.code) == 2}
+_TWO_BYTE_PREFIXES = {t.code[0] for t in ALL_TOKENS if len(t.code) == 2}
 
 
 @dataclass

@@ -365,8 +365,8 @@ class TestMatrixRowOps:
 	def setup_method(self):
 		self.mat = TiMatrix([[1, 2], [3, 4], [5, 6]])
 
-	def test_rowswap(self):
-		result = pf.rowswap(self.mat, 1, 3)
+	def test_row_swap(self):
+		result = pf.row_swap(self.mat, 1, 3)
 		assert result.data == [[5, 6], [3, 4], [1, 2]]
 		assert self.mat.data == [[1, 2], [3, 4], [5, 6]]  # original unchanged
 
@@ -427,11 +427,11 @@ class TestDistributions:
 	def test_normalcdf_68_rule(self):
 		assert pf.normalcdf(-1, 1) == approx(0.6827, rel=1e-3)
 
-	def test_invnorm_median(self):
-		assert pf.invnorm(0.5) == approx(0, abs=1e-6)
+	def test_inv_norm_median(self):
+		assert pf.inv_norm(0.5) == approx(0, abs=1e-6)
 
-	def test_invnorm_roundtrip(self):
-		assert pf.normalcdf(-1e99, pf.invnorm(0.9)) == approx(0.9, rel=1e-4)
+	def test_inv_norm_roundtrip(self):
+		assert pf.normalcdf(-1e99, pf.inv_norm(0.9)) == approx(0.9, rel=1e-4)
 
 	def test_normalpdf_peak(self):
 		# PDF peaks at x=μ with value 1/sqrt(2π)
@@ -461,8 +461,8 @@ class TestDistributions:
 		# t-distribution is symmetric; CDF(-∞, 0) = 0.5
 		assert pf.tcdf(-1e9, 0, df=10) == approx(0.5, rel=1e-4)
 
-	def test_chi2cdf_zero(self):
-		assert pf.chi2cdf(0, 0, df=5) == approx(0, abs=1e-6)
+	def test_chi_sq_cdf_zero(self):
+		assert pf.chi_sq_cdf(0, 0, df=5) == approx(0, abs=1e-6)
 
 	def test_invt_roundtrip(self):
 		from purefunctions import invt

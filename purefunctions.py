@@ -457,33 +457,32 @@ def rand_int_no_rep(a, b):
 
 # ── Matrix row operations ────────────────────────────────────────────────────
 
-def rowswap(mat, row1, row2):
+def row_swap(mat, row1, row2):
 	require_matrix(mat)
 	result = mat.copy()
-	r1, r2 = result.get_row(row1), result.get_row(row2)
-	result.set_row(row1, r2)
-	result.set_row(row2, r1)
+	result.set_row(row1, mat.get_row(row2))
+	result.set_row(row2, mat.get_row(row1))
 	return result
 
 
 def row_plus(mat, row1, row2):
 	require_matrix(mat)
 	result = mat.copy()
-	result.set_row(row2, [a + b for a, b in zip(result.get_row(row2), result.get_row(row1))])
+	result.set_row(row2, [a + b for a, b in zip(mat.get_row(row2), mat.get_row(row1))])
 	return result
 
 
 def times_row(factor, mat, row):
 	require_matrix(mat)
 	result = mat.copy()
-	result.set_row(row, [factor * x for x in result.get_row(row)])
+	result.set_row(row, [factor * x for x in mat.get_row(row)])
 	return result
 
 
 def times_row_plus(factor, mat, row1, row2):
 	require_matrix(mat)
 	result = mat.copy()
-	result.set_row(row2, [a + factor * b for a, b in zip(result.get_row(row2), result.get_row(row1))])
+	result.set_row(row2, [factor * a + b for a, b in zip(mat.get_row(row1), mat.get_row(row2))])
 	return result
 
 
@@ -746,7 +745,7 @@ def normalcdf(lower, upper, mu=0, sigma=1):
 	return _cdf((upper - mu) / sigma) - _cdf((lower - mu) / sigma)
 
 
-def invnorm(p, mu=0, sigma=1):
+def inv_norm(p, mu=0, sigma=1):
 	require_real(p)
 	if p <= 0:
 		return -1e99
@@ -804,7 +803,7 @@ def invt(p, df):
 	if p >= 1:
 		return 1e99
 	# Newton's method starting from normal approximation
-	x = invnorm(p)
+	x = inv_norm(p)
 	for _ in range(50):
 		fx = tcdf(-1e99, x, df) - p
 		fpx = tpdf(x, df)
@@ -818,7 +817,7 @@ def invt(p, df):
 	return x
 
 
-def chi2pdf(x, df):
+def chi_sq_pdf(x, df):
 	require_real(x)
 	require_real(df)
 	if x <= 0:
@@ -827,7 +826,7 @@ def chi2pdf(x, df):
 	return math.exp((k / 2 - 1) * math.log(x) - x / 2 - (k / 2) * math.log(2) - math.lgamma(k / 2))
 
 
-def chi2cdf(lower, upper, df):
+def chi_sq_cdf(lower, upper, df):
 	require_real(lower)
 	require_real(upper)
 	require_real(df)
@@ -838,7 +837,7 @@ def chi2cdf(lower, upper, df):
 	return _cdf(upper, df) - _cdf(lower, df)
 
 
-def fpdf(x, df1, df2):
+def f_pdf(x, df1, df2):
 	require_real(x)
 	require_real(df1)
 	require_real(df2)

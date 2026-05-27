@@ -26,7 +26,7 @@ def ans_index_or_mul(a: ArgParser):
 
 def seq(a: ArgParser) -> TiList:
 	formula = a.thunk()
-	var = a.real_var()
+	var = a.numeric_var()
 	start = a.expr()
 	end = a.expr()
 	step = a.expr(optional=True, default=1)
@@ -56,7 +56,7 @@ def seq(a: ArgParser) -> TiList:
 
 def sigma(a: ArgParser) -> float:
 	formula = a.thunk()
-	var = a.real_var()
+	var = a.numeric_var()
 	start = a.expr()
 	end = a.expr()
 	a.end()
@@ -73,7 +73,7 @@ def sigma(a: ArgParser) -> float:
 
 def n_deriv(a: ArgParser) -> float:
 	formula = a.thunk()
-	var = a.real_var()
+	var = a.numeric_var()
 	val = a.expr()
 	h = a.expr(optional=True, default=0.001)
 	a.end()
@@ -129,7 +129,7 @@ def _adaptive_gk15(f, lo, hi, tol, depth=0):
 
 def fn_int(a: ArgParser) -> float:
 	formula = a.thunk()
-	var = a.real_var()
+	var = a.numeric_var()
 	lo = a.expr()
 	hi = a.expr()
 	tol = a.expr(optional=True, default=1e-5)

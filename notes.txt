@@ -1,3 +1,5 @@
+Do we need a purefunctions equivalent for Environment?
+
 Improve matrix methods
 
 Make sure deg symbol vs D/M/S format is working

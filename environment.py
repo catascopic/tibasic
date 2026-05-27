@@ -1,3 +1,4 @@
+from collections import defaultdict
 import math
 import random
 
@@ -49,6 +50,19 @@ class NumericVar(Variable):
 
 	def set(self, env, value):
 		env.numerics[self._idx] = require_num(value)
+
+
+class RealVar(Variable):
+	__slots__ = ('_name',)
+
+	def __init__(self, name: int):
+		self._name = name
+
+	def get(self, env):
+		return getattr(env, name)
+
+	def set(self, env, value):
+		return setattr(env, name, require_real(value))
 
 
 class ListVar(Variable):
@@ -153,9 +167,10 @@ class Environment:
 		self.lists      = _VarArray(6,  None, lambda n: f"L{n+1}")         # L1–L6
 		self.matrices   = _VarArray(10, None, lambda n: f"[{chr(65+n)}]")  # [A]–[J]
 		self.strings    = _VarArray(10, None, lambda n: f"Str{n+1}")       # Str0–9
-		self.stat       = _VarArray(0x3D, None, repr)                         # stat vars
-		self.window     = _VarArray(0x37, None, repr)                         # window vars
+		self.stat       = _VarArray(0x3D, None, repr)                      # stat vars
+		self.window     = _VarArray(0x37, None, repr)                      # window vars
 		self.user_lists = {}                                               # ᴸNAME lists
+		self.n = None
 		self.ans              = 0
 		self.angle_mode       = 'RAD'
 		self.dt_fmt           = 1
@@ -163,7 +178,7 @@ class Environment:
 		self.clock_on         = True
 		self.key_code         = 0
 		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
-		self._nest_depth: dict[object, int] = {}  # tracks nesting depth for ILLEGAL NEST guards
+		self._nest_depth: dict[object, int] = defaultdict(lambda: 0)  # tracks nesting depth for ILLEGAL NEST guards
 
 	def to_radians(self, x):
 		return x / (180 / math.pi) if self.angle_mode == 'RAD' else x
@@ -271,15 +286,13 @@ class Environment:
 
 	@contextmanager
 	def nest_guard(self, func: object, max_depth: int = 0):
-		"""Raise ERR:ILLEGAL NEST if this function is already nested deeper than max_depth."""
-		current = self._nest_depth.get(func, 0)
-		if current > max_depth:
+		if self._nest_depth[func] > max_depth:
 			raise IllegalNestError(func)
-		self._nest_depth[func] = current + 1
+		self._nest_depth[func] += 1
 		try:
 			yield
 		finally:
-			self._nest_depth[func] = current
+			self._nest_depth[func] -= 1
 
 	def _iter_values(self):
 		for field in ('numerics', 'lists', 'matrices', 'strings'):
@@ -292,3 +305,5 @@ class Environment:
 		for name, value in self._iter_values():
 			print(f"{name:8}= {value!r}")
 
+	def print_screen(self):
+		pass
