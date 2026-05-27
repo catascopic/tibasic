@@ -1,136 +1,98 @@
-﻿from collections.abc import Callable, Sequence
+import enum
+import itertools
+from collections.abc import Sequence
 from dataclasses import dataclass
-import operator as op
-from typing import Any
-import math, itertools
-from environment import (
-	Environment, Variable, NumericVar, ListVar, MatrixVar, StringVar, StatVar, WindowVar,
-)
-import purefunctions as pf
-import forms
 
+
+class TokenFlags(enum.Flag):
+	FUNCTION    = enum.auto()   # takes ArgParser, returns a value
+	COMMAND     = enum.auto()   # takes ArgParser, returns None (side-effect only)
+	NULLARY     = enum.auto()   # constant / computed value, no args
+	POSTFIX     = enum.auto()   # unary postfix operator
+	CONVERTER   = enum.auto()   # ►DMS, ►Dec, ►Frac — postfix type conversion
+	OPENS_PAREN = enum.auto()   # opens a ( context in capture() (functions + L_PAREN)
+
+
+_F   = TokenFlags.FUNCTION | TokenFlags.OPENS_PAREN
+_CMD = TokenFlags.COMMAND
+_N   = TokenFlags.NULLARY
+_NF  = TokenFlags.NULLARY | TokenFlags.FUNCTION | TokenFlags.OPENS_PAREN
+_PFX = TokenFlags.POSTFIX
+_CVT = TokenFlags.CONVERTER
 
 
 @dataclass(slots=True, eq=False)
 class Token:
-	code: bytes
+	code:  bytes
 	ascii: str | None
-	text: str
-	bp: tuple[int, int] | None = None # (left_bp, right_bp) for binary operators
-	operator:  Callable | None = None # (lhs, rhs) -> value
-	postfix:   Callable | None = None # (operand) -> value (prefix or postfix)
-	function:  Callable | None = None # (ArgParser) -> value for function tokens
-	command:   Callable | None = None # (ArgParser) -> None for command tokens
-	nullary:   Callable | None = None # (env) -> value for read-only computed constants
-	converter: Callable | None = None # (value) -> value for ►DMS, ►Dec, ►Frac and others
-	variable:  Callable | None = None # Variable instance for storable typed variables
-	
-	# type TiValue = Number | TiList | TiMatrix | TiString
-	# operator: Callable[[TiValue, TiValue], TiValue] | None = None
-	# postfix: Callable[[TiValue], TiValue] | None = None
-	# function: Callable[[ArgParser], TiValue] | None = None
-	# command: Callable[[ArgParser], TiValue] | None = None
-	# nullary: Callable[[], TiValue] | None = None
-	# converter: Callable[[TiValue], TiValue] | None = None
-	# atom: bool = False
+	text:  str
+	bp:    tuple[int, int] | None = None
+	flags: TokenFlags = TokenFlags(0)
 
 	# ── Token type predicates ──────────────────────────────────────────────────
 
 	def is_numeric_var(self) -> bool:
-	    return 0x41 <= self.code[0] < 0x5c
+		return 0x41 <= self.code[0] <= 0x5b
 
 	def is_list_var(self) -> bool:
-	    return self.code[0] == 0x5d
+		return self.code[0] == 0x5d
 
 	def is_list_var_start(self) -> bool:
-	    return self.code[0] in {0x5d, 0xeb}
+		return self.code[0] in {0x5d, 0xeb}
 
 	def is_matrix_var(self) -> bool:
-	    return self.code[0] == 0x5c
+		return self.code[0] == 0x5c
 
 	def is_string_var(self) -> bool:
-	    return self.code[0] == 0xaa
+		return self.code[0] == 0xaa
 
 	def is_stat_var(self) -> bool:
-	    return self.code[0] == 0x62
+		return self.code[0] == 0x62
 
 	def is_window_var(self) -> bool:
-	    return self.code[0] == 0x63
+		return self.code[0] == 0x63
 
 	def is_digit(self) -> bool:
-	    return 0x30 <= self.code[0] <= 0x39
+		return 0x30 <= self.code[0] <= 0x39
 
 	def is_name_char(self):
-	    return self.is_numeric_var() or self.is_digit()
+		return self.is_numeric_var() or self.is_digit()
 
 	def can_start_atom(self) -> bool:
-	    return (
-	        self.is_digit()
-	        or self.variable is not None
-	        or self.nullary is not None
-	        or self.function is not None
-	        or self in {DOT, L_PAREN, L_BRACE, L_BRACKET, QUOTE, NEG, LIST_PREFIX}
-	    )
-	
+		return (
+			self.is_digit()
+			or self.is_numeric_var()
+			or self.is_list_var()
+			or self.is_matrix_var()
+			or self.is_string_var()
+			or self.is_stat_var()
+			or self.is_window_var()
+			or TokenFlags.FUNCTION in self.flags
+			or TokenFlags.NULLARY in self.flags
+			or self in {DOT, L_PAREN, L_BRACE, L_BRACKET, QUOTE, NEG, LIST_PREFIX}
+		)
+
 	def __repr__(self):
-	    return f'{self.code.hex().upper()}:{self.text}'
+		return f'{self.code.hex().upper()}:{self.text}'
 
 
-# TODO: remove code after transition to flags
 EOF_TOKEN = Token(b'\x00', None, '<END-OF-INPUT>')
-
 
 _SEEN: set[bytes] = set()
 
-def _make_pure_func(f):
-	def wrapper(a):
-	    return f(*a.parse_args())
-	return wrapper
-
-def _make_variable(code: bytes) -> Variable | None:
-	b0 = code[0]
-	if 0x41 <= b0 <= 0x5b: # A–Z, θ
-	    return NumericVar(b0 - 0x41)
-	if b0 == 0x5d:         # L1–L6
-	    return ListVar(code[1])
-	if b0 == 0x5c:         # [A]–[J]
-	    return MatrixVar(code[1])
-	if b0 == 0xaa:         # Str0–9
-	    return StringVar(code[1])
-	if b0 == 0x62:         # stat vars
-	    return StatVar(code[1])
-	if b0 == 0x63:         # window vars
-	    return WindowVar(code[1])
-	return None
-
 
 def token(
-	code: bytes,
-	text: str = None,
+	code:  bytes,
+	text:  str = None,
 	ascii: str = None,
 	*,
-	bp: tuple[int, int] | None = None,
-	operator:  Callable | None = None,
-	postfix:   Callable | None = None,
-	func:      Callable | None = None,
-	pure_func: Callable | None = None,
-	cmd:       Callable | None = None,
-	nullary:   Callable | None = None,
-	converter: Callable | None = None,
-	variable:  Variable | None = None,
+	bp:    tuple[int, int] | None = None,
+	flags: TokenFlags = TokenFlags(0),
 ) -> Token:
-
 	if code in _SEEN:
-	    raise ValueError(f'Duplicate token code: {code!r} ({text!r})')
+		raise ValueError(f'Duplicate token code: {code!r} ({text!r})')
 	_SEEN.add(code)
-	if pure_func is not None:
-	    if func is not None:
-	        raise ValueError(f'Token {text!r}: cannot set both func and pure_func')
-	    func = _make_pure_func(pure_func)
-	if variable is None and nullary is None:
-	    variable = _make_variable(code)
-
-	return Token(code, ascii, text or ascii, bp, operator, postfix, func, cmd, nullary, converter, variable)
+	return Token(code, ascii, text or ascii, bp, flags)
 
 
 # ── Named syntactic tokens (referenced by identity in the parser) ──────────────
@@ -151,7 +113,7 @@ L_BRACKET   = token(b'\x06', ascii='[')
 R_BRACKET   = token(b'\x07', ascii=']')
 L_BRACE     = token(b'\x08', ascii='{')
 R_BRACE     = token(b'\x09', ascii='}')
-L_PAREN     = token(b'\x10', ascii='(')
+L_PAREN     = token(b'\x10', ascii='(', flags=TokenFlags.OPENS_PAREN)
 R_PAREN     = token(b'\x11', ascii=')')
 QUOTE       = token(b'\x2a', ascii='"')
 COMMA       = token(b'\x2b', ascii=',')
@@ -159,49 +121,49 @@ DOT         = token(b'\x3a', ascii='.')
 COLON       = token(b'\x3e', ascii=':')
 NEWLINE     = token(b'\x3f', ascii='\n')
 PRGM        = token(b'\x5f', 'prgm')
-ANS         = token(b'\x72', 'Ans', nullary=Environment.get_ans, func=forms.ans_index_or_mul)
+ANS         = token(b'\x72', 'Ans',  flags=_NF)
 NEG         = token(b'\xb0', ascii='−')
 APOS        = token(b'\xae', ascii="'")
-DIM         = token(b'\xb5', 'dim(', pure_func=pf.dim)
+DIM         = token(b'\xb5', 'dim(', flags=_F)
 LIST_PREFIX = token(b'\xeb', '∟')
 
-# Postfix operators
-RAD         = token(b'\x0a', 'ʳ') # postfix operator that needs env, so gets a special case
-DEG         = token(b'\x0b', '°') # ditto
-INV         = token(b'\x0c', '¹', postfix=pf.inv)
-SQ          = token(b'\x0d', '²', postfix=lambda x: x**2)
-TRANSPOSE   = token(b'\x0e', 'ᵀ', postfix=pf.transpose)
-CUBE        = token(b'\x0f', '³', postfix=lambda x: x**3)
-FACT        = token(b'\x2d', ascii='!', postfix=pf.factorial)
+# Postfix operators (RAD/DEG handled specially in parser via eat_if)
+RAD         = token(b'\x0a', 'ʳ')
+DEG         = token(b'\x0b', '°')
+INV         = token(b'\x0c', '¹',  flags=_PFX)
+SQ          = token(b'\x0d', '²',  flags=_PFX)
+TRANSPOSE   = token(b'\x0e', 'ᵀ',  flags=_PFX)
+CUBE        = token(b'\x0f', '³',  flags=_PFX)
+FACT        = token(b'\x2d', ascii='!', flags=_PFX)
 
 # Binary operators
 SCI_E       = token(b'\x3b', 'ᴇ')
-OR          = token(b'\x3c', ' or ',    bp=(20, 21), operator=pf.or_)
-XOR         = token(b'\x3d', ' xor ',   bp=(20, 21), operator=pf.xor)
-AND         = token(b'\x40', ' and ',   bp=(30, 31), operator=pf.and_)
-EQ          = token(b'\x6a', ascii='=', bp=(40, 41), operator=op.eq)
-LT          = token(b'\x6b', ascii='<', bp=(40, 41), operator=op.lt)
-GT          = token(b'\x6c', ascii='>', bp=(40, 41), operator=op.gt)
-LE          = token(b'\x6d', '≤',       bp=(40, 41), operator=op.le)
-GE          = token(b'\x6e', '≥',       bp=(40, 41), operator=op.ge)
-NE          = token(b'\x6f', '≠',       bp=(40, 41), operator=op.ne)
-ADD         = token(b'\x70', ascii='+', bp=(50, 51), operator=op.add)
-SUB         = token(b'\x71', ascii='-', bp=(50, 51), operator=op.sub)
-MUL         = token(b'\x82', ascii='*', bp=(60, 61), operator=op.mul)
-DIV         = token(b'\x83', ascii='/', bp=(60, 61), operator=op.truediv)
-NPR         = token(b'\x94', 'nPr',     bp=(60, 61), operator=pf.npr)
-NCR         = token(b'\x95', 'nCr',     bp=(60, 61), operator=pf.ncr)
-RAND        = token(b'\xab', 'rand', nullary=Environment.rand, pure_func=pf.rand_list)
-POW         = token(b'\xf0', ascii='^', bp=(70, 69), operator=op.pow)
-XTH_ROOT    = token(b'\xf1', 'ˣ√',      bp=(60, 61), operator=pf.xth_root)
+OR          = token(b'\x3c', ' or ',    bp=(20, 21))
+XOR         = token(b'\x3d', ' xor ',   bp=(20, 21))
+AND         = token(b'\x40', ' and ',   bp=(30, 31))
+EQ          = token(b'\x6a', ascii='=', bp=(40, 41))
+LT          = token(b'\x6b', ascii='<', bp=(40, 41))
+GT          = token(b'\x6c', ascii='>', bp=(40, 41))
+LE          = token(b'\x6d', '≤',       bp=(40, 41))
+GE          = token(b'\x6e', '≥',       bp=(40, 41))
+NE          = token(b'\x6f', '≠',       bp=(40, 41))
+ADD         = token(b'\x70', ascii='+', bp=(50, 51))
+SUB         = token(b'\x71', ascii='-', bp=(50, 51))
+MUL         = token(b'\x82', ascii='*', bp=(60, 61))
+DIV         = token(b'\x83', ascii='/', bp=(60, 61))
+NPR         = token(b'\x94', 'nPr',     bp=(60, 61))
+NCR         = token(b'\x95', 'nCr',     bp=(60, 61))
+RAND        = token(b'\xab', 'rand',    flags=_NF)
+POW         = token(b'\xf0', ascii='^', bp=(70, 69))
+XTH_ROOT    = token(b'\xf1', 'ˣ√',      bp=(60, 61))
 
 # ── Token list ─────────────────────────────────────────────────────────────────
 
 TOKENS: list[Token] = [
 	# One-byte tokens
-	token(b'\x01', '►DMS', converter=pf.to_dms),
-	token(b'\x02', '►Dec', converter=pf.to_dec),
-	token(b'\x03', '►Frac', converter=pf.to_frac),
+	token(b'\x01', '►DMS',   flags=_CVT),
+	token(b'\x02', '►Dec',   flags=_CVT),
+	token(b'\x03', '►Frac',  flags=_CVT),
 	STORE,
 	token(b'\x05', 'Boxplot'),
 	L_BRACKET,
@@ -216,42 +178,42 @@ TOKENS: list[Token] = [
 	CUBE,
 	L_PAREN,
 	R_PAREN,
-	token(b'\x12', 'round(', pure_func=pf.round),
+	token(b'\x12', 'round(',    flags=_F),
 	token(b'\x13', 'pxl-Test('),
-	token(b'\x14', 'augment(', pure_func=pf.augment),
-	token(b'\x15', 'rowSwap(', pure_func=pf.rowswap),
-	token(b'\x16', 'row+(', pure_func=pf.row_plus),
-	token(b'\x17', '*row(', pure_func=pf.times_row),
-	token(b'\x18', '*row+(', pure_func=pf.times_row_plus),
-	token(b'\x19', 'max(', pure_func=pf.max),
-	token(b'\x1a', 'min(', pure_func=pf.min),
-	token(b'\x1b', 'R►Pr(', pure_func=pf.r_pr),
-	token(b'\x1c', 'R►Pθ(', pure_func=pf.r_ptheta),
-	token(b'\x1d', 'P►Rx(', pure_func=pf.p_rx),
-	token(b'\x1e', 'P►Ry(', pure_func=pf.p_ry),
-	token(b'\x1f', 'median(', pure_func=pf.median),
-	token(b'\x20', 'randM(', pure_func=pf.rand_m),
-	token(b'\x21', 'mean(', pure_func=pf.mean),
+	token(b'\x14', 'augment(',  flags=_F),
+	token(b'\x15', 'rowSwap(',  flags=_F),
+	token(b'\x16', 'row+(',     flags=_F),
+	token(b'\x17', '*row(',     flags=_F),
+	token(b'\x18', '*row+(',    flags=_F),
+	token(b'\x19', 'max(',      flags=_F),
+	token(b'\x1a', 'min(',      flags=_F),
+	token(b'\x1b', 'R►Pr(',    flags=_F),
+	token(b'\x1c', 'R►Pθ(',   flags=_F),
+	token(b'\x1d', 'P►Rx(',    flags=_F),
+	token(b'\x1e', 'P►Ry(',    flags=_F),
+	token(b'\x1f', 'median(',   flags=_F),
+	token(b'\x20', 'randM(',    flags=_F),
+	token(b'\x21', 'mean(',     flags=_F),
 	token(b'\x22', 'solve('),
-	token(b'\x23', 'seq(', func=forms.seq),
-	token(b'\x24', 'fnInt(', func=forms.fn_int),
-	token(b'\x25', 'nDeriv(', func=forms.n_deriv),
+	token(b'\x23', 'seq(',      flags=_F),
+	token(b'\x24', 'fnInt(',    flags=_F),
+	token(b'\x25', 'nDeriv(',   flags=_F),
 	token(b'\x27', 'fMin('),
 	token(b'\x28', 'fMax('),
 	token(b'\x29', ascii=' '),
 	QUOTE,
 	COMMA,
-	token(b'\x2c', '𝑖', nullary=lambda env: 1j),
+	token(b'\x2c', '𝑖',         flags=_N),
 	FACT,
 	token(b'\x2e', 'CubicReg '),
 	token(b'\x2f', 'QuartReg '),
 	*DIGITS,
-	DOT, 
-	SCI_E, 
-	OR, 
-	XOR, 
-	COLON, 
-	NEWLINE, 
+	DOT,
+	SCI_E,
+	OR,
+	XOR,
+	COLON,
+	NEWLINE,
 	AND,
 	*LETTERS,
 	THETA,
@@ -326,39 +288,39 @@ TOKENS: list[Token] = [
 	token(b'\xa8', 'DrawInv '),
 	token(b'\xa9', 'DrawF '),
 	RAND,
-	token(b'\xac', 'π', nullary=lambda env: math.pi),
-	token(b'\xad', 'getKey', nullary=Environment.get_key),
+	token(b'\xac', 'π',          flags=_N),
+	token(b'\xad', 'getKey',     flags=_N),
 	APOS,
 	token(b'\xaf', ascii='?'),
 	NEG,
-	token(b'\xb1', 'int(', pure_func=pf.int_),
-	token(b'\xb2', 'abs(', pure_func=pf.abs),
-	token(b'\xb3', 'det(', pure_func=pf.det),
-	token(b'\xb4', 'identity(', pure_func=pf.identity),
+	token(b'\xb1', 'int(',       flags=_F),
+	token(b'\xb2', 'abs(',       flags=_F),
+	token(b'\xb3', 'det(',       flags=_F),
+	token(b'\xb4', 'identity(',  flags=_F),
 	DIM,
-	token(b'\xb6', 'sum(', pure_func=pf.sum),
-	token(b'\xb7', 'prod(', pure_func=pf.prod),
-	token(b'\xb8', 'not(', pure_func=pf.not_),
-	token(b'\xb9', 'iPart(', pure_func=pf.i_part),
-	token(b'\xba', 'fPart(', pure_func=pf.f_part),
-	token(b'\xbc', '√(', pure_func=pf.sqrt),
-	token(b'\xbd', '³√(', pure_func=pf.cbrt),
-	token(b'\xbe', 'ln(', pure_func=pf.ln),
-	token(b'\xbf', '𝑒^(', pure_func=pf.exp),
-	token(b'\xc0', 'log(', pure_func=pf.log),
-	token(b'\xc1', '⑽^(', pure_func=pf.pow10),
-	token(b'\xc2', 'sin(', pure_func=pf.sin),
-	token(b'\xc3', 'sin¹(', pure_func=pf.asin),
-	token(b'\xc4', 'cos(', pure_func=pf.cos),
-	token(b'\xc5', 'cos¹(', pure_func=pf.acos),
-	token(b'\xc6', 'tan(', pure_func=pf.tan),
-	token(b'\xc7', 'tan¹(', pure_func=pf.atan),
-	token(b'\xc8', 'sinh(', pure_func=pf.sinh),
-	token(b'\xc9', 'sinh¹(', pure_func=pf.asinh),
-	token(b'\xca', 'cosh(', pure_func=pf.cosh),
-	token(b'\xcb', 'cosh¹(', pure_func=pf.acosh),
-	token(b'\xcc', 'tanh(', pure_func=pf.tanh),
-	token(b'\xcd', 'tanh¹(', pure_func=pf.atanh),
+	token(b'\xb6', 'sum(',       flags=_F),
+	token(b'\xb7', 'prod(',      flags=_F),
+	token(b'\xb8', 'not(',       flags=_F),
+	token(b'\xb9', 'iPart(',     flags=_F),
+	token(b'\xba', 'fPart(',     flags=_F),
+	token(b'\xbc', '√(',         flags=_F),
+	token(b'\xbd', '³√(',        flags=_F),
+	token(b'\xbe', 'ln(',        flags=_F),
+	token(b'\xbf', '𝑒^(',        flags=_F),
+	token(b'\xc0', 'log(',       flags=_F),
+	token(b'\xc1', '⑽^(',        flags=_F),
+	token(b'\xc2', 'sin(',       flags=_F),
+	token(b'\xc3', 'sin¹(',      flags=_F),
+	token(b'\xc4', 'cos(',       flags=_F),
+	token(b'\xc5', 'cos¹(',      flags=_F),
+	token(b'\xc6', 'tan(',       flags=_F),
+	token(b'\xc7', 'tan¹(',      flags=_F),
+	token(b'\xc8', 'sinh(',      flags=_F),
+	token(b'\xc9', 'sinh¹(',     flags=_F),
+	token(b'\xca', 'cosh(',      flags=_F),
+	token(b'\xcb', 'cosh¹(',     flags=_F),
+	token(b'\xcc', 'tanh(',      flags=_F),
+	token(b'\xcd', 'tanh¹(',     flags=_F),
 	token(b'\xce', 'If '),
 	token(b'\xcf', 'Then'),
 	token(b'\xd0', 'Else'),
@@ -379,9 +341,9 @@ TOKENS: list[Token] = [
 	token(b'\xdf', 'DispGraph'),
 	token(b'\xe0', 'Output('),
 	token(b'\xe1', 'ClrHome'),
-	token(b'\xe2', 'Fill('),
-	token(b'\xe3', 'SortA('),
-	token(b'\xe4', 'SortD('),
+	token(b'\xe2', 'Fill(',      flags=_CMD),
+	token(b'\xe3', 'SortA(',     flags=_CMD),
+	token(b'\xe4', 'SortD(',     flags=_CMD),
 	token(b'\xe5', 'DispTable'),
 	token(b'\xe6', 'Menu('),
 	token(b'\xe7', 'Send('),
@@ -410,7 +372,7 @@ TOKENS: list[Token] = [
 	token(b'\xff', 'LinReg(ax+b) '),
 	*MATRICES,
 	*LISTS,
-	*[token(bytes([0x5e, 0x10 + i]), f'Y{chr(0x2080 + (i + 1) % 10)}') for i in range(10)], 
+	*[token(bytes([0x5e, 0x10 + i]), f'Y{chr(0x2080 + (i + 1) % 10)}') for i in range(10)],
 	*[token(bytes([0x5e, 0x20 + i]), f'{x}{chr(0x2080 + n)}ₜ') for i, (n, x) in enumerate(itertools.product(range(1, 7), 'XY'))],
 	*[token(bytes([0x5e, 0x40 + i]), f'r{chr(0x2081 + i)}') for i in range(6)],
 	token(b'\x5e\x80', '𝑢'),
@@ -541,49 +503,49 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x04', 'ΣInt('),
 	token(b'\xbb\x05', '►Nom('),
 	token(b'\xbb\x06', '►Eff('),
-	token(b'\xbb\x07', 'dbd(', pure_func=pf.dbd),
-	token(b'\xbb\x08', 'lcm(', pure_func=pf.lcm),
-	token(b'\xbb\x09', 'gcd(', pure_func=pf.gcd),
-	token(b'\xbb\x0a', 'randInt(', pure_func=pf.rand_int),
-	token(b'\xbb\x0b', 'randBin(', pure_func=pf.rand_bin),
-	token(b'\xbb\x0c', 'sub(', pure_func=pf.sub_string),
-	token(b'\xbb\x0d', 'stdDev(', pure_func=pf.stddev),
-	token(b'\xbb\x0e', 'variance(', pure_func=pf.variance),
-	token(b'\xbb\x0f', 'inString(', pure_func=pf.in_string),
-	token(b'\xbb\x10', 'normalcdf(', pure_func=pf.normalcdf),
-	token(b'\xbb\x11', 'invNorm(', pure_func=pf.invnorm),
-	token(b'\xbb\x12', 'tcdf(', pure_func=pf.tcdf),
-	token(b'\xbb\x13', 'χ²cdf(', pure_func=pf.chi2cdf),
-	token(b'\xbb\x14', 'Fcdf(', pure_func=pf.fcdf),
-	token(b'\xbb\x15', 'binompdf(', pure_func=pf.binompdf),
-	token(b'\xbb\x16', 'binomcdf(', pure_func=pf.binomcdf),
-	token(b'\xbb\x17', 'poissonpdf(', pure_func=pf.poissonpdf),
-	token(b'\xbb\x18', 'poissoncdf(', pure_func=pf.poissoncdf),
-	token(b'\xbb\x19', 'geometpdf(', pure_func=pf.geometpdf),
-	token(b'\xbb\x1a', 'geometcdf(', pure_func=pf.geometcdf),
-	token(b'\xbb\x1b', 'normalpdf(', pure_func=pf.normalpdf),
-	token(b'\xbb\x1c', 'tpdf(', pure_func=pf.tpdf),
-	token(b'\xbb\x1d', 'χ²pdf(', pure_func=pf.chi2pdf),
-	token(b'\xbb\x1e', 'Fpdf(', pure_func=pf.fpdf),
-	token(b'\xbb\x1f', 'randNorm(', pure_func=pf.rand_norm),
+	token(b'\xbb\x07', 'dbd(',            flags=_F),
+	token(b'\xbb\x08', 'lcm(',            flags=_F),
+	token(b'\xbb\x09', 'gcd(',            flags=_F),
+	token(b'\xbb\x0a', 'randInt(',        flags=_F),
+	token(b'\xbb\x0b', 'randBin(',        flags=_F),
+	token(b'\xbb\x0c', 'sub(',            flags=_F),
+	token(b'\xbb\x0d', 'stdDev(',         flags=_F),
+	token(b'\xbb\x0e', 'variance(',       flags=_F),
+	token(b'\xbb\x0f', 'inString(',       flags=_F),
+	token(b'\xbb\x10', 'normalcdf(',      flags=_F),
+	token(b'\xbb\x11', 'invNorm(',        flags=_F),
+	token(b'\xbb\x12', 'tcdf(',           flags=_F),
+	token(b'\xbb\x13', 'χ²cdf(',          flags=_F),
+	token(b'\xbb\x14', 'Fcdf(',           flags=_F),
+	token(b'\xbb\x15', 'binompdf(',       flags=_F),
+	token(b'\xbb\x16', 'binomcdf(',       flags=_F),
+	token(b'\xbb\x17', 'poissonpdf(',     flags=_F),
+	token(b'\xbb\x18', 'poissoncdf(',     flags=_F),
+	token(b'\xbb\x19', 'geometpdf(',      flags=_F),
+	token(b'\xbb\x1a', 'geometcdf(',      flags=_F),
+	token(b'\xbb\x1b', 'normalpdf(',      flags=_F),
+	token(b'\xbb\x1c', 'tpdf(',           flags=_F),
+	token(b'\xbb\x1d', 'χ²pdf(',          flags=_F),
+	token(b'\xbb\x1e', 'Fpdf(',           flags=_F),
+	token(b'\xbb\x1f', 'randNorm(',       flags=_F),
 	token(b'\xbb\x20', 'tvm_Pmt'),
 	token(b'\xbb\x21', 'tvm_I%'),
 	token(b'\xbb\x22', 'tvm_PV'),
 	token(b'\xbb\x23', 'tvm_N'),
 	token(b'\xbb\x24', 'tvm_FV'),
-	token(b'\xbb\x25', 'conj(', pure_func=pf.conj),
-	token(b'\xbb\x26', 'real(', pure_func=pf.real),
-	token(b'\xbb\x27', 'imag(', pure_func=pf.imag),
-	token(b'\xbb\x28', 'angle(', pure_func=pf.angle),
-	token(b'\xbb\x29', 'cumSum(', pure_func=pf.cum_sum),
-	token(b'\xbb\x2a', 'expr(', func=forms.expr),
-	token(b'\xbb\x2b', 'length(', pure_func=pf.length),
-	token(b'\xbb\x2c', 'ΔList(', pure_func=pf.delta_list),
-	token(b'\xbb\x2d', 'ref(', pure_func=pf.ref),
-	token(b'\xbb\x2e', 'rref(', pure_func=pf.rref),
+	token(b'\xbb\x25', 'conj(',           flags=_F),
+	token(b'\xbb\x26', 'real(',           flags=_F),
+	token(b'\xbb\x27', 'imag(',           flags=_F),
+	token(b'\xbb\x28', 'angle(',          flags=_F),
+	token(b'\xbb\x29', 'cumSum(',         flags=_F),
+	token(b'\xbb\x2a', 'expr(',           flags=_F),
+	token(b'\xbb\x2b', 'length(',         flags=_F),
+	token(b'\xbb\x2c', 'ΔList(',          flags=_F),
+	token(b'\xbb\x2d', 'ref(',            flags=_F),
+	token(b'\xbb\x2e', 'rref(',           flags=_F),
 	token(b'\xbb\x2f', '►Rect'),
 	token(b'\xbb\x30', '►Polar'),
-	token(b'\xbb\x31', '𝑒', nullary=lambda env: math.e),
+	token(b'\xbb\x31', '𝑒',              flags=_N),
 	token(b'\xbb\x32', 'SinReg '),
 	token(b'\xbb\x33', 'Logistic '),
 	token(b'\xbb\x34', 'LinRegTTest '),
@@ -591,8 +553,8 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x36', 'Shade_t('),
 	token(b'\xbb\x37', 'Shadeχ²('),
 	token(b'\xbb\x38', 'ShadeF('),
-	token(b'\xbb\x39', 'Matr►list(', cmd=forms.matr_to_list),
-	token(b'\xbb\x3a', 'List►matr(', cmd=forms.list_to_matr),
+	token(b'\xbb\x39', 'Matr►list(',     flags=_CMD),
+	token(b'\xbb\x3a', 'List►matr(',     flags=_CMD),
 	token(b'\xbb\x3b', 'Z-Test('),
 	token(b'\xbb\x3c', 'T-Test'),
 	token(b'\xbb\x3d', '2-SampZTest('),
@@ -680,7 +642,7 @@ TOKENS: list[Token] = [
 	token(b'\xbb\x98', 'Ñ'),
 	token(b'\xbb\x99', 'ñ'),
 	token(b'\xbb\x9a', '´'),
-	token(b'\xbb\x9b', 'ˋ'), # "Combining grave accent"
+	token(b'\xbb\x9b', 'ˋ'),
 	token(b'\xbb\x9c', '¨'),
 	token(b'\xbb\x9d', '¿'),
 	token(b'\xbb\x9e', '¡'),
@@ -692,14 +654,14 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xa4', 'ε'),
 	token(b'\xbb\xa5', 'λ'),
 	token(b'\xbb\xa6', 'μ'),
-	token(b'\xbb\xa7', '𝛑'), # bold pi
+	token(b'\xbb\xa7', '𝛑'),
 	token(b'\xbb\xa8', 'ρ'),
 	token(b'\xbb\xa9', 'Σ'),
 	token(b'\xbb\xab', 'φ'),
 	token(b'\xbb\xac', 'Ω'),
 	token(b'\xbb\xad', 'ψ'),
 	token(b'\xbb\xae', 'χ'),
-	token(b'\xbb\xaf', '𝟊'), # Using digamma symbol
+	token(b'\xbb\xaf', '𝟊'),
 	token(b'\xbb\xb0', ascii='a'),
 	token(b'\xbb\xb1', ascii='b'),
 	token(b'\xbb\xb2', ascii='c'),
@@ -740,7 +702,7 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xd7', ascii='\\'),
 	token(b'\xbb\xd8', ascii='|'),
 	token(b'\xbb\xd9', ascii='_'),
-	token(b'\xbb\xda', ascii='%', postfix=lambda x: x / 100),
+	token(b'\xbb\xda', ascii='%',  flags=_PFX),
 	token(b'\xbb\xdb', '…'),
 	token(b'\xbb\xdc', '∠'),
 	token(b'\xbb\xdd', 'ß'),
@@ -761,7 +723,7 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xec', '🡆'),
 	token(b'\xbb\xed', '↑'),
 	token(b'\xbb\xee', '↓'),
-	token(b'\xbb\xf0', '𝑥'), # italic x to differentiate
+	token(b'\xbb\xf0', '𝑥'),
 	token(b'\xbb\xf1', '∫'),
 	token(b'\xbb\xf2', '🡅'),
 	token(b'\xbb\xf3', '🡇'),
@@ -769,26 +731,26 @@ TOKENS: list[Token] = [
 	token(b'\xbb\xf5', '≛'),
 
 	# Two-byte: TI-84+ extended tokens 0xEF xx
-	token(b'\xef\x00', 'setDate(', cmd=forms.set_date),
-	token(b'\xef\x01', 'setTime(', cmd=forms.set_time),
-	token(b'\xef\x02', 'checkTmr(', func=forms.check_tmr),
-	token(b'\xef\x03', 'setDtFmt(', cmd=forms.set_dt_fmt),
-	token(b'\xef\x04', 'setTmFmt(', cmd=forms.set_tm_fmt),
-	token(b'\xef\x05', 'timeCnv(', pure_func=pf.timecnv),
-	token(b'\xef\x06', 'dayOfWk(', pure_func=pf.dayofwk),
-	token(b'\xef\x07', 'getDtStr(', func=forms.get_dt_str),
-	token(b'\xef\x08', 'getTmStr(', func=forms.get_tm_str),
-	token(b'\xef\x09', 'getDate', nullary=Environment.get_date),
-	token(b'\xef\x0a', 'getTime', nullary=Environment.get_time),
-	token(b'\xef\x0b', 'startTmr', nullary=Environment.start_tmr),
-	token(b'\xef\x0c', 'getDtFmt', nullary=Environment.get_dt_fmt),
-	token(b'\xef\x0d', 'getTmFmt', nullary=Environment.get_tm_fmt),
-	token(b'\xef\x0e', 'isClockOn', nullary=Environment.is_clock_on),
-	token(b'\xef\x0f', 'ClockOff', cmd=Environment.clock_off),
-	token(b'\xef\x10', 'ClockOn', cmd=Environment.clock_on),
+	token(b'\xef\x00', 'setDate(',    flags=_CMD),
+	token(b'\xef\x01', 'setTime(',    flags=_CMD),
+	token(b'\xef\x02', 'checkTmr(',   flags=_F),
+	token(b'\xef\x03', 'setDtFmt(',   flags=_CMD),
+	token(b'\xef\x04', 'setTmFmt(',   flags=_CMD),
+	token(b'\xef\x05', 'timeCnv(',    flags=_F),
+	token(b'\xef\x06', 'dayOfWk(',    flags=_F),
+	token(b'\xef\x07', 'getDtStr(',   flags=_F),
+	token(b'\xef\x08', 'getTmStr(',   flags=_F),
+	token(b'\xef\x09', 'getDate',     flags=_N),
+	token(b'\xef\x0a', 'getTime',     flags=_N),
+	token(b'\xef\x0b', 'startTmr',    flags=_N),
+	token(b'\xef\x0c', 'getDtFmt',    flags=_N),
+	token(b'\xef\x0d', 'getTmFmt',    flags=_N),
+	token(b'\xef\x0e', 'isClockOn',   flags=_N),
+	token(b'\xef\x0f', 'ClockOff',    flags=_CMD),
+	token(b'\xef\x10', 'ClockOn',     flags=_CMD),
 	token(b'\xef\x11', 'OpenLib('),
 	token(b'\xef\x12', 'ExecLib'),
-	token(b'\xef\x13', 'invT(', pure_func=pf.invt),
+	token(b'\xef\x13', 'invT(',       flags=_F),
 	token(b'\xef\x14', 'χ²GOF-Test('),
 	token(b'\xef\x15', 'LinRegTInt '),
 	token(b'\xef\x16', 'Manual-Fit '),
@@ -802,10 +764,10 @@ TOKENS: list[Token] = [
 	token(b'\xef\x1e', 'mathprintbox'),
 	token(b'\xef\x30', '►n/d◄►Un/d'),
 	token(b'\xef\x31', '►F◄►D'),
-	token(b'\xef\x32', 'remainder(', pure_func=pf.remainder),
-	token(b'\xef\x33', 'Σ(', func=forms.sigma),
-	token(b'\xef\x34', 'logBASE(', pure_func=pf.log_base),
-	token(b'\xef\x35', 'randIntNoRep(', pure_func=pf.rand_int_no_rep),
+	token(b'\xef\x32', 'remainder(',  flags=_F),
+	token(b'\xef\x33', 'Σ(',          flags=_F),
+	token(b'\xef\x34', 'logBASE(',    flags=_F),
+	token(b'\xef\x35', 'randIntNoRep(', flags=_F),
 	token(b'\xef\x36', 'MATHPRINT'),
 	token(b'\xef\x37', 'CLASSIC'),
 	token(b'\xef\x38', 'n/d'),
@@ -847,12 +809,12 @@ class TokenTable:
 				raise KeyError(code)
 			table = sub
 			idx = code[1]
-			
+
 		token = table[idx] if idx < len(table) else None
 		if token is None:
 			raise KeyError(code)
 		return token
-	
+
 	def __repr__(self):
 		return repr(self._table)
 
@@ -865,16 +827,5 @@ TOKENS_BY_TEXT = {t.text: t for t in TOKENS} | ASCII
 
 
 if __name__ == '__main__':
-	
-	# lookup = {}
-
-	# for token in TOKENS:
-		# try:
-			# dup = lookup[token.text]
-		# except KeyError:
-			# lookup[token.text] = token
-			# continue
-		# print(dup, token)
-
 	for i in range(32, 127):
 		print(i, TOKENS_BY_TEXT[chr(i)])

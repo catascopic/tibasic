@@ -129,6 +129,20 @@ class WindowVar(Variable):
 		env.window[self._idx] = float(value)
 
 
+class ComputedVar(Variable):
+	"""A read-only Variable backed by a callable (env) -> value."""
+	__slots__ = ('_fn',)
+
+	def __init__(self, fn):
+		self._fn = fn
+
+	def get(self, env):
+		return self._fn(env)
+
+	def set(self, env, value):
+		raise TiTypeError("Cannot store to a computed value")
+
+
 class _NumericVarArray(_VarArray):
 	def __init__(self):
 		super().__init__(27, None, lambda n: chr(65+n) if n < 26 else 'θ')

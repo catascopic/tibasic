@@ -2,13 +2,14 @@ from dataclasses import dataclass
 
 from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
-	Token, EOF_TOKEN,
+	Token, EOF_TOKEN, TokenFlags,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
 	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, ANS, NEG, LIST_PREFIX,
 	RAND, DIM, SCI_E, DEG, RAD, APOS
 )
 from environment import Environment, Variable, UserListVar
 from forms import ArgParser
+from dispatch import CALLABLES, VARIABLES, OPERATORS, POSTFIXES, CONVERTERS
 
 class ParseError(Exception):
 	pass
@@ -181,7 +182,7 @@ class Parser:
 				break
 			elif stack and t is stack[-1]:
 				stack.pop()
-			elif t.function is not None or t is L_PAREN:
+			elif TokenFlags.OPENS_PAREN in t.flags:
 				stack.append(R_PAREN)
 			elif t is L_BRACE:
 				stack.append(R_BRACE)
@@ -258,31 +259,32 @@ class Parser:
 
 		# Nullary constants (π, e, rand, Ans, getDate, etc.)
 		# Checked before function so tokens with both can dispatch on whether ( follows.
-		if t.nullary is not None:
-			if self.peek() is L_PAREN and t.function is not None:
+		if TokenFlags.NULLARY in t.flags:
+			if self.peek() is L_PAREN and TokenFlags.FUNCTION in t.flags:
 				self.advance()
-				return t.function(ArgParser(self))
-			return t.nullary(self.env)
+				return CALLABLES[t](ArgParser(self))
+			return VARIABLES[t].get(self.env)
 
-		if t.function is not None:
-			return t.function(ArgParser(self))
+		if TokenFlags.FUNCTION in t.flags:
+			return CALLABLES[t](ArgParser(self))
 
 		if t.is_list_var():
-			return self.parse_list_atom(t.variable)
+			return self.parse_list_atom(VARIABLES[t])
 
 		if t is LIST_PREFIX:
 			return self.parse_list_atom(UserListVar(self._read_name()))
-		
+
 		if t.is_matrix_var():
-			val = t.variable.get(self.env)
+			val = VARIABLES[t].get(self.env)
 			if self.eat_if(L_PAREN):
 				val = val[self.parse_row_col()]
 				self.eat_if(R_PAREN)
 			return val
 
-		if t.variable is not None:
-			return t.variable.get(self.env)
-			
+		var = VARIABLES.get(t)
+		if var is not None:
+			return var.get(self.env)
+
 		raise ParseError(f"Unexpected token in expression: {t}")
 
 	def parse_list_atom(self, var):
@@ -324,10 +326,9 @@ class Parser:
 			t = self.peek()
 
 			# Postfix operators
-			# make a .eat_if_flag method if I make flags for tokens after decoupling from functions
-			if t.postfix:
+			if TokenFlags.POSTFIX in t.flags:
 				self.advance()
-				lhs = t.postfix(lhs)
+				lhs = POSTFIXES[t](lhs)
 				continue
 
 			# Explicit binary operator
@@ -336,7 +337,7 @@ class Parser:
 				if left_bp <= min_bp:
 					break
 				self.advance()
-				lhs = t.operator(lhs, self.parse_expr(right_bp))
+				lhs = OPERATORS[t](lhs, self.parse_expr(right_bp))
 				continue
 
 			# Implicit multiplication
@@ -359,30 +360,31 @@ class Parser:
 				
 		t = self.advance()
 
-		if t.is_list_var():
-			self.parse_store_list(t.variable, value)
+		if t is DIM:
+			self.parse_store_dim(value)
+
+		elif t is RAND:
+			self.env.set_random_seed(value)
+
+		elif t.is_list_var():
+			self.parse_store_list(VARIABLES[t], value)
 
 		elif t is LIST_PREFIX:
 			self.parse_store_list(UserListVar(self._read_name()), value)
 
 		elif t.is_matrix_var():
+			mat_var = VARIABLES[t]
 			if self.eat_if(L_PAREN):
-				mat = t.variable.get(self.env)
+				mat = mat_var.get(self.env)
 				if mat is None:
 					raise ValueError(f"Undefined matrix: {t.text}")
 				mat[self.parse_row_col()] = value
 				self.eat_if(R_PAREN)
 			else:
-				t.variable.set(self.env, value)
-		
-		elif t.variable is not None:
-			t.variable.set(self.env, value)
+				mat_var.set(self.env, value)
 
-		elif t is DIM:
-			self.parse_store_dim(value)
-			
-		elif t is RAND:
-			self.env.set_random_seed(value)
+		elif (var := VARIABLES.get(t)) is not None:
+			var.set(self.env, value)
 
 		else:
 			raise ParseError(f"Invalid store target: {t}")
@@ -409,10 +411,11 @@ class Parser:
 			lst.set_dim(value)
 		elif t.is_matrix_var():
 			self.advance()
-			mat = t.variable.get(self.env)
+			mat_var = VARIABLES[t]
+			mat = mat_var.get(self.env)
 			if mat is None:
 				mat = TiMatrix([])
-				t.variable.set(self.env, mat)
+				mat_var.set(self.env, mat)
 			mat.set_dim(value)
 		else:
 			raise ParseError(f"Invalid store-to-dim target: {t}")
@@ -422,7 +425,7 @@ class Parser:
 	def parse_list_var(self) -> Variable:
 		t = self.advance()
 		if t.is_list_var():
-			return t.variable
+			return VARIABLES[t]
 		if t is LIST_PREFIX:
 			return UserListVar(self._read_name())
 		raise ParseError(f"Expected a list variable, got {t.text!r}")
@@ -430,15 +433,16 @@ class Parser:
 	def parse_matrix_var(self) -> Variable:
 		t = self.advance()
 		if t.is_matrix_var():
-			return t.variable
+			return VARIABLES[t]
 		raise ParseError(f"Expected a matrix variable, got {t.text!r}")
 
 	def parse_any_var(self) -> Variable:
 		t = self.advance()
 		if t is LIST_PREFIX:
 			return UserListVar(self._read_name())
-		if t.variable:
-			return t.variable
+		var = VARIABLES.get(t)
+		if var is not None:
+			return var
 		raise ParseError(f"Expected a variable, got {t.text!r}")
 
 	# ── Statement dispatcher ───────────────────────────────────────────────────
@@ -452,15 +456,15 @@ class Parser:
 				name = self._read_name()
 				val = self.env.programs[name].execute()
 
-			elif self.peek().command is not None:
-				self.advance().command(ArgParser(self))
+			elif TokenFlags.COMMAND in self.peek().flags:
+				CALLABLES[self.advance()](ArgParser(self))
 
 			else:
 				value = self.parse_expr()
 				if self.eat_if(STORE):
 					self.parse_store(value)
-				elif self.peek().converter is not None:
-					value = self.advance().converter(value)
+				elif TokenFlags.CONVERTER in self.peek().flags:
+					value = CONVERTERS[self.advance()](value)
 				self.env.ans = value
 				
 			if not self.eat_if(COLON):

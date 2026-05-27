@@ -15,6 +15,7 @@ from tokens import (
 	L_PAREN, R_PAREN, L_BRACE, R_BRACE, L_BRACKET, R_BRACKET,
 	ANS, INV, SQ, TRANSPOSE, RAND, DIM,
 )
+from dispatch import VARIABLES
 from tiobjects import TiList, TiMatrix, TiString
 
 
@@ -750,7 +751,7 @@ class TestColonStatements:
 		# 1→A:2  →  Ans=2, A=1
 		parse_line(toks(1, STORE, 'A', COLON, 2), env)
 		assert env.ans == 2.0
-		assert T('A').variable.get(env) == 1.0
+		assert VARIABLES[T('A')].get(env) == 1.0
 
 	def test_colon_store_then_read(self, env):
 		# 5→A:A*3  →  Ans=15
@@ -760,8 +761,8 @@ class TestColonStatements:
 	def test_colon_two_stores(self, env):
 		# 1→A:3→B  →  A=1, B=3, Ans=3
 		parse_line(toks(1, STORE, 'A', COLON, 3, STORE, 'B'), env)
-		assert T('A').variable.get(env) == 1.0
-		assert T('B').variable.get(env) == 3.0
+		assert VARIABLES[T('A')].get(env) == 1.0
+		assert VARIABLES[T('B')].get(env) == 3.0
 		assert env.ans == 3.0
 
 	def test_colon_three_segments(self, env):
@@ -837,34 +838,34 @@ class TestStoreDim:
 		# 5→dim(L₁)  →  L₁ becomes {0,0,0,0,0}
 		l1 = T('L₁')
 		parse_line(toks(5, STORE, DIM, l1), env)
-		assert l1.variable.get(env).data == [0, 0, 0, 0, 0]
+		assert VARIABLES[l1].get(env).data == [0, 0, 0, 0, 0]
 
 	def test_store_dim_list_expand(self, env):
 		# {1,2,3}→L₁ : 5→dim(L₁)  →  L₁ = {1,2,3,0,0}
 		l1 = T('L₁')
 		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, R_BRACE, STORE, l1), env)
 		parse_line(toks(5, STORE, DIM, l1), env)
-		assert l1.variable.get(env).data == [1, 2, 3, 0, 0]
+		assert VARIABLES[l1].get(env).data == [1, 2, 3, 0, 0]
 
 	def test_store_dim_list_shrink(self, env):
 		# {1,2,3,4,5}→L₁ : 3→dim(L₁)  →  L₁ = {1,2,3}
 		l1 = T('L₁')
 		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, COMMA, 4, COMMA, 5, R_BRACE, STORE, l1), env)
 		parse_line(toks(3, STORE, DIM, l1), env)
-		assert l1.variable.get(env).data == [1, 2, 3]
+		assert VARIABLES[l1].get(env).data == [1, 2, 3]
 
 	def test_store_dim_matrix_create(self, env):
 		# {2,3}→dim([A])  →  [A] becomes 2×3 of zeros
 		ma = T('[A]')
 		parse_line(toks(L_BRACE, 2, COMMA, 3, R_BRACE, STORE, DIM, ma), env)
-		assert ma.variable.get(env).data == 2 * [3 * [0]]
+		assert VARIABLES[ma].get(env).data == 2 * [3 * [0]]
 
 	def test_store_dim_matrix_resize_preserves(self, env):
 		# Build [[1,2][3,4]], then resize to 3×3; original values survive, new cells = 0
 		ma = T('[A]')
 		parse_line(toks('[[1,2][3,4', STORE, ma), env)
 		parse_line(toks('{3,3', STORE, DIM, ma), env)
-		assert ma.variable.get(env).data == [
+		assert VARIABLES[ma].get(env).data == [
 			[1, 2, 0],
 			[3, 4, 0],
 			[0, 0, 0],
@@ -1053,7 +1054,7 @@ class TestIllegalNest:
 		# expr( evaluating a string that itself calls expr( → ERR:ILLEGAL NEST
 		str1 = T('Str1')
 		# Directly store TiString([expr(, Str1, )]) in Str1 — evaluating it calls expr again
-		str1.variable.set(env, TiString([T('expr('), str1, R_PAREN]))
+		VARIABLES[str1].set(env, TiString([T('expr('), str1, R_PAREN]))
 		with pytest.raises(ValueError, match="ILLEGAL NEST"):
 			parse_line([T('expr('), str1, R_PAREN], env)
 

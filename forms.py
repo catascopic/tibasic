@@ -13,6 +13,12 @@ from tiobjects import TiList, TiMatrix, require_real, require_str
 from environment import Variable
 
 
+def _var(tok):
+	"""Look up the Variable for a Token via dispatch.VARIABLES."""
+	from dispatch import VARIABLES
+	return VARIABLES[tok]
+
+
 @contextmanager
 def _nest_guard(env, name: str, max_depth: int = 0):
 	"""Raise ERR:ILLEGAL NEST if this function is already nested deeper than max_depth."""
@@ -157,7 +163,7 @@ def seq(a: ArgParser) -> TiList:
 			raise ValueError(f"seq: step is negative but start ({start}) < end ({end})")
 		op = operator.ge
 		end -= 1e-10
-	variable = var.variable
+	variable = _var(var)
 	with _nest_guard(a.env, 'seq'), _scoped_var(a.env, variable):
 		while op(n, end):
 			variable.set(a.env, n)
@@ -174,7 +180,7 @@ def sigma(a: ArgParser) -> float:
 	a.end()
 	total = 0
 	n = start
-	variable = var.variable
+	variable = _var(var)
 	with _nest_guard(a.env, 'sigma'), _scoped_var(a.env, variable):
 		while n <= end:
 			variable.set(a.env, n)
@@ -189,7 +195,7 @@ def n_deriv(a: ArgParser) -> float:
 	val = a.expr()
 	h = a.expr(optional=True, default=0.001)
 	a.end()
-	variable = var.variable
+	variable = _var(var)
 	with _nest_guard(a.env, 'nDeriv', max_depth=1), _scoped_var(a.env, variable):
 		variable.set(a.env, val + h)
 		fwd = formula.eval()
@@ -246,7 +252,7 @@ def fn_int(a: ArgParser) -> float:
 	hi = a.expr()
 	tol = a.expr(optional=True, default=1e-5)
 	a.end()
-	variable = var.variable
+	variable = _var(var)
 	with _nest_guard(a.env, 'fnInt'), _scoped_var(a.env, variable):
 		def f(x):
 			variable.set(a.env, x)
