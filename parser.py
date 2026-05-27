@@ -409,29 +409,13 @@ class Parser:
 		else:
 			raise ParseError(f"Invalid store-to-dim target: {t}")
 
-	# ── Variable key parsers ──────────────────────────────────────────────────────
-
-	def parse_list_var(self) -> Variable:
+	def parse_list_var(self):
 		t = self.advance()
+		if t is LIST_PREFIX:
+			return UserListVar(self._read_name())
 		if t.is_list_var():
 			return t.variable
-		if t is LIST_PREFIX:
-			return UserListVar(self._read_name())
 		raise ParseError(f"Expected a list variable, got {t.text!r}")
-
-	def parse_matrix_var(self) -> Variable:
-		t = self.advance()
-		if t.is_matrix_var():
-			return t.variable
-		raise ParseError(f"Expected a matrix variable, got {t.text!r}")
-
-	def parse_any_var(self) -> Variable:
-		t = self.advance()
-		if t is LIST_PREFIX:
-			return UserListVar(self._read_name())
-		if t.variable:
-			return t.variable
-		raise ParseError(f"Expected a variable, got {t.text!r}")
 
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 
@@ -522,11 +506,10 @@ class ArgParser:
 
 	@_parse_method
 	def matrix_var(self) -> Variable:
-		return self._parser.parse_matrix_var()
-
-	@_parse_method
-	def var(self) -> Variable:
-		return self._parser.parse_any_var()
+		t = self._parser.advance()
+		if t.is_matrix_var():
+			return t.variable
+		raise ParseError(f"Expected a matrix variable, got {t.text!r}")
 
 	def end(self):
 		self._parser.eat_if(R_PAREN)

@@ -210,18 +210,21 @@ def sort_d(a: ArgParser):
 
 
 def fill(a: ArgParser):
-	var = a.var().get(a.env)
+	matrix_mode = a.peek().is_matrix_var()
+	if matrix_mode:
+		var = a.matrix_var()
+	else:
+		var = a.list_var()
+
 	x = require_real(a.expr())
 	a.end()
-	if isinstance(lst, TiList):
+	if matrix_mode:
 		for i in range(len(lst.data)):
 			lst.data[i] = x
-	elif isinstance(lst, TiMatrix):
+	else:
 		for row in lst.data:
 			for i in range(len(row)):
 				row[i] = x
-	else:
-		raise ValueError(f"fill: expected list or matrix, got {type(lst).__name__}")
 
 
 # ── env_func decorator ────────────────────────────────────────────────────────
