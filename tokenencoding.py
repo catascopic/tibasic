@@ -21,7 +21,7 @@ _D: dict[str, bytes] = {
 	'√':	   b'\x10',	   # square root radical
 	'²':	   b'\x12',	   # superscript 2
 	'∠':	   b'\x13',	   # angle
-	'∟':	   b'\x13',	   # right angle → same glyph as ∠
+	'ᴸ':	   b'\x13',	   # right angle → same glyph as ∠
 	'°':	   b'\x14',	   # degree
 	'ʳ':	   b'\x15',	   # superscript r (radian)
 	'ᵀ':	   b'\x16',	   # superscript T (transpose)

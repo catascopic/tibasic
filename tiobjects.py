@@ -308,10 +308,10 @@ class TiString:
 		self.tokens = tokens
 
 	@classmethod
-	def from_ascii(cls, s: str) -> 'TiString':
+	def from_str(cls, s: str) -> 'TiString':
 		"""Create a TiString from a plain Python string."""
-		from tokens import ASCII
-		return cls([ASCII[c] for c in s])
+		from tokens import CHARS
+		return cls([CHARS[c] for c in s])
 
 	def __len__(self):
 		return len(self.tokens)

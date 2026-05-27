@@ -5,16 +5,13 @@ import pytest
 from pytest import approx
 
 import purefunctions as pf
-from environment import Environment
+from environment import Environment, IllegalNestError
 from parser import parse_line, ParseError
 import tokens
 from tokens import (
-	ALL_TOKENS, Token, TOKEN_TABLE, ASCII,
-	STORE, SCI_E, XTH_ROOT,
-	EQ, LT, GT, LE, GE, NE,
-	Ans, INV, SQ, TRANSPOSE,
-	LISTS, MATRICES, STRINGS,
-	VAR_A, VAR_B,
+	ALL_TOKENS, Token, TOKEN_TABLE,
+	XTH_ROOT, INV, SQ, TRANSPOSE,
+	LISTS, MATRICES, STRINGS, VAR_A, VAR_B,
 )
 from tiobjects import TiList, TiMatrix, TiString
 
@@ -25,14 +22,15 @@ STR_1 = STRINGS[0]
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-tokens_by_text = {_t.text: _t for _t in ALL_TOKENS}
-tokens_by_text['~'] = tokens.NEG
-tokens_by_text['@'] = tokens.STORE
+lookup = {_t.text: _t for _t in ALL_TOKENS}
+lookup['~'] = tokens.NEG
+lookup['@'] = tokens.STORE
+lookup['E'] = tokens.SCI_E  # make sure not to use variable E
 
 
 def _iter_chars(obj):
 	for c in str(obj):
-		yield tokens_by_text[c]
+		yield lookup[c]
 
 def _iter_tokens(line):
 	for obj in line:
@@ -42,7 +40,7 @@ def _iter_tokens(line):
 			yield from _iter_chars(str(obj))
 		elif isinstance(obj, str):
 			try:
-				yield tokens_by_text[obj]
+				yield lookup[obj]
 			except KeyError:
 				yield from _iter_chars(obj)
 		else:
@@ -50,10 +48,10 @@ def _iter_tokens(line):
 
 def toks(*line) -> list[Token]:
 	"""Build a token list.
-	- Token     → used directly
-	- int ≥ 0  → tokenised digit-by-digit
-	- str in token table → that token
-	- other str → each character looked up individually
+	- Token: used directly
+	- number: tokenised digit-by-digit
+	- str in token table: that token
+	- other str: each character looked up individually
 	"""
 	return list(_iter_tokens(line))
 
@@ -87,7 +85,7 @@ class TestArithmetic:
 	def test_negation(self):     assert calc('~5') == -5.0
 	def test_sq_postfix(self):   assert calc(7, SQ) == 49.0
 	def test_xroot(self):        assert calc(4, XTH_ROOT, 256) == approx(4)
-	def test_sci_e(self):        assert calc(1, SCI_E, 3) == 1000.0
+	def test_sci_e(self):        assert calc('1E3') == 1000.0
 	def test_implicit_mul(self): assert calc('2(3+4)') == 14.0
 
 	def test_precedence_mul_over_add(self):
@@ -108,93 +106,93 @@ class TestSciE:
 
 	def test_infix_basic(self):
 		# 1ᴇ3 = 1000
-		assert calc(1, SCI_E, 3) == 1000.0
+		assert calc('1E3') == 1000.0
 
 	def test_prefix_basic(self):
 		# ᴇ3 = 10^3 = 1000  (no left operand → implicit 1)
-		assert calc(SCI_E, 3) == 1000.0
+		assert calc('E3') == 1000.0
 
 	def test_infix_zero_exp(self):
 		# 5ᴇ0 = 5
-		assert calc(5, SCI_E, 0) == 5.0
+		assert calc('5E0') == 5.0
 
 	def test_infix_decimal_exp(self):
 		# 1ᴇ1.5 = 10^1.5
-		assert calc(1, SCI_E, '1.5') == approx(10 ** 1.5)
+		assert calc('1E1.5') == approx(10 ** 1.5)
 
 	def test_infix_multi_digit_exp(self):
 		# 2ᴇ10 = 2048 (not 2*(10^1)*0 or anything weird)
-		assert calc(2, SCI_E, 10) == approx(2 * 10 ** 10)
+		assert calc('2E10') == approx(2 * 10 ** 10)
 
 	def test_infix_dms_exp(self):
 		# 1ᴇ1°30' — exponent is 1.5 decimal degrees → 10^1.5
-		assert calc(1, SCI_E, "1°30'") == approx(10 ** 1.5)
+		assert calc("1E1°30'") == approx(10 ** 1.5)
 
 	def test_precedence_over_add(self):
 		# 2 + 3ᴇ2 = 2 + 300 = 302  (ᴇ binds tighter than +)
-		assert calc('2+3', SCI_E, 2) == 302.0
+		assert calc('2+3E2') == 302.0
 
 	def test_precedence_over_mul(self):
 		# 2 * 3ᴇ2 = 2 * 300 = 600  (ᴇ binds tighter than *)
-		assert calc('2*3', SCI_E, 2) == 600.0
+		assert calc('2*3E2') == 600.0
 
 	def test_neg_before_sci_e(self):
 		# ~1ᴇ3 = ~1000  (negation of the whole scientific-notation number)
-		assert calc('~1', SCI_E, 3) == -1000.0
+		assert calc('~1E3') == -1000.0
 
 	def test_pow_rhs_is_sci_e(self):
 		# 2^3ᴇ2: ᴇ binds tighter than ^, so exponent is 3ᴇ2=300 → 2^300
-		assert calc('2^3', SCI_E, 2) == approx(2 ** 300)
+		assert calc('2^3E2') == approx(2 ** 300)
 
 	def test_in_larger_expression(self):
 		# (1ᴇ3 + 1ᴇ2) = 1100
-		assert calc('(1', SCI_E, '3+1', SCI_E, '2)') == 1100.0
+		assert calc('(1E3+1E2)') == 1100.0
 
 	# ── Negative cases ────────────────────────────────────────────────────────
 
 	def test_rejects_paren_expr(self):
 		# 1ᴇ(3) — parenthesised expression is not a numeric literal
 		with pytest.raises(ParseError):
-			calc(1, SCI_E, '(3)')
+			calc('1E(3)')
 
 	def test_rejects_variable(self):
 		# 1ᴇA — variable is not a numeric literal
 		with pytest.raises(ParseError):
-			calc(1, SCI_E, 'A')
+			calc('1EA')
 
 	def test_rejects_expression_rhs(self):
 		# 1ᴇ2+1 must parse as (1ᴇ2)+1 = 101, not 1ᴇ(2+1) = 1000
 		# (confirms the RHS stops at the literal boundary)
-		assert calc(1, SCI_E, '2+1') == 101.0
+		assert calc('1E2+1') == 101.0
 
 	def test_rejects_ans_as_exponent(self):
 		# 1ᴇAns — Ans is not a numeric literal
 		with pytest.raises(ParseError):
-			calc(1, SCI_E, Ans)
+			calc('1E', 'Ans')
 
 	def test_infix_negative_exp(self):
 		# 1ᴇ~3 = 0.001
-		assert calc(1, SCI_E, '~3') == approx(0.001)
+		assert calc('1E~3') == approx(0.001)
 
 	def test_prefix_negative_exp(self):
 		# ᴇ~3 = 10^~3 = 0.001
-		assert calc(SCI_E, '~3') == approx(0.001)
+		assert calc('E~3') == approx(0.001)
 
 	def test_negative_exp_decimal(self):
 		# 1ᴇ~1.5 = 10^~1.5
-		assert calc(1, SCI_E, '~1.5') == approx(10 ** -1.5)
+		assert calc('1E~1.5') == approx(10 ** -1.5)
 
 	def test_negative_exp_in_expression(self):
 		# 2 + 3ᴇ~2 = 2 + 0.03 = 2.03
-		assert calc('2+3', SCI_E, '~2') == approx(2.03)
+		assert calc('2+3E~2') == approx(2.03)
 
 	def test_neg_literal_neg_exp(self):
 		# ~2ᴇ~3 = ~0.002
-		assert calc('~2', SCI_E, '~3') == approx(-0.002)
+		assert calc('~2E~3') == approx(-0.002)
 
 	def test_rejects_double_neg_exp(self):
 		# 1ᴇ~~3 — two negations is actually a valid literal
-		assert calc(SCI_E, '~~3') == approx(1000)
+		assert calc('E~~3') == approx(1000)
 
 
 # ── Numeric functions ─────────────────────────────────────────────────────────
@@ -474,22 +472,22 @@ class TestDistributions:
 
 class TestStrings:
 	def test_length(self):
-		assert pf.length(TiString.from_ascii("HELLO")) == 5
+		assert pf.length(TiString.from_str("HELLO")) == 5
 
 	def test_length_empty(self):
-		assert pf.length(TiString.from_ascii("")) == 0
+		assert pf.length(TiString.from_str("")) == 0
 
 	def test_in_string_found(self):
-		assert pf.in_string(TiString.from_ascii("HELLO"), TiString.from_ascii("ELL")) == 2
+		assert pf.in_string(TiString.from_str("HELLO"), TiString.from_str("ELL")) == 2
 
 	def test_in_string_not_found(self):
-		assert pf.in_string(TiString.from_ascii("HELLO"), TiString.from_ascii("XYZ")) == 0
+		assert pf.in_string(TiString.from_str("HELLO"), TiString.from_str("XYZ")) == 0
 
 	def test_in_string_with_start(self):
-		assert pf.in_string(TiString.from_ascii("ABAB"), TiString.from_ascii("AB"), 3) == 3
+		assert pf.in_string(TiString.from_str("ABAB"), TiString.from_str("AB"), 3) == 3
 
 	def test_sub_string(self):
-		result = pf.sub_string(TiString.from_ascii("HELLO"), 2, 3)
+		result = pf.sub_string(TiString.from_str("HELLO"), 2, 3)
 		assert str(result) == "ELL"
 
 
@@ -602,12 +600,12 @@ class TestDateTime:
 
 class TestParserFeatures:
 	def test_variable_store_retrieve(self, env):
-		calc(3, STORE, 'A', env=env)
+		calc('3@A', env=env)
 		assert calc('A', env=env) == 3.0
 
 	def test_ans(self, env):
 		calc(5, env=env)
-		calc(Ans, '+1', env=env)
+		calc('Ans', '+1', env=env)
 		assert env.ans == 6.0
 
 	def test_colon_separator(self, env):
@@ -617,7 +615,7 @@ class TestParserFeatures:
 		assert list(calc('{1,2,3')) == [1.0, 2.0, 3.0]
 
 	def test_list_index(self, env):
-		calc('{1,2,3', STORE, L1, env=env)
+		calc('{1,2,3@', L1, env=env)
 		assert calc(L1, '(2', env=env) == 2.0
 
 	def test_matrix_literal(self):
@@ -626,7 +624,7 @@ class TestParserFeatures:
 		assert result.data == [[1.0, 2.0], [3.0, 4.0]]
 
 	def test_matrix_index(self, env):
-		calc('[[1,2][3,4]]', STORE, MAT_A, env=env)
+		calc('[[1,2][3,4]]@', MAT_A, env=env)
 		assert calc(MAT_A, '(2,1', env=env) == 3.0
 
 	def test_string_literal(self, env):
@@ -690,19 +688,19 @@ class TestRand:
 
 	def test_rand_seed_reproducible(self, env):
 		# Store a seed → rand, then same seed → rand again; must match
-		parse_line(toks(1, STORE, 'rand'), env)
+		parse_line(toks('1@', 'rand'), env)
 		parse_line(toks('rand'), env)
 		first = env.ans
-		parse_line(toks(1, STORE, 'rand'), env)
+		parse_line(toks('1@', 'rand'), env)
 		parse_line(toks('rand'), env)
 		assert env.ans == first
 
 	def test_rand_implicit_multiply(self, env):
 		# 2rand  ≡  2 * rand()  — result must be in [0, 2)
-		parse_line(toks(1, STORE, 'rand'), env)   # fix seed
+		parse_line(toks('1@', 'rand'), env)   # fix seed
 		parse_line(toks('rand'), env)
 		single = env.ans
-		parse_line(toks(1, STORE, 'rand'), env)   # reset seed
+		parse_line(toks('1@', 'rand'), env)   # reset seed
 		parse_line(toks(2, 'rand'), env)          # implicit multiply
 		assert env.ans == approx(2 * single)
 
@@ -736,7 +734,7 @@ class TestRand:
 class TestColonStatements:
 	def test_colon_ans_is_last(self, env):
 		# 1→A:2  →  Ans=2, A=1
-		calc(1, STORE, 'A', ':', 2, env=env)
+		calc('1@A', ':', 2, env=env)
 		assert env.ans == 2.0
 		assert VAR_A.variable.get(env) == 1.0
 
@@ -757,16 +755,16 @@ class TestColonStatements:
 
 	def test_colon_ans_carries_across(self, env):
 		# 7:Ans+1  →  Ans=8  (Ans from segment 1 is visible in segment 2)
-		assert calc('7:', Ans, '+1', env=env) == 8.0
+		assert calc('7:', 'Ans', '+1', env=env) == 8.0
 
 	def test_colon_store_does_not_clobber_a(self, env):
 		# 1→A:2  →  A must still be 1 after Ans becomes 2
-		calc(1, STORE, 'A:2', env=env)
+		calc('1@A:2', env=env)
 		assert calc('A', env=env) == 1.0
 
 	def test_colon_list_then_index(self, env):
 		# {10,20,30}→L₁:L₁(2)  →  Ans=20
-		assert calc('{10,20,30', STORE, L1, ':', L1, '(2', env=env) == 20.0
+		assert calc('{10,20,30@', L1, ':', L1, '(2', env=env) == 20.0
 
 
 # ── Implicit delimiter closing ────────────────────────────────────────────────
@@ -816,30 +814,30 @@ class TestImplicitClose:
 class TestStoreDim:
 	def test_store_dim_list_create(self, env):
 		# 5→dim(L₁)  →  L₁ becomes {0,0,0,0,0}
-		calc(5, STORE, 'dim(', L1, env=env)
+		calc('5@', 'dim(', L1, env=env)
 		assert L1.variable.get(env).data == [0, 0, 0, 0, 0]
 
 	def test_store_dim_list_expand(self, env):
 		# {1,2,3}→L₁ : 5→dim(L₁)  →  L₁ = {1,2,3,0,0}
-		calc('{1,2,3', STORE, L1, env=env)
-		calc(5, STORE, 'dim(', L1, env=env)
+		calc('{1,2,3@', L1, env=env)
+		calc('5@', 'dim(', L1, env=env)
 		assert L1.variable.get(env).data == [1, 2, 3, 0, 0]
 
 	def test_store_dim_list_shrink(self, env):
 		# {1,2,3,4,5}→L₁ : 3→dim(L₁)  →  L₁ = {1,2,3}
-		calc('{1,2,3,4,5', STORE, L1, env=env)
-		calc(3, STORE, 'dim(', L1, env=env)
+		calc('{1,2,3,4,5@', L1, env=env)
+		calc('3@', 'dim(', L1, env=env)
 		assert L1.variable.get(env).data == [1, 2, 3]
 
 	def test_store_dim_matrix_create(self, env):
 		# {2,3}→dim([A])  →  [A] becomes 2×3 of zeros
-		calc('{2,3', STORE, 'dim(', MAT_A, env=env)
+		calc('{2,3@', 'dim(', MAT_A, env=env)
 		assert MAT_A.variable.get(env).data == 2 * [3 * [0]]
 
 	def test_store_dim_matrix_resize_preserves(self, env):
 		# Build [[1,2][3,4]], then resize to 3×3; original values survive, new cells = 0
-		calc('[[1,2][3,4', STORE, MAT_A, env=env)
-		calc('{3,3', STORE, 'dim(', MAT_A, env=env)
+		calc('[[1,2][3,4@', MAT_A, env=env)
+		calc('{3,3@', 'dim(', MAT_A, env=env)
 		assert MAT_A.variable.get(env).data == [
 			[1, 2, 0],
 			[3, 4, 0],
@@ -862,7 +860,7 @@ class TestStoreDim:
 class TestNesting:
 	def test_sum_of_seq(self):
 		# sum(seq(X²,X,1,5))  =  1+4+9+16+25 = 55
-		assert calc('sum(', 'seq(', 'X²,X,1,5') == approx(55)
+		assert calc('sum(', 'seq(', 'X^2,X,1,5') == approx(55)
 
 	def test_seq_with_step(self):
 		# seq(X,X,1,9,2)  =  {1,3,5,7,9}
@@ -878,15 +876,15 @@ class TestNesting:
 
 	def test_sigma_formula(self):
 		# Σ(X²,X,1,4)  =  1+4+9+16 = 30
-		assert calc('Σ(', 'X²,X,1,4') == approx(30)
+		assert calc('Σ(', 'X^2,X,1,4') == approx(30)
 
 	def test_nderiv(self):
 		# nDeriv(X²,X,3) ≈ 6  (derivative of x² at x=3)
-		assert calc('nDeriv(', 'X²,X,3') == approx(6.0, rel=1e-4)
+		assert calc('nDeriv(', 'X^2,X,3') == approx(6.0, rel=1e-4)
 
 	def test_fnint(self):
 		# fnInt(X²,X,0,3) ≈ 9  (∫₀³ x² dx = 9)
-		assert calc('fnInt(', 'X²,X,0,3') == approx(9.0, rel=1e-4)
+		assert calc('fnInt(', 'X^2,X,0,3') == approx(9.0, rel=1e-4)
 
 	def test_abs_of_neg_expr(self):
 		# abs(~(3+4))  =  7
@@ -902,7 +900,7 @@ class TestNesting:
 
 	def test_list_arithmetic_then_sum(self, env):
 		# {1,2,3}*2  =  {2,4,6}, then sum({2,4,6}) = 12
-		calc('{1,2,3}*2', STORE, L1, env=env)
+		calc('{1,2,3}*2@', L1, env=env)
 		assert calc('sum(', L1, env=env) == 12.0
 
 	def test_matrix_power_then_det(self):
@@ -911,8 +909,8 @@ class TestNesting:
 
 	def test_string_concat_then_length(self, env):
 		# "AB"+"CD" stored in Str1, then length(Str1) = 4
-		calc('"AB"+"CD"', STORE, STR_1, env=env)
-		assert calc('length(', STR_1, env=env) == 4.0
+		calc('"AB"+"CD"@', 'Str1', env=env)
+		assert calc('length(', 'Str1', env=env) == 4.0
 
 	def test_cumsum_then_max(self):
 		# max(cumSum({1,2,3,4}))  =  max({1,3,6,10})  =  10
@@ -920,30 +918,30 @@ class TestNesting:
 
 	def test_expr_evaluates_string(self, env):
 		# Build "2+3" dynamically as a string stored in Str1, then expr(Str1) = 5
-		calc('"2+3"', STORE, STR_1, env=env)
-		assert calc('expr(', STR_1, env=env) == approx(5.0)
+		calc('"2+3"@', 'Str1', env=env)
+		assert calc('expr(', 'Str1', env=env) == approx(5.0)
 
 	def test_ans_index_or_mul_list(self, env):
 		# {10,20,30}→Ans  (via plain eval), then Ans(2)  =  20
 		parse_line(toks('{10,20,30}'), env)
-		parse_line(toks(Ans, '(2)'), env)
+		parse_line(toks('Ans', '(2)'), env)
 		assert env.ans == 20.0
 
 	def test_ans_index_or_mul_scalar(self, env):
 		# 7→Ans, then Ans(3)  =  21  (scalar * 3)
 		parse_line(toks(7), env)
-		parse_line(toks(Ans, '(3)'), env)
+		parse_line(toks('Ans', '(3)'), env)
 		assert env.ans == 21.0
 
 	def test_ans_index_matrix(self, env):
 		# [[1,2][3,4]]→Ans, then Ans(2,1) = 3
 		parse_line(toks('[[1,2][3,4'), env)
-		parse_line(toks(Ans, '(2,1'), env)
+		parse_line(toks('Ans', '(2,1'), env)
 		assert env.ans == 3.0
 
 	def test_seq_preserves_variable(self, env):
 		# X=99 before seq; seq restores X=99 afterward
-		parse_line(toks(99, STORE, 'X'), env)
+		parse_line(toks('99@X'), env)
 		parse_line(toks('seq(', 'X,X,1,3'), env)
 		parse_line(toks('X'), env)
 		assert env.ans == 99.0
@@ -956,7 +954,7 @@ class TestIllegalNest:
 
 	def test_seq_no_self_nest(self, env):
 		# seq( inside its own formula → ERR:ILLEGAL NEST
-		with pytest.raises(ValueError, match="ILLEGAL NEST"):
+		with pytest.raises(IllegalNestError):
 			parse_line(toks('seq(', 'seq(', 'X,X,1,2),X,1,3)'), env)
 
 	def test_seq_allows_normal_nesting(self, env):
@@ -966,12 +964,12 @@ class TestIllegalNest:
 
 	def test_sigma_no_self_nest(self, env):
 		# Σ( inside its own formula → ERR:ILLEGAL NEST
-		with pytest.raises(ValueError, match="ILLEGAL NEST"):
+		with pytest.raises(IllegalNestError):
 			parse_line(toks('Σ(', 'Σ(', 'X,X,1,2),X,1,3'), env)
 
 	def test_fnint_no_self_nest(self, env):
 		# fnInt( inside its own integrand → ERR:ILLEGAL NEST
-		with pytest.raises(ValueError, match="ILLEGAL NEST"):
+		with pytest.raises(IllegalNestError):
 			parse_line(toks('fnInt(', 'fnInt(', 'X,X,0,1),X,0,1'), env)
 
 	def test_nderiv_one_level_ok(self, env):
@@ -981,19 +979,19 @@ class TestIllegalNest:
 
 	def test_nderiv_two_levels_raises(self, env):
 		# nDeriv( inside nDeriv( inside nDeriv( → ERR:ILLEGAL NEST
-		with pytest.raises(ValueError, match="ILLEGAL NEST"):
+		with pytest.raises(IllegalNestError):
 			parse_line(toks('nDeriv(', 'nDeriv(', 'nDeriv(', 'X,X,X),X,X),X,1'), env)
 
 	def test_expr_no_self_nest(self, env):
 		# expr( evaluating a string that itself calls expr( → ERR:ILLEGAL NEST
 		# Directly store TiString([expr(, Str1, )]) in Str1 — evaluating it calls expr again
 		STR_1.variable.set(env, TiString(toks('expr(', 'Str1', ')')))
-		with pytest.raises(ValueError, match="ILLEGAL NEST"):
+		with pytest.raises(IllegalNestError):
 			calc('expr(', STR_1, env=env)
 
 	def test_expr_nest_depth_resets(self, env):
 		# After a successful expr( call, the guard is back to 0 — can call again
-		calc('"1+2"', STORE, STR_1, env=env)
+		calc('"1+2"@', STR_1, env=env)
 		assert calc('expr(', STR_1, env=env) == approx(3.0)
 		assert calc('expr(', STR_1, env=env) == approx(3.0)   # second call — must not raise
 
@@ -1034,7 +1032,7 @@ class TestThunkCapture:
 	def test_store_inside_thunk_raises(self, env):
 		# store inside a formula is a statement-level construct; rejected at capture time
 		with pytest.raises(ParseError, match="arguments"):
-			parse_line(toks('seq(', '5', STORE, 'A,X,1,3)'), env)
+			parse_line(toks('seq(', '5@A,X,1,3)'), env)
 
 
 class TestSeqIncrement:

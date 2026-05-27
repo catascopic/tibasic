@@ -5,122 +5,10 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-	from parser import Parser, ParseError
-	from tokens import Token
+	from parser import ArgParser
 
-from contextlib import contextmanager
 from tiobjects import TiList, TiMatrix, require_real, require_str
-from environment import Variable
-
-
-@contextmanager
-def _nest_guard(env, name: str, max_depth: int = 0):
-	"""Raise ERR:ILLEGAL NEST if this function is already nested deeper than max_depth."""
-	depth = env._nest_depth
-	current = depth.get(name, 0)
-	if current > max_depth:
-		raise ValueError(f"ERR:ILLEGAL NEST ({name})")
-	depth[name] = current + 1
-	try:
-		yield
-	finally:
-		depth[name] = current
-
-
-@contextmanager
-def _scoped_var(env, variable):
-	saved = variable.get(env)
-	try:
-		yield
-	finally:
-		variable.set(env, saved)
-
-
-def _parse_method(method):
-	def wrapper(self, optional=False, default=None):
-		return self._arg(lambda: method(self), optional, default)
-	return wrapper
-
-
-class ArgParser:
-	"""Stateful helper for parsing comma-separated function arguments."""
-
-	def __init__(self, parser: Parser):
-		self._parser = parser
-		self._first = True
-
-	def _sep(self):
-		if self._first:
-			self._first = False
-		else:
-			self._parser.expect_comma()
-
-	def _arg(self, parse_fn, optional=False, default=None):
-		if optional:
-			if self._first:
-				if self._parser.at_end() or self._parser.peek_is_rparen():
-					return default
-				self._first = False
-				return parse_fn()
-			if not self._parser.eat_if_comma():
-				return default
-			return parse_fn()
-		self._sep()
-		return parse_fn()
-
-	@_parse_method
-	def expr(self):
-		return self._parser.parse_expr()
-
-	@_parse_method
-	def thunk(self):
-		return self._parser.capture()
-
-	@_parse_method
-	def real_var(self) -> Token:
-		tok = self._parser.advance()
-		if not tok.is_numeric_var():
-			raise ValueError(f"Expected a real variable, got {tok.text!r}")
-		return tok
-
-	@_parse_method
-	def list_var(self) -> Variable:
-		return self._parser.parse_list_var()
-
-	@_parse_method
-	def matrix_var(self) -> Variable:
-		return self._parser.parse_matrix_var()
-
-	@_parse_method
-	def var(self) -> Variable:
-		return self._parser.parse_any_var()
-
-	def end(self):
-		self._parser.eat_if_rparen()
-
-	@property
-	def env(self):
-		return self._parser.env
-
-	def has_next_arg(self) -> bool:
-		return self._parser.peek_is_comma()
-
-	def parse_args(self) -> list:
-		args = []
-		if not self._parser.at_end() and not self._parser.peek_is_rparen():
-			args.append(self.expr())
-			while self.has_next_arg():
-				args.append(self.expr())
-		self.end()
-		return args
-
-	def next_is_matrix_var(self) -> bool:
-		pos = self._parser.pos + 1
-		return pos < len(self._parser.tokens) and self._parser.tokens[pos].is_matrix_var()
-
-	def next_is_list_var(self) -> bool:
-		pos = self._parser.pos + 1
-		return pos < len(self._parser.tokens) and self._parser.tokens[pos].is_list_var_start()
+from environment import Variable, Environment
 
 
 def ans_index_or_mul(a: ArgParser):
@@ -158,7 +46,7 @@ def seq(a: ArgParser) -> TiList:
 		op = operator.ge
 		end -= 1e-10
 	variable = var.variable
-	with _nest_guard(a.env, 'seq'), _scoped_var(a.env, variable):
+	with a.env.nest_guard(seq), a.env.scoped_var(variable):
 		while op(n, end):
 			variable.set(a.env, n)
 			result.append(formula.eval())
@@ -175,7 +63,7 @@ def sigma(a: ArgParser) -> float:
 	total = 0
 	n = start
 	variable = var.variable
-	with _nest_guard(a.env, 'sigma'), _scoped_var(a.env, variable):
+	with a.env.nest_guard(sigma), a.env.scoped_var(variable):
 		while n <= end:
 			variable.set(a.env, n)
 			total += formula.eval()
@@ -190,7 +78,7 @@ def n_deriv(a: ArgParser) -> float:
 	h = a.expr(optional=True, default=0.001)
 	a.end()
 	variable = var.variable
-	with _nest_guard(a.env, 'nDeriv', max_depth=1), _scoped_var(a.env, variable):
+	with a.env.nest_guard(n_deriv, max_depth=1), a.env.scoped_var(variable):
 		variable.set(a.env, val + h)
 		fwd = formula.eval()
 		variable.set(a.env, val - h)
@@ -247,7 +135,7 @@ def fn_int(a: ArgParser) -> float:
 	tol = a.expr(optional=True, default=1e-5)
 	a.end()
 	variable = var.variable
-	with _nest_guard(a.env, 'fnInt'), _scoped_var(a.env, variable):
+	with a.env.nest_guard('fnInt'), a.env.scoped_var(variable):
 		def f(x):
 			variable.set(a.env, x)
 			return formula.eval()
@@ -338,11 +226,11 @@ def fill(a: ArgParser):
 
 # ── env_func decorator ────────────────────────────────────────────────────────
 
-def env_func(f):
+def env_func(func):
 	"""Convert an (env, arg1, ...) function into an ArgParser handler."""
-	@wraps(f)
+	@wraps(func)
 	def wrapper(a: ArgParser):
-		return f(a.env, *a.parse_args())
+		return func(a.env, *a.parse_args())
 	return wrapper
 
 
@@ -351,10 +239,10 @@ def env_func(f):
 def expr(a: ArgParser):
 	"""Evaluate a TiString as a TI-BASIC expression."""
 	from parser import Parser
-	string = a.expr()
+	string = require_str(a.expr())
 	a.end()
-	with _nest_guard(a.env, 'expr'):
-		return Parser(require_str(string).tokens, a.env).parse_expr()
+	with a.env.nest_guard(expr):
+		return Parser(string.tokens, a.env).parse_expr()
 
 
 # ── Clock / date-time commands and functions ──────────────────────────────────

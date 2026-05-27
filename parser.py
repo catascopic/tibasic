@@ -2,13 +2,16 @@ from dataclasses import dataclass
 
 from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
-	Token, EOF_TOKEN,
-	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN,
-	QUOTE, COMMA, DOT, COLON, NEWLINE, PRGM, NEG, LIST_PREFIX,
-	RAND, DIM, SCI_E, DEG, RAD, APOS
+	Token,
+	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE, 
+	COMMA, DOT, NEG, COLON, NEWLINE, PRGM,
+	LIST_PREFIX, RAND, DIM, SCI_E, DEG, RAD, APOS,
 )
 from environment import Environment, Variable, UserListVar
-from forms import ArgParser
+
+
+EOF_TOKEN = Token(b'\x00', None, '<END-OF-INPUT>')
+
 
 class ParseError(Exception):
 	pass
@@ -63,18 +66,6 @@ class Parser:
 
 	def at_end(self) -> bool:
 		return self.peek() is EOF_TOKEN
-
-	# Wrappers used by ArgParser so it doesn't need to import token objects
-	def expect_comma(self):
-		self.expect(COMMA)
-	def eat_if_comma(self) -> bool:
-		return self.eat_if(COMMA)
-	def eat_if_rparen(self):
-		self.eat_if(R_PAREN)
-	def peek_is_comma(self) -> bool:
-		return self.peek() is COMMA
-	def peek_is_rparen(self) -> bool:
-		return self.peek() is R_PAREN
 
 	def close_delimiter(self, expected: Token) -> bool:
 		"""Consume expected closer, or implicitly close at statement boundaries.
@@ -476,6 +467,88 @@ def parse_line(tokens: list[Token], env: Environment):
 	"""Parse and evaluate a single program line."""
 	Parser(tokens, env).parse_statement()
 
+
+
+def _parse_method(method):
+	def wrapper(self, optional=False, default=None):
+		return self._arg(lambda: method(self), optional, default)
+	return wrapper
+
+
+class ArgParser:
+	"""Stateful helper for parsing comma-separated function arguments."""
+
+	def __init__(self, parser: Parser):
+		self._parser = parser
+		self._first = True
+
+	def _sep(self):
+		if self._first:
+			self._first = False
+		else:
+			self._parser.expect(COMMA)
+
+	def _arg(self, parse_fn, optional=False, default=None):
+		if optional:
+			if self._first:
+				if self._parser.at_end() or self._parser.peek_is_rparen():
+					return default
+				self._first = False
+				return parse_fn()
+			if not self._parser.eat_if(COMMA):
+				return default
+			return parse_fn()
+		self._sep()
+		return parse_fn()
+
+	@_parse_method
+	def expr(self):
+		return self._parser.parse_expr()
+
+	@_parse_method
+	def thunk(self):
+		return self._parser.capture()
+
+	@_parse_method
+	def real_var(self) -> Token:
+		tok = self._parser.advance()
+		if not tok.is_numeric_var():
+			raise ValueError(f"Expected a real variable, got {tok.text!r}")
+		return tok
+
+	@_parse_method
+	def list_var(self) -> Variable:
+		return self._parser.parse_list_var()
+
+	@_parse_method
+	def matrix_var(self) -> Variable:
+		return self._parser.parse_matrix_var()
+
+	@_parse_method
+	def var(self) -> Variable:
+		return self._parser.parse_any_var()
+
+	def end(self):
+		self._parser.eat_if(R_PAREN)
+
+	@property
+	def env(self):
+		return self._parser.env
+
+	def has_next_arg(self) -> bool:
+		return self.peek() is COMMA
+
+	def parse_args(self) -> list:
+		args = []
+		if not self._parser.at_end() and not self.peek() is R_PAREN:
+			args.append(self.expr())
+			while self.has_next_arg():
+				args.append(self.expr())
+		self.end()
+		return args
+
+	def peek(self):
+		return self._parser.peek()
 
 
 if __name__ == '__main__':

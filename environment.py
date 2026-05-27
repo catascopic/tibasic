@@ -1,7 +1,9 @@
 import math
 import random
 
+from contextlib import contextmanager
 from datetime import datetime, date, timedelta
+
 from tiobjects import TiList, TiMatrix, TiString, TiTypeError, require_num, require_real, require_int, require_list, require_matrix, require_str
 
 
@@ -140,6 +142,10 @@ class _NumericVarArray(_VarArray):
 		return val
 
 
+class IllegalNestError(ValueError):
+	pass
+
+
 class Environment:
 
 	def __init__(self):
@@ -149,7 +155,7 @@ class Environment:
 		self.strings    = _VarArray(10, None, lambda n: f"Str{n+1}")       # Str0–9
 		self.stat       = _VarArray(0x3D, None, repr)                         # stat vars
 		self.window     = _VarArray(0x37, None, repr)                         # window vars
-		self.user_lists = {}                                               # ∟NAME lists
+		self.user_lists = {}                                               # ᴸNAME lists
 		self.ans              = 0
 		self.angle_mode       = 'RAD'
 		self.dt_fmt           = 1
@@ -157,7 +163,7 @@ class Environment:
 		self.clock_on         = True
 		self.key_code         = 0
 		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
-		self._nest_depth: dict[str, int] = {}  # tracks nesting depth for ILLEGAL NEST guards
+		self._nest_depth: dict[object, int] = {}  # tracks nesting depth for ILLEGAL NEST guards
 
 	def to_radians(self, x):
 		return x / (180 / math.pi) if self.angle_mode == 'RAD' else x
@@ -205,7 +211,7 @@ class Environment:
 		fmt = require_int(fmt)
 		if fmt not in {1, 2, 3}:
 			raise ValueError(f"getDtStr: invalid format {fmt}")
-		return TiString.from_ascii(self._now().strftime(['%m/%d/%y', '%d/%m/%y', '%y/%m/%d'][fmt - 1]))
+		return TiString.from_str(self._now().strftime(['%m/%d/%y', '%d/%m/%y', '%y/%m/%d'][fmt - 1]))
 
 	def get_tm_str(self, fmt):
 		fmt = require_int(fmt)
@@ -216,7 +222,7 @@ class Environment:
 			time_str = now.strftime('%I:%M %p').lstrip('0')
 		else:
 			raise ValueError(f"getTmStr: invalid format {fmt}")
-		return TiString.from_ascii(time_str)
+		return TiString.from_str(time_str)
 
 	def clock_on(self):
 		self.clock_on = True
@@ -255,13 +261,34 @@ class Environment:
 	def rand(self):
 		return random.random()
 
+	@contextmanager
+	def scoped_var(self, variable):
+		saved = variable.get(self)
+		try:
+			yield
+		finally:
+			variable.set(self, saved)
+
+	@contextmanager
+	def nest_guard(self, func: object, max_depth: int = 0):
+		"""Raise ERR:ILLEGAL NEST if this function is already nested deeper than max_depth."""
+		current = self._nest_depth.get(func, 0)
+		if current > max_depth:
+			raise IllegalNestError(func)
+		self._nest_depth[func] = current + 1
+		try:
+			yield
+		finally:
+			self._nest_depth[func] = current
+
 	def _iter_values(self):
 		for field in ('numerics', 'lists', 'matrices', 'strings'):
 			yield from getattr(self, field).iter_values()
 		for name, lst in self.user_lists.items():
-			yield f"∟{name}", value
+			yield f"ᴸ{name}", value
 		yield "Ans", self.ans
 
 	def dump(self):
 		for name, value in self._iter_values():
 			print(f"{name:8}= {value!r}")
+

@@ -24,6 +24,8 @@ use Token instead of string as nesting key
 
 tests:
 freq_list
+matr_to_list/list_to_matr
+
 new function paradigm: decorators for everything
 
 enum for RADIAN/DEGREE
