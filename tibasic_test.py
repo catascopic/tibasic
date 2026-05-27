@@ -14,17 +14,16 @@ from tokens import (
 	EQ, LT, GT, LE, GE, NE, and_, or_, xor,
 	L_PAREN, R_PAREN, L_BRACE, R_BRACE, L_BRACKET, R_BRACKET,
 	Ans, INV, SQ, TRANSPOSE, rand, dim,
+	VAR_A, VAR_B, L1, MAT_A, STR_1,
 )
 from tiobjects import TiList, TiMatrix, TiString
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-tokens_by_text = {_t.text: _t for _t in ALL_TOKENS}
+# TODO: Don't use −
 
-def T(text: str) -> Token:
-	"""Look up a token by its display text."""
-	return tokens_by_text[text]
+tokens_by_text = {_t.text: _t for _t in ALL_TOKENS}
 
 def _iter_chars(obj):
 	for c in str(obj):
@@ -599,46 +598,35 @@ class TestDateTime:
 
 class TestParserFeatures:
 	def test_variable_store_retrieve(self, env):
-		parse_line(toks(3, STORE, 'A'), env)
-		parse_line(toks('A'), env)
-		assert env.ans == 3.0
+		calc(3, STORE, 'A', env=env)
+		assert calc('A', env=env) == 3.0
 
 	def test_ans(self, env):
-		parse_line(toks(5), env)
-		parse_line(toks(Ans, ADD, 1), env)
+		calc(5, env=env)
+		calc(Ans, ADD, 1, env=env)
 		assert env.ans == 6.0
 
 	def test_colon_separator(self, env):
-		parse_line(toks(3, STORE, 'A', COLON, 'A', MUL, 2), env)
-		assert env.ans == 6.0
+		assert calc(3, STORE, 'A', COLON, 'A', MUL, 2, env=env) == 6.0
 
 	def test_list_literal(self):
-		result = calc(L_BRACE, 1, COMMA, 2, COMMA, 3, R_BRACE)
-		assert list(result) == [1.0, 2.0, 3.0]
+		assert list(calc('{1,2,3')) == [1.0, 2.0, 3.0]
 
 	def test_list_index(self, env):
-		l1 = T('L₁')
-		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, R_BRACE, STORE, l1), env)
-		parse_line(toks(l1, L_PAREN, 2, R_PAREN), env)
-		assert env.ans == 2.0
+		calc('{1,2,3', STORE, L1, env=env)
+		assert calc(L1, '(2', env=env) == 2.0
 
 	def test_matrix_literal(self):
-		result = calc(
-			L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET,
-			L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET)
+		result = calc('[[1,2][3,4]]')
 		assert isinstance(result, TiMatrix)
 		assert result.data == [[1.0, 2.0], [3.0, 4.0]]
 
 	def test_matrix_index(self, env):
-		ma = T('[A]')
-		parse_line(toks(
-			L_BRACKET, L_BRACKET, 1, COMMA, 2, R_BRACKET, 
-			L_BRACKET, 3, COMMA, 4, R_BRACKET, R_BRACKET, STORE, ma), env)
-		parse_line(toks(ma, L_PAREN, 2, COMMA, 1, R_PAREN), env)
-		assert env.ans == 3.0
+		calc('[[1,2][3,4]]', STORE, MAT_A, env=env)
+		assert calc(MAT_A, '(2,1', env=env) == 3.0
 
 	def test_string_literal(self, env):
-		parse_line([QUOTE, T('H'), T('I'), QUOTE], env)
+		calc('"HI"', env=env)
 		assert str(env.ans) == "HI"
 
 	def test_dms_degree_in_rad_mode(self):
@@ -659,7 +647,7 @@ class TestParserFeatures:
 
 	def test_expr(self, env):
 		# expr("1+2") evaluates the string as code
-		parse_line([T('expr('), QUOTE, T('1'), ADD, T('2'), QUOTE], env)
+		calc('expr(', '"1+2"', env=env)
 		assert env.ans == approx(3)
 
 	def test_inv_postfix(self):
@@ -750,43 +738,37 @@ class TestRand:
 class TestColonStatements:
 	def test_colon_ans_is_last(self, env):
 		# 1→A:2  →  Ans=2, A=1
-		parse_line(toks(1, STORE, 'A', COLON, 2), env)
+		calc(1, STORE, 'A', COLON, 2, env=env)
 		assert env.ans == 2.0
-		assert T('A').variable.get(env) == 1.0
+		assert VAR_A.variable.get(env) == 1.0
 
 	def test_colon_store_then_read(self, env):
 		# 5→A:A*3  →  Ans=15
-		parse_line(toks(5, STORE, 'A', COLON, 'A', MUL, 3), env)
-		assert env.ans == 15.0
+		assert calc(5, STORE, 'A', COLON, 'A', MUL, 3, env=env) == 15.0
 
 	def test_colon_two_stores(self, env):
 		# 1→A:3→B  →  A=1, B=3, Ans=3
-		parse_line(toks(1, STORE, 'A', COLON, 3, STORE, 'B'), env)
-		assert T('A').variable.get(env) == 1.0
-		assert T('B').variable.get(env) == 3.0
+		calc(1, STORE, 'A', COLON, 3, STORE, 'B', env=env)
+		assert VAR_A.variable.get(env) == 1.0
+		assert VAR_B.variable.get(env) == 3.0
 		assert env.ans == 3.0
 
 	def test_colon_three_segments(self, env):
 		# 1:2:3  →  Ans=3
-		parse_line(toks(1, COLON, 2, COLON, 3), env)
-		assert env.ans == 3.0
+		assert calc(1, COLON, 2, COLON, 3, env=env) == 3.0
 
 	def test_colon_ans_carries_across(self, env):
 		# 7:Ans+1  →  Ans=8  (Ans from segment 1 is visible in segment 2)
-		parse_line(toks(7, COLON, Ans, ADD, 1), env)
-		assert env.ans == 8.0
+		assert calc(7, COLON, Ans, ADD, 1, env=env) == 8.0
 
 	def test_colon_store_does_not_clobber_a(self, env):
 		# 1→A:2  →  A must still be 1 after Ans becomes 2
-		parse_line(toks(1, STORE, 'A', COLON, 2), env)
-		parse_line(toks('A'), env)
-		assert env.ans == 1.0
+		calc(1, STORE, 'A', COLON, 2, env=env)
+		assert calc('A', env=env) == 1.0
 
 	def test_colon_list_then_index(self, env):
 		# {10,20,30}→L₁:L₁(2)  →  Ans=20
-		l1 = T('L₁')
-		parse_line(toks(L_BRACE, 10, COMMA, 20, COMMA, 30, R_BRACE, STORE, l1, COLON, l1, L_PAREN, 2, R_PAREN), env)
-		assert env.ans == 20.0
+		assert calc('{10,20,30', STORE, L1, COLON, L1, '(2', env=env) == 20.0
 
 
 # ── Implicit delimiter closing ────────────────────────────────────────────────
@@ -820,16 +802,15 @@ class TestImplicitClose:
 
 	def test_unclosed_list_then_colon_sum(self, env):
 		# {1,2,3:sum(Ans  →  Ans=6
-		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, COLON, T('sum('), Ans), env)
-		assert env.ans == 6.0
+		assert calc('{1,2,3', COLON, 'sum(', Ans, env=env) == 6.0
 
 	def test_unclosed_fn_args(self):
 		# max(3,7  →  7 (trailing ) omitted)
-		assert calc(T('max('), 3, COMMA, 7) == 7.0
+		assert calc('max(', 3, COMMA, 7) == 7.0
 
 	def test_nested_unclosed(self):
 		# abs(−(3+4  →  7
-		assert calc(T('abs('), NEG, L_PAREN, 3, ADD, 4) == 7.0
+		assert calc('abs(', '−(3+4') == 7.0
 
 
 # ── Storing to dim( ───────────────────────────────────────────────────────────
@@ -837,36 +818,31 @@ class TestImplicitClose:
 class TestStoreDim:
 	def test_store_dim_list_create(self, env):
 		# 5→dim(L₁)  →  L₁ becomes {0,0,0,0,0}
-		l1 = T('L₁')
-		parse_line(toks(5, STORE, dim, l1), env)
-		assert l1.variable.get(env).data == [0, 0, 0, 0, 0]
+		calc(5, STORE, dim, L1, env=env)
+		assert L1.variable.get(env).data == [0, 0, 0, 0, 0]
 
 	def test_store_dim_list_expand(self, env):
 		# {1,2,3}→L₁ : 5→dim(L₁)  →  L₁ = {1,2,3,0,0}
-		l1 = T('L₁')
-		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, R_BRACE, STORE, l1), env)
-		parse_line(toks(5, STORE, dim, l1), env)
-		assert l1.variable.get(env).data == [1, 2, 3, 0, 0]
+		calc('{1,2,3', STORE, L1, env=env)
+		calc(5, STORE, dim, L1, env=env)
+		assert L1.variable.get(env).data == [1, 2, 3, 0, 0]
 
 	def test_store_dim_list_shrink(self, env):
 		# {1,2,3,4,5}→L₁ : 3→dim(L₁)  →  L₁ = {1,2,3}
-		l1 = T('L₁')
-		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, COMMA, 4, COMMA, 5, R_BRACE, STORE, l1), env)
-		parse_line(toks(3, STORE, dim, l1), env)
-		assert l1.variable.get(env).data == [1, 2, 3]
+		calc('{1,2,3,4,5', STORE, L1, env=env)
+		calc(3, STORE, dim, L1, env=env)
+		assert L1.variable.get(env).data == [1, 2, 3]
 
 	def test_store_dim_matrix_create(self, env):
 		# {2,3}→dim([A])  →  [A] becomes 2×3 of zeros
-		ma = T('[A]')
-		parse_line(toks(L_BRACE, 2, COMMA, 3, R_BRACE, STORE, dim, ma), env)
-		assert ma.variable.get(env).data == 2 * [3 * [0]]
+		calc('{2,3', STORE, dim, MAT_A, env=env)
+		assert MAT_A.variable.get(env).data == 2 * [3 * [0]]
 
 	def test_store_dim_matrix_resize_preserves(self, env):
 		# Build [[1,2][3,4]], then resize to 3×3; original values survive, new cells = 0
-		ma = T('[A]')
-		parse_line(toks('[[1,2][3,4', STORE, ma), env)
-		parse_line(toks('{3,3', STORE, dim, ma), env)
-		assert ma.variable.get(env).data == [
+		calc('[[1,2][3,4', STORE, MAT_A, env=env)
+		calc('{3,3', STORE, dim, MAT_A, env=env)
+		assert MAT_A.variable.get(env).data == [
 			[1, 2, 0],
 			[3, 4, 0],
 			[0, 0, 0],
@@ -888,89 +864,66 @@ class TestStoreDim:
 class TestNesting:
 	def test_sum_of_seq(self):
 		# sum(seq(X²,X,1,5))  =  1+4+9+16+25 = 55
-		X = T('X')
-		result = calc(T('sum('), T('seq('), X, SQ, COMMA, X, COMMA, 1, COMMA, 5, R_PAREN)
-		assert result == approx(55)
+		assert calc('sum(', 'seq(', 'X²,X,1,5') == approx(55)
 
 	def test_seq_with_step(self):
 		# seq(X,X,1,9,2)  =  {1,3,5,7,9}
-		X = T('X')
-		result = calc(T('seq('), X, COMMA, X, COMMA, 1, COMMA, 9, COMMA, 2, R_PAREN)
-		assert list(result) == approx([1, 3, 5, 7, 9])
+		assert list(calc('seq(', 'X,X,1,9,2')) == approx([1, 3, 5, 7, 9])
 
 	def test_seq_negative_step(self):
 		# seq(X,X,5,1,−1)  =  {5,4,3,2,1}
-		X = T('X')
-		result = calc(T('seq('), X, COMMA, X, COMMA, 5, COMMA, 1, COMMA, NEG, 1, R_PAREN)
-		assert list(result) == approx([5, 4, 3, 2, 1])
+		assert list(calc('seq(', 'X,X,5,1,−1')) == approx([5, 4, 3, 2, 1])
 
 	def test_sigma(self):
 		# Σ(X,X,1,10)  =  55
-		X = T('X')
-		result = calc(T('Σ('), X, COMMA, X, COMMA, 1, COMMA, 10, R_PAREN)
-		assert result == approx(55)
+		assert calc('Σ(', 'X,X,1,10') == approx(55)
 
 	def test_sigma_formula(self):
 		# Σ(X²,X,1,4)  =  1+4+9+16 = 30
-		X = T('X')
-		result = calc(T('Σ('), X, SQ, COMMA, X, COMMA, 1, COMMA, 4, R_PAREN)
-		assert result == approx(30)
+		assert calc('Σ(', 'X²,X,1,4') == approx(30)
 
 	def test_nderiv(self):
 		# nDeriv(X²,X,3) ≈ 6  (derivative of x² at x=3)
-		X = T('X')
-		result = calc(T('nDeriv('), X, SQ, COMMA, X, COMMA, 3, R_PAREN)
-		assert result == approx(6.0, rel=1e-4)
+		assert calc('nDeriv(', 'X²,X,3') == approx(6.0, rel=1e-4)
 
 	def test_fnint(self):
 		# fnInt(X²,X,0,3) ≈ 9  (∫₀³ x² dx = 9)
-		X = T('X')
-		result = calc(T('fnInt('), X, SQ, COMMA, X, COMMA, 0, COMMA, 3, R_PAREN)
-		assert result == approx(9.0, rel=1e-4)
+		assert calc('fnInt(', 'X²,X,0,3') == approx(9.0, rel=1e-4)
 
 	def test_abs_of_neg_expr(self):
 		# abs(−(3+4))  =  7
-		assert calc(T('abs('), NEG, L_PAREN, 3, ADD, 4, R_PAREN, R_PAREN) == 7.0
+		assert calc('abs(', '−(3+4') == 7.0
 
 	def test_max_of_list_expr(self):
 		# max({3,1,4,1,5})  =  5
-		result = calc(T('max('), L_BRACE, 3, COMMA, 1, COMMA, 4, COMMA, 1, COMMA, 5, R_BRACE, R_PAREN)
-		assert result == 5.0
+		assert calc('max(', '{3,1,4,1,5') == 5.0
 
 	def test_nested_arithmetic_functions(self):
 		# round(1/6, 3)  =  0.167
-		assert calc(T('round('), 1, DIV, 6, COMMA, 3) == approx(0.167)
+		assert calc('round(', '1/6,3') == approx(0.167)
 
 	def test_list_arithmetic_then_sum(self, env):
 		# {1,2,3}*2  =  {2,4,6}, then sum({2,4,6}) = 12
-		parse_line(toks(L_BRACE, 1, COMMA, 2, COMMA, 3, R_BRACE, MUL, 2, STORE, T('L₁')), env)
-		parse_line(toks(T('sum('), T('L₁'), R_PAREN), env)
-		assert env.ans == 12.0
+		calc('{1,2,3}*2', STORE, L1, env=env)
+		assert calc('sum(', L1, env=env) == 12.0
 
 	def test_matrix_power_then_det(self):
 		# det([[1,1][0,1]]²)  =  det([[1,2][0,1]])  =  1
-		mat_toks = toks(L_BRACKET, L_BRACKET, 1, COMMA, 1, R_BRACKET, L_BRACKET, 0, COMMA, 1, R_BRACKET, R_BRACKET)
-		result = calc(T('det('), *mat_toks, POW, 2, R_PAREN)
-		assert result == approx(1.0)
+		assert calc('det(', '[[1,1][0,1]]^2') == approx(1.0)
 
 	def test_string_concat_then_length(self, env):
 		# "AB"+"CD" stored in Str1, then length(Str1) = 4
-		str1 = T('Str1')
-		parse_line([QUOTE, T('A'), T('B'), QUOTE, ADD, QUOTE, T('C'), T('D'), QUOTE, STORE, str1], env)
-		parse_line([T('length('), str1, R_PAREN], env)
-		assert env.ans == 4.0
+		calc('"AB"+"CD"', STORE, STR_1, env=env)
+		assert calc('length(', STR_1, env=env) == 4.0
 
 	def test_cumsum_then_max(self):
 		# max(cumSum({1,2,3,4}))  =  max({1,3,6,10})  =  10
-		result = calc(T('max('), T('cumSum('), L_BRACE, 1, COMMA, 2, COMMA, 3, COMMA, 4, R_BRACE, R_PAREN)
-		assert result == 10.0
+		assert calc('max(', 'cumSum(', '{1,2,3,4') == 10.0
 
 	def test_expr_evaluates_string(self, env):
 		# Build "2+3" dynamically as a string stored in Str1, then expr(Str1) = 5
-		str1 = T('Str1')
-		parse_line([QUOTE, T('2'), ADD, T('3'), QUOTE, STORE, str1], env)
-		parse_line([T('expr('), str1, R_PAREN], env)
-		assert env.ans == approx(5.0)
+		calc('"2+3"', STORE, STR_1, env=env)
+		assert calc('expr(', STR_1, env=env) == approx(5.0)
 
 	def test_ans_index_or_mul_list(self, env):
 		# {10,20,30}→Ans  (via plain eval), then Ans(2)  =  20
@@ -1015,58 +968,36 @@ class TestIllegalNest:
 
 	def test_sigma_no_self_nest(self, env):
 		# Σ( inside its own formula → ERR:ILLEGAL NEST
-		X = T('X')
 		with pytest.raises(ValueError, match="ILLEGAL NEST"):
-			parse_line(toks(
-				T('Σ('), T('Σ('), X, COMMA, X, COMMA, 1, COMMA, 2, R_PAREN,
-				COMMA, X, COMMA, 1, COMMA, 3, R_PAREN
-			), env)
+			parse_line(toks('Σ(', 'Σ(', 'X,X,1,2),X,1,3'), env)
 
 	def test_fnint_no_self_nest(self, env):
 		# fnInt( inside its own integrand → ERR:ILLEGAL NEST
-		X = T('X')
 		with pytest.raises(ValueError, match="ILLEGAL NEST"):
-			parse_line(toks(
-				T('fnInt('), T('fnInt('), X, COMMA, X, COMMA, 0, COMMA, 1, R_PAREN,
-				COMMA, X, COMMA, 0, COMMA, 1, R_PAREN
-			), env)
+			parse_line(toks('fnInt(', 'fnInt(', 'X,X,0,1),X,0,1'), env)
 
 	def test_nderiv_one_level_ok(self, env):
 		# nDeriv( inside nDeriv( once is allowed
-		X = T('X')
-		parse_line(toks(
-			T('nDeriv('), T('nDeriv('), X, SQ, COMMA, X, COMMA, X, R_PAREN,
-			COMMA, X, COMMA, 1, R_PAREN
-		), env)
+		parse_line(toks('nDeriv(', 'nDeriv(', 'X²,X,X),X,1'), env)
 		assert env.ans == approx(2.0, rel=1e-3)
 
 	def test_nderiv_two_levels_raises(self, env):
 		# nDeriv( inside nDeriv( inside nDeriv( → ERR:ILLEGAL NEST
-		X = T('X')
 		with pytest.raises(ValueError, match="ILLEGAL NEST"):
-			parse_line(toks(
-				T('nDeriv('),
-				T('nDeriv('), T('nDeriv('), X, COMMA, X, COMMA, X, R_PAREN,
-				COMMA, X, COMMA, X, R_PAREN,
-				COMMA, X, COMMA, 1, R_PAREN
-			), env)
+			parse_line(toks('nDeriv(', 'nDeriv(', 'nDeriv(', 'X,X,X),X,X),X,1'), env)
 
 	def test_expr_no_self_nest(self, env):
 		# expr( evaluating a string that itself calls expr( → ERR:ILLEGAL NEST
-		str1 = T('Str1')
 		# Directly store TiString([expr(, Str1, )]) in Str1 — evaluating it calls expr again
-		str1.variable.set(env, TiString([T('expr('), str1, R_PAREN]))
+		STR_1.variable.set(env, TiString([tokens_by_text['expr('], STR_1, R_PAREN]))
 		with pytest.raises(ValueError, match="ILLEGAL NEST"):
-			parse_line([T('expr('), str1, R_PAREN], env)
+			calc('expr(', STR_1, env=env)
 
 	def test_expr_nest_depth_resets(self, env):
 		# After a successful expr( call, the guard is back to 0 — can call again
-		str1 = T('Str1')
-		parse_line([QUOTE, T('1'), ADD, T('2'), QUOTE, STORE, str1], env)
-		parse_line([T('expr('), str1, R_PAREN], env)
-		assert env.ans == approx(3.0)
-		parse_line([T('expr('), str1, R_PAREN], env)   # second call — must not raise
-		assert env.ans == approx(3.0)
+		calc('"1+2"', STORE, STR_1, env=env)
+		assert calc('expr(', STR_1, env=env) == approx(3.0)
+		assert calc('expr(', STR_1, env=env) == approx(3.0)   # second call — must not raise
 
 
 # ── Thunk capture: commas inside nested delimiters ────────────────────────────
@@ -1112,26 +1043,19 @@ class TestSeqIncrement:
 	"""seq( raises a clear error when start/end/step are inconsistent."""
 
 	def test_zero_step_raises(self, env):
-		X = T('X')
 		with pytest.raises(ValueError, match="zero"):
-			parse_line(toks(T('seq('), X, COMMA, X, COMMA, 1, COMMA, 5, COMMA, 0, R_PAREN), env)
+			calc('seq(', 'X,X,1,5,0', env=env)
 
 	def test_positive_step_start_after_end_raises(self, env):
-		X = T('X')
 		with pytest.raises(ValueError, match="start.*end|end.*start"):
-			parse_line(toks(T('seq('), X, COMMA, X, COMMA, 5, COMMA, 1, R_PAREN), env)
+			calc('seq(', 'X,X,5,1', env=env)
 
 	def test_negative_step_start_before_end_raises(self, env):
-		X = T('X')
 		with pytest.raises(ValueError, match="start.*end|end.*start"):
-			parse_line(toks(T('seq('), X, COMMA, X, COMMA, 1, COMMA, 5, COMMA, NEG, 1, R_PAREN), env)
+			calc('seq(', 'X,X,1,5,−1', env=env)
 
 	def test_equal_start_end_is_fine(self, env):
-		X = T('X')
-		parse_line(toks(T('seq('), X, COMMA, X, COMMA, 3, COMMA, 3, R_PAREN), env)
-		assert env.ans == TiList([3])
+		assert list(calc('seq(', 'X,X,3,3', env=env)) == [3]
 
 	def test_negative_step_descending_is_fine(self, env):
-		X = T('X')
-		parse_line(toks(T('seq('), X, COMMA, X, COMMA, 3, COMMA, 1, COMMA, NEG, 1, R_PAREN), env)
-		assert env.ans == TiList([3, 2, 1])
+		assert list(calc('seq(', 'X,X,3,1,−1', env=env)) == [3, 2, 1]

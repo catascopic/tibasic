@@ -1,9 +1,5 @@
 Improve matrix methods
 
-Environment: screen
-96 columns, 64 rows
-What's the best data structure for this?
-
 Make sure deg symbol vs D/M/S format is working
 
 Also, trig functions actually do need access to the environment so they can see what mode the calculator is in!
@@ -26,34 +22,35 @@ Go through all commands, check to see if they're vectorized correctly
 
 use Token instead of string as nesting key
 
-Right now I'm planning on changing tokens to have no dependencies, and link the functions/commands to tokens elsewhere. One thing I'm stuck on is the text representation of tokens. This came up in getDtStr/getTmStr, which may be the only functions that return strings that aren't derived from user strings, and necessitated the Char_ class. Once tokens are decoupled from functions, this could be changed to directly operating on tokens. In general, I don't want to make strings and tokens interchangeable, though. It is nice for testing to be able to reference "seq(" and not having to do get_token('\x33') or something, but that should mostly be for internal use. Of course, since this is a TI-84 simulator, I do want to be able to save strings as text files, and it is true that every ascii character has an equivalent on the calculator, so I made an ascii field for those tokens. But there are also weird things like the negation sign vs. minus sign.
-Another related problem is how to organize the tokens. First, we have the giant list of all tokens, which is nice if you want to iterate through them all, but maybe that should be discouraged. At least for testing a text-approximation-to-token map would be useful, though there's weird stuff where some tokens have the same text, and we should make sure the "ascii" tokens take precedence. For getDtStr/getTmStr and maybe a nonstandard writeStr method, we might also want an ascii-only lookup table. For reading .8xp files, we need to be able to look up tokens by their byte code. I'm not sure there are any good reasons to iterate through all the tokens after building those lookups.
-A couple other ideas: should all tokens be constants? Should Pxl-Change( be assigned to the constant PXL_CHANGE? (And if so, maybe we break the standard styling and match the capitalization to get Pxl_Change; maybe operators are still uppercase like SUB.) I actually kind of like that; it would make testing easier. I'm also wondering if the token() utility method should be doing the work of setting up the data structures like the full byte-code table or the text/ascii lookup. I kind of want the tokens to be an enum, but I don't think I gain much from doing that, and it would just make them more verbose to work with, since I'd have to reference Token.PXL_CHANGE or something. But if, like enums, the full lookup table for them was built automatically, that would be convenient.
-
-
 tests:
 freq_list
-time test: could tests fail if the clock is right between seconds?
-I like how the toks utility method tries to full-match strings before parsing them as chars, but can we leverage that more in the tests?
-For example, instead of:
-parse_line(toks(T('sum('), T('seq('), X, COMMA, X, COMMA, 1, COMMA, 4, R_PAREN, R_PAREN), env)
-We can just do:
-parse_line(toks('sum(', 'seq(', 'X,X,1,4))'), env)
-The T() function should probably not be necessary.
-But can we cut down on the boilerplate even more? Instead of parse_line(toks(...), env) is there a way to just do: run('2X', STORE, 'A') or something like that?
-Run would have a varargs of token-parseable objects and a kwarg for env. Is this doable in the test framework?
-Remember, `TiList == ...` does not return a boolean! To check the value of a TiList, you have to do `ti_list.data == ...` or `list(ti_list)`
-
 new function paradigm: decorators for everything
-
-check that date/time formats are correct
 
 enum for RADIAN/DEGREE
 make them IntEnums for easier testing?
 
-Not sure what to do about tokens/text
-
 ********
+
+check that date/time formats are correct
+
+Environment: screen
+96 columns, 64 rows
+What's the best data structure for this?
+
+Right now I'm planning on changing tokens to have no dependencies, and link the functions/commands to tokens elsewhere. One thing I'm stuck on is the text representation of tokens. This came up in getDtStr/getTmStr, which may be the only functions that return strings that aren't derived from user strings, and necessitated the Char_ class. Once tokens are decoupled from functions, this could be changed to directly operating on tokens. In general, I don't want to make strings and tokens interchangeable, though. It is nice for testing to be able to reference "seq(" and not having to do get_token('\x33') or something, but that should mostly be for internal use. Of course, since this is a TI-84 simulator, I do want to be able to save strings as text files, and it is true that every ascii character has an equivalent on the calculator, so I made an ascii field for those tokens. But there are also weird things like the negation sign vs. minus sign.
+Another related problem is how to organize the tokens. First, we have the giant list of all tokens, which is nice if you want to iterate through them all, but maybe that should be discouraged. At least for testing a text-approximation-to-token map would be useful, though there's weird stuff where some tokens have the same text, and we should make sure the "ascii" tokens take precedence. For getDtStr/getTmStr and maybe a nonstandard writeStr method, we might also want an ascii-only lookup table. For reading .8xp files, we need to be able to look up tokens by their byte code. I'm not sure there are any good reasons to iterate through all the tokens after building those lookups.
+A couple other ideas: should all tokens be constants? Should Pxl-Change( be assigned to the constant PXL_CHANGE? (And if so, maybe we break the standard styling and match the capitalization to get Pxl_Change; maybe operators are still uppercase like SUB.) I actually kind of like that; it would make testing easier. I'm also wondering if the token() utility method should be doing the work of setting up the data structures like the full byte-code table or the text/ascii lookup. I kind of want the tokens to be an enum, but I don't think I gain much from doing that, and it would just make them more verbose to work with, since I'd have to reference Token.PXL_CHANGE or something. But if, like enums, the full lookup table for them was built automatically, that would be convenient.
+
+time test: could tests fail if the clock is right between seconds?
+In the tests, I like how the toks utility method tries to full-match strings before parsing them as chars, but can we leverage that more in the tests?
+For example, instead of:
+parse_line(toks(T('sum('), T('seq('), X, COMMA, X, COMMA, 1, COMMA, 4, R_PAREN, R_PAREN), env)
+We can just do:
+parse_line(toks('sum(', 'seq(', 'X,X,1,4))'), env)
+Or even do tokens.seq instead of 'seq('. The T() function should not be necessary.
+But can we cut down on the boilerplate even more? Instead of parse_line(toks(...), env) is there a way to just do: run('2X', STORE, 'A') or something like that?
+Run would have a varargs of token-parseable objects and a kwarg for env. Is this doable in the test framework?
+Remember, `TiList == ...` does not return a boolean! To check the value of a TiList, you have to do `ti_list.data == ...` or `list(ti_list)`
 
 I'm switching you to using Opus to think about this problem:
 Can you take a look at this parser at the big-picture level and tell me if you think it's the right approach? Keep in mind that this parser models how the TI-84 calculator works, and I feel like none of the calculator's behavior should be too difficult to model, given that it's also a piece of software that's (mostly) well-written and well-tested. Specifically, I'm hoping there's a way to do the Thunk parsing that's more elegant than what I currently have. How do you think the calculator is capturing the formula of a seq( call?
