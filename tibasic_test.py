@@ -9,7 +9,7 @@ from environment import Environment, IllegalNestError
 from parser import parse_line, ParseError
 import tokens
 from tokens import (
-	ALL_TOKENS, Token, TOKEN_TABLE,
+	ALL_TOKENS, Token, get_token,
 	XTH_ROOT, INV, SQ, TRANSPOSE,
 	LISTS, MATRICES, STRINGS, VAR_A, VAR_B,
 )
@@ -44,7 +44,7 @@ def _iter_tokens(line):
 			except KeyError:
 				yield from _iter_chars(obj)
 		else:
-			yield TOKEN_TABLE[obj]
+			yield get_token(obj)
 
 def toks(*line) -> list[Token]:
 	"""Build a token list.

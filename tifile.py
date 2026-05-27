@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from tokens import Token, TOKENS, TOKEN_TABLE
+from tokens import Token, TOKENS, get_token
 
 
 _TWO_BYTE_PREFIXES = {t.code[0] for t in TOKENS if len(t.code) == 2}
@@ -45,7 +45,7 @@ def read(file) -> TiProgram:
 		tokens = []
 		while f.tell() < end:
 			b = f.peek(1)[0]
-			tokens.append(TOKEN_TABLE[f.read(2 if b in _TWO_BYTE_PREFIXES else 1)])
+			tokens.append(get_token(f.read(2 if b in _TWO_BYTE_PREFIXES else 1)))
 	
 	# TODO: checksum check
 	return TiProgram(

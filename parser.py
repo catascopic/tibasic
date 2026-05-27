@@ -572,7 +572,7 @@ if __name__ == '__main__':
 					for c in obj:
 						tokens.append(str_to_token[c])
 			else:
-				tokens.append(TOKEN_TABLE[obj])
+				tokens.append(tokens.get_token(obj))
 
 		print('>>', ''.join(t.text for t in tokens))
 		parse_line(tokens, env)

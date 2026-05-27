@@ -10,8 +10,7 @@ import purefunctions as pf
 import forms
 
 
-
-@dataclass(slots=True, eq=False)
+@dataclass(slots=True, frozen=True, eq=False)
 class Token:
 	code: bytes
 	char: str | None
@@ -31,16 +30,16 @@ class Token:
 		return 0x30 <= self.code[0] <= 0x39
 
 	def is_numeric_var(self) -> bool:
-		return 0x41 <= self.code[0] < 0x5c
+		return 0x41 <= self.code[0] < 0x5C
 
 	def is_list_var(self) -> bool:
-		return self.code[0] == 0x5d
+		return self.code[0] == 0x5D
 
 	def is_matrix_var(self) -> bool:
-		return self.code[0] == 0x5c
+		return self.code[0] == 0x5C
 
 	def is_string_var(self) -> bool:
-		return self.code[0] == 0xaa
+		return self.code[0] == 0xAA
 
 	def is_stat_var(self) -> bool:
 		return self.code[0] == 0x62
@@ -61,13 +60,50 @@ class Token:
 		)
 
 	def __repr__(self):
-		return f'{self.code.hex().upper()}:{self.text}'
+		return f'0x{int.from_bytes(self.code):0{2 * len(self.code)}X}:{self.text!r}'
 
+
+_TABLE: list[Token | list[Token | None] | None] = [None] * 256
 
 ALL_TOKENS: list[Token] = []
 CHARS = {}
 
-_SEEN: set[bytes] = set()
+def get_token(code: int | Sequence[int]) -> Token:
+	if isinstance(code, int):
+		code = (code,)
+	b0 = code[0]
+	if len(code) == 1:
+		tbl = _TABLE
+		idx = b0
+	else:
+		tbl = _TABLE[b0]
+		if tbl is None:
+			raise KeyError(code)
+		idx = code[1]
+
+	token = tbl[idx] if idx < len(tbl) else None
+	if token is None:
+		raise KeyError(code)
+	return token
+
+
+def _set_token(token: Token):
+	b0 = token.code[0]
+	if len(token.code) == 1:
+		tbl = _TABLE
+		idx = b0
+	else:
+		tbl = _TABLE[b0]
+		idx = token.code[1]
+		if tbl is None:
+			_TABLE[b0] = tbl = []
+		if idx >= len(tbl):
+			tbl.extend([None] * (idx + 1 - len(tbl)))
+
+	if (dup := tbl[idx]) is not None:
+		raise ValueError(f"Duplicate token: {token} vs. {dup}")
+	tbl[idx] = token
+ 
 
 def _make_pure_func(f):
 	def wrapper(a):
@@ -91,15 +127,13 @@ def token(
 	var:  Variable | None = None,
 ) -> Token:
 	text = text or char
-	if code in _SEEN:
-		raise ValueError(f'Duplicate token code: {code!r} ({text!r})')
-	_SEEN.add(code)
 	if pure is not None:
 		if func is not None:
 			raise ValueError(f'Token {text!r}: cannot set both func and pure')
 		func = _make_pure_func(pure)
 
-	t = Token(code.to_bytes(2 if code > 0xFF else 1), char, text, bp, op, post, func, cmd, res, cnv, var)
+	t = Token(code.to_bytes(1 + (code > 0xFF)), char, text, bp, op, post, func, cmd, res, cnv, var)
+	_set_token(t)
 	ALL_TOKENS.append(t)
 	if char:
 		CHARS[char] = t
@@ -673,16 +707,16 @@ token(0xBF, '𝑒^(',		pure=pf.exp)
 token(0xC0, 'log(',		pure=pf.log)
 token(0xC1, '⑽^(',		pure=pf.pow10)
 token(0xC2, 'sin(',		pure=pf.sin)
-token(0xC3, 'sin¹(',		pure=pf.asin)
+token(0xC3, 'sin¹(',	pure=pf.asin)
 token(0xC4, 'cos(',		pure=pf.cos)
-token(0xC5, 'cos¹(',		pure=pf.acos)
+token(0xC5, 'cos¹(',	pure=pf.acos)
 token(0xC6, 'tan(',		pure=pf.tan)
-token(0xC7, 'tan¹(',		pure=pf.atan)
-token(0xC8, 'sinh(',		pure=pf.sinh)
+token(0xC7, 'tan¹(',	pure=pf.atan)
+token(0xC8, 'sinh(',	pure=pf.sinh)
 token(0xC9, 'sinh¹(',	pure=pf.asinh)
-token(0xCA, 'cosh(',		pure=pf.cosh)
+token(0xCA, 'cosh(',	pure=pf.cosh)
 token(0xCB, 'cosh¹(',	pure=pf.acosh)
-token(0xCC, 'tanh(',		pure=pf.tanh)
+token(0xCC, 'tanh(',	pure=pf.tanh)
 token(0xCD, 'tanh¹(',	pure=pf.atanh)
 token(0xCE, 'If ')
 token(0xCF, 'Then')
@@ -787,49 +821,6 @@ token(0xFE, 'Scatter')
 token(0xFF, 'LinReg(ax+b) ')
 
 
-class TokenTable:
-
-	def __init__(self, tokens):
-		self._table: list[Token | list[Token | None] | None] = [None] * 256
-		for token in tokens:
-			b0 = token.code[0]
-			if len(token.code) == 1:
-				self._table[b0] = token
-			else:
-				sub = self._table[b0]
-				if sub is None:
-					self._table[b0] = sub = []
-				b1 = token.code[1]
-				if b1 >= len(sub):
-					sub.extend([None] * (b1 + 1 - len(sub)))
-				sub[b1] = token
-
-	def __getitem__(self, code: int | Sequence[int]) -> Token:
-		if isinstance(code, int):
-			code = (code,)
-		b0 = code[0]
-		if len(code) == 1:
-			table = self._table
-			idx = b0
-		else:
-			sub = self._table[b0]
-			if sub is None:
-				raise KeyError(code)
-			table = sub
-			idx = code[1]
-
-		token = table[idx] if idx < len(table) else None
-		if token is None:
-			raise KeyError(code)
-		return token
-
-	def __repr__(self):
-		return repr(self._table)
-
-
-TOKEN_TABLE = TokenTable(ALL_TOKENS)
-
-
 if __name__ == '__main__':
 	for token in ALL_TOKENS:
-		print(f"token({token.code}, char={token.char!r})")
+		print(token)
