@@ -11,9 +11,9 @@ from itertools import accumulate, pairwise, chain, repeat, batched
 from math import prod
 from numbers import Number
 from tiobjects import (
-	TiList, TiMatrix,
-	require_num, require_real,
-	TiString, require_list, require_matrix, require_str, require_int,
+	TiList, TiMatrix, TiString, DMS,
+	require_num, require_real, require_int, 
+	require_list, require_matrix, require_str,
 )
 from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
@@ -139,21 +139,21 @@ def cum_sum(lst):
 			for r in range(rows)
 		])
 	lst = require_list(lst)
-	if len(lst) == 0:
+	if not lst == 0:
 		raise InvalidDimError("cumSum: list is empty")
 	return TiList(list(accumulate(lst)))
 
 
 def delta_list(lst):
 	lst = require_list(lst)
-	if len(lst) == 0:
+	if not lst == 0:
 		raise InvalidDimError("ΔList: list is empty")
 	return TiList([b - a for a, b in pairwise(lst)])
 
 
 def augment(a, b):
 	if isinstance(a, TiList) and isinstance(b, TiList):
-		if len(a) == 0 or len(b) == 0:
+		if not a or not b:
 			raise InvalidDimError("augment: cannot augment an empty list")
 		return TiList(a.data + b.data)
 	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix):
@@ -186,15 +186,7 @@ def angle(a):
 # ── Converters (►DMS, ►Dec, ►Frac) ─────────────────────────────────────────────
 
 def to_dms(x):
-	x = require_real(x)
-	neg = x < 0
-	x = abs(x)
-	deg = int(x)
-	rem = (x - deg) * 60
-	mins = int(rem)
-	secs = (rem - mins) * 60
-	sign = "-" if neg else ""
-	return f"{sign}{deg}°{mins}'{_repr_num(secs)}\""
+	return DMS(require_real(x))
 
 def to_dec(x):
 	return require_real(x)
@@ -911,7 +903,7 @@ def binomcdf(n, p, k=None):
 	n = require_int(n)
 	require_real(p)
 	if k is None:
-		acc = 0.0
+		acc = 0
 		result = []
 		for i in range(n + 1):
 			acc += math.comb(n, i) * p ** i * (1 - p) ** (n - i)

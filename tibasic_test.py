@@ -30,10 +30,14 @@ STR_1 = STRINGS[0]
 lookup = {_t.text: _t for _t in ALL_TOKENS}
 lookup['~'] = tokens.NEG
 lookup['@'] = tokens.STORE
-lookup['E'] = tokens.SCI_E  # make sure not to use variable E
+lookup['e'] = tokens.SCI_E
 lookup['$'] = tokens.LIST_PREFIX
+lookup['i'] = tokens.IMAG_I
 for i, ls in enumerate(tokens.LISTS, start=1):
 	lookup[f"L{i}"] = ls
+for name, value in vars(tokens).items():
+	if isinstance(value, Token):
+		lookup[name] = value
 
 
 def _iter_chars(obj):
@@ -47,10 +51,11 @@ def _iter_tokens(line):
 		elif isinstance(obj, (int, float)):
 			yield from _iter_chars(str(obj))
 		elif isinstance(obj, str):
-			try:
-				yield lookup[obj]
-			except KeyError:
-				yield from _iter_chars(obj)
+			for seg in obj.split():
+				try:
+					yield lookup[seg]
+				except KeyError:
+					yield from _iter_chars(seg)
 		else:
 			yield get_token(obj)
 
@@ -97,7 +102,7 @@ class TestArithmetic:
 	def test_negation(self):     assert calc('~5') == -5
 	def test_sq_postfix(self):   assert calc(7, SQ) == 49
 	def test_xroot(self):        assert calc(4, XTH_ROOT, 256) == approx(4)
-	def test_sci_e(self):        assert calc('1E3') == 1000
+	def test_sci_e(self):        assert calc('1e3') == 1000
 	def test_implicit_mul(self): assert calc('2(3+4)') == 14
 
 	def test_precedence_mul_over_add(self):
@@ -118,116 +123,116 @@ class TestSciE:
 
 	def test_infix_basic(self):
 		# 1ᴇ3 = 1000
-		assert calc('1E3') == 1000
+		assert calc('1e3') == 1000
 
 	def test_prefix_basic(self):
 		# ᴇ3 = 10^3 = 1000  (no left operand → implicit 1)
-		assert calc('E3') == 1000
+		assert calc('e3') == 1000
 
 	def test_infix_zero_exp(self):
 		# 5ᴇ0 = 5
-		assert calc('5E0') == 5
+		assert calc('5e0') == 5
 
 	def test_infix_decimal_exp(self):
 		# 1ᴇ1.5 = 10^1.5
-		assert calc('1E1.5') == approx(10 ** 1.5)
+		assert calc('1e1.5') == approx(10 ** 1.5)
 
 	def test_infix_multi_digit_exp(self):
 		# 2ᴇ10 = 2048 (not 2*(10^1)*0 or anything weird)
-		assert calc('2E10') == approx(2 * 10 ** 10)
+		assert calc('2e10') == approx(2 * 10 ** 10)
 
 	def test_dms_e_in_minutes(self):
 		# 1°2ᴇ2'3" is valid: minutes may use ᴇ notation → 1 + 200/60 + 3/3600
-		assert calc("1°2E2'3\"") == approx(1 + 200 / 60 + 3 / 3600)
+		assert calc("1°2e2'3\"") == approx(1 + 200 / 60 + 3 / 3600)
 
 	def test_dms_sci_min(self):
-		assert calc("1E1°30'") == approx(10.5)
+		assert calc("1e1°30'") == approx(10.5)
 	
 	def test_dms_sci_min(self):
-		assert calc('1E~1°2\'3"') == approx(.1341666666)
+		assert calc('1e~1°2\'3"') == approx(.1341666666)
 	
 	def test_leading_sci_dms(self):
-		assert calc("E1°30'") == approx(10.5)
+		assert calc("e1°30'") == approx(10.5)
 
 	def test_expr_sci_dms(self):
-		assert calc("(1+1)E1°30'") == approx(21)
+		assert calc("(1+1)e1°30'") == approx(21)
 	
 	def test_dms_expr_error(self):
 		with pytest.raises(TiSyntaxError):
-			calc('(1E~1)°2\'3"')
+			calc('(1e~1)°2\'3"')
 
 	def test_precedence_over_add(self):
 		# 2 + 3ᴇ2 = 2 + 300 = 302  (ᴇ binds tighter than +)
-		assert calc('2+3E2') == 302
+		assert calc('2+3e2') == 302
 
 	def test_precedence_over_mul(self):
 		# 2 * 3ᴇ2 = 2 * 300 = 600  (ᴇ binds tighter than *)
-		assert calc('2*3E2') == 600
+		assert calc('2*3e2') == 600
 
 	def test_neg_before_sci_e(self):
 		# ~1ᴇ3 = ~1000  (negation of the whole scientific-notation number)
-		assert calc('~1E3') == -1000
+		assert calc('~1e3') == -1000
 
 	def test_pow_rhs_is_sci_e(self):
 		# 2^3ᴇ2: ᴇ binds tighter than ^, so exponent is 3ᴇ2=300 → 2^300
-		assert calc('2^3E2') == approx(2 ** 300)
+		assert calc('2^3e2') == approx(2 ** 300)
 
 	def test_in_larger_expression(self):
 		# (1ᴇ3 + 1ᴇ2) = 1100
-		assert calc('(1E3+1E2)') == 1100
+		assert calc('(1e3+1e2)') == 1100
 
 	# ── Negative cases ────────────────────────────────────────────────────────
 
 	def test_rejects_paren_expr(self):
 		# 1ᴇ(3) — parenthesised expression is not a numeric literal
 		with pytest.raises(TiSyntaxError):
-			calc('1E(3)')
+			calc('1e(3)')
 
 	def test_rejects_variable(self):
 		# 1ᴇA — variable is not a numeric literal
 		with pytest.raises(TiSyntaxError):
-			calc('1EA')
+			calc('1eA')
 
 	def test_rejects_expression_rhs(self):
 		# 1ᴇ2+1 must parse as (1ᴇ2)+1 = 101, not 1ᴇ(2+1) = 1000
 		# (confirms the RHS stops at the literal boundary)
-		assert calc('1E2+1') == 101
+		assert calc('1e2+1') == 101
 
 	def test_rejects_ans_as_exponent(self):
 		# 1ᴇAns — Ans is not a numeric literal
 		with pytest.raises(TiSyntaxError):
-			calc('1E', 'Ans')
+			calc('1e', 'Ans')
 	
 	def test_rejects_double_sci(self):
 		with pytest.raises(TiSyntaxError):
-			calc('1E1E1')
+			calc('1e1e1')
 	
 	def test_multi_degrees(self, deg):
-		assert calc("1E2°2'°2", env=deg) == approx(200 + (2/30))
+		assert calc("1e2°2'°2", env=deg) == approx(200 + (2/30))
 			
 	def test_infix_negative_exp(self):
 		# 1ᴇ~3 = 0.001
-		assert calc('1E~3') == approx(0.001)
+		assert calc('1e~3') == approx(0.001)
 
 	def test_prefix_negative_exp(self):
 		# ᴇ~3 = 10^~3 = 0.001
-		assert calc('E~3') == approx(0.001)
+		assert calc('e~3') == approx(0.001)
 
 	def test_negative_exp_decimal(self):
 		# 1ᴇ~1.5 = 10^~1.5
-		assert calc('1E~1.5') == approx(10 ** -1.5)
+		assert calc('1e~1.5') == approx(10 ** -1.5)
 
 	def test_negative_exp_in_expression(self):
 		# 2 + 3ᴇ~2 = 2 + 0.03 = 2.03
-		assert calc('2+3E~2') == approx(2.03)
+		assert calc('2+3e~2') == approx(2.03)
 
 	def test_neg_literal_neg_exp(self):
 		# ~2ᴇ~3 = ~0.002
-		assert calc('~2E~3') == approx(-0.002)
+		assert calc('~2e~3') == approx(-0.002)
 
 	def test_rejects_double_neg_exp(self):
 		# 1ᴇ~~3 — two negations is actually a valid literal
-		assert calc('E~~3') == approx(1000)
+		assert calc('e~~3') == approx(1000)
 
 
 # ── Numeric functions ─────────────────────────────────────────────────────────
@@ -379,8 +384,8 @@ class TestEmptyList:
 		assert pf.dim(self._empty) == 0
 
 	def test_store_dim_zero(self, env):
-		calc('{1,2,3@', L1, env=env)
-		calc('0@', 'dim(', L1, env=env)
+		calc('{1,2,3@', 'L1', env=env)
+		calc('0@', 'dim(', 'L1', env=env)
 		assert env.lists[0].data == []
 
 	# ── Aggregate functions ───────────────────────────────────────────────────
@@ -585,25 +590,25 @@ class TestMatrixRowOps:
 class TestMatrToList:
 	def test_single_column_first(self, env):
 		# Matr►list([A], 1, L1) extracts column 1 into L1
-		calc('Matr►list(', '[[1,2][3,4][5,6]],1,', L1, env=env)
+		calc('Matr►list(', '[[1,2][3,4][5,6]],1,', 'L1', env=env)
 		assert L1.variable.get(env).data == [1, 3, 5]
 
 	def test_single_column_second(self, env):
 		# Matr►list([A], 2, L1) extracts column 2
-		calc('Matr►list(', '[[1,2][3,4][5,6]],2,', L1, env=env)
+		calc('Matr►list( [[1,2][3,4][5,6]],2,', L1, env=env)
 		assert L1.variable.get(env).data == [2, 4, 6]
 
 	def test_multi_list_all_columns(self, env):
 		# Matr►list([A], L1, L2) — each list gets one column
 		calc('[[1,2][3,4]]@', MAT_A, env=env)
-		calc('Matr►list(', MAT_A, ',', L1, ',', L2, env=env)
+		calc('Matr►list( [A] , L1 , L2', env=env)
 		assert L1.variable.get(env).data == [1, 3]
 		assert L2.variable.get(env).data == [2, 4]
 
 	def test_multi_list_single_column_matrix(self, env):
 		# 1-column matrix: one list var is enough
 		calc('[[7][8][9', env=env)
-		calc('Matr►list(', 'Ans', ',', L1, env=env)
+		calc('Matr►list(', 'Ans', ',', 'L1', env=env)
 		assert L1.variable.get(env).data == [7, 8, 9]
 
 	def test_column_out_of_range(self):
@@ -613,7 +618,7 @@ class TestMatrToList:
 	def test_too_many_list_args(self, env):
 		# 2-column matrix but 3 list destinations → InvalidDimError
 		with pytest.raises(InvalidDimError):
-			calc('Matr►list(', '[[1,2][3,4]],', L1, ',', L2, ',', LISTS[2])
+			calc('Matr►list( [[1,2][3,4]], L1 , L2 , L3 )')
 
 	def test_non_matrix_raises(self, env):
 		with pytest.raises(DataTypeError):
@@ -664,21 +669,29 @@ class TestUserLists:
 
 	def test_store_and_retrieve_with_prefix(self, env):
 		calc('{1,2,3}@$AB', env=env)
-		assert list(calc('$AB', env=env)) == [1, 2, 3]
+		assert env.user_lists['AB'].data == [1, 2, 3]
 
 	def test_store_bare_name(self, env):
 		# When the value is already a list, →NAME (no ᴸ) stores as a user list
 		calc('{4,5}@AB', env=env)
-		assert list(calc('$AB', env=env)) == [4, 5]
+		assert env.user_lists['AB'].data == [4, 5]
 
 	def test_single_char_name(self, env):
 		calc('{7,8}@$Z', env=env)
-		assert list(calc('$Z', env=env)) == [7, 8]
+		assert env.user_lists['Z'].data == [7, 8]
+		
+	def test_with_numbers(self, env):
+		calc('{1,2@A1234', env=env)
+		assert env.user_lists['A1234'].data == [1, 2]
 
 	def test_overwrite(self, env):
 		calc('{1,2,3}@$AB', env=env)
 		calc('{9,8}@$AB', env=env)
-		assert list(calc('$AB', env=env)) == [9, 8]
+		assert env.user_lists['AB'].data == [9, 8]
+	
+	def test_fail_leading_number(self):
+		with pytest.raises(TiSyntaxError):
+			calc('{1}@$7A')
 
 	# ── Indexing ──────────────────────────────────────────────────────────────
 
@@ -693,11 +706,11 @@ class TestUserLists:
 	def test_index_write(self, env):
 		calc('{1,2,3}@$AB', env=env)
 		calc('99@$AB(2)', env=env)
-		assert list(calc('$AB', env=env)) == [1, 99, 3]
+		assert env.user_lists['AB'].data == [1, 99, 3]
 
 	# ── Arithmetic — behaves the same as L1–L6 ───────────────────────────────
 
-	def test_scalar_multiply(self, env):
+	def test_scalar_div(self, env):
 		calc('{2,4,6}@$AB', env=env)
 		assert list(calc('$AB/2', env=env)) == [1, 2, 3]
 
@@ -786,7 +799,10 @@ class TestUserLists:
 		calc('Matr►list(', MAT_A, ',$AB,$CD', env=env)
 		calc('List►matr(', '$AB,$CD,', MAT_A, env=env)
 		assert MAT_A.variable.get(env).data == [[10, 20], [30, 40]]
-
+	
+	def test_six_char(self):
+		with pytest.raises(TiSyntaxError):
+			calc('{1}@$ABCDEF')
 
 # ── Complex numbers ───────────────────────────────────────────────────────────
 
@@ -1063,29 +1079,29 @@ class TestParserFeatures:
 			calc("1°~30'")
 
 	def test_dms_neg_exp_in_minutes(self):
-		# 1°2E~1' — negative ᴇ exponent in minutes is valid: 2E~1 = 0.2 min
-		assert calc("1°2E~1'") == approx(1 + 0.2 / 60)
+		# 1°2e~1' — negative ᴇ exponent in minutes is valid: 2e~1 = 0.2 min
+		assert calc("1°2e~1'") == approx(1 + 0.2 / 60)
 
 	def test_dms_prefix_e_neg_exp_in_minutes(self):
-		# 1°E~1'3" — prefix ᴇ with negative exponent as minutes: E~1 = 0.1 min
-		assert calc("1°E~1'3\"") == approx(1 + 0.1 / 60 + 3 / 3600)
+		# 1°e~1'3" — prefix ᴇ with negative exponent as minutes: e~1 = 0.1 min
+		assert calc("1°e~1'3\"") == approx(1 + 0.1 / 60 + 3 / 3600)
 
 	def test_dms_prefix_e_minutes(self):
-		# 1°E1'3" — bare ᴇ1 (= 10) as minutes: 1 + 10/60 + 3/3600
-		assert calc("1°E1'3\"") == approx(1 + 10 / 60 + 3 / 3600)
+		# 1°e1'3" — bare ᴇ1 (= 10) as minutes: 1 + 10/60 + 3/3600
+		assert calc("1°e1'3\"") == approx(1 + 10 / 60 + 3 / 3600)
 
 	def test_dms_trailing_sci_errors(self):
-		# 1°30'E2 — ᴇ immediately after a DMS literal is invalid
+		# 1°30'e2 — ᴇ immediately after a DMS literal is invalid
 		with pytest.raises(TiSyntaxError):
-			calc("1°30'E2")
+			calc("1°30'e2")
 
 	def test_dms_neg_sci_literal(self):
-		# ~1E1°30' = ~(1E1°30') = -10.5
-		assert calc("~1E1°30'") == approx(-10.5)
+		# ~1e1°30' = ~(1e1°30') = -10.5
+		assert calc("~1e1°30'") == approx(-10.5)
 
 	def test_dms_lit_sci(self):
-		# 2E1°30': literal 2E1 = 20, then DMS 20°30' → 20.5
-		assert calc("2E1°30'") == approx(20.5)
+		# 2e1°30': literal 2e1 = 20, then DMS 20°30' → 20.5
+		assert calc("2e1°30'") == approx(20.5)
 
 	def test_dms_any_minutes(self):
 		# 1°60' is valid — no range restriction on minutes
@@ -1482,18 +1498,33 @@ class TestSeqIncrement:
 
 	def test_zero_step_raises(self, env):
 		with pytest.raises(IncrementError, match="zero"):
-			calc('seq(', 'X,X,1,5,0', env=env)
+			calc('seq( X,X,1,5,0', env=env)
 
 	def test_positive_step_start_after_end_raises(self, env):
 		with pytest.raises(IncrementError, match="start.*end|end.*start"):
-			calc('seq(', 'X,X,5,1', env=env)
+			calc('seq( X,X,5,1', env=env)
 
 	def test_negative_step_start_before_end_raises(self, env):
 		with pytest.raises(IncrementError, match="start.*end|end.*start"):
-			calc('seq(', 'X,X,1,5,~1', env=env)
+			calc('seq( X,X,1,5,~1', env=env)
 
 	def test_equal_start_end_is_fine(self, env):
-		assert list(calc('seq(', 'X,X,3,3', env=env)) == [3]
+		assert list(calc('seq( X,X,3,3', env=env)) == [3]
 
 	def test_negative_step_descending_is_fine(self, env):
-		assert list(calc('seq(', 'X,X,3,1,~1', env=env)) == [3, 2, 1]
+		assert list(calc('seq( X,X,3,1,~1', env=env)) == [3, 2, 1]
+
+
+class TestCompleXor:
+	
+	def test_xor(self, env):
+		calc('55@A:99@B', env=env)
+		calc('int( log( 2) INV log( max( {A,B', env=env)
+		calc('2^ cumSum( binomcdf( Ans ,0', env=env)
+		assert calc('sum( Ans .5(1= abs( int( 2 fPart( Ans INV (A+Bi', env=env) == 84
+
+	def test_xor2(self, env):
+		calc('55@A:99@B', env=env)
+		calc('seq( 2^N,N,8,1,~1@ L1', env=env).data == [256, 128, 64, 32, 16, 8, 4, 2]
+		calc('.5 sum( L1 *(1= abs( int( 2 fPart( (A+Bi)/ L1 @F', env=env)
+		assert calc('F', env=env) == 84

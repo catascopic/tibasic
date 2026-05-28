@@ -11,7 +11,7 @@ from errors import DataTypeError, DomainError, IllegalNestError
 
 class _VarArray:
 	"""Array-backed variable store with integer indexing."""
-	__slots__ = ('_data','_formatter')
+	__slots__ = ('_data', '_formatter')
 
 	def __init__(self, size, default, formatter):
 		self._data = [default] * size
@@ -27,9 +27,6 @@ class _VarArray:
 		for i, x in enumerate(self._data):
 			if x is not None:
 				yield self._formatter(i), x
-
-	def __repr__(self):
-		return ', '.join(iter_values())
 
 
 # ── Variable hierarchy ────────────────────────────────────────────────────────────
@@ -301,6 +298,9 @@ class Environment:
 	def dump(self):
 		for name, value in self._iter_values():
 			print(f"{name:8}= {value!r}")
+	
+	def __repr__(self):
+		return f"ENV({';'.join(f"{name}={value!r}" for name, value in self._iter_values())})"
 
 	def print_screen(self):
 		pass

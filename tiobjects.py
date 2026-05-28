@@ -10,13 +10,13 @@ from errors import (
 
 
 def repr_num(value):
-	return repr(int(value) if value.is_integer() else value)
+	return repr(int(value) if not isinstance(value, complex) and value.is_integer() else value)
 
 
 class DMS(float):
 	"""A float in decimal degrees that displays as degrees°minutes'seconds\"."""
 	def __repr__(self):
-		total = abs(float(self))
+		total = abs(self)
 		sign = '-' if self < 0 else ''
 		d = int(total)
 		m_total = (total - d) * 60
@@ -69,6 +69,7 @@ class TiList:
 		return self.data[int(index) - 1]
 
 	def __setitem__(self, index, value):
+		require_num(value)
 		if index == len(self) + 1:
 			self.data.append(value)
 		elif index != int(index) or not (1 <= index <= len(self)):
@@ -172,6 +173,7 @@ class TiMatrix:
 		return self.data[int(row_index) - 1][int(col_index) - 1]
 
 	def __setitem__(self, index, value):
+		require_real(value)
 		row_index, col_index = self._check_index(index)
 		self.data[int(row_index) - 1][int(col_index) - 1] = value
 

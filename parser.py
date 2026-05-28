@@ -232,15 +232,18 @@ class Parser:
 
 		return label
 
-	def _read_name(self) -> str:
+	def _read_name(self, limit) -> str:
 		"""Read alphanumeric tokens as an identifier (prgm, user list, etc.)."""
 		t = self.advance()
 		if not t.is_numeric_var():
 			raise TiSyntaxError("Expected a name")
-		name = [t.char]
+		chars = [t.char]
 		while self.peek().is_name_char():
-			name.append(self.advance().char)
-		return ''.join(name)
+			chars.append(self.advance().char)
+		name = ''.join(chars)
+		if len(name) > limit:
+			raise TiSyntaxError(f"Name to long; limit {limit} chars but got: {name}")
+		return name
 
 	# ── Atom parser ────────────────────────────────────────────────────────────
 
@@ -290,7 +293,7 @@ class Parser:
 			return self.parse_list_atom(t.variable)
 
 		if t is LIST_PREFIX:
-			return self.parse_list_atom(UserListVar(self._read_name()))
+			return self.parse_list_atom(self._parse_user_list_var())
 		
 		if t.is_matrix_var():
 			val = t.variable.get(self.env)
@@ -369,7 +372,7 @@ class Parser:
 
 	def parse_store(self, value):
 		if self.peek().is_numeric_var() and isinstance(value, TiList):
-			self.env.user_lists[self._read_name()] = value
+			self.env.user_lists[self._read_name(5)] = value
 			return
 				
 		t = self.advance()
@@ -378,7 +381,7 @@ class Parser:
 			self.parse_store_list(t.variable, value)
 
 		elif t is LIST_PREFIX:
-			self.parse_store_list(UserListVar(self._read_name()), value)
+			self.parse_store_list(self._parse_user_list_var(), value)
 
 		elif t.is_matrix_var():
 			if self.eat_if(L_PAREN):
@@ -435,10 +438,13 @@ class Parser:
 	def parse_list_var(self):
 		t = self.advance()
 		if t is LIST_PREFIX:
-			return UserListVar(self._read_name())
+			return self._parse_user_list_var()
 		if t.is_list_var():
 			return t.variable
 		raise TiSyntaxError(f"Expected a list variable, got {t}")
+	
+	def _parse_user_list_var(self):
+		return UserListVar(self._read_name(5))
 
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 
@@ -448,7 +454,7 @@ class Parser:
 				return
 
 			if self.eat_if(PRGM):
-				name = self._read_name()
+				name = self._read_name(8)
 				val = self.env.programs[name].execute()
 
 			elif self.peek().command is not None:
@@ -559,6 +565,7 @@ class ArgParser:
 
 if __name__ == '__main__':
 	from tibasic_test import toks, calc
+	from tokens import INV
 
 	env = Environment()
 
@@ -568,14 +575,24 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print('<<', env.ans)
 
-	# env.angle_mode = 'DEG'
+	env.angle_mode = 'DEG'
 
-	test('{}')
-	# test("1E2°2'°2")
+	# test('55@A:99@B')
+	# test('int( log( 2) INV log( max( {A,B')
+	# test('2^ cumSum( binomcdf( Ans ,0')
+	# test('sum( Ans .5(1= abs( int( 2 fPart( Ans INV (A+Bi')
+	
+	test('55@A:99@B')
+	test('seq( 2^N,N,8,1,~1@ L1')
+	test('.5 sum( L1 *(1= abs( int( 2 fPart( (A+Bi)/ L1')
+	
+	# test("1E2°1E2'")
+	# test("1E2+(1E2/60)")
+	# test('1@A')
 	# test('1E~1°2\'3"')
 	# test("1°~30'")
-	# test('List►matr(', '{1,2},{3,4},', '[A]')
-	# test('⑽^(', '{1,10')
+	# test('List►matr( {1,2},{3,4}, [A]')
+	# test('⑽^( {1,10')
 	# test('5°')
 	# test('5°5\'5"')
 	# test('2^3',SCI_E,2)
@@ -585,10 +602,10 @@ if __name__ == '__main__':
 	# test('[A]','+[[5,6],[7,8]]')
 	# test('[A]','^4')
 	# test('[A]')
-	# test('length(', '"', ' or ')
+	# test('length( "  or ')
 	# test('{1,2,3}',SCI_E,'{1,2,3}')
 	# test('[[2','dim(','{1,2,3]')
-	# test('rand', '(5')
+	# test('rand (5')
 	# test('[[1:[[','Ans','(1,1')
 	# test('{5,5',STORE,'dim(',(0x5C,0))
 	# test('{5',STORE,LIST_PREFIX,'AB')

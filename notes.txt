@@ -1,4 +1,4 @@
-$RFLCTA should be an error
+Custom numeric classes for formatting?
 
 Aho-Corasick parser for testing
 
@@ -18,6 +18,8 @@ make them IntEnums for easier testing?
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+$RFLCTA should be an error
 
 test: matr_to_list/list_to_matr
 
