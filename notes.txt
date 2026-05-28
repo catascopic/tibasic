@@ -1,3 +1,12 @@
+Improve parameter names in purefunctions
+
+solve( fMin( fMax(
+npv( irr( bal( Σprn( ΣInt( 
+Converters? ►Nom( ►Eff(
+ClrAllLists GetCalc( DelVar Equ►String( String►Equ(
+
+matr_to_list: lists do not have to equal matrix columns. there can be fewer or extra (which are ignored)
+
 Improve get_token, read_token
 
 Custom numeric classes for formatting?
@@ -8,7 +17,8 @@ Do we need a purefunctions equivalent for Environment?
 
 Make sure deg symbol vs D/M/S format is working
 
-Also, trig functions actually do need access to the environment so they can see what mode the calculator is in!
+trig functions actually do need access to the environment so they can see what mode the calculator is in!
+Coordinate conversion use these trig functions so they also need it.
 
 move vectorized to tiobjects
 

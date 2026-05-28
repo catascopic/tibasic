@@ -561,22 +561,22 @@ def rref(mat):
 # ── Coordinate conversions ───────────────────────────────────────────────────
 
 @vectorized
-def r_pr(x, y):
+def rect_to_polar_radius(x, y):
 	return math.hypot(require_real(x), require_real(y))
 
 
 @vectorized
-def r_ptheta(x, y):
+def rect_to_polar_angle(x, y):
 	return math.atan2(require_real(y), require_real(x))
 
 
 @vectorized
-def p_rx(r, theta):
+def polar_to_rect_x(r, theta):
 	return require_real(r) * math.cos(require_real(theta))
 
 
 @vectorized
-def p_ry(r, theta):
+def polar_to_rect_y(r, theta):
 	return require_real(r) * math.sin(require_real(theta))
 
 
