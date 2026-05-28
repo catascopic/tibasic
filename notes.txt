@@ -1,4 +1,4 @@
-Is there any concern that in the time tests, the time might be different between setting and checking?
+Advanced DMS/SCI syntax tests
 
 Aho-Corasick parser for testing
 
@@ -30,6 +30,7 @@ Add aliases to any token that has a character that can't be typed on the keyboar
 
 ********
 
+Is there any concern that in the time tests, the time might be different between setting and checking?
 ArgumentError: wrong number of arguments specified
 DataTypeError: wrong type of an argument or operand
 
@@ -116,7 +117,6 @@ Mixing delimiters doesn't work!
 [[dim(rand(2 VALID
 {length("123 VALID
 
-
 Is [2] valid???
 rand is nullary but can also be called like rand(7) to generate 7 random numbers
 Let's talk about delimiters. The parser never expects you to close them, but this is only partly correct: delimiters don't close other delimiters! For example, ({7) is not valid.
@@ -124,7 +124,6 @@ Possibly the way to handle this is with exceptions. Parentheticals/lists/matrice
 Additionally, Colon closes all delimiters EXCEPT quotation marks (Store arrow DOES close quotation marks)
 As a side note, converters also close all delimiters except quotes
 But I'm not sure this is the best way. What other ideas do you have?
-
 
 {1->A Should be allowed as a way to create a user list without the prefix. (Can be up to 5 characters, as usual)
 
@@ -151,7 +150,6 @@ Is there any concern of a circular import with TiList/TiMatrix? If so, you can m
 
 Get rid of all refs on tokens! environment is responsible for making lookup table of functions
 
-
 tokens that start with "►" and don't use parentheses (like "►DMS") are a special type of command I'm calling a converter, and they're only valid as the last token in a line. Like the "store" arrow, they also implicitly close all parentheses/brackets/quotes
 Basically, lines can take these forms:
 <expression> (does nothing by itself other than side effects, updates Ans)
@@ -169,9 +167,6 @@ This prompted me to store a value to A, then errored, since 1 isn't a variable. 
 Refactor TiMatrix so it has 1-indexed getters/setters. When possible, use these in commands.
 
 fix xth_root arg order
-
-
-
 
 Three function types:
 pure_func: if the function takes pre-parsed arguments and doesn't need access to the environment. Function should be defined in a purefunctions module.
@@ -207,8 +202,6 @@ value_fn -> resolve
 
 Variables shoould also implement resolve!
 New field: store(env) function for variables, also rand, but not dim since it takes an additional argument and makes more sense as a special case
-
-
 
 Okay, I have a pretty big change in mind: I want to make the important tokens, or maybe all tokens, top-level objects. Like this:
 

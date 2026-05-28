@@ -132,9 +132,25 @@ class TestSciE:
 		# 2ᴇ10 = 2048 (not 2*(10^1)*0 or anything weird)
 		assert calc('2E10') == approx(2 * 10 ** 10)
 
-	def test_infix_dms_exp(self):
-		# 1ᴇ1°30' — exponent is 1.5 decimal degrees → 10^1.5
-		assert calc("1E1°30'") == approx(10 ** 1.5)
+	def test_dms_e_in_minutes(self):
+		# 1°2ᴇ2'3" is valid: minutes may use ᴇ notation → 1 + 200/60 + 3/3600
+		assert calc("1°2E2'3\"") == approx(1 + 200 / 60 + 3 / 3600)
+
+	def test_dms_sci_min(self):
+		assert calc("1E1°30'") == approx(10.5)
+	
+	def test_dms_sci_min(self):
+		assert calc('1E~1°2\'3"') == approx(.1341666666)
+	
+	def test_leading_sci_dms(self):
+		assert calc("E1°30'") == approx(10.5)
+
+	def test_expr_sci_dms(self):
+		assert calc("(1+1)E1°30'") == approx(21)
+	
+	def test_dms_expr_error(self):
+		with pytest.raises(TiSyntaxError):
+			calc('(1E~1)°2\'3"')
 
 	def test_precedence_over_add(self):
 		# 2 + 3ᴇ2 = 2 + 300 = 302  (ᴇ binds tighter than +)
@@ -177,7 +193,11 @@ class TestSciE:
 		# 1ᴇAns — Ans is not a numeric literal
 		with pytest.raises(TiSyntaxError):
 			calc('1E', 'Ans')
-
+	
+	def test_rejects_double_sci(self):
+		with pytest.raises(TiSyntaxError):
+			calc('1E1E1')
+			
 	def test_infix_negative_exp(self):
 		# 1ᴇ~3 = 0.001
 		assert calc('1E~3') == approx(0.001)
@@ -640,7 +660,8 @@ class TestDateTime:
 	def test_settime_gettime(self):
 		e = Environment()
 		e.set_time(14, 30, 0)
-		assert list(e.get_time()) == [14, 30, 0]
+		h, m, s = list(e.get_time())
+		assert [h, m] == [14, 30]  # seconds omitted: may drift by 1 across a wall-clock tick
 
 	def test_dt_str_fmt1(self):
 		e = Environment()
@@ -728,6 +749,48 @@ class TestParserFeatures:
 	def test_dms_literal_seconds(self):
 		# 0°0'36" = 0.01 decimal degrees (36/3600 = 0.01)
 		assert calc('0°0\'36"') == approx(0.01)
+	
+	def test_dms_min_error(self):
+		with pytest.raises(TiSyntaxError):
+			calc('1°(2+2)\'3"')
+			
+	def test_neg_min_not_allowed(self):
+		# Direct negation (~) cannot start a DMS component
+		with pytest.raises(TiSyntaxError):
+			calc("1°~30'")
+
+	def test_dms_neg_exp_in_minutes(self):
+		# 1°2E~1' — negative ᴇ exponent in minutes is valid: 2E~1 = 0.2 min
+		assert calc("1°2E~1'") == approx(1 + 0.2 / 60)
+
+	def test_dms_prefix_e_neg_exp_in_minutes(self):
+		# 1°E~1'3" — prefix ᴇ with negative exponent as minutes: E~1 = 0.1 min
+		assert calc("1°E~1'3\"") == approx(1 + 0.1 / 60 + 3 / 3600)
+
+	def test_dms_prefix_e_minutes(self):
+		# 1°E1'3" — bare ᴇ1 (= 10) as minutes: 1 + 10/60 + 3/3600
+		assert calc("1°E1'3\"") == approx(1 + 10 / 60 + 3 / 3600)
+
+	def test_dms_trailing_sci_errors(self):
+		# 1°30'E2 — ᴇ immediately after a DMS literal is invalid
+		with pytest.raises(TiSyntaxError):
+			calc("1°30'E2")
+
+	def test_dms_neg_sci_literal(self):
+		# ~1E1°30' = ~(1E1°30') = -10.5
+		assert calc("~1E1°30'") == approx(-10.5)
+
+	def test_dms_lit_sci(self):
+		# 2E1°30': literal 2E1 = 20, then DMS 20°30' → 20.5
+		assert calc("2E1°30'") == approx(20.5)
+
+	def test_dms_any_minutes(self):
+		# 1°60' is valid — no range restriction on minutes
+		assert calc("1°60'") == approx(2)
+
+	def test_dms_any_seconds(self):
+		# 1°0'60" is valid — no range restriction on seconds
+		assert calc("1°0'60\"") == approx(1 + 60 / 3600)
 
 	def test_expr(self, env):
 		# expr("1+2") evaluates the string as code

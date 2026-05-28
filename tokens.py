@@ -60,6 +60,7 @@ class Token:
 			or self.nullary is not None
 			or self.function is not None
 			or self in {DOT, L_PAREN, L_BRACE, L_BRACKET, QUOTE, NEG, LIST_PREFIX}
+			or self.code[0] == 0x3B  # SCI_E (ᴇ) — prefix form starts a new atom
 		)
 
 	def __repr__(self):

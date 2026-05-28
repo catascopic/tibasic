@@ -49,7 +49,6 @@ class Parser:
 		self.pos += 1
 		return t
 
-	# TODO: remane to try_eat?
 	def eat_if(self, tok: Token) -> bool:
 		if self.peek() is tok:
 			self.pos += 1
@@ -70,38 +69,80 @@ class Parser:
 		if self.eat_if(expected):
 			return True
 		if self.peek() is R_PAREN:
-			raise TiSyntaxError(f"Mismatched delimiter: expected {expected.text!r}, got ')'")
+			raise TiSyntaxError(f"Mismatched delimiter: expected {expected}, got ')'")
 		return False
 
 	# ── Sub-parsers ────────────────────────────────────────────────────────────
 
 	def _parse_digits(self, first: Token) -> float:
-		"""Parse a bare numeric literal with no DMS handling."""
-		num = [first.text]
-		while True:
-			t = self.peek()
-			if not (t.is_digit() or t is DOT):
-				break
-			num.append(self.advance().text)
+		"""Parse a bare numeric literal with no DMS or ᴇ handling."""
+		num = [first.char]
+		while self.peek_digit_or_dot():
+			num.append(self.advance().char)
 		try:
 			return float(''.join(num))
 		except ValueError:
 			raise TiSyntaxError(f"Bad numeric literal: {num!r}")
 
-	def parse_num_literal(self, first: Token) -> float:
+	def _parse_sci_num(self, first: Token) -> float:
+		"""Parse a numeric literal with optional ᴇ exponent, but no DMS."""
 		value = self._parse_digits(first)
-		if self.eat_if(DEG):
-			if self.peek_digit_or_dot():
-				minutes = self._parse_digits(self.advance())
-				self.expect(APOS)
-				seconds = 0
-				if self.peek_digit_or_dot():
-					seconds = self._parse_digits(self.advance())
-					self.expect(QUOTE)
-				value = value + minutes / 60 + seconds / 3600
-			else:
-				value = self.env.to_radians(value)
+		if self.eat_if(SCI_E):
+			value = value * 10 ** self.parse_sci_e_exp()
 		return value
+
+	def parse_sci_e_exp(self) -> float:
+		"""Parse the exponent of an ᴇ expression: an optional ~ followed by a numeric literal."""
+		sign = 1
+		while self.eat_if(NEG):
+			sign *= -1
+		if not self.peek_digit_or_dot():
+			raise TiSyntaxError("ᴇ requires a numeric literal exponent")
+		return sign * self._parse_digits(self.advance())
+
+	def _peek_dms_start(self) -> bool:
+		"""Return True if the next token can start a DMS minutes/seconds component."""
+		t = self.peek()
+		return t.is_digit() or t in {DOT, SCI_E}
+
+	def _parse_dms_component(self) -> float:
+		"""Parse one DMS component (minutes or seconds): digits[ᴇexp] or prefix ᴇexp."""
+		if self.eat_if(SCI_E):
+			return 10 ** self.parse_sci_e_exp()
+		return self._parse_sci_num(self.advance())
+
+	def _parse_dms_num(self, value: float) -> float:
+		"""If ° follows, apply DMS (°min'sec") or deg→rad. Otherwise return value unchanged.
+
+		DMS is valid directly after a numeric literal or ᴇ expression; plain deg→rad
+		is valid anywhere. Callers that represent an ᴇ context call this after ᴇ;
+		parse_expr's bare ° branch handles the non-ᴇ case with to_radians only.
+		"""
+		if not self.eat_if(DEG):
+			return value
+		if self._peek_dms_start():
+			# DMS form: degrees°minutes'seconds"
+			# Components may be digits, digits+ᴇ, or a bare prefix ᴇ (e.g. 1°E1'3")
+			minutes = self._parse_dms_component()
+			self.expect(APOS)
+			seconds = 0
+			if self._peek_dms_start():
+				seconds = self._parse_dms_component()
+				self.expect(QUOTE)
+			result = value + minutes / 60 + seconds / 3600
+			if self.peek() is SCI_E:
+				raise TiSyntaxError("ᴇ cannot follow a DMS literal")
+			return result
+		return self.env.to_radians(value)
+
+	def parse_num_literal(self, first: Token) -> float:
+		"""Parse a numeric literal: digits, optional ᴇ exponent, optional DMS/° suffix."""
+		value = self._parse_digits(first)
+		if self.eat_if(SCI_E):
+			value = value * 10 ** self.parse_sci_e_exp()
+			if self.peek() is SCI_E:
+				raise TiSyntaxError("Cannot chain ᴇ notation (e.g. 1ᴇ1ᴇ1 is invalid)")
+		return self._parse_dms_num(value)
 
 	def parse_string_literal(self) -> TiString:
 		"""Opening \" already consumed. Reads until the next \" or end of line."""
@@ -162,7 +203,7 @@ class Parser:
 				if t is QUOTE:
 					in_string = False
 			elif t in {STORE, COLON, NEWLINE}:
-				raise TiSyntaxError(f"Unexpected {t.text!r} inside function arguments")
+				raise TiSyntaxError(f"Unexpected {t} inside function arguments")
 			elif t is QUOTE:
 				in_string = True
 			elif not stack and t in {COMMA, R_PAREN}:
@@ -182,23 +223,14 @@ class Parser:
 		t = self.peek()
 		return t.is_digit() or t is DOT
 
-	def parse_sci_e_exp(self) -> float:
-		"""Parse the exponent of a ᴇ expression: an optional ~ followed by a numeric literal."""
-		sign = 1
-		while self.eat_if(NEG):
-			sign *= -1
-		if not self.peek_digit_or_dot():
-			raise TiSyntaxError("ᴇ requires a numeric literal exponent")
-		return sign * self.parse_num_literal(self.advance())
-
 	def parse_label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name."""
 		t = self.advance()
 		if not t.is_name_char():
 			raise TiSyntaxError("Expected a label")
-		label = t.text
+		label = t.char
 		if self.peek().is_name_char():
-			label += self.advance().text
+			label += self.advance().char
 
 		return label
 
@@ -207,9 +239,9 @@ class Parser:
 		t = self.advance()
 		if not t.is_numeric_var():
 			raise TiSyntaxError("Expected a name")
-		name = [t.text]
+		name = [t.char]
 		while self.peek().is_name_char():
-			name.append(self.advance().text)
+			name.append(self.advance().char)
 		return ''.join(name)
 
 	# ── Atom parser ────────────────────────────────────────────────────────────
@@ -243,7 +275,7 @@ class Parser:
 
 		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ3 = 1000, ᴇ~3 = 0.001)
 		if t is SCI_E:
-			return 10 ** self.parse_sci_e_exp()
+			return self._parse_dms_num(10 ** self.parse_sci_e_exp())
 
 		# Nullary constants (π, e, rand, Ans, getDate, etc.)
 		# Checked before function so tokens with both can dispatch on whether ( follows.
@@ -296,6 +328,8 @@ class Parser:
 		while True:
 
 			# Angle-mode conversions (need env access, so handled here rather than as token postfixes)
+			# DMS (°minutes'seconds") is handled inside parse_num_literal, so ° here is
+			# always the plain degrees→radians conversion, valid on any expression result.
 			if self.eat_if(DEG):
 				lhs = self.env.to_radians(lhs)
 				continue
@@ -303,12 +337,6 @@ class Parser:
 				lhs = self.env.to_degrees(lhs)
 				continue
 
-			# ᴇ (scientific notation): RHS must be a numeric literal, not a general expression.
-			# No min_bp guard needed — the RHS is always a bare literal, never a sub-expression,
-			# so ᴇ binds maximally tight (tighter than ^) with no Pratt conflict to worry about.
-			if self.eat_if(SCI_E):
-				lhs = lhs * 10 ** self.parse_sci_e_exp()
-				continue
 
 			t = self.peek()
 
@@ -358,7 +386,7 @@ class Parser:
 			if self.eat_if(L_PAREN):
 				mat = t.variable.get(self.env)
 				if mat is None:
-					raise UndefinedError(f"Undefined matrix: {t.text}")
+					raise UndefinedError(f"Undefined matrix: {t}")
 				mat[self.parse_row_col()] = value
 				self.eat_if(R_PAREN)
 			else:
@@ -412,7 +440,7 @@ class Parser:
 			return UserListVar(self._read_name())
 		if t.is_list_var():
 			return t.variable
-		raise TiSyntaxError(f"Expected a list variable, got {t.text!r}")
+		raise TiSyntaxError(f"Expected a list variable, got {t}")
 
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 
@@ -492,10 +520,10 @@ class ArgParser:
 
 	@_parse_method
 	def numeric_var(self) -> Token:
-		tok = self._parser.advance()
-		if not tok.is_numeric_var():
-			raise DataTypeError(f"Expected a numeric variable, got {tok.text!r}")
-		return tok
+		t = self._parser.advance()
+		if not t.is_numeric_var():
+			raise DataTypeError(f"Expected a numeric variable, got {t}")
+		return t
 
 	@_parse_method
 	def list_var(self) -> Variable:
@@ -506,7 +534,7 @@ class ArgParser:
 		t = self._parser.advance()
 		if t.is_matrix_var():
 			return t.variable
-		raise DataTypeError(f"Expected a matrix variable, got {t.text!r}")
+		raise DataTypeError(f"Expected a matrix variable, got {t}")
 
 	def end(self):
 		"""Assert no surplus arguments remain.  The closing ) is already consumed
@@ -544,7 +572,9 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('0!')
+	# test('1E~1°2\'3"')
+	# test("1°~30'")
+	test('1E1E1')
 	# test('List►matr(', '{1,2},{3,4},', '[A]')
 	# test('⑽^(', '{1,10')
 	# test('5°')
