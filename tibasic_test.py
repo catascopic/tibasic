@@ -378,12 +378,10 @@ class TestEmptyList:
 	def test_dim_empty_returns_zero(self):
 		assert pf.dim(self._empty) == 0
 
-	# ── 0→dim(L₁) is rejected ────────────────────────────────────────────────
-
-	def test_store_dim_zero_raises(self, env):
+	def test_store_dim_zero(self, env):
 		calc('{1,2,3@', L1, env=env)
-		with pytest.raises(InvalidDimError):
-			calc('0@', 'dim(', L1, env=env)
+		calc('0@', 'dim(', L1, env=env)
+		assert env.lists[0].data == []
 
 	# ── Aggregate functions ───────────────────────────────────────────────────
 
