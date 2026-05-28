@@ -210,13 +210,7 @@ NEWLINE   = token(0x3F, char='\n')
 
 token(0x40, ' and ',   bp=(30, 31), op=pf.and_)
 
-(
-	VAR_A, VAR_B, VAR_C, VAR_D, VAR_E, VAR_F, VAR_G, VAR_H, VAR_I, VAR_J, 
-	VAR_K, VAR_L, VAR_M, VAR_N, VAR_O, VAR_P, VAR_Q, VAR_R, VAR_S, VAR_T, 
-	VAR_U, VAR_V, VAR_W, VAR_X, VAR_Y, VAR_Z) = LETTERS = tuple(
-	token(0x41 + i, char=chr(0x41 + i), var=NumericVar(i)) for i in range(26)
-)
-
+LETTERS = tuple(token(0x41 + i, char=chr(0x41 + i), var=NumericVar(i)) for i in range(26))
 VAR_THETA = token(0x5B, char='θ', var=NumericVar(26))
 
 # ── 0x5C xx: matrix variables ([A]–[J]) ──────────────────────────────────────
@@ -828,3 +822,6 @@ token(0xFF, 'LinReg(ax+b) ')
 
 if __name__ == '__main__':
 	print(len(ALL_TOKENS))
+	for token in ALL_TOKENS:
+		if ' ' in token.text:
+			print(token)
