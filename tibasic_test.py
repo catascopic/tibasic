@@ -585,14 +585,12 @@ class TestMatrixRowOps:
 class TestMatrToList:
 	def test_single_column_first(self, env):
 		# Matr►list([A], 1, L1) extracts column 1 into L1
-		calc('[[1,2][3,4][5,6]]@', MAT_A, env=env)
-		calc('Matr►list(', MAT_A, ',1,', L1, env=env)
+		calc('Matr►list(', '[[1,2][3,4][5,6]],1,', L1, env=env)
 		assert L1.variable.get(env).data == [1, 3, 5]
 
 	def test_single_column_second(self, env):
 		# Matr►list([A], 2, L1) extracts column 2
-		calc('[[1,2][3,4][5,6]]@', MAT_A, env=env)
-		calc('Matr►list(', MAT_A, ',2,', L1, env=env)
+		calc('Matr►list(', '[[1,2][3,4][5,6]],2,', L1, env=env)
 		assert L1.variable.get(env).data == [2, 4, 6]
 
 	def test_multi_list_all_columns(self, env):
@@ -604,20 +602,18 @@ class TestMatrToList:
 
 	def test_multi_list_single_column_matrix(self, env):
 		# 1-column matrix: one list var is enough
-		calc('[[7][8][9]]@', MAT_A, env=env)
-		calc('Matr►list(', MAT_A, ',', L1, env=env)
+		calc('[[7][8][9', env=env)
+		calc('Matr►list(', 'Ans', ',', L1, env=env)
 		assert L1.variable.get(env).data == [7, 8, 9]
 
-	def test_column_out_of_range(self, env):
-		calc('[[1,2][3,4]]@', MAT_A, env=env)
+	def test_column_out_of_range(self):
 		with pytest.raises(InvalidDimError):
-			calc('Matr►list(', MAT_A, ',3,', L1, env=env)
+			calc('Matr►list(', '[[1,2][3,4]],3,', L1)
 
 	def test_too_many_list_args(self, env):
 		# 2-column matrix but 3 list destinations → InvalidDimError
-		calc('[[1,2][3,4]]@', MAT_A, env=env)
 		with pytest.raises(InvalidDimError):
-			calc('Matr►list(', MAT_A, ',', L1, ',', L2, ',', LISTS[2], env=env)
+			calc('Matr►list(', '[[1,2][3,4]],', L1, ',', L2, ',', LISTS[2])
 
 	def test_non_matrix_raises(self, env):
 		with pytest.raises(DataTypeError):
@@ -641,8 +637,7 @@ class TestListToMatr:
 
 	def test_roundtrip_with_matr_to_list(self, env):
 		# Store a matrix, round-trip through List►matr
-		calc('[[10,20][30,40]]@', MAT_A, env=env)
-		calc('Matr►list(', MAT_A, ',', L1, ',', L2, env=env)
+		calc('Matr►list(', '[[10,20][30,40]],', L1, ',', L2, env=env)
 		calc('List►matr(', L1, ',', L2, ',', MAT_A, env=env)
 		assert MAT_A.variable.get(env).data == [[10, 20], [30, 40]]
 
@@ -761,8 +756,8 @@ class TestStrings:
 	def test_in_string_with_start(self):
 		assert pf.in_string(TiString.from_str("ABAB"), TiString.from_str("AB"), 3) == 3
 
-	def test_sub_string(self):
-		result = pf.sub_string(TiString.from_str("HELLO"), 2, 3)
+	def test_sub(self):
+		result = pf.sub(TiString.from_str("HELLO"), 2, 3)
 		assert str(result) == "ELL"
 
 
@@ -827,29 +822,28 @@ class TestDateTime:
 
 	def test_setdate_getdate(self):
 		e = Environment()
-		e.set_date(2020, 6, 15)
-		assert list(e.get_date()) == [2020, 6, 15]
+		e.set_date(2008, 7, 4)
+		assert list(e.get_date()) == [2008, 7, 4]
 
 	def test_settime_gettime(self):
 		e = Environment()
-		e.set_time(14, 30, 0)
-		h, m, s = list(e.get_time())
-		assert [h, m] == [14, 30]  # seconds omitted: may drift by 1 across a wall-clock tick
+		e.set_time(14, 30, 2)
+		assert list(e.get_time()) == [14, 30, approx(2, abs=1)]  # seconds omitted: may drift by 1 across a wall-clock tick
 
 	def test_dt_str_fmt1(self):
 		e = Environment()
-		e.set_date(2020, 6, 15)
-		assert str(e.get_dt_str(1)) == "06/15/20"
+		e.set_date(2006, 6, 15)
+		assert str(e.get_dt_str(1)) == "06/15/06"
 
 	def test_dt_str_fmt2(self):
 		e = Environment()
-		e.set_date(2020, 6, 15)
-		assert str(e.get_dt_str(2)) == "15/06/20"
+		e.set_date(2005, 12, 25)
+		assert str(e.get_dt_str(2)) == "25/12/05"
 
 	def test_dt_str_fmt3(self):
 		e = Environment()
-		e.set_date(2020, 6, 15)
-		assert str(e.get_dt_str(3)) == "20/06/15"
+		e.set_date(2009, 2, 20)
+		assert str(e.get_dt_str(3)) == "09/02/20"
 
 	def test_tm_str_24h(self):
 		e = Environment()

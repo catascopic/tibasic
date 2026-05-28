@@ -1,5 +1,3 @@
-Empty list literals should be invalid. Additionally, calling augment with one or more empty lists should result in InvalidDimError. Calling most functions on an empty list should also result in InvalidDimError, but dim( still returns 0.
-
 Aho-Corasick parser for testing
 
 Do we need a purefunctions equivalent for Environment?
@@ -10,9 +8,6 @@ Also, trig functions actually do need access to the environment so they can see 
 
 move vectorized to tiobjects
 
-tests:
-matr_to_list/list_to_matr
-
 new function paradigm: decorators for everything
 
 enum for RADIAN/DEGREE
@@ -21,6 +16,10 @@ make them IntEnums for easier testing?
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+test: matr_to_list/list_to_matr
+
+Empty list literals should be invalid. Additionally, calling augment with one or more empty lists should result in InvalidDimError. Calling most functions on an empty list should also result in InvalidDimError, but dim( still returns 0.
 
 Go through all commands, check to see if they're vectorized correctly
 

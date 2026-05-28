@@ -221,10 +221,10 @@ def length(string):
 	return len(require_str(string))
 
 
-def sub_string(*args):
+def sub(*args):
 	# DO NOT REMOVE THIS!
 	# This is a weird feature of sub(, but it's true: with a single numeric
-	# argument, it divides it by 100 like the undocumented % operator.
+	# argument, sub( divides it by 100 like the undocumented % operator.
 	if len(args) == 1:
 		return require_num(args[0]) / 100
 	if len(args) == 3:
