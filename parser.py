@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from numbers import Number
 
 from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
@@ -74,7 +75,7 @@ class Parser:
 
 	# ── Sub-parsers ────────────────────────────────────────────────────────────
 
-	def _parse_digits(self, first: Token) -> float:
+	def _parse_digits(self, first: Token) -> Number:
 		"""Parse a bare numeric literal with no DMS or ᴇ handling."""
 		num = [first.char]
 		while self.peek_digit_or_dot():
@@ -84,14 +85,7 @@ class Parser:
 		except ValueError:
 			raise TiSyntaxError(f"Bad numeric literal: {num!r}")
 
-	def _parse_sci_num(self, first: Token) -> float:
-		"""Parse a numeric literal with optional ᴇ exponent, but no DMS."""
-		value = self._parse_digits(first)
-		if self.eat_if(SCI_E):
-			value = value * 10 ** self.parse_sci_e_exp()
-		return value
-
-	def parse_sci_e_exp(self) -> float:
+	def _parse_sci_exp(self) -> Number:
 		"""Parse the exponent of an ᴇ expression: an optional ~ followed by a numeric literal."""
 		sign = 1
 		while self.eat_if(NEG):
@@ -105,13 +99,16 @@ class Parser:
 		t = self.peek()
 		return t.is_digit() or t in {DOT, SCI_E}
 
-	def _parse_dms_component(self) -> float:
-		"""Parse one DMS component (minutes or seconds): digits[ᴇexp] or prefix ᴇexp."""
+	def _parse_dms_component(self) -> Number:
+		"""Parse one DMS component (minutes or seconds): digits[ᴇ exp] or prefix ᴇexp."""
 		if self.eat_if(SCI_E):
-			return 10 ** self.parse_sci_e_exp()
-		return self._parse_sci_num(self.advance())
+			return 10 ** self._parse_sci_exp()
+		value = self._parse_digits(self.advance())
+		if self.eat_if(SCI_E):
+			value = value * 10 ** self._parse_sci_exp()
+		return value
 
-	def _parse_dms_num(self, value: float) -> float:
+	def _parse_dms_num(self, value: Number) -> Number:
 		"""If ° follows, apply DMS (°min'sec") or deg→rad. Otherwise return value unchanged.
 
 		DMS is valid directly after a numeric literal or ᴇ expression; plain deg→rad
@@ -135,11 +132,11 @@ class Parser:
 			return result
 		return self.env.to_radians(value)
 
-	def parse_num_literal(self, first: Token) -> float:
+	def parse_num_literal(self, first: Token) -> Number:
 		"""Parse a numeric literal: digits, optional ᴇ exponent, optional DMS/° suffix."""
 		value = self._parse_digits(first)
 		if self.eat_if(SCI_E):
-			value = value * 10 ** self.parse_sci_e_exp()
+			value = value * 10 ** self._parse_sci_exp()
 			if self.peek() is SCI_E:
 				raise TiSyntaxError("Cannot chain ᴇ notation (e.g. 1ᴇ1ᴇ1 is invalid)")
 		return self._parse_dms_num(value)
@@ -255,19 +252,23 @@ class Parser:
 
 		if t.is_digit() or t is DOT:
 			return self.parse_num_literal(t)
+			
 		if t is QUOTE:
 			return self.parse_string_literal()
+			
 		if t is L_BRACE:
 			if self._struct_depth > 0:
 				raise TiSyntaxError("List literal not allowed inside a list or matrix")
 			return self.parse_list_literal()
+			
 		if t is L_BRACKET:
 			if self._struct_depth > 0:
 				raise TiSyntaxError("Matrix literal not allowed inside a list or matrix")
 			return self.parse_matrix_literal()
+			
 		if t is L_PAREN:
 			val = self.parse_expr()
-			self.close_delimiter(R_PAREN)
+			self.eat_if(R_PAREN)
 			return val
 
 		# special case: this is the only prefix unary operator
@@ -276,7 +277,7 @@ class Parser:
 
 		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ3 = 1000, ᴇ~3 = 0.001)
 		if t is SCI_E:
-			return self._parse_dms_num(10 ** self.parse_sci_e_exp())
+			return self._parse_dms_num(10 ** self._parse_sci_exp())
 
 		# Nullary constants (π, e, rand, Ans, getDate, etc.)
 		# Checked before function so tokens with both can dispatch on whether ( follows.
@@ -311,7 +312,7 @@ class Parser:
 		val = var.get(self.env)
 		if self.eat_if(L_PAREN):
 			val = val[self.parse_expr()]
-			self.close_delimiter(R_PAREN)
+			self.eat_if(R_PAREN)
 		return val
 
 	def parse_row_col(self):
@@ -337,7 +338,6 @@ class Parser:
 			if self.eat_if(RAD):
 				lhs = self.env.to_degrees(lhs)
 				continue
-
 
 			t = self.peek()
 
@@ -422,16 +422,16 @@ class Parser:
 			var = self.parse_list_var()
 			lst = var.get(self.env)
 			if lst is None:
-				lst = TiList([])
-				var.set(self.env, lst)
-			lst.set_dim(value)
+				var.set(self.env, TiList.alloc(value))
+			else:
+				lst.set_dim(value)
 		elif t.is_matrix_var():
 			self.advance()
 			mat = t.variable.get(self.env)
 			if mat is None:
-				mat = TiMatrix([])
-				t.variable.set(self.env, mat)
-			mat.set_dim(value)
+				t.variable.set(self.env, TiMatrix.alloc(value))
+			else:
+				mat.set_dim(value)
 		else:
 			raise TiSyntaxError(f"Invalid store-to-dim target: {t}")
 
@@ -577,14 +577,15 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
+	
 	# test('55@A:99@B')
 	# test('int( log( 2) INV log( max( {A,B')
 	# test('2^ cumSum( binomcdf( Ans ,0')
 	# test('sum( Ans .5(1= abs( int( 2 fPart( Ans INV (A+Bi')
 	
-	test('55@A:99@B')
-	test('seq( 2^N,N,8,1,~1@ L1')
-	test('.5 sum( L1 *(1= abs( int( 2 fPart( (A+Bi)/ L1')
+	# test('55@A:99@B')
+	# test('seq( 2^N,N,8,1,~1@ L1')
+	# test('.5 sum( L1 *(1= abs( int( 2 fPart( (A+Bi)/ L1')
 	
 	# test("1E2°1E2'")
 	# test("1E2+(1E2/60)")
@@ -598,7 +599,7 @@ if __name__ == '__main__':
 	# test('2^3',SCI_E,2)
 	# test('"a',STORE,'Str1')
 	# test('1°ʳ')
-	# test('([[1,2][3,4',STORE,'[A]')
+	# test('([[1,2][3,4@ [A]')
 	# test('[A]','+[[5,6],[7,8]]')
 	# test('[A]','^4')
 	# test('[A]')

@@ -1,3 +1,5 @@
+Improve get_token, read_token
+
 Custom numeric classes for formatting?
 
 Aho-Corasick parser for testing

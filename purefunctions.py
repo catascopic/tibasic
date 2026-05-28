@@ -426,9 +426,8 @@ for _name, _real_fn, _cpx_fn in [
 
 @vectorized
 def factorial(n):
-	require_real(n)
 	try:
-		return math.gamma(n + 1)
+		return math.gamma(require_real(n) + 1)
 	except ValueError:
 		raise DomainError(f"factorial: undefined for {n} (negative integer)")
 
@@ -456,6 +455,7 @@ def gcd(a, b):
 
 @vectorized
 def remainder(a, b):
+	# TODO: this works like C %, not Python %
 	return require_int(a) % require_int(b)
 
 # ── Random ──────────────────────────────────────────────────────────────────────
@@ -464,14 +464,17 @@ def rand_list(n):
 	return TiList([random.random() for _ in range(require_int(n))])
 
 
-def rand_int(low, high, count=1):
-	low, high = require_int(low), require_int(high)
-	if count == 1:
+def rand_int(low, high, n=1):
+	low = require_int(low)
+	high = require_int(high)
+	if n == 1:
 		return random.randint(low, high)
-	return TiList([random.randint(low, high) for _ in range(require_int(count))])
+	return TiList([random.randint(low, high) for _ in range(require_int(n))])
 
 
 def rand_norm(mu, sigma, n=None):
+	require_real(mu)
+	require_real(sigma)
 	if n is None:
 		return random.gauss(mu, sigma)
 	return TiList([random.gauss(mu, sigma) for _ in range(require_int(n))])
@@ -516,53 +519,43 @@ def times_row_plus(factor, mat, row1, row2):
 
 # ── ref / rref ───────────────────────────────────────────────────────────────
 
-def ref(mat):
+def _row_reduce(mat, get_range):
 	require_matrix(mat)
 	if mat.rows > mat.cols:
-		raise InvalidDimError(f"ref: matrix must have at least as many columns as rows")
-	m = [row.copy() for row in mat.data]
-	rows, cols = mat.rows, mat.cols
+		raise InvalidDimError(f"ref/rref: matrix must have at least as many columns as rows")
+	result = [row.copy() for row in mat.data]
 	pivot_row = 0
-	for col in range(cols):
-		if pivot_row >= rows:
+	for col in range(mat.cols):
+		if pivot_row >= mat.rows:
 			break
-		# Find pivot
-		pivot = next((r for r in range(pivot_row, rows) if m[r][col] != 0), None)
-		if pivot is None:
+		try:
+			swap_row = next((r for r in range(pivot_row, mat.rows) if result[r][col] != 0))
+		except StopIteration:
 			continue
-		m[pivot_row], m[pivot] = m[pivot], m[pivot_row]
-		p = m[pivot_row][col]
-		m[pivot_row] = [x / p for x in m[pivot_row]]
-		for r in range(pivot_row + 1, rows):
-			if m[r][col] != 0:
-				f = m[r][col]
-				m[r] = [m[r][k] - f * m[pivot_row][k] for k in range(cols)]
+
+		result[pivot_row], result[swap_row] = result[swap_row], result[pivot_row]
+		pivot = result[pivot_row]
+		p = pivot[col]
+		for k in range(mat.cols):
+			pivot[k] /= p
+		for r in get_range(pivot_row, mat.rows):
+			if r != pivot_row and result[r][col] != 0:
+				pivot = result[pivot_row]
+				current = result[r]
+				f = current[col]
+				for k in range(mat.cols):
+					current[k] -= f * pivot[k]
+
 		pivot_row += 1
-	return TiMatrix(m)
+	return TiMatrix(result)
+
+
+def ref(mat):
+	return _row_reduce(mat, lambda pivot_row, rows: range(pivot_row + 1, rows))
 
 
 def rref(mat):
-	require_matrix(mat)
-	if mat.rows > mat.cols:
-		raise InvalidDimError(f"rref: matrix must have at least as many columns as rows")
-	m = [row.copy() for row in mat.data]
-	rows, cols = mat.rows, mat.cols
-	pivot_row = 0
-	for col in range(cols):
-		if pivot_row >= rows:
-			break
-		pivot = next((r for r in range(pivot_row, rows) if m[r][col] != 0), None)
-		if pivot is None:
-			continue
-		m[pivot_row], m[pivot] = m[pivot], m[pivot_row]
-		p = m[pivot_row][col]
-		m[pivot_row] = [x / p for x in m[pivot_row]]
-		for r in range(rows):
-			if r != pivot_row and m[r][col] != 0:
-				f = m[r][col]
-				m[r] = [m[r][k] - f * m[pivot_row][k] for k in range(cols)]
-		pivot_row += 1
-	return TiMatrix(m)
+	return _row_reduce(mat, lambda pivot_row, rows: range(rows))
 
 
 # ── Coordinate conversions ───────────────────────────────────────────────────

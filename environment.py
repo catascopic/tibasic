@@ -221,7 +221,11 @@ class RealVar(Variable):
 		self._name = name
 
 	def get(self, env):
-		return getattr(env, name)
+		val = getattr(env, name)
+		if val is None:
+			setattr(env, name, 0)
+			val = 0
+		return val
 
 	def set(self, env, value):
 		return setattr(env, name, require_real(value))

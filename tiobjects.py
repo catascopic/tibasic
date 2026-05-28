@@ -63,6 +63,10 @@ class TiList:
 	def __init__(self, data=None):
 		self.data = [] if data is None else data
 
+	@classmethod
+	def alloc(cls, value):
+		return cls(list(repeat(0, require_int(value))))
+
 	def __getitem__(self, index):
 		if index != int(index) or not (1 <= index <= len(self)):
 			raise InvalidDimError(f"{index=}")
@@ -87,12 +91,12 @@ class TiList:
 		return TiList([-a for a in self.data])
 
 	def set_dim(self, value):
-		new_dim = int(value)
+		value = require_int(value)
 		dim = len(self)
-		if new_dim < dim:
-			del self.data[new_dim:]
-		elif new_dim > dim:
-			self.data.extend(repeat(0, new_dim - dim))
+		if value < dim:
+			del self.data[value:]
+		elif value > dim:
+			self.data.extend(repeat(0, value - dim))
 
 	def copy(self):
 		return TiList(self.data.copy())
@@ -132,13 +136,17 @@ for name, op in [
 	setattr(TiList, name, _vectorize_op(op))
 
 
-def _check_valid_dim(rows, cols):
+def _check_valid_dim(value):
+	require_list(value)
+	if len(value) != 2:
+		raise InvalidDimError(f"Matrix dimensions must be 2 elements, but got {value}")
+	rows, cols = value
 	rows = require_int(rows)
 	cols = require_int(cols)
 	if not (1 <= rows <= 99):
-		raise InvalidDimError(f"{rows=}")
+		raise InvalidDimError(f"Required: 1 <= rows <= 99; got {rows}")
 	if not (1 <= cols <= 99):
-		raise InvalidDimError(f"{cols=}")
+		raise InvalidDimError(f"Required: 1 <= cols <= 99; got {cols}")
 	return rows, cols
 
 
@@ -147,6 +155,11 @@ class TiMatrix:
 
 	def __init__(self, data=None):
 		self.data = [] if data is None else data
+
+	@classmethod
+	def alloc(cls, dim_list):
+		rows, cols = _check_valid_dim(dim_list)
+		return cls([list(repeat(0, cols)) for r in range(rows)])
 
 	@property
 	def rows(self):
@@ -178,13 +191,11 @@ class TiMatrix:
 		self.data[int(row_index) - 1][int(col_index) - 1] = value
 
 	def set_dim(self, dim_list: TiList):
-		new_rows, new_cols = _check_valid_dim(*dim_list.data)
-		self.data = [
-			[
-				self.data[r][c] if r < self.rows and c < self.cols else 0.0
-				for c in range(new_cols)
-			] for r in range(new_rows)
-		]
+		new_rows, new_cols = _check_valid_dim(dim_list)
+		self.data = [[
+			self.data[r][c] if r < self.rows and c < self.cols else 0.0
+			for c in range(new_cols)
+		] for r in range(new_rows)]
 
 	def get_row(self, r) -> list:
 		n = require_int(r)
@@ -227,12 +238,10 @@ class TiMatrix:
 	def __matmul__(self, other):
 		if self.cols != other.rows:
 			raise DimMismatchError(f"Dimension mismatch: ({self.rows}×{self.cols}) @ ({other.rows}×{other.cols})")
+		other_cols = list(zip(*other.data))
 		return TiMatrix([
-			[
-				builtins.sum(
-					self.data[r][k] * other.data[k][c] for k in range(self.cols)
-				) for c in range(other.cols)
-			] for r in range(self.rows)
+			[builtins.sum(a * b for a, b in zip(row, col)) for col in other_cols]
+			for row in self.data
 		])
 
 	def __mul__(self, other):

@@ -1,6 +1,7 @@
+import operator as op
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-import operator as op
+from io import BytesIO
 from typing import Any
 import math, itertools
 from environment import (
@@ -75,6 +76,7 @@ CHARS = {}
 def get_token(code: int | Sequence[int]) -> Token:
 	if isinstance(code, int):
 		code = code.to_bytes(1 + (code > 0xFF))
+
 	b0 = code[0]
 	if len(code) == 1:
 		tbl = _TABLE
@@ -107,7 +109,21 @@ def _set_token(token: Token):
 	if (dup := tbl[idx]) is not None:
 		raise ValueError(f"Duplicate token: {token} vs. {dup}")
 	tbl[idx] = token
- 
+
+
+def read_token(f: BytesIO):
+	(b,) = f.read(1)
+	item = _TABLE[b]
+	if isinstance(item, Token):
+		return item
+	if item is None:
+		raise ValueError(f"Invalid token code: 0x{b:02X}")
+	(b2,) = f.read(1)
+	item = item[b2]
+	if item is None:
+		raise ValueError(f"Invalid token code: 0x{b:02X}{b2:02X}")
+	return item
+
 
 def _make_pure_func(f):
 	def wrapper(a):
@@ -278,7 +294,7 @@ token(0x621D, 'x₃')
 token(0x621E, 'y₁')
 token(0x621F, 'y₂')
 token(0x6220, 'y₃')
-token(0x6221, '𝑛', var=RealVar('n'))
+REC_N = token(0x6221, '𝑛', var=RealVar('n'))
 token(0x6222, 'p')
 token(0x6223, 'z')
 token(0x6224, 't')
@@ -821,7 +837,4 @@ token(0xFF, 'LinReg(ax+b) ')
 
 
 if __name__ == '__main__':
-	print(len(ALL_TOKENS))
-	for token in ALL_TOKENS:
-		if ' ' in token.text:
-			print(token)
+	print(get_token(0x6221))
