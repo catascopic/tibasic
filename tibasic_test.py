@@ -197,6 +197,9 @@ class TestSciE:
 	def test_rejects_double_sci(self):
 		with pytest.raises(TiSyntaxError):
 			calc('1E1E1')
+	
+	def test_multi_degrees(self, deg):
+		assert calc("1E2°2'°2", env=deg) == approx(200 + (2/30))
 			
 	def test_infix_negative_exp(self):
 		# 1ᴇ~3 = 0.001

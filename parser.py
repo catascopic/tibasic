@@ -560,7 +560,7 @@ class ArgParser:
 
 
 if __name__ == '__main__':
-	from tibasic_test import toks
+	from tibasic_test import toks, calc
 
 	env = Environment()
 
@@ -570,11 +570,11 @@ if __name__ == '__main__':
 		parse_line(tokens, env)
 		print('<<', env.ans)
 
-	env.angle_mode = 'DEG'
+	# env.angle_mode = 'DEG'
 
+	test("1E2°2'°2")
 	# test('1E~1°2\'3"')
 	# test("1°~30'")
-	test('1E1E1')
 	# test('List►matr(', '{1,2},{3,4},', '[A]')
 	# test('⑽^(', '{1,10')
 	# test('5°')
