@@ -6,7 +6,8 @@ from pytest import approx
 
 import purefunctions as pf
 from environment import Environment, IllegalNestError
-from parser import parse_line, ParseError
+from errors import TiSyntaxError
+from parser import parse_line
 import tokens
 from tokens import (
 	ALL_TOKENS, Token, get_token,
@@ -159,12 +160,12 @@ class TestSciE:
 
 	def test_rejects_paren_expr(self):
 		# 1ᴇ(3) — parenthesised expression is not a numeric literal
-		with pytest.raises(ParseError):
+		with pytest.raises(TiSyntaxError):
 			calc('1E(3)')
 
 	def test_rejects_variable(self):
 		# 1ᴇA — variable is not a numeric literal
-		with pytest.raises(ParseError):
+		with pytest.raises(TiSyntaxError):
 			calc('1EA')
 
 	def test_rejects_expression_rhs(self):
@@ -174,7 +175,7 @@ class TestSciE:
 
 	def test_rejects_ans_as_exponent(self):
 		# 1ᴇAns — Ans is not a numeric literal
-		with pytest.raises(ParseError):
+		with pytest.raises(TiSyntaxError):
 			calc('1E', 'Ans')
 
 	def test_infix_negative_exp(self):
@@ -1101,12 +1102,12 @@ class TestThunkCapture:
 
 	def test_colon_inside_thunk_raises(self, env):
 		# seq(X:5, X, 1, 3) — colon crosses a statement boundary; rejected at capture time
-		with pytest.raises(ParseError, match="arguments"):
+		with pytest.raises(TiSyntaxError, match="arguments"):
 			parse_line(toks('seq(', 'X:5,X,1,3)'), env)
 
 	def test_store_inside_thunk_raises(self, env):
 		# store inside a formula is a statement-level construct; rejected at capture time
-		with pytest.raises(ParseError, match="arguments"):
+		with pytest.raises(TiSyntaxError, match="arguments"):
 			parse_line(toks('seq(', '5@A,X,1,3)'), env)
 
 

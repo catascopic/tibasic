@@ -1,6 +1,4 @@
-ArgumentError: wrong number of arguments specified
-DataTypeError: wrong type of an argument or operand
-
+Is there any concern that in the time tests, the time might be different between setting and checking?
 
 Aho-Corasick parser for testing
 
@@ -31,6 +29,9 @@ make them IntEnums for easier testing?
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+ArgumentError: wrong number of arguments specified
+DataTypeError: wrong type of an argument or operand
 
 freq_list
 

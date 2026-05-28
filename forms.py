@@ -182,7 +182,7 @@ def list_to_matr(a: ArgParser) -> None:
 def _sort(a: ArgParser, reverse: bool):
 	main = a.list_var().get(a.env)
 	deps = []
-	while a.has_next_arg():
+	while a.has_next():
 		deps.append(a.list_var().get(a.env))
 	if not deps:
 		sort(main, reverse=reverse)

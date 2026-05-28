@@ -8,13 +8,10 @@ from tokens import (
 	LIST_PREFIX, RAND, DIM, SCI_E, DEG, RAD, APOS,
 )
 from environment import Environment, Variable, UserListVar
+from errors import TiSyntaxError, ArgumentError
 
 
 EOF_TOKEN = Token(b'\x00', None, '<END-OF-INPUT>')
-
-
-class ParseError(Exception):
-	pass
 
 
 @dataclass
@@ -48,7 +45,7 @@ class Parser:
 	def advance(self) -> Token:
 		t = self.peek()
 		if t is EOF_TOKEN:
-			raise ParseError("Unexpected end of input")
+			raise TiSyntaxError("Unexpected end of input")
 		self.pos += 1
 		return t
 
@@ -61,7 +58,7 @@ class Parser:
 
 	def expect(self, tok: Token) -> None:
 		if self.peek() is not tok:
-			raise ParseError(f"Expected {tok}, got {self.peek()}")
+			raise TiSyntaxError(f"Expected {tok}, got {self.peek()}")
 		self.pos += 1
 
 	def at_end(self) -> bool:
@@ -73,7 +70,7 @@ class Parser:
 		if self.eat_if(expected):
 			return True
 		if self.peek() is R_PAREN:
-			raise ParseError(f"Mismatched delimiter: expected {expected.text!r}, got ')'")
+			raise TiSyntaxError(f"Mismatched delimiter: expected {expected.text!r}, got ')'")
 		return False
 
 	# ── Sub-parsers ────────────────────────────────────────────────────────────
@@ -89,7 +86,7 @@ class Parser:
 		try:
 			return float(''.join(num))
 		except ValueError:
-			raise ParseError(f"Bad numeric literal: {num!r}")
+			raise TiSyntaxError(f"Bad numeric literal: {num!r}")
 
 	def parse_num_literal(self, first: Token) -> float:
 		value = self._parse_digits(first)
@@ -140,7 +137,7 @@ class Parser:
 					break
 			rows.append(row)
 			if len(row) != len(rows[0]):
-				raise ValueError(f"Unequal matrix rows: {rows}")
+				raise TiSyntaxError(f"Unequal matrix rows: {rows}")
 			if not self.close_delimiter(R_BRACKET):
 				break
 			self.eat_if(COMMA)  # comma is completely optional between rows
@@ -165,7 +162,7 @@ class Parser:
 				if t is QUOTE:
 					in_string = False
 			elif t in {STORE, COLON, NEWLINE}:
-				raise ParseError(f"Unexpected {t.text!r} inside function arguments")
+				raise TiSyntaxError(f"Unexpected {t.text!r} inside function arguments")
 			elif t is QUOTE:
 				in_string = True
 			elif not stack and t in {COMMA, R_PAREN}:
@@ -191,14 +188,14 @@ class Parser:
 		while self.eat_if(NEG):
 			sign *= -1
 		if not self.peek_digit_or_dot():
-			raise ParseError("ᴇ requires a numeric literal exponent")
+			raise TiSyntaxError("ᴇ requires a numeric literal exponent")
 		return sign * self.parse_num_literal(self.advance())
 
 	def parse_label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name."""
 		t = self.advance()
 		if not t.is_name_char():
-			raise ParseError("Expected a label")
+			raise TiSyntaxError("Expected a label")
 		label = t.text
 		if self.peek().is_name_char():
 			label += self.advance().text
@@ -209,7 +206,7 @@ class Parser:
 		"""Read alphanumeric tokens as an identifier (prgm, user list, etc.)."""
 		t = self.advance()
 		if not t.is_numeric_var():
-			raise ParseError("Expected a name")
+			raise TiSyntaxError("Expected a name")
 		name = [t.text]
 		while self.peek().is_name_char():
 			name.append(self.advance().text)
@@ -219,7 +216,7 @@ class Parser:
 
 	def parse_atom(self):
 		if self.at_end():
-			raise ParseError("Expected an expression")
+			raise TiSyntaxError("Expected an expression")
 
 		t = self.advance()
 
@@ -229,11 +226,11 @@ class Parser:
 			return self.parse_string_literal()
 		if t is L_BRACE:
 			if self._struct_depth > 0:
-				raise ParseError("List literal not allowed inside a list or matrix")
+				raise TiSyntaxError("List literal not allowed inside a list or matrix")
 			return self.parse_list_literal()
 		if t is L_BRACKET:
 			if self._struct_depth > 0:
-				raise ParseError("Matrix literal not allowed inside a list or matrix")
+				raise TiSyntaxError("Matrix literal not allowed inside a list or matrix")
 			return self.parse_matrix_literal()
 		if t is L_PAREN:
 			val = self.parse_expr()
@@ -275,7 +272,7 @@ class Parser:
 		if t.variable is not None:
 			return t.variable.get(self.env)
 			
-		raise ParseError(f"Unexpected token in expression: {t}")
+		raise TiSyntaxError(f"Unexpected token in expression: {t}")
 
 	def parse_list_atom(self, var):
 		val = var.get(self.env)
@@ -361,7 +358,7 @@ class Parser:
 			if self.eat_if(L_PAREN):
 				mat = t.variable.get(self.env)
 				if mat is None:
-					raise ValueError(f"Undefined matrix: {t.text}")
+					raise UndefinedError(f"Undefined matrix: {t.text}")
 				mat[self.parse_row_col()] = value
 				self.eat_if(R_PAREN)
 			else:
@@ -377,7 +374,7 @@ class Parser:
 			self.env.set_random_seed(value)
 
 		else:
-			raise ParseError(f"Invalid store target: {t}")
+			raise TiSyntaxError(f"Invalid store target: {t}")
 
 	def parse_store_list(self, var: Variable, value):
 		if self.eat_if(L_PAREN):
@@ -407,7 +404,7 @@ class Parser:
 				t.variable.set(self.env, mat)
 			mat.set_dim(value)
 		else:
-			raise ParseError(f"Invalid store-to-dim target: {t}")
+			raise TiSyntaxError(f"Invalid store-to-dim target: {t}")
 
 	def parse_list_var(self):
 		t = self.advance()
@@ -415,7 +412,7 @@ class Parser:
 			return UserListVar(self._read_name())
 		if t.is_list_var():
 			return t.variable
-		raise ParseError(f"Expected a list variable, got {t.text!r}")
+		raise TiSyntaxError(f"Expected a list variable, got {t.text!r}")
 
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 
@@ -476,7 +473,7 @@ class ArgParser:
 		if not self._next:
 			if optional:
 				return default
-			raise ParseError("Missing argument: expected comma before next argument")
+			raise ArgumentError("Missing argument: expected comma before next argument")
 		if optional and (self._parser.at_end() or self._parser.peek() is R_PAREN):
 			return default
 		val = parse_fn()
@@ -497,7 +494,7 @@ class ArgParser:
 	def numeric_var(self) -> Token:
 		tok = self._parser.advance()
 		if not tok.is_numeric_var():
-			raise ValueError(f"Expected a numeric variable, got {tok.text!r}")
+			raise DataTypeError(f"Expected a numeric variable, got {tok.text!r}")
 		return tok
 
 	@_parse_method
@@ -509,24 +506,24 @@ class ArgParser:
 		t = self._parser.advance()
 		if t.is_matrix_var():
 			return t.variable
-		raise ParseError(f"Expected a matrix variable, got {t.text!r}")
+		raise DataTypeError(f"Expected a matrix variable, got {t.text!r}")
 
 	def end(self):
 		"""Assert no surplus arguments remain.  The closing ) is already consumed
 		by the trailing-comma logic in _arg, so this is purely a validation call."""
 		if self._next:
-			raise ParseError(f"Too many arguments: unexpected {self.peek()}")
+			raise ArgumentError(f"Too many arguments: unexpected {self.peek()}")
 
 	@property
 	def env(self):
 		return self._parser.env
 
 	def has_next(self) -> bool:
-		return self._ready
+		return self._next
 
 	def parse_args(self) -> list:
 		args = [self.expr()]
-		while self._ready:
+		while self._next:
 			args.append(self.expr())
 		return args
 
@@ -547,7 +544,7 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('Matr►list(', '[[1,2][3,4]],', 'L1', ',', 'L2')
+	test('List►matr(', '{1,2},{3,4},', '[A]')
 	# test('⑽^(', '{1,10')
 	# test('5°')
 	# test('5°5\'5"')
