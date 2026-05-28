@@ -201,7 +201,7 @@ class TestSciE:
 	def test_rejects_ans_as_exponent(self):
 		# 1ᴇAns — Ans is not a numeric literal
 		with pytest.raises(TiSyntaxError):
-			calc('1e', 'Ans')
+			calc('1e Ans')
 	
 	def test_rejects_double_sci(self):
 		with pytest.raises(TiSyntaxError):
@@ -384,8 +384,8 @@ class TestEmptyList:
 		assert pf.dim(self._empty) == 0
 
 	def test_store_dim_zero(self, env):
-		calc('{1,2,3@', 'L1', env=env)
-		calc('0@', 'dim(', 'L1', env=env)
+		calc('{1,2,3@ L1', env=env)
+		calc('0@ dim( L1', env=env)
 		assert env.lists[0].data == []
 
 	# ── Aggregate functions ───────────────────────────────────────────────────
@@ -590,7 +590,7 @@ class TestMatrixRowOps:
 class TestMatrToList:
 	def test_single_column_first(self, env):
 		# Matr►list([A], 1, L1) extracts column 1 into L1
-		calc('Matr►list(', '[[1,2][3,4][5,6]],1,', 'L1', env=env)
+		calc('Matr►list( [[1,2][3,4][5,6]],1, L1', env=env)
 		assert L1.variable.get(env).data == [1, 3, 5]
 
 	def test_single_column_second(self, env):
@@ -608,12 +608,12 @@ class TestMatrToList:
 	def test_multi_list_single_column_matrix(self, env):
 		# 1-column matrix: one list var is enough
 		calc('[[7][8][9', env=env)
-		calc('Matr►list(', 'Ans', ',', 'L1', env=env)
+		calc('Matr►list( Ans , L1', env=env)
 		assert L1.variable.get(env).data == [7, 8, 9]
 
 	def test_column_out_of_range(self):
 		with pytest.raises(InvalidDimError):
-			calc('Matr►list(', '[[1,2][3,4]],3,', L1)
+			calc('Matr►list( [[1,2][3,4]],3,', L1)
 
 	def test_too_many_list_args(self, env):
 		# 2-column matrix but 3 list destinations → InvalidDimError
@@ -622,39 +622,39 @@ class TestMatrToList:
 
 	def test_non_matrix_raises(self, env):
 		with pytest.raises(DataTypeError):
-			calc('Matr►list(', '{1,2,3},1,', L1, env=env)
+			calc('Matr►list( {1,2,3},1,', L1, env=env)
 
 
 class TestListToMatr:
 	def test_basic_two_lists(self, env):
 		# List►matr({1,3},{2,4},[A]) → [[1,2],[3,4]]  (lists become columns)
-		calc('List►matr(', '{1,3},{2,4},', MAT_A, env=env)
+		calc('List►matr( {1,3},{2,4},', MAT_A, env=env)
 		assert MAT_A.variable.get(env).data == [[1, 2], [3, 4]]
 
 	def test_single_list(self, env):
-		calc('List►matr(', '{5,6,7},', MAT_A, env=env)
+		calc('List►matr( {5,6,7},', MAT_A, env=env)
 		assert MAT_A.variable.get(env).data == [[5], [6], [7]]
 
 	def test_unequal_lengths_pads_zero(self, env):
 		# Shorter list gets zero-padded to match the longest
-		calc('List►matr(', '{1,2,3},{4,5},', MAT_A, env=env)
+		calc('List►matr( {1,2,3},{4,5},', MAT_A, env=env)
 		assert MAT_A.variable.get(env).data == [[1, 4], [2, 5], [3, 0]]
 
 	def test_roundtrip_with_matr_to_list(self, env):
 		# Store a matrix, round-trip through List►matr
-		calc('Matr►list(', '[[10,20][30,40]],', L1, ',', L2, env=env)
+		calc('Matr►list( [[10,20][30,40]],', L1, ',', L2, env=env)
 		calc('List►matr(', L1, ',', L2, ',', MAT_A, env=env)
 		assert MAT_A.variable.get(env).data == [[10, 20], [30, 40]]
 
 	def test_non_list_raises(self, env):
 		# Scalar where a list is expected → DataTypeError
 		with pytest.raises(DataTypeError):
-			calc('List►matr(', '5,{1,2},', MAT_A, env=env)
+			calc('List►matr( 5,{1,2},', MAT_A, env=env)
 
 	def test_no_matrix_raises(self, env):
 		# Missing matrix destination → ArgumentError
 		with pytest.raises(ArgumentError):
-			calc('List►matr(', '{1,2},{3,4}', env=env)
+			calc('List►matr( {1,2},{3,4}', env=env)
 
 
 # ── User-named lists (ᴸNAME) ─────────────────────────────────────────────────
@@ -734,27 +734,27 @@ class TestUserLists:
 
 	def test_dim(self, env):
 		calc('{1,2,3,4}@$AB', env=env)
-		assert calc('dim(', '$AB', env=env) == 4
+		assert calc('dim( $AB', env=env) == 4
 
 	def test_sum(self, env):
 		calc('{1,2,3}@$AB', env=env)
-		assert calc('sum(', '$AB', env=env) == 6
+		assert calc('sum( $AB', env=env) == 6
 
 	def test_max(self, env):
 		calc('{3,1,4,1,5}@$AB', env=env)
-		assert calc('max(', '$AB', env=env) == 5
+		assert calc('max( $AB', env=env) == 5
 
 	def test_augment_two_user_lists(self, env):
 		calc('{1,2}@$AB', env=env)
 		calc('{3,4}@$CD', env=env)
-		assert list(calc('augment(', '$AB,$CD', env=env)) == [1, 2, 3, 4]
+		assert list(calc('augment( $AB,$CD', env=env)) == [1, 2, 3, 4]
 
 	def test_cum_sum(self, env):
 		calc('{1,2,3}@$AB', env=env)
-		assert list(calc('cumSum(', '$AB', env=env)) == [1, 3, 6]
+		assert list(calc('cumSum( $AB', env=env)) == [1, 3, 6]
 
 	def test_seq_result_stored_in_user_list(self, env):
-		calc('seq(', 'X,X,1,5)@$AB', env=env)
+		calc('seq( X,X,1,5)@$AB', env=env)
 		assert list(calc('$AB', env=env)) == [1, 2, 3, 4, 5]
 
 	# ── Matr►list / List►matr ────────────────────────────────────────────────
@@ -762,20 +762,20 @@ class TestUserLists:
 	def test_matr_to_list_single_column(self, env):
 		# Matr►list([A], 1, ᴸAB) — extract column 1 into the user list
 		calc('[[1,2][3,4][5,6]]@', MAT_A, env=env)
-		calc('Matr►list(', MAT_A, ',1,$AB', env=env)
+		calc('Matr►list( [A] ,1,$AB', env=env)
 		assert env.user_lists['AB'].data == [1, 3, 5]
 
 	def test_matr_to_list_multi(self, env):
 		# Matr►list([A], ᴸAB, ᴸCD) — extract each column into a user list
 		calc('[[1,2][3,4]]@', MAT_A, env=env)
-		calc('Matr►list(', MAT_A, ',$AB,$CD', env=env)
+		calc('Matr►list( [A] ,$AB,$CD', env=env)
 		assert env.user_lists['AB'].data == [1, 3]
 		assert env.user_lists['CD'].data == [2, 4]
 
 	def test_matr_to_list_mixed(self, env):
 		# Matr►list([A], L1, ᴸAB) — one regular list, one user list
 		calc('[[1,2][3,4][5,6]]@', MAT_A, env=env)
-		calc('Matr►list(', MAT_A, ',', L1, ',$AB', env=env)
+		calc('Matr►list( [A] ,', L1, ',$AB', env=env)
 		assert L1.variable.get(env).data == [1, 3, 5]
 		assert env.user_lists['AB'].data == [2, 4, 6]
 
@@ -783,21 +783,21 @@ class TestUserLists:
 		# List►matr(ᴸAB, ᴸCD, [A])
 		calc('{1,3,5}@$AB', env=env)
 		calc('{2,4,6}@$CD', env=env)
-		calc('List►matr(', '$AB,$CD,', MAT_A, env=env)
+		calc('List►matr( $AB,$CD,', MAT_A, env=env)
 		assert MAT_A.variable.get(env).data == [[1, 2], [3, 4], [5, 6]]
 
 	def test_list_to_matr_mixed(self, env):
 		# Mix a regular list and a user list as sources
 		calc('{1,3,5}@', L1, env=env)
 		calc('{2,4,6}@$AB', env=env)
-		calc('List►matr(', L1, ',$AB,', MAT_A, env=env)
+		calc('List►matr( L1 ,$AB, [A]', env=env)
 		assert MAT_A.variable.get(env).data == [[1, 2], [3, 4], [5, 6]]
 
 	def test_roundtrip(self, env):
 		# Store a matrix → Matr►list → List►matr → should recover original
 		calc('[[10,20][30,40]]@', MAT_A, env=env)
-		calc('Matr►list(', MAT_A, ',$AB,$CD', env=env)
-		calc('List►matr(', '$AB,$CD,', MAT_A, env=env)
+		calc('Matr►list( [A] ,$AB,$CD', env=env)
+		calc('List►matr( $AB,$CD, [A] ', env=env)
 		assert MAT_A.variable.get(env).data == [[10, 20], [30, 40]]
 	
 	def test_six_char(self):
@@ -1027,7 +1027,7 @@ class TestParserFeatures:
 
 	def test_ans(self, env):
 		calc(5, env=env)
-		calc('Ans', '+1', env=env)
+		calc('Ans +1', env=env)
 		assert env.ans == 6
 
 	def test_colon_separator(self, env):
@@ -1046,8 +1046,8 @@ class TestParserFeatures:
 		assert result.data == [[1, 2], [3, 4]]
 
 	def test_matrix_index(self, env):
-		calc('[[1,2][3,4]]@', MAT_A, env=env)
-		assert calc(MAT_A, '(2,1', env=env) == 3
+		calc('[[1,2][3,4]]@ [A]', env=env)
+		assert calc('[A] (2,1', env=env) == 3
 
 	def test_string_literal(self, env):
 		calc('"HI"', env=env)
@@ -1113,16 +1113,16 @@ class TestParserFeatures:
 
 	def test_expr(self, env):
 		# expr("1+2") evaluates the string as code
-		calc('expr(', '"1+2"', env=env)
+		calc('expr( "1+2"', env=env)
 		assert env.ans == approx(3)
 
 	def test_inv_postfix(self):
 		# [[1,2][3,4]]¹ gives the inverse
-		result = calc('[[1,2][3,4]]', INV)
+		result = calc('[[1,2][3,4]] INV')
 		assert result.data == approx_mat([[-2, 1], [1.5, -0.5]])
-		
+
 	def test_transpose_postfix(self):
-		result = calc('[[1,2][3,4]]', TRANSPOSE)
+		result = calc('[[1,2][3,4]] TRANSPOSE')
 		assert result.data == [[1, 3], [2, 4]]
 
 
@@ -1137,56 +1137,56 @@ class TestRand:
 
 	def test_rand_with_parens_returns_list(self):
 		# rand(5) returns a TiList of 5 floats
-		result = calc('rand', '(5)')
+		result = calc('rand (5)')
 		assert isinstance(result, TiList)
 		assert len(result) == 5
 		assert all(0 <= x < 1 for x in result)
 
 	def test_rand_with_parens_no_close(self):
 		# Trailing ) may be omitted
-		result = calc('rand', '(3')
+		result = calc('rand (3')
 		assert isinstance(result, TiList)
 		assert len(result) == 3
 
 	def test_rand_seed_reproducible(self, env):
 		# Store a seed → rand, then same seed → rand again; must match
-		parse_line(toks('1@', 'rand'), env)
+		parse_line(toks('1@ rand'), env)
 		parse_line(toks('rand'), env)
 		first = env.ans
-		parse_line(toks('1@', 'rand'), env)
+		parse_line(toks('1@ rand'), env)
 		parse_line(toks('rand'), env)
 		assert env.ans == first
 
 	def test_rand_implicit_multiply(self, env):
 		# 2rand  ≡  2 * rand()  — result must be in [0, 2)
-		parse_line(toks('1@', 'rand'), env)   # fix seed
+		parse_line(toks('1@ rand'), env)   # fix seed
 		parse_line(toks('rand'), env)
 		single = env.ans
-		parse_line(toks('1@', 'rand'), env)   # reset seed
+		parse_line(toks('1@ rand'), env)   # reset seed
 		parse_line(toks(2, 'rand'), env)          # implicit multiply
 		assert env.ans == approx(2 * single)
 
 	def test_rand_int(self):
 		# randInt(1,6) returns an integer value in [1, 6]
-		result = calc('randInt(', '1,6)')
+		result = calc('randInt( 1,6)')
 		assert result == int(result)
 		assert 1 <= result <= 6
 
 	def test_rand_int_list(self):
 		# randInt(1,6,10) returns a TiList of 10 ints
-		result = calc('randInt(', '1,6,10)')
+		result = calc('randInt( 1,6,10)')
 		assert isinstance(result, TiList)
 		assert len(result) == 10
 		assert all(1 <= x <= 6 for x in result)
 
 	def test_rand_norm(self):
 		# randNorm(0,1) returns a float (no guaranteed range, just check type)
-		result = calc('randNorm(', '0,1)')
+		result = calc('randNorm( 0,1)')
 		assert isinstance(result, float)
 
 	def test_rand_norm_list(self):
 		# randNorm(0,1,5) returns a TiList of 5 floats
-		result = calc('randNorm(', '0,1,5)')
+		result = calc('randNorm( 0,1,5)')
 		assert isinstance(result, TiList)
 		assert len(result) == 5
 
@@ -1196,7 +1196,7 @@ class TestRand:
 class TestColonStatements:
 	def test_colon_ans_is_last(self, env):
 		# 1→A:2  →  Ans=2, A=1
-		calc('1@A', ':', 2, env=env)
+		calc('1@A :', 2, env=env)
 		assert env.ans == 2
 		assert VAR_A.variable.get(env) == 1
 
@@ -1217,7 +1217,7 @@ class TestColonStatements:
 
 	def test_colon_ans_carries_across(self, env):
 		# 7:Ans+1  →  Ans=8  (Ans from segment 1 is visible in segment 2)
-		assert calc('7:', 'Ans', '+1', env=env) == 8
+		assert calc('7: Ans +1', env=env) == 8
 
 	def test_colon_store_does_not_clobber_a(self, env):
 		# 1→A:2  →  A must still be 1 after Ans becomes 2
@@ -1226,7 +1226,7 @@ class TestColonStatements:
 
 	def test_colon_list_then_index(self, env):
 		# {10,20,30}→L₁:L₁(2)  →  Ans=20
-		assert calc('{10,20,30@', L1, ':', L1, '(2', env=env) == 20
+		assert calc('{10,20,30@ L1 : L1 (2', env=env) == 20
 
 
 # ── Implicit delimiter closing ────────────────────────────────────────────────
@@ -1255,20 +1255,20 @@ class TestImplicitClose:
 
 	def test_unclosed_matrix_then_colon_index(self, env):
 		# [[1:Ans(1,1  →  first segment produces [[1]], second indexes it → 1
-		parse_line(toks('[[1:', 'Ans', '(1,1'), env)
+		parse_line(toks('[[1: Ans (1,1'), env)
 		assert env.ans == 1
 
 	def test_unclosed_list_then_colon_sum(self, env):
 		# {1,2,3:sum(Ans  →  Ans=6
-		assert calc('{1,2,3:', 'sum(', 'Ans', env=env) == 6
+		assert calc('{1,2,3: sum( Ans', env=env) == 6
 
 	def test_unclosed_fn_args(self):
 		# max(3,7  →  7 (trailing ) omitted)
-		assert calc('max(', '3,7') == 7
+		assert calc('max( 3,7') == 7
 
 	def test_nested_unclosed(self):
 		# abs(~(3+4  →  7
-		assert calc('abs(', '~(3+4') == 7
+		assert calc('abs( ~(3+4') == 7
 
 
 # ── Storing to dim( ───────────────────────────────────────────────────────────
@@ -1276,40 +1276,40 @@ class TestImplicitClose:
 class TestStoreDim:
 	def test_store_dim_list_create(self, env):
 		# 5→dim(L₁)  →  L₁ becomes {0,0,0,0,0}
-		calc('5@', 'dim(', L1, env=env)
+		calc('5@ dim(', L1, env=env)
 		assert L1.variable.get(env).data == [0, 0, 0, 0, 0]
 
 	def test_store_dim_list_expand(self, env):
 		# {1,2,3}→L₁ : 5→dim(L₁)  →  L₁ = {1,2,3,0,0}
-		calc('{1,2,3@', L1, env=env)
-		calc('5@', 'dim(', L1, env=env)
+		calc('{1,2,3@ L1', env=env)
+		calc('5@ dim( L1', env=env)
 		assert L1.variable.get(env).data == [1, 2, 3, 0, 0]
 
 	def test_store_dim_list_shrink(self, env):
 		# {1,2,3,4,5}→L₁ : 3→dim(L₁)  →  L₁ = {1,2,3}
-		calc('{1,2,3,4,5@', L1, env=env)
-		calc('3@', 'dim(', L1, env=env)
+		calc('{1,2,3,4,5@ L1', env=env)
+		calc('3@ dim( L1', env=env)
 		assert L1.variable.get(env).data == [1, 2, 3]
 
 	def test_store_dim_matrix_create(self, env):
 		# {2,3}→dim([A])  →  [A] becomes 2×3 of zeros
-		calc('{2,3@', 'dim(', MAT_A, env=env)
+		calc('{2,3@ dim( [A]', env=env)
 		assert MAT_A.variable.get(env).data == 2 * [3 * [0]]
 
 	def test_store_dim_matrix_resize_preserves(self, env):
 		# Build [[1,2][3,4]], then resize to 3×3; original values survive, new cells = 0
-		calc('[[1,2][3,4@', MAT_A, env=env)
-		calc('{3,3@', 'dim(', MAT_A, env=env)
+		calc('[[1,2][3,4@ [A]', env=env)
+		calc('{3,3@ dim( [A]', env=env)
 		assert MAT_A.variable.get(env).data == [[1, 2, 0], [3, 4, 0], [0, 0, 0]]
 
 	def test_dim_read_list(self, env):
 		# dim({1,2,3,4}) = 4  (reading, not storing)
-		result = calc('dim(', '{1,2,3,4}')
+		result = calc('dim( {1,2,3,4}')
 		assert result == 4
 
 	def test_dim_read_matrix(self, env):
 		# dim([[1,2,3][4,5,6]]) = {2,3}
-		result = calc('dim(', '[[1,2,3][4,5,6')
+		result = calc('dim( [[1,2,3][4,5,6')
 		assert result.data == [2, 3]
 
 
@@ -1318,43 +1318,43 @@ class TestStoreDim:
 class TestNesting:
 	def test_sum_of_seq(self):
 		# sum(seq(X²,X,1,5))  =  1+4+9+16+25 = 55
-		assert calc('sum(', 'seq(', 'X^2,X,1,5') == approx(55)
+		assert calc('sum( seq( X^2,X,1,5') == approx(55)
 
 	def test_seq_with_step(self):
 		# seq(X,X,1,9,2)  =  {1,3,5,7,9}
-		assert list(calc('seq(', 'X,X,1,9,2')) == approx([1, 3, 5, 7, 9])
+		assert list(calc('seq( X,X,1,9,2')) == approx([1, 3, 5, 7, 9])
 
 	def test_seq_negative_step(self):
 		# seq(X,X,5,1,~1)  =  {5,4,3,2,1}
-		assert list(calc('seq(', 'X,X,5,1,~1')) == approx([5, 4, 3, 2, 1])
+		assert list(calc('seq( X,X,5,1,~1')) == approx([5, 4, 3, 2, 1])
 
 	def test_sigma(self):
 		# Σ(X,X,1,10)  =  55
-		assert calc('Σ(', 'X,X,1,10') == approx(55)
+		assert calc('Σ( X,X,1,10') == approx(55)
 
 	def test_sigma_formula(self):
 		# Σ(X²,X,1,4)  =  1+4+9+16 = 30
-		assert calc('Σ(', 'X^2,X,1,4') == approx(30)
+		assert calc('Σ( X^2,X,1,4') == approx(30)
 
 	def test_nderiv(self):
 		# nDeriv(X²,X,3) ≈ 6  (derivative of x² at x=3)
-		assert calc('nDeriv(', 'X^2,X,3') == approx(6, rel=1e-4)
+		assert calc('nDeriv( X^2,X,3') == approx(6, rel=1e-4)
 
 	def test_fnint(self):
 		# fnInt(X²,X,0,3) ≈ 9  (∫₀³ x² dx = 9)
-		assert calc('fnInt(', 'X^2,X,0,3') == approx(9, rel=1e-4)
+		assert calc('fnInt( X^2,X,0,3') == approx(9, rel=1e-4)
 
 	def test_abs_of_neg_expr(self):
 		# abs(~(3+4))  =  7
-		assert calc('abs(', '~(3+4') == 7
+		assert calc('abs( ~(3+4') == 7
 
 	def test_max_of_list_expr(self):
 		# max({3,1,4,1,5})  =  5
-		assert calc('max(', '{3,1,4,1,5') == 5
+		assert calc('max( {3,1,4,1,5') == 5
 
 	def test_nested_arithmetic_functions(self):
 		# round(1/6, 3)  =  0.167
-		assert calc('round(', '1/6,3') == approx(0.167)
+		assert calc('round( 1/6,3') == approx(0.167)
 
 	def test_list_arithmetic_then_sum(self, env):
 		# {1,2,3}*2  =  {2,4,6}, then sum({2,4,6}) = 12
@@ -1363,44 +1363,44 @@ class TestNesting:
 
 	def test_matrix_power_then_det(self):
 		# det([[1,1][0,1]]²)  =  det([[1,2][0,1]])  =  1
-		assert calc('det(', '[[1,1][0,1]]^2') == approx(1)
+		assert calc('det( [[1,1][0,1]]^2') == approx(1)
 
 	def test_string_concat_then_length(self, env):
 		# "AB"+"CD" stored in Str1, then length(Str1) = 4
-		calc('"AB"+"CD"@', 'Str1', env=env)
-		assert calc('length(', 'Str1', env=env) == 4
+		calc('"AB"+"CD"@ Str1', env=env)
+		assert calc('length( Str1', env=env) == 4
 
 	def test_cumsum_then_max(self):
 		# max(cumSum({1,2,3,4}))  =  max({1,3,6,10})  =  10
-		assert calc('max(', 'cumSum(', '{1,2,3,4') == 10
+		assert calc('max( cumSum( {1,2,3,4') == 10
 
 	def test_expr_evaluates_string(self, env):
 		# Build "2+3" dynamically as a string stored in Str1, then expr(Str1) = 5
-		calc('"2+3"@', 'Str1', env=env)
-		assert calc('expr(', 'Str1', env=env) == approx(5)
+		calc('"2+3"@ Str1', env=env)
+		assert calc('expr( Str1', env=env) == approx(5)
 
 	def test_ans_index_or_mul_list(self, env):
 		# {10,20,30}→Ans  (via plain eval), then Ans(2)  =  20
 		parse_line(toks('{10,20,30}'), env)
-		parse_line(toks('Ans', '(2)'), env)
+		parse_line(toks('Ans (2)'), env)
 		assert env.ans == 20
 
 	def test_ans_index_or_mul_scalar(self, env):
 		# 7→Ans, then Ans(3)  =  21  (scalar * 3)
 		parse_line(toks(7), env)
-		parse_line(toks('Ans', '(3)'), env)
+		parse_line(toks('Ans (3)'), env)
 		assert env.ans == 21
 
 	def test_ans_index_matrix(self, env):
 		# [[1,2][3,4]]→Ans, then Ans(2,1) = 3
 		parse_line(toks('[[1,2][3,4'), env)
-		parse_line(toks('Ans', '(2,1'), env)
+		parse_line(toks('Ans (2,1'), env)
 		assert env.ans == 3
 
 	def test_seq_preserves_variable(self, env):
 		# X=99 before seq; seq restores X=99 afterward
 		parse_line(toks('99@X'), env)
-		parse_line(toks('seq(', 'X,X,1,3'), env)
+		parse_line(toks('seq( X,X,1,3'), env)
 		parse_line(toks('X'), env)
 		assert env.ans == 99
 
@@ -1413,45 +1413,45 @@ class TestIllegalNest:
 	def test_seq_no_self_nest(self, env):
 		# seq( inside its own formula → ERR:ILLEGAL NEST
 		with pytest.raises(IllegalNestError):
-			parse_line(toks('seq(', 'seq(', 'X,X,1,2),X,1,3)'), env)
+			parse_line(toks('seq( seq( X,X,1,2),X,1,3)'), env)
 
 	def test_seq_allows_normal_nesting(self, env):
 		# sum(seq(...)) is fine — only seq inside seq is forbidden
-		parse_line(toks('sum(', 'seq(', 'X,X,1,4))'), env)
+		parse_line(toks('sum( seq( X,X,1,4))'), env)
 		assert env.ans == approx(10)
 
 	def test_sigma_no_self_nest(self, env):
 		# Σ( inside its own formula → ERR:ILLEGAL NEST
 		with pytest.raises(IllegalNestError):
-			parse_line(toks('Σ(', 'Σ(', 'X,X,1,2),X,1,3'), env)
+			parse_line(toks('Σ( Σ( X,X,1,2),X,1,3'), env)
 
 	def test_fnint_no_self_nest(self, env):
 		# fnInt( inside its own integrand → ERR:ILLEGAL NEST
 		with pytest.raises(IllegalNestError):
-			parse_line(toks('fnInt(', 'fnInt(', 'X,X,0,1),X,0,1'), env)
+			parse_line(toks('fnInt( fnInt( X,X,0,1),X,0,1'), env)
 
 	def test_nderiv_one_level_ok(self, env):
 		# nDeriv( inside nDeriv( once is allowed
-		parse_line(toks('nDeriv(', 'nDeriv(', 'X²,X,X),X,1'), env)
+		parse_line(toks('nDeriv( nDeriv( X²,X,X),X,1'), env)
 		assert env.ans == approx(2, rel=1e-3)
 
 	def test_nderiv_two_levels_raises(self, env):
 		# nDeriv( inside nDeriv( inside nDeriv( → ERR:ILLEGAL NEST
 		with pytest.raises(IllegalNestError):
-			parse_line(toks('nDeriv(', 'nDeriv(', 'nDeriv(', 'X,X,X),X,X),X,1'), env)
+			parse_line(toks('nDeriv( nDeriv( nDeriv( X,X,X),X,X),X,1'), env)
 
 	def test_expr_no_self_nest(self, env):
 		# expr( evaluating a string that itself calls expr( → ERR:ILLEGAL NEST
 		# Directly store TiString([expr(, Str1, )]) in Str1 — evaluating it calls expr again
-		STR_1.variable.set(env, TiString(toks('expr(', 'Str1', ')')))
+		STR_1.variable.set(env, TiString(toks('expr( Str1 )')))
 		with pytest.raises(IllegalNestError):
-			calc('expr(', 'Str1', env=env)
+			calc('expr( Str1', env=env)
 
 	def test_expr_nest_depth_resets(self, env):
 		# After a successful expr( call, the guard is back to 0 — can call again
-		calc('"1+2"@', 'Str1', env=env)
-		assert calc('expr(', 'Str1', env=env) == 3
-		assert calc('expr(', 'Str1', env=env) == 3   # second call — must not raise
+		calc('"1+2"@ Str1', env=env)
+		assert calc('expr( Str1', env=env) == 3
+		assert calc('expr( Str1', env=env) == 3   # second call — must not raise
 
 
 # ── Thunk capture: commas inside nested delimiters ────────────────────────────
@@ -1463,34 +1463,34 @@ class TestThunkCapture:
 
 	def test_list_literal_in_seq_formula(self, env):
 		# seq(sum({1,2,X}),X,1,3) — commas inside {} must not split the thunk
-		parse_line(toks('seq(', 'sum(', '{1,2,X}),X,1,3'), env)
+		parse_line(toks('seq( sum( {1,2,X}),X,1,3'), env)
 		assert env.ans.data == [4, 5, 6]
 
 	def test_matrix_literal_in_seq_formula(self, env):
 		# seq(sum({1,2,X}),X,1,3) — commas inside {} must not split the thunk
-		parse_line(toks('seq(', 'det(', '[[1,2][X,4]]),X,1,3'), env)
+		parse_line(toks('seq( det( [[1,2][X,4]]),X,1,3'), env)
 		assert env.ans.data == [2, 0, -2]
 
 	def test_multi_arg_func_in_seq_formula(self, env):
 		# seq(max(X,10), X, 8, 12) — commas inside max(...) must not split the thunk
-		parse_line(toks('seq(', 'max(', 'X,10),X,8,12)'), env)
+		parse_line(toks('seq( max( X,10),X,8,12)'), env)
 		assert env.ans.data == [10, 10, 10, 11, 12]
 
 	def test_string_literal_in_seq_formula(self, env):
 		# seq(length("a,b"), X, 1, 3) — the comma in the string must not split the thunk
 		# "a,b" has length 3; result should be {3,3,3}
-		parse_line(toks('seq(', 'length(', '"a,b"),X,1,3'), env)
+		parse_line(toks('seq( length( "a,b"),X,1,3'), env)
 		assert env.ans.data == [3, 3, 3]
 
 	def test_colon_inside_thunk_raises(self, env):
 		# seq(X:5, X, 1, 3) — colon crosses a statement boundary; rejected at capture time
 		with pytest.raises(TiSyntaxError, match="arguments"):
-			parse_line(toks('seq(', 'X:5,X,1,3)'), env)
+			parse_line(toks('seq( X:5,X,1,3)'), env)
 
 	def test_store_inside_thunk_raises(self, env):
 		# store inside a formula is a statement-level construct; rejected at capture time
 		with pytest.raises(TiSyntaxError, match="arguments"):
-			parse_line(toks('seq(', '5@A,X,1,3)'), env)
+			parse_line(toks('seq( 5@A,X,1,3)'), env)
 
 
 class TestSeqIncrement:
