@@ -189,7 +189,7 @@ class TestSciE:
 			calc('1e1e1')
 	
 	def test_multi_degrees(self, deg):
-		assert calc("1e2°2'°2", env=deg) == approx(200 + (2/30))
+		assert calc("1e2°2'°2", deg) == approx(200 + (2/30))
 			
 	def test_infix_negative_exp(self):
 		# 1ᴇ~3 = 0.001
@@ -365,8 +365,8 @@ class TestEmptyList:
 		assert pf.dim(self._empty) == 0
 
 	def test_store_dim_zero(self, env):
-		calc('{1,2,3@ L1', env=env)
-		calc('0@ dim( L1', env=env)
+		calc('{1,2,3@ L1', env)
+		calc('0@ dim( L1', env)
 		assert env.lists[0].data == []
 
 	# ── Aggregate functions ───────────────────────────────────────────────────
@@ -571,25 +571,25 @@ class TestMatrixRowOps:
 class TestMatrToList:
 	def test_single_column_first(self, env):
 		# Matr►list([A], 1, L1) extracts column 1 into L1
-		calc('Matr►list( [[1,2][3,4][5,6]],1, L1', env=env)
+		calc('Matr►list( [[1,2][3,4][5,6]],1, L1', env)
 		assert env.lists[0].data == [1, 3, 5]
 
 	def test_single_column_second(self, env):
 		# Matr►list([A], 2, L1) extracts column 2
-		calc('Matr►list( [[1,2][3,4][5,6]],2, L1', env=env)
+		calc('Matr►list( [[1,2][3,4][5,6]],2, L1', env)
 		assert env.lists[0].data == [2, 4, 6]
 
 	def test_multi_list_all_columns(self, env):
 		# Matr►list([A], L1, L2) — each list gets one column
-		calc('[[1,2][3,4]]@ [A]', env=env)
-		calc('Matr►list( [A] , L1 , L2', env=env)
+		calc('[[1,2][3,4]]@ [A]', env)
+		calc('Matr►list( [A] , L1 , L2', env)
 		assert env.lists[0].data == [1, 3]
 		assert env.lists[1].data == [2, 4]
 
 	def test_multi_list_single_column_matrix(self, env):
 		# 1-column matrix: one list var is enough
-		calc('[[7][8][9', env=env)
-		calc('Matr►list( Ans , L1', env=env)
+		calc('[[7][8][9', env)
+		calc('Matr►list( Ans , L1', env)
 		assert env.lists[0].data == [7, 8, 9]
 
 	def test_column_out_of_range(self):
@@ -603,39 +603,39 @@ class TestMatrToList:
 
 	def test_non_matrix_raises(self, env):
 		with pytest.raises(DataTypeError):
-			calc('Matr►list( {1,2,3},1, L1', env=env)
+			calc('Matr►list( {1,2,3},1, L1', env)
 
 
 class TestListToMatr:
 	def test_basic_two_lists(self, env):
 		# List►matr({1,3},{2,4},[A]) → [[1,2],[3,4]]  (lists become columns)
-		calc('List►matr( {1,3},{2,4}, [A]', env=env)
+		calc('List►matr( {1,3},{2,4}, [A]', env)
 		assert env.matrices[0].data == [[1, 2], [3, 4]]
 
 	def test_single_list(self, env):
-		calc('List►matr( {5,6,7}, [A]', env=env)
+		calc('List►matr( {5,6,7}, [A]', env)
 		assert env.matrices[0].data == [[5], [6], [7]]
 
 	def test_unequal_lengths_pads_zero(self, env):
 		# Shorter list gets zero-padded to match the longest
-		calc('List►matr( {1,2,3},{4,5}, [A]', env=env)
+		calc('List►matr( {1,2,3},{4,5}, [A]', env)
 		assert env.matrices[0].data == [[1, 4], [2, 5], [3, 0]]
 
 	def test_roundtrip_with_matr_to_list(self, env):
 		# Store a matrix, round-trip through List►matr
-		calc('Matr►list( [[10,20][30,40]], L1 , L2', env=env)
-		calc('List►matr( L1 , L2 , [A]', env=env)
+		calc('Matr►list( [[10,20][30,40]], L1 , L2', env)
+		calc('List►matr( L1 , L2 , [A]', env)
 		assert env.matrices[0].data == [[10, 20], [30, 40]]
 
 	def test_non_list_raises(self, env):
 		# Scalar where a list is expected → DataTypeError
 		with pytest.raises(DataTypeError):
-			calc('List►matr( 5,{1,2}, [A]', env=env)
+			calc('List►matr( 5,{1,2}, [A]', env)
 
 	def test_no_matrix_raises(self, env):
 		# Missing matrix destination → ArgumentError
 		with pytest.raises(ArgumentError):
-			calc('List►matr( {1,2},{3,4}', env=env)
+			calc('List►matr( {1,2},{3,4}', env)
 
 
 # ── User-named lists (ᴸNAME) ─────────────────────────────────────────────────
@@ -649,25 +649,25 @@ class TestUserLists:
 	# ── Basic store / retrieve ────────────────────────────────────────────────
 
 	def test_store_and_retrieve_with_prefix(self, env):
-		calc('{1,2,3}@$AB', env=env)
+		calc('{1,2,3}@$AB', env)
 		assert env.user_lists['AB'].data == [1, 2, 3]
 
 	def test_store_bare_name(self, env):
 		# When the value is already a list, →NAME (no ᴸ) stores as a user list
-		calc('{4,5}@AB', env=env)
+		calc('{4,5}@AB', env)
 		assert env.user_lists['AB'].data == [4, 5]
 
 	def test_single_char_name(self, env):
-		calc('{7,8}@$Z', env=env)
+		calc('{7,8}@$Z', env)
 		assert env.user_lists['Z'].data == [7, 8]
 		
 	def test_with_numbers(self, env):
-		calc('{1,2@A1234', env=env)
+		calc('{1,2@A1234', env)
 		assert env.user_lists['A1234'].data == [1, 2]
 
 	def test_overwrite(self, env):
-		calc('{1,2,3}@$AB', env=env)
-		calc('{9,8}@$AB', env=env)
+		calc('{1,2,3}@$AB', env)
+		calc('{9,8}@$AB', env)
 		assert env.user_lists['AB'].data == [9, 8]
 	
 	def test_fail_leading_number(self):
@@ -677,108 +677,108 @@ class TestUserLists:
 	# ── Indexing ──────────────────────────────────────────────────────────────
 
 	def test_index_read(self, env):
-		calc('{10,20,30}@$AB', env=env)
-		assert calc('$AB(2)', env=env) == 20
+		calc('{10,20,30}@$AB', env)
+		assert calc('$AB(2)', env) == 20
 
 	def test_index_first_element(self, env):
-		calc('{10,20,30}@$AB', env=env)
-		assert calc('$AB(1)', env=env) == 10
+		calc('{10,20,30}@$AB', env)
+		assert calc('$AB(1)', env) == 10
 
 	def test_index_write(self, env):
-		calc('{1,2,3}@$AB', env=env)
-		calc('99@$AB(2)', env=env)
+		calc('{1,2,3}@$AB', env)
+		calc('99@$AB(2)', env)
 		assert env.user_lists['AB'].data == [1, 99, 3]
 
 	# ── Arithmetic — behaves the same as L1–L6 ───────────────────────────────
 
 	def test_scalar_div(self, env):
-		calc('{2,4,6}@$AB', env=env)
-		assert list(calc('$AB/2', env=env)) == [1, 2, 3]
+		calc('{2,4,6}@$AB', env)
+		assert list(calc('$AB/2', env)) == [1, 2, 3]
 
 	def test_add_two_user_lists(self, env):
-		calc('{1,2,3}@$AB', env=env)
-		calc('{4,5,6}@$CD', env=env)
-		assert list(calc('$AB+$CD', env=env)) == [5, 7, 9]
+		calc('{1,2,3}@$AB', env)
+		calc('{4,5,6}@$CD', env)
+		assert list(calc('$AB+$CD', env)) == [5, 7, 9]
 
 	def test_add_user_list_and_regular_list(self, env):
-		calc('{1,2,3}@$AB', env=env)
-		calc('{4,5,6}@ L1', env=env)
-		assert list(calc('$AB+ L1', env=env)) == [5, 7, 9]
+		calc('{1,2,3}@$AB', env)
+		calc('{4,5,6}@ L1', env)
+		assert list(calc('$AB+ L1', env)) == [5, 7, 9]
 
 	def test_dim_mismatch_raises(self, env):
-		calc('{1,2}@$AB', env=env)
-		calc('{3,4,5}@$CD', env=env)
+		calc('{1,2}@$AB', env)
+		calc('{3,4,5}@$CD', env)
 		with pytest.raises(DimMismatchError):
-			calc('$AB+$CD', env=env)
+			calc('$AB+$CD', env)
 
 	# ── Aggregate functions ───────────────────────────────────────────────────
 
 	def test_dim(self, env):
-		calc('{1,2,3,4}@$AB', env=env)
-		assert calc('dim( $AB', env=env) == 4
+		calc('{1,2,3,4}@$AB', env)
+		assert calc('dim( $AB', env) == 4
 
 	def test_sum(self, env):
-		calc('{1,2,3}@$AB', env=env)
-		assert calc('sum( $AB', env=env) == 6
+		calc('{1,2,3}@$AB', env)
+		assert calc('sum( $AB', env) == 6
 
 	def test_max(self, env):
-		calc('{3,1,4,1,5}@$AB', env=env)
-		assert calc('max( $AB', env=env) == 5
+		calc('{3,1,4,1,5}@$AB', env)
+		assert calc('max( $AB', env) == 5
 
 	def test_augment_two_user_lists(self, env):
-		calc('{1,2}@$AB', env=env)
-		calc('{3,4}@$CD', env=env)
-		assert list(calc('augment( $AB,$CD', env=env)) == [1, 2, 3, 4]
+		calc('{1,2}@$AB', env)
+		calc('{3,4}@$CD', env)
+		assert list(calc('augment( $AB,$CD', env)) == [1, 2, 3, 4]
 
 	def test_cum_sum(self, env):
-		calc('{1,2,3}@$AB', env=env)
-		assert list(calc('cumSum( $AB', env=env)) == [1, 3, 6]
+		calc('{1,2,3}@$AB', env)
+		assert list(calc('cumSum( $AB', env)) == [1, 3, 6]
 
 	def test_seq_result_stored_in_user_list(self, env):
-		calc('seq( X,X,1,5)@$AB', env=env)
-		assert list(calc('$AB', env=env)) == [1, 2, 3, 4, 5]
+		calc('seq( X,X,1,5)@$AB', env)
+		assert list(calc('$AB', env)) == [1, 2, 3, 4, 5]
 
 	# ── Matr►list / List►matr ────────────────────────────────────────────────
 
 	def test_matr_to_list_single_column(self, env):
 		# Matr►list([A], 1, ᴸAB) — extract column 1 into the user list
-		calc('[[1,2][3,4][5,6]]@ [A]', env=env)
-		calc('Matr►list( [A] ,1,$AB', env=env)
+		calc('[[1,2][3,4][5,6]]@ [A]', env)
+		calc('Matr►list( [A] ,1,$AB', env)
 		assert env.user_lists['AB'].data == [1, 3, 5]
 
 	def test_matr_to_list_multi(self, env):
 		# Matr►list([A], ᴸAB, ᴸCD) — extract each column into a user list
-		calc('[[1,2][3,4]]@ [A]', env=env)
-		calc('Matr►list( [A] ,$AB,$CD', env=env)
+		calc('[[1,2][3,4]]@ [A]', env)
+		calc('Matr►list( [A] ,$AB,$CD', env)
 		assert env.user_lists['AB'].data == [1, 3]
 		assert env.user_lists['CD'].data == [2, 4]
 
 	def test_matr_to_list_mixed(self, env):
 		# Matr►list([A], L1, ᴸAB) — one regular list, one user list
-		calc('[[1,2][3,4][5,6]]@ [A]', env=env)
-		calc('Matr►list( [A] , L1 ,$AB', env=env)
+		calc('[[1,2][3,4][5,6]]@ [A]', env)
+		calc('Matr►list( [A] , L1 ,$AB', env)
 		assert env.lists[0].data == [1, 3, 5]
 		assert env.user_lists['AB'].data == [2, 4, 6]
 
 	def test_list_to_matr_from_user_lists(self, env):
 		# List►matr(ᴸAB, ᴸCD, [A])
-		calc('{1,3,5}@$AB', env=env)
-		calc('{2,4,6}@$CD', env=env)
-		calc('List►matr( $AB,$CD, [A]', env=env)
+		calc('{1,3,5}@$AB', env)
+		calc('{2,4,6}@$CD', env)
+		calc('List►matr( $AB,$CD, [A]', env)
 		assert env.matrices[0].data == [[1, 2], [3, 4], [5, 6]]
 
 	def test_list_to_matr_mixed(self, env):
 		# Mix a regular list and a user list as sources
-		calc('{1,3,5}@ L1', env=env)
-		calc('{2,4,6}@$AB', env=env)
-		calc('List►matr( L1 ,$AB, [A]', env=env)
+		calc('{1,3,5}@ L1', env)
+		calc('{2,4,6}@$AB', env)
+		calc('List►matr( L1 ,$AB, [A]', env)
 		assert env.matrices[0].data == [[1, 2], [3, 4], [5, 6]]
 
 	def test_roundtrip(self, env):
 		# Store a matrix → Matr►list → List►matr → should recover original
-		calc('[[10,20][30,40]]@ [A]', env=env)
-		calc('Matr►list( [A] ,$AB,$CD', env=env)
-		calc('List►matr( $AB,$CD, [A] ', env=env)
+		calc('[[10,20][30,40]]@ [A]', env)
+		calc('Matr►list( [A] ,$AB,$CD', env)
+		calc('List►matr( $AB,$CD, [A] ', env)
 		assert env.matrices[0].data == [[10, 20], [30, 40]]
 	
 	def test_six_char(self):
@@ -1003,23 +1003,23 @@ class TestDateTime:
 
 class TestParserFeatures:
 	def test_variable_store_retrieve(self, env):
-		calc('3@A', env=env)
-		assert calc('A', env=env) == 3
+		calc('3@A', env)
+		assert calc('A', env) == 3
 
 	def test_ans(self, env):
-		calc('5', env=env)
-		calc('Ans +1', env=env)
+		calc('5', env)
+		calc('Ans +1', env)
 		assert env.ans == 6
 
 	def test_colon_separator(self, env):
-		assert calc('3@A:A*2', env=env) == 6
+		assert calc('3@A:A*2', env) == 6
 
 	def test_list_literal(self):
 		assert list(calc('{1,2,3')) == [1, 2, 3]
 
 	def test_list_index(self, env):
-		calc('{1,2,3@ L1', env=env)
-		assert calc('L1 (2', env=env) == 2
+		calc('{1,2,3@ L1', env)
+		assert calc('L1 (2', env) == 2
 
 	def test_matrix_literal(self):
 		result = calc('[[1,2][3,4]]')
@@ -1027,11 +1027,11 @@ class TestParserFeatures:
 		assert result.data == [[1, 2], [3, 4]]
 
 	def test_matrix_index(self, env):
-		calc('[[1,2][3,4]]@ [A]', env=env)
-		assert calc('[A] (2,1', env=env) == 3
+		calc('[[1,2][3,4]]@ [A]', env)
+		assert calc('[A] (2,1', env) == 3
 
 	def test_string_literal(self, env):
-		calc('"HI"', env=env)
+		calc('"HI"', env)
 		assert str(env.ans) == "HI"
 
 	def test_dms_degree_in_rad_mode(self):
@@ -1040,7 +1040,7 @@ class TestParserFeatures:
 
 	def test_dms_degree_in_deg_mode(self, deg):
 		# 90° in degree mode = 90 (no conversion)
-		assert calc('90°', env=deg) == 90
+		assert calc('90°', deg) == 90
 
 	def test_dms_literal_minutes(self):
 		# 1°30' = 1.5 decimal degrees (DMS literals always return decimal degrees, no mode conversion)
@@ -1094,7 +1094,7 @@ class TestParserFeatures:
 
 	def test_expr(self, env):
 		# expr("1+2") evaluates the string as code
-		calc('expr( "1+2"', env=env)
+		calc('expr( "1+2"', env)
 		assert env.ans == approx(3)
 
 	def test_inv_postfix(self):
@@ -1177,37 +1177,37 @@ class TestRand:
 class TestColonStatements:
 	def test_colon_ans_is_last(self, env):
 		# 1→A:2  →  Ans=2, A=1
-		calc('1@A :2', env=env)
+		calc('1@A :2', env)
 		assert env.ans == 2
 		assert env.numerics[0] == 1
 
 	def test_colon_store_then_read(self, env):
 		# 5→A:A*3  →  Ans=15
-		assert calc('5@A:A*3', env=env) == 15
+		assert calc('5@A:A*3', env) == 15
 
 	def test_colon_two_stores(self, env):
 		# 1→A:3→B  →  A=1, B=3, Ans=3
-		calc('1@A:3@B', env=env)
+		calc('1@A:3@B', env)
 		assert env.numerics[0] == 1
 		assert env.numerics[1] == 3
 		assert env.ans == 3
 
 	def test_colon_three_segments(self, env):
 		# 1:2:3  →  Ans=3
-		assert calc('1:2:3', env=env) == 3
+		assert calc('1:2:3', env) == 3
 
 	def test_colon_ans_carries_across(self, env):
 		# 7:Ans+1  →  Ans=8  (Ans from segment 1 is visible in segment 2)
-		assert calc('7: Ans +1', env=env) == 8
+		assert calc('7: Ans +1', env) == 8
 
 	def test_colon_store_does_not_clobber_a(self, env):
 		# 1→A:2  →  A must still be 1 after Ans becomes 2
-		calc('1@A:2', env=env)
-		assert calc('A', env=env) == 1
+		calc('1@A:2', env)
+		assert calc('A', env) == 1
 
 	def test_colon_list_then_index(self, env):
 		# {10,20,30}→L₁:L₁(2)  →  Ans=20
-		assert calc('{10,20,30@ L1 : L1 (2', env=env) == 20
+		assert calc('{10,20,30@ L1 : L1 (2', env) == 20
 
 
 # ── Implicit delimiter closing ────────────────────────────────────────────────
@@ -1241,7 +1241,7 @@ class TestImplicitClose:
 
 	def test_unclosed_list_then_colon_sum(self, env):
 		# {1,2,3:sum(Ans  →  Ans=6
-		assert calc('{1,2,3: sum( Ans', env=env) == 6
+		assert calc('{1,2,3: sum( Ans', env) == 6
 
 	def test_unclosed_fn_args(self):
 		# max(3,7  →  7 (trailing ) omitted)
@@ -1257,30 +1257,30 @@ class TestImplicitClose:
 class TestStoreDim:
 	def test_store_dim_list_create(self, env):
 		# 5→dim(L₁)  →  L₁ becomes {0,0,0,0,0}
-		calc('5@ dim( L1', env=env)
+		calc('5@ dim( L1', env)
 		assert env.lists[0].data == [0, 0, 0, 0, 0]
 
 	def test_store_dim_list_expand(self, env):
 		# {1,2,3}→L₁ : 5→dim(L₁)  →  L₁ = {1,2,3,0,0}
-		calc('{1,2,3@ L1', env=env)
-		calc('5@ dim( L1', env=env)
+		calc('{1,2,3@ L1', env)
+		calc('5@ dim( L1', env)
 		assert env.lists[0].data == [1, 2, 3, 0, 0]
 
 	def test_store_dim_list_shrink(self, env):
 		# {1,2,3,4,5}→L₁ : 3→dim(L₁)  →  L₁ = {1,2,3}
-		calc('{1,2,3,4,5@ L1', env=env)
-		calc('3@ dim( L1', env=env)
+		calc('{1,2,3,4,5@ L1', env)
+		calc('3@ dim( L1', env)
 		assert env.lists[0].data == [1, 2, 3]
 
 	def test_store_dim_matrix_create(self, env):
 		# {2,3}→dim([A])  →  [A] becomes 2×3 of zeros
-		calc('{2,3@ dim( [A]', env=env)
+		calc('{2,3@ dim( [A]', env)
 		assert env.matrices[0].data == 2 * [3 * [0]]
 
 	def test_store_dim_matrix_resize_preserves(self, env):
 		# Build [[1,2][3,4]], then resize to 3×3; original values survive, new cells = 0
-		calc('[[1,2][3,4@ [A]', env=env)
-		calc('{3,3@ dim( [A]', env=env)
+		calc('[[1,2][3,4@ [A]', env)
+		calc('{3,3@ dim( [A]', env)
 		assert env.matrices[0].data == [[1, 2, 0], [3, 4, 0], [0, 0, 0]]
 
 	def test_dim_read_list(self, env):
@@ -1339,8 +1339,8 @@ class TestNesting:
 
 	def test_list_arithmetic_then_sum(self, env):
 		# {1,2,3}*2  =  {2,4,6}, then sum({2,4,6}) = 12
-		calc('{1,2,3}*2@ L1', env=env)
-		assert calc('sum( L1', env=env) == 12
+		calc('{1,2,3}*2@ L1', env)
+		assert calc('sum( L1', env) == 12
 
 	def test_matrix_power_then_det(self):
 		# det([[1,1][0,1]]²)  =  det([[1,2][0,1]])  =  1
@@ -1348,8 +1348,8 @@ class TestNesting:
 
 	def test_string_concat_then_length(self, env):
 		# "AB"+"CD" stored in Str1, then length(Str1) = 4
-		calc('"AB"+"CD"@ Str1', env=env)
-		assert calc('length( Str1', env=env) == 4
+		calc('"AB"+"CD"@ Str1', env)
+		assert calc('length( Str1', env) == 4
 
 	def test_cumsum_then_max(self):
 		# max(cumSum({1,2,3,4}))  =  max({1,3,6,10})  =  10
@@ -1357,8 +1357,8 @@ class TestNesting:
 
 	def test_expr_evaluates_string(self, env):
 		# Build "2+3" dynamically as a string stored in Str1, then expr(Str1) = 5
-		calc('"2+3"@ Str1', env=env)
-		assert calc('expr( Str1', env=env) == approx(5)
+		calc('"2+3"@ Str1', env)
+		assert calc('expr( Str1', env) == approx(5)
 
 	def test_ans_index_or_mul_list(self, env):
 		# {10,20,30}→Ans  (via plain eval), then Ans(2)  =  20
@@ -1423,15 +1423,15 @@ class TestIllegalNest:
 
 	def test_expr_no_self_nest(self, env):
 		# expr( evaluating a string that itself calls expr( → ERR:ILLEGAL NEST
-		calc('" expr( Str1 )"@ Str1', env=env)
+		calc('" expr( Str1 )"@ Str1', env)
 		with pytest.raises(IllegalNestError):
-			calc('expr( Str1', env=env)
+			calc('expr( Str1', env)
 
 	def test_expr_nest_depth_resets(self, env):
 		# After a successful expr( call, the guard is back to 0 — can call again
-		calc('"1+2"@ Str1', env=env)
-		assert calc('expr( Str1', env=env) == 3
-		assert calc('expr( Str1', env=env) == 3   # second call — must not raise
+		calc('"1+2"@ Str1', env)
+		assert calc('expr( Str1', env) == 3
+		assert calc('expr( Str1', env) == 3   # second call — must not raise
 
 
 # ── Thunk capture: commas inside nested delimiters ────────────────────────────
@@ -1478,33 +1478,33 @@ class TestSeqIncrement:
 
 	def test_zero_step_raises(self, env):
 		with pytest.raises(IncrementError, match="zero"):
-			calc('seq( X,X,1,5,0', env=env)
+			calc('seq( X,X,1,5,0', env)
 
 	def test_positive_step_start_after_end_raises(self, env):
 		with pytest.raises(IncrementError, match="start.*end|end.*start"):
-			calc('seq( X,X,5,1', env=env)
+			calc('seq( X,X,5,1', env)
 
 	def test_negative_step_start_before_end_raises(self, env):
 		with pytest.raises(IncrementError, match="start.*end|end.*start"):
-			calc('seq( X,X,1,5,~1', env=env)
+			calc('seq( X,X,1,5,~1', env)
 
 	def test_equal_start_end_is_fine(self, env):
-		assert list(calc('seq( X,X,3,3', env=env)) == [3]
+		assert list(calc('seq( X,X,3,3', env)) == [3]
 
 	def test_negative_step_descending_is_fine(self, env):
-		assert list(calc('seq( X,X,3,1,~1', env=env)) == [3, 2, 1]
+		assert list(calc('seq( X,X,3,1,~1', env)) == [3, 2, 1]
 
 
 class TestCompleXor:
 	
 	def test_xor(self, env):
-		calc('55@A:99@B', env=env)
-		calc('int( log( 2) INV log( max( {A,B', env=env)
-		calc('2^ cumSum( binomcdf( Ans ,0', env=env)
-		assert calc('sum( Ans .5(1= abs( int( 2 fPart( Ans INV (A+Bi', env=env) == 84
+		calc('55@A:99@B', env)
+		calc('int( log( 2) INV log( max( {A,B', env)
+		calc('2^ cumSum( binomcdf( Ans ,0', env)
+		assert calc('sum( Ans .5(1= abs( int( 2 fPart( Ans INV (A+Bi', env) == 84
 
 	def test_xor2(self, env):
-		calc('55@A:99@B', env=env)
-		calc('seq( 2^N,N,8,1,~1@ L1', env=env).data == [256, 128, 64, 32, 16, 8, 4, 2]
-		calc('.5 sum( L1 *(1= abs( int( 2 fPart( (A+Bi)/ L1 @F', env=env)
-		assert calc('F', env=env) == 84
+		calc('55@A:99@B', env)
+		calc('seq( 2^N,N,8,1,~1@ L1', env).data == [256, 128, 64, 32, 16, 8, 4, 2]
+		calc('.5 sum( L1 *(1= abs( int( 2 fPart( (A+Bi)/ L1 @F', env)
+		assert calc('F', env) == 84
