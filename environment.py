@@ -29,119 +29,6 @@ class _VarArray:
 				yield self._formatter(i), x
 
 
-# ── Variable hierarchy ────────────────────────────────────────────────────────────
-
-class Variable:
-	"""Base class for typed, storable token variables."""
-	def get(self, env): ...
-	def set(self, env, value): ...
-
-
-class NumericVar(Variable):
-	__slots__ = ('_idx',)
-
-	def __init__(self, idx: int):
-		self._idx = idx
-
-	def get(self, env):
-		return env.numerics[self._idx]
-
-	def set(self, env, value):
-		env.numerics[self._idx] = require_num(value)
-
-
-class RealVar(Variable):
-	__slots__ = ('_name',)
-
-	def __init__(self, name: int):
-		self._name = name
-
-	def get(self, env):
-		return getattr(env, name)
-
-	def set(self, env, value):
-		return setattr(env, name, require_real(value))
-
-
-class ListVar(Variable):
-	__slots__ = ('_idx',)
-
-	def __init__(self, idx: int):
-		self._idx = idx
-
-	def get(self, env):
-		return env.lists[self._idx]
-
-	def set(self, env, value):
-		env.lists[self._idx] = require_list(value)
-
-
-class UserListVar(Variable):
-	__slots__ = ('_name',)
-
-	def __init__(self, name: str):
-		self._name = name
-
-	def get(self, env):
-		return env.user_lists[self._name]
-
-	def set(self, env, value):
-		env.user_lists[self._name] = require_list(value)
-
-
-class MatrixVar(Variable):
-	__slots__ = ('_idx',)
-
-	def __init__(self, idx: int):
-		self._idx = idx
-
-	def get(self, env):
-		return env.matrices[self._idx]
-
-	def set(self, env, value):
-		env.matrices[self._idx] = require_matrix(value)
-
-
-class StringVar(Variable):
-	__slots__ = ('_idx',)
-
-	def __init__(self, idx: int):
-		self._idx = idx
-
-	def get(self, env):
-		return env.strings[self._idx]
-
-	def set(self, env, value):
-		env.strings[self._idx] = require_str(value)
-
-
-class StatVar(Variable):
-	__slots__ = ('_idx',)
-
-	def __init__(self, idx: int):
-		self._idx = idx
-
-	def get(self, env):
-		return env.stat[self._idx]
-
-	def set(self, env, value):
-		raise DataTypeError("Stat variables are read-only")
-
-
-class WindowVar(Variable):
-	__slots__ = ('_idx',)
-
-	def __init__(self, idx: int):
-		self._idx = idx
-
-	def get(self, env):
-		return env.window[self._idx]
-
-	def set(self, env, value):
-		if isinstance(value, complex):
-			raise DataTypeError("Cannot store complex number in window variable")
-		env.window[self._idx] = float(value)
-
 
 class _NumericVarArray(_VarArray):
 	def __init__(self):
@@ -304,3 +191,115 @@ class Environment:
 
 	def print_screen(self):
 		pass
+
+
+# ── Variable hierarchy ────────────────────────────────────────────────────────────
+
+class Variable:
+	"""Base class for typed, storable token variables."""
+	def get(self, env): ...
+	def set(self, env, value): ...
+
+
+class NumericVar(Variable):
+	__slots__ = ('_idx',)
+
+	def __init__(self, idx: int):
+		self._idx = idx
+
+	def get(self, env):
+		return env.numerics[self._idx]
+
+	def set(self, env, value):
+		env.numerics[self._idx] = require_num(value)
+
+
+class RealVar(Variable):
+	__slots__ = ('_name',)
+
+	def __init__(self, name: int):
+		self._name = name
+
+	def get(self, env):
+		return getattr(env, name)
+
+	def set(self, env, value):
+		return setattr(env, name, require_real(value))
+
+
+class ListVar(Variable):
+	__slots__ = ('_idx',)
+
+	def __init__(self, idx: int):
+		self._idx = idx
+
+	def get(self, env):
+		return env.lists[self._idx]
+
+	def set(self, env, value):
+		env.lists[self._idx] = require_list(value)
+
+
+class UserListVar(Variable):
+	__slots__ = ('_name',)
+
+	def __init__(self, name: str):
+		self._name = name
+
+	def get(self, env):
+		return env.user_lists[self._name]
+
+	def set(self, env, value):
+		env.user_lists[self._name] = require_list(value)
+
+
+class MatrixVar(Variable):
+	__slots__ = ('_idx',)
+
+	def __init__(self, idx: int):
+		self._idx = idx
+
+	def get(self, env):
+		return env.matrices[self._idx]
+
+	def set(self, env, value):
+		env.matrices[self._idx] = require_matrix(value)
+
+
+class StringVar(Variable):
+	__slots__ = ('_idx',)
+
+	def __init__(self, idx: int):
+		self._idx = idx
+
+	def get(self, env):
+		return env.strings[self._idx]
+
+	def set(self, env, value):
+		env.strings[self._idx] = require_str(value)
+
+
+class StatVar(Variable):
+	__slots__ = ('_idx',)
+
+	def __init__(self, idx: int):
+		self._idx = idx
+
+	def get(self, env):
+		return env.stat[self._idx]
+
+	def set(self, env, value):
+		raise DataTypeError("Stat variables are read-only")
+
+
+class WindowVar(Variable):
+	__slots__ = ('_idx',)
+
+	def __init__(self, idx: int):
+		self._idx = idx
+
+	def get(self, env):
+		return env.window[self._idx]
+
+	def set(self, env, value):
+		env.window[self._idx] = require_real(value)
