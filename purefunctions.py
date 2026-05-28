@@ -172,15 +172,15 @@ def imag(x):
 	return x.imag if isinstance(x, complex) else 0
 
 @vectorized
-def conj(a):
-	return complex(a.real, -a.imag) if isinstance(a, complex) else a
+def conj(x):
+	return complex(x.real, -x.imag) if isinstance(x, complex) else x
 
 # Technically works on matrices, but since matrices can't store complex numbers, the result is all 0s.
 # TiBasicDev thinks this is basically a bug, so I'm not implementing it in order to discourage it.
 # (If you want a matrix of all 0s, you can just do 0[A].)
 @vectorized
-def angle(a):
-	return cmath.phase(a)
+def angle(x):
+	return cmath.phase(x)
 
 
 # ── Converters (►DMS, ►Dec, ►Frac) ─────────────────────────────────────────────
@@ -258,8 +258,8 @@ def stddev(lst, freqlist=None):
 
 
 @vectorized_with_matrix
-def round(a, b=9):
-	return builtins.round(a, require_int(b))
+def round(x, decimals=9):
+	return builtins.round(x, require_int(decimals))
 
 
 def _minmax(fn, a, b):
@@ -290,10 +290,10 @@ def median(lst, freqlist=None):
 	if len(lst) == 0:
 		raise InvalidDimError("median: list is empty")
 	if freqlist is None:
-		s = sorted(lst)
-		n = len(s)
+		sorted_data = sorted(lst)
+		n = len(sorted_data)
 		mid = n // 2
-		return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
+		return sorted_data[mid] if n % 2 else (sorted_data[mid - 1] + sorted_data[mid]) / 2
 
 	require_list(freqlist)
 	if len(lst) != len(freqlist):
@@ -335,21 +335,21 @@ def det(mat):
 	n = mat.rows
 	if n == 0 or n != mat.cols:
 		raise InvalidDimError(f"det requires a square matrix, got {mat.rows}×{mat.cols}")
-	m = [row.copy() for row in mat.data]
+	work = [row.copy() for row in mat.data]
 	sign = 1.0
 	for col in range(n):
-		pivot = next((r for r in range(col, n) if m[r][col] != 0), None)
+		pivot = next((r for r in range(col, n) if work[r][col] != 0), None)
 		if pivot is None:
 			return 0.0
 		if pivot != col:
-			m[col], m[pivot] = m[pivot], m[col]
+			work[col], work[pivot] = work[pivot], work[col]
 			sign = -sign
 		for row in range(col + 1, n):
-			if m[row][col] != 0:
-				f = m[row][col] / m[col][col]
+			if work[row][col] != 0:
+				factor = work[row][col] / work[col][col]
 				for j in range(col, n):
-					m[row][j] -= f * m[col][j]
-	return sign * math.prod(m[i][i] for i in range(n))
+					work[row][j] -= factor * work[col][j]
+	return sign * math.prod(work[i][i] for i in range(n))
 
 
 def identity(n):
@@ -480,8 +480,8 @@ def rand_norm(mu, sigma, n=None):
 	return TiList([random.gauss(mu, sigma) for _ in range(require_int(n))])
 
 
-def rand_int_no_rep(a, b):
-	lst = list(range(require_int(a), require_int(b) + 1))
+def rand_int_no_rep(low, high):
+	lst = list(range(require_int(low), require_int(high) + 1))
 	random.shuffle(lst)
 	return TiList(lst)
 
@@ -535,16 +535,16 @@ def _row_reduce(mat, get_range):
 
 		result[pivot_row], result[swap_row] = result[swap_row], result[pivot_row]
 		pivot = result[pivot_row]
-		p = pivot[col]
+		scale = pivot[col]
 		for k in range(mat.cols):
-			pivot[k] /= p
+			pivot[k] /= scale
 		for r in get_range(pivot_row, mat.rows):
 			if r != pivot_row and result[r][col] != 0:
 				pivot = result[pivot_row]
 				current = result[r]
-				f = current[col]
+				factor = current[col]
 				for k in range(mat.cols):
-					current[k] -= f * pivot[k]
+					current[k] -= factor * pivot[k]
 
 		pivot_row += 1
 	return TiMatrix(result)
@@ -607,9 +607,9 @@ def timecnv(seconds):
 	"""Convert a number of seconds into {days, hours, minutes, seconds}."""
 	seconds = require_int(seconds)
 	sign = -1 if seconds < 0 else 1
-	s, secs = divmod(abs(seconds), 60)
-	s, minutes = divmod(s, 60)
-	days, hours = divmod(s, 24)
+	remaining, secs = divmod(abs(seconds), 60)
+	remaining, minutes = divmod(remaining, 60)
+	days, hours = divmod(remaining, 24)
 	return sign * TiList([days, hours, minutes, secs])
 
 
@@ -864,9 +864,8 @@ def f_pdf(x, df1, df2):
 	require_real(df2)
 	if x <= 0:
 		return 0.0
-	d1, d2 = df1, df2
-	log_num = (d1 / 2) * math.log(d1 * x) + (d2 / 2) * math.log(d2) - ((d1 + d2) / 2) * math.log(d1 * x + d2)
-	log_den = math.log(x) + math.lgamma(d1 / 2) + math.lgamma(d2 / 2) - math.lgamma((d1 + d2) / 2)
+	log_num = (df1 / 2) * math.log(df1 * x) + (df2 / 2) * math.log(df2) - ((df1 + df2) / 2) * math.log(df1 * x + df2)
+	log_den = math.log(x) + math.lgamma(df1 / 2) + math.lgamma(df2 / 2) - math.lgamma((df1 + df2) / 2)
 	return math.exp(log_num - log_den)
 
 

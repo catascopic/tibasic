@@ -21,7 +21,8 @@
       "Bash(python -m pytest tibasic_test.py -v)",
       "Bash(python -c \"import purefunctions as pf; print\\(pf.factorial\\(0.5\\)\\); print\\(pf.factorial\\(5\\)\\); print\\(pf.factorial\\(-0.5\\)\\)\")",
       "Bash(python -m pytest tibasic_test.py -q -x)",
-      "Bash(python -m pytest tibasic_test.py -x -q)"
+      "Bash(python -m pytest tibasic_test.py -x -q)",
+      "Bash(python -m pytest tibasic_test.py::TestMatrToList -v)"
     ]
   }
 }

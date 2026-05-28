@@ -5,8 +5,6 @@ npv( irr( bal( Σprn( ΣInt(
 Converters? ►Nom( ►Eff(
 ClrAllLists GetCalc( DelVar Equ►String( String►Equ(
 
-matr_to_list: lists do not have to equal matrix columns. there can be fewer or extra (which are ignored)
-
 Improve get_token, read_token
 
 Custom numeric classes for formatting?
@@ -30,6 +28,8 @@ make them IntEnums for easier testing?
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+matr_to_list: lists do not have to equal matrix columns. there can be fewer or extra (which are ignored)
 
 $RFLCTA should be an error
 

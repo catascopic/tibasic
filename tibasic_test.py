@@ -596,10 +596,18 @@ class TestMatrToList:
 		with pytest.raises(InvalidDimError):
 			calc('Matr►list( [[1,2][3,4]],3, L1')
 
-	def test_too_many_list_args(self, env):
-		# 2-column matrix but 3 list destinations → InvalidDimError
-		with pytest.raises(InvalidDimError):
-			calc('Matr►list( [[1,2][3,4]], L1 , L2 , L3 )')
+	def test_fewer_lists_than_columns(self, env):
+		# 2-column matrix, only 1 list destination → only column 1 is filled
+		calc('Matr►list( [[1,2][3,4]], L1', env=env)
+		assert env.lists[0].data == [1, 3]
+		assert env.lists[1] is None  # L2 untouched
+
+	def test_extra_lists_ignored(self, env):
+		# 2-column matrix but 3 list destinations → extra list is simply ignored
+		calc('Matr►list( [[1,2][3,4]], L1 , L2 , L3 )', env=env)
+		assert env.lists[0].data == [1, 3]
+		assert env.lists[1].data == [2, 4]
+		assert env.lists[2] is None  # L3 never written
 
 	def test_non_matrix_raises(self, env):
 		with pytest.raises(DataTypeError):
@@ -800,24 +808,24 @@ class TestComplex:
 
 class TestCoordinates:
 	def test_r_pr(self):
-		assert pf.r_pr(3, 4) == approx(5)
+		assert pf.rect_to_polar_radius(3, 4) == approx(5)
 
 	def test_r_ptheta(self):
-		assert pf.r_ptheta(1, 0) == approx(0)
+		assert pf.rect_to_polar_angle(1, 0) == approx(0)
 
 	def test_p_rx(self):
-		assert pf.p_rx(5, 0) == approx(5)
+		assert pf.polar_to_rect_x(5, 0) == approx(5)
 
 	def test_p_ry(self):
-		assert pf.p_ry(5, math.pi / 2) == approx(5)
+		assert pf.polar_to_rect_y(5, math.pi / 2) == approx(5)
 
 	def test_roundtrip(self):
 		# (r, θ) → (x, y) → r
 		r, theta = 5, math.pi / 3
-		x = pf.p_rx(r, theta)
-		y = pf.p_ry(r, theta)
-		assert pf.r_pr(x, y) == approx(r)
-		assert pf.r_ptheta(x, y) == approx(theta)
+		x = pf.polar_to_rect_x(r, theta)
+		y = pf.polar_to_rect_y(r, theta)
+		assert pf.rect_to_polar_radius(x, y) == approx(r)
+		assert pf.rect_to_polar_angle(x, y) == approx(theta)
 
 
 # ── Probability distributions ─────────────────────────────────────────────────

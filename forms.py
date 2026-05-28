@@ -2,6 +2,7 @@ from __future__ import annotations
 import operator
 import purefunctions
 from functools import wraps
+from itertools import zip_longest
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -151,12 +152,8 @@ def matr_to_list(a: ArgParser) -> None:
 		list_refs = [a.list_var()]
 		while a.has_next():
 			list_refs.append(a.list_var())
-		if len(list_refs) > mat.cols:
-			raise InvalidDimError(
-				f"Matr►list: {len(list_refs)} list args but matrix has only {mat.cols} columns"
-			)
-		for col, ref in enumerate(list_refs):
-			ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))
+		for ref, col_data in zip(list_refs, zip(*mat.data)):
+			ref.set(a.env, TiList(list(col_data)))
 	else:
 		col = require_int(a.expr()) - 1
 		if not (0 <= col < mat.cols):
@@ -176,11 +173,8 @@ def list_to_matr(a: ArgParser) -> None:
 		if a.peek().is_matrix_var():
 			mat_var = a.matrix_var()
 			break
-	cols = len(list_vals)
-	rows = max(len(lst) for lst in list_vals)
 	mat_var.set(a.env, TiMatrix([
-		[list_vals[c].data[r] if r < len(list_vals[c]) else 0 for c in range(cols)]
-		for r in range(rows)
+		list(row) for row in zip_longest(*[lst.data for lst in list_vals], fillvalue=0)
 	]))
 
 
