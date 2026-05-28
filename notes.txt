@@ -1,5 +1,3 @@
-Advanced DMS/SCI syntax tests
-
 Aho-Corasick parser for testing
 
 Do we need a purefunctions equivalent for Environment?
@@ -8,15 +6,9 @@ Make sure deg symbol vs D/M/S format is working
 
 Also, trig functions actually do need access to the environment so they can see what mode the calculator is in!
 
-
-Full token overhaul: operators and bp are okay, everything else moved to dispatcher
-Commands: no paren flag? Or use argparser to do it manually
-
 move vectorized to tiobjects
 
 Go through all commands, check to see if they're vectorized correctly
-
-use Token instead of string as nesting key
 
 tests:
 matr_to_list/list_to_matr
@@ -29,6 +21,8 @@ make them IntEnums for easier testing?
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+use Token instead of string as nesting key
 
 Is there any concern that in the time tests, the time might be different between setting and checking?
 ArgumentError: wrong number of arguments specified

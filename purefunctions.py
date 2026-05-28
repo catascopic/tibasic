@@ -410,6 +410,7 @@ for _name, _real_fn, _cpx_fn in [
 
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
 
+@vectorized
 def factorial(n):
 	require_real(n)
 	try:
@@ -417,11 +418,19 @@ def factorial(n):
 	except ValueError:
 		raise DomainError(f"factorial: undefined for {n} (negative integer)")
 
+@vectorized
 def ncr(n, r):
-	return math.comb(require_int(n), require_int(r))
+	try:
+		return math.comb(require_int(n), require_int(r))
+	except ValueError:
+		raise DomainError(f"nCr: invalid arguments ({n}, {r})")
 
+@vectorized
 def npr(n, r):
-	return math.perm(require_int(n), require_int(r))
+	try:
+		return math.perm(require_int(n), require_int(r))
+	except ValueError:
+		raise DomainError(f"nPr: invalid arguments ({n}, {r})")
 
 @vectorized
 def lcm(a, b):

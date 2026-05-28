@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from tiobjects import TiList, TiMatrix, require_real, require_int, require_str
+from tiobjects import TiList, TiMatrix, require_real, require_int, require_str, require_list
 from environment import Variable, Environment
-from errors import DomainError, DataTypeError, ArgumentError, IncrementError
+from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError
 
 
 def ans_index_or_mul(a: ArgParser):
@@ -18,7 +18,7 @@ def ans_index_or_mul(a: ArgParser):
 	if isinstance(ans, TiMatrix):
 		return ans[args]
 	if len(args) != 1:
-		raise ValueError(f"Too many arguments: {args}")
+		raise ArgumentError(f"Too many arguments: {args}")
 	(arg,) = args
 	if isinstance(ans, TiList):
 		return ans[arg]
@@ -151,10 +151,18 @@ def matr_to_list(a: ArgParser) -> None:
 		list_refs = [a.list_var()]
 		while a.has_next():
 			list_refs.append(a.list_var())
+		if len(list_refs) > mat.cols:
+			raise InvalidDimError(
+				f"Matr►list: {len(list_refs)} list args but matrix has only {mat.cols} columns"
+			)
 		for col, ref in enumerate(list_refs):
 			ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))
 	else:
 		col = require_int(a.expr()) - 1
+		if not (0 <= col < mat.cols):
+			raise InvalidDimError(
+				f"Matr►list: column {col + 1} out of range for {mat.rows}×{mat.cols} matrix"
+			)
 		ref = a.list_var()
 		ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))
 
@@ -162,7 +170,7 @@ def matr_to_list(a: ArgParser) -> None:
 def list_to_matr(a: ArgParser) -> None:
 	list_vals = []
 	while True:
-		list_vals.append(a.expr())
+		list_vals.append(require_list(a.expr()))
 		if not a.has_next():
 			raise ArgumentError("List►matr: expected matrix variable as last argument")
 		if a.peek().is_matrix_var():
@@ -186,39 +194,37 @@ def _sort(a: ArgParser, reverse: bool):
 	while a.has_next():
 		deps.append(a.list_var().get(a.env))
 	if not deps:
-		sort(main, reverse=reverse)
+		main.data.sort(reverse=reverse)
 	else:
 		data = main.data
 		indices = sorted(range(len(data)), key=lambda i: data[i], reverse=reverse)
-		lst.data = [data[i] for i in indices]
+		main.data = [data[i] for i in indices]
 		for d in deps:
 			d.data = [d.data[i] for i in indices]
 
 
 def sort_a(a: ArgParser):
-	_sort(a, True)
+	_sort(a, False)  # ascending
 
 
 def sort_d(a: ArgParser):
-	_sort(a, False)
+	_sort(a, True)   # descending
 
 
 def fill(a: ArgParser):
-	matrix_mode = a.peek().is_matrix_var()
-	if matrix_mode:
-		var = a.matrix_var()
-	else:
-		var = a.list_var()
-
+	# Fill(value, listname) or Fill(value, matrixname) — value comes first
 	x = require_real(a.expr())
-	a.end()
-	if matrix_mode:
-		for i in range(len(lst.data)):
-			lst.data[i] = x
-	else:
+	if a.peek().is_matrix_var():
+		lst = a.matrix_var().get(a.env)
+		a.end()
 		for row in lst.data:
 			for i in range(len(row)):
 				row[i] = x
+	else:
+		lst = a.list_var().get(a.env)
+		a.end()
+		for i in range(len(lst.data)):
+			lst.data[i] = x
 
 
 # ── env_func decorator ────────────────────────────────────────────────────────
