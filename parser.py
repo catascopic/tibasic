@@ -460,30 +460,30 @@ def _parse_method(method):
 
 
 class ArgParser:
-	"""Stateful helper for parsing comma-separated function arguments."""
+	"""Stateful helper for parsing comma-separated function arguments.
+
+	Uses a trailing-comma model: after each argument is parsed, the following
+	COMMA (if present) is consumed immediately.  This means peek() between
+	argument calls always shows the first token of the *next* argument rather
+	than a COMMA, which lets callers dispatch on argument type before consuming.
+	"""
 
 	def __init__(self, parser: Parser):
 		self._parser = parser
-		self._first = True
-
-	def _sep(self):
-		if self._first:
-			self._first = False
-		else:
-			self._parser.expect(COMMA)
+		self._next = True  # True = next arg token is already exposed (no leading comma to eat)
 
 	def _arg(self, parse_fn, optional=False, default=None):
-		if optional:
-			if self._first:
-				if self._parser.at_end() or self._parser.peek_is_rparen():
-					return default
-				self._first = False
-				return parse_fn()
-			if not self._parser.eat_if(COMMA):
+		if not self._next:
+			if optional:
 				return default
-			return parse_fn()
-		self._sep()
-		return parse_fn()
+			raise ParseError("Missing argument: expected comma before next argument")
+		if optional and (self._parser.at_end() or self._parser.peek() is R_PAREN):
+			return default
+		val = parse_fn()
+		self._next = self._parser.eat_if(COMMA)
+		if not self._next:
+			self._parser.eat_if(R_PAREN)
+		return val
 
 	@_parse_method
 	def expr(self):
@@ -512,22 +512,22 @@ class ArgParser:
 		raise ParseError(f"Expected a matrix variable, got {t.text!r}")
 
 	def end(self):
-		self._parser.eat_if(R_PAREN)
+		"""Assert no surplus arguments remain.  The closing ) is already consumed
+		by the trailing-comma logic in _arg, so this is purely a validation call."""
+		if self._next:
+			raise ParseError(f"Too many arguments: unexpected {self.peek()}")
 
 	@property
 	def env(self):
 		return self._parser.env
 
-	def has_next_arg(self) -> bool:
-		return self.peek() is COMMA
+	def has_next(self) -> bool:
+		return self._ready
 
 	def parse_args(self) -> list:
-		args = []
-		if not self._parser.at_end() and not self.peek() is R_PAREN:
+		args = [self.expr()]
+		while self._ready:
 			args.append(self.expr())
-			while self.has_next_arg():
-				args.append(self.expr())
-		self.end()
 		return args
 
 	def peek(self):

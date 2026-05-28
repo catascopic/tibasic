@@ -1,3 +1,9 @@
+ArgumentError: wrong number of arguments specified
+DataTypeError: wrong type of an argument or operand
+
+
+Aho-Corasick parser for testing
+
 Do we need a purefunctions equivalent for Environment?
 
 Make sure deg symbol vs D/M/S format is working

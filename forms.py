@@ -97,7 +97,7 @@ _K15_WEIGHTS = [
 ]
 # G7 uses nodes at indices 0, 2, 4, 6 (every other Kronrod node)
 _G7_WEIGHTS  = [
-	0.4179591836734694, None, 0.3818300505051189, None, 
+	0.4179591836734694, None, 0.3818300505051189, None,
 	0.2797053914892767, None, 0.1294849661688697, None
 ]
 
@@ -122,7 +122,7 @@ def _adaptive_gk15(f, lo, hi, tol, depth=0):
 		return k15
 	mid = (lo + hi) / 2
 	return (
-		_adaptive_gk15(f, lo, mid, tol / 2, depth + 1) + 
+		_adaptive_gk15(f, lo, mid, tol / 2, depth + 1) +
 		_adaptive_gk15(f, mid, hi, tol / 2, depth + 1)
 	)
 
@@ -148,15 +148,13 @@ def matr_to_list(a: ArgParser) -> None:
 		raise ValueError("Matr►list: first argument must be a matrix")
 	if a.peek().is_list_start():
 		list_refs = [a.list_var()]
-		while a.has_next_arg():
+		while a.has_next():
 			list_refs.append(a.list_var())
-		a.end()
 		for col, ref in enumerate(list_refs):
 			ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))
 	else:
 		col = require_int(a.expr()) - 1
 		ref = a.list_var()
-		a.end()
 		ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))
 
 
@@ -164,17 +162,13 @@ def list_to_matr(a: ArgParser) -> None:
 	list_vals = []
 	while True:
 		list_vals.append(a.expr())
-		if not a.has_next_arg():
+		if not a.has_next():
 			raise ValueError("List►matr: expected matrix variable as last argument")
-		# TODO: let ArgParser peek?
-		# if a.peek().is_matrix_var():
-		if a.next_is_matrix_var():
+		if a.peek().is_matrix_var():
 			mat_var = a.matrix_var()
 			break
-	a.end()
 	cols = len(list_vals)
 	rows = max(len(lst) for lst in list_vals)
-	# TODO: can we use zip with a default value?
 	mat_var.set(a.env, TiMatrix([
 		[list_vals[c].data[r] if r < len(list_vals[c]) else 0 for c in range(cols)]
 		for r in range(rows)
@@ -190,7 +184,6 @@ def _sort(a: ArgParser, reverse: bool):
 	deps = []
 	while a.has_next_arg():
 		deps.append(a.list_var().get(a.env))
-	a.end()
 	if not deps:
 		sort(main, reverse=reverse)
 	else:
