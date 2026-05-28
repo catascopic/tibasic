@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 from tiobjects import TiList, TiMatrix, require_real, require_int, require_str
 from environment import Variable, Environment
+from errors import DomainError, DataTypeError, ArgumentError, IncrementError
 
 
 def ans_index_or_mul(a: ArgParser):
@@ -34,15 +35,15 @@ def seq(a: ArgParser) -> TiList:
 	n = start
 	result = []
 	if step == 0:
-		raise ValueError("seq: step cannot be zero")
+		raise IncrementError("seq: step cannot be zero")
 	if step > 0:
 		if start > end + 1e-10:
-			raise ValueError(f"seq: step is positive but start ({start}) > end ({end})")
+			raise IncrementError(f"seq: step is positive but start ({start}) > end ({end})")
 		op = operator.le
 		end += 1e-10
 	else:
 		if start < end - 1e-10:
-			raise ValueError(f"seq: step is negative but start ({start}) < end ({end})")
+			raise IncrementError(f"seq: step is negative but start ({start}) < end ({end})")
 		op = operator.ge
 		end -= 1e-10
 	variable = var.variable
@@ -145,7 +146,7 @@ def fn_int(a: ArgParser) -> float:
 def matr_to_list(a: ArgParser) -> None:
 	mat = a.expr()
 	if not isinstance(mat, TiMatrix):
-		raise ValueError("Matr►list: first argument must be a matrix")
+		raise DataTypeError("Matr►list: first argument must be a matrix")
 	if a.peek().is_list_start():
 		list_refs = [a.list_var()]
 		while a.has_next():
@@ -163,7 +164,7 @@ def list_to_matr(a: ArgParser) -> None:
 	while True:
 		list_vals.append(a.expr())
 		if not a.has_next():
-			raise ValueError("List►matr: expected matrix variable as last argument")
+			raise ArgumentError("List►matr: expected matrix variable as last argument")
 		if a.peek().is_matrix_var():
 			mat_var = a.matrix_var()
 			break

@@ -15,6 +15,10 @@ from tiobjects import (
 	require_num, require_real,
 	TiString, require_list, require_matrix, require_str, require_int,
 )
+from errors import (
+	DataTypeError, DimMismatchError, InvalidDimError,
+	DomainError, StatError, ArgumentError,
+)
 
 
 
@@ -44,7 +48,7 @@ def vectorized(func):
 			return func(*args)
 		if len(len_check) == 1:
 			return TiList([func(*v) for v in zip(*vec)])
-		raise ValueError(f"Dim mismatch: {len_check}")
+		raise DimMismatchError(f"Dim mismatch: {len_check}")
 	return apply
 
 
@@ -87,7 +91,7 @@ def dim(value):
 		return len(value)
 	if isinstance(value, TiMatrix):
 		return TiList([value.rows, value.cols])
-	raise ValueError(f"Invalid type: {type(value).__name__}; required: list or matrix")
+	raise DataTypeError(f"Invalid type: {type(value).__name__}; required: list or matrix")
 
 
 # ── Numeric functions ────────────────────────────────────────────────────────────
@@ -146,9 +150,9 @@ def augment(a, b):
 		return TiList(a.data + b.data)
 	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix):
 		if a.rows != b.rows:
-			raise ValueError(f"Row count mismatch: {a.rows} vs {b.rows}")
+			raise DimMismatchError(f"Row count mismatch: {a.rows} vs {b.rows}")
 		return TiMatrix([r1 + r2 for r1, r2 in zip(a.data, b.data)])
-	raise ValueError("augment: both args must be lists or both must be matrices")
+	raise DataTypeError("augment: both args must be lists or both must be matrices")
 
 
 @vectorized
@@ -218,11 +222,11 @@ def sub_string(*args):
 		start = require_int(start)
 		length = require_int(length)
 		if length < 1:
-			raise ValueError(f"sub: length must be ≥ 1, got {length}")
+			raise DomainError(f"sub: length must be ≥ 1, got {length}")
 		if not (1 <= start <= len(string) - length + 1):
-			raise ValueError(f"sub: index out of range")
+			raise InvalidDimError(f"sub: index out of range")
 		return TiString(string.tokens[start - 1 : start - 1 + length])
-	raise ValueError(f"Invalid arguments: {args}")
+	raise ArgumentError(f"Invalid arguments: {args}")
 
 # ── Aggregate / statistics ───────────────────────────────────────────────────────
 
@@ -231,16 +235,16 @@ def variance(lst, freqlist=None):
 	if freqlist is None:
 		n = len(lst)
 		if n < 2:
-			raise ValueError("stdDev: need at least 2 elements")
+			raise StatError("stdDev: need at least 2 elements")
 		m = mean(lst)
 		return builtins.sum((x - m) ** 2 for x in lst) / (n - 1)
 	require_list(freqlist)
 	if len(lst) != len(freqlist):
-		raise ValueError("stdDev: dim mismatch")
+		raise DimMismatchError("stdDev: dim mismatch")
 	m = mean(lst, freqlist)
 	total_w = builtins.sum(freqlist)
 	if total_w <= 1:
-		raise ValueError("stdDev: total frequency must be > 1")
+		raise StatError("stdDev: total frequency must be > 1")
 	return builtins.sum(w * (x - m) ** 2 for x, w in zip(lst, freqlist)) / (total_w - 1)
 
 
@@ -258,11 +262,11 @@ def _minmax(fn, a, b):
 		return fn(require_list(a))
 	if isinstance(a, TiList) and isinstance(b, TiList):
 		if len(a) != len(b):
-			raise ValueError(f"{fn.__name__}: dim mismatch ({len(a)} vs {len(b)})")
+			raise DimMismatchError(f"{fn.__name__}: dim mismatch ({len(a)} vs {len(b)})")
 		return TiList([fn(x, y) for x, y in zip(a, b)])
 	if isinstance(a, Number) and isinstance(b, Number):
 		return fn(a, b)
-	raise ValueError(f"{fn.__name__}: both args must be the same type (both numeric or both list)")
+	raise DataTypeError(f"{fn.__name__}: both args must be the same type (both numeric or both list)")
 
 
 def max(a, b=None):
@@ -279,17 +283,17 @@ def median(lst, freqlist=None):
 		s = sorted(lst)
 		n = len(s)
 		if n == 0:
-			raise ValueError("median: empty list")
+			raise StatError("median: empty list")
 		mid = n // 2
 		return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
 
 	require_list(freqlist)
 	if len(lst) != len(freqlist):
-		raise ValueError("median: dim mismatch")
+		raise DimMismatchError("median: dim mismatch")
 	pairs = sorted(zip(lst, freqlist), key=lambda p: p[0])
 	total = builtins.sum(require_int(f) for _, f in pairs)
 	if total <= 0:
-		raise ValueError("median: total frequency must be positive")
+		raise StatError("median: total frequency must be positive")
 
 	def nth(n):
 		count = 0
@@ -320,7 +324,7 @@ def det(mat):
 	require_matrix(mat)
 	n = mat.rows
 	if n == 0 or n != mat.cols:
-		raise ValueError(f"det requires a square matrix, got {mat.rows}×{mat.cols}")
+		raise InvalidDimError(f"det requires a square matrix, got {mat.rows}×{mat.cols}")
 	m = [row.copy() for row in mat.data]
 	sign = 1.0
 	for col in range(n):
@@ -355,7 +359,7 @@ def sum(lst, start=None, end=None):
 	start = require_int(start)
 	end = require_int(end) if end is not None else len(data)
 	if not (1 <= start <= end <= len(data)):
-		raise ValueError(f"sum: index out of range (start={start}, end={end}, dim={len(data)})")
+		raise InvalidDimError(f"sum: index out of range (start={start}, end={end}, dim={len(data)})")
 	return builtins.sum(data[start - 1 : end])
 
 
@@ -366,7 +370,7 @@ def prod(lst, start=None, end=None):
 	start = require_int(start)
 	end = require_int(end) if end is not None else len(data)
 	if not (1 <= start <= end <= len(data)):
-		raise ValueError(f"prod: index out of range (start={start}, end={end}, dim={len(data)})")
+		raise InvalidDimError(f"prod: index out of range (start={start}, end={end}, dim={len(data)})")
 	return math.prod(data[start - 1 : end])
 
 
@@ -407,10 +411,11 @@ for _name, _real_fn, _cpx_fn in [
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
 
 def factorial(n):
-	n = require_int(n)
-	if n < 0:
-		raise ValueError("Argument to ! must be a non-negative integer")
-	return math.factorial(n)
+	require_real(n)
+	try:
+		return math.gamma(n + 1)
+	except ValueError:
+		raise DomainError(f"factorial: undefined for {n} (negative integer)")
 
 def ncr(n, r):
 	return math.comb(require_int(n), require_int(r))
@@ -491,7 +496,7 @@ def times_row_plus(factor, mat, row1, row2):
 def ref(mat):
 	require_matrix(mat)
 	if mat.rows > mat.cols:
-		raise ValueError(f"ref: matrix must have at least as many columns as rows")
+		raise InvalidDimError(f"ref: matrix must have at least as many columns as rows")
 	m = [row.copy() for row in mat.data]
 	rows, cols = mat.rows, mat.cols
 	pivot_row = 0
@@ -516,7 +521,7 @@ def ref(mat):
 def rref(mat):
 	require_matrix(mat)
 	if mat.rows > mat.cols:
-		raise ValueError(f"rref: matrix must have at least as many columns as rows")
+		raise InvalidDimError(f"rref: matrix must have at least as many columns as rows")
 	m = [row.copy() for row in mat.data]
 	rows, cols = mat.rows, mat.cols
 	pivot_row = 0
@@ -565,7 +570,7 @@ def rand_m(rows, cols):
 	rows = require_int(rows)
 	cols = require_int(cols)
 	if not (1 <= rows <= 99) or not (1 <= cols <= 99):
-		raise ValueError("randM: dimensions must be 1-99")
+		raise InvalidDimError("randM: dimensions must be 1-99")
 	# Per spec: entries are successive randInt(-9,9) calls filled bottom-right to top-left
 	data = [random.randint(-9, 9) for _ in range(rows * cols)]
 	return TiMatrix([list(row) for row in batched(reversed(data), cols)])
@@ -574,7 +579,7 @@ def rand_m(rows, cols):
 def rand_bin(n, p, simulations=None):
 	n = require_int(n)
 	if not (0 <= p <= 1):
-		raise ValueError("randBin: p must be in [0, 1]")
+		raise DomainError("randBin: p must be in [0, 1]")
 	if simulations is None:
 		return builtins.sum(1 for _ in range(n) if random.random() < p)
 	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(require_int(simulations))])
@@ -616,7 +621,7 @@ def _parse_dbd_date(d):
 		raw = frac_part * 10000
 		ddyy = builtins.round(raw)
 		if abs(raw - ddyy) > 1e-6:
-			raise ValueError(f"dbd: too many decimal places in MM.DDYY date {d!r}")
+			raise DomainError(f"dbd: too many decimal places in MM.DDYY date {d!r}")
 		month = int_part
 		day, yy = divmod(ddyy, 100)
 	elif int_part >= 100:
@@ -624,10 +629,10 @@ def _parse_dbd_date(d):
 		raw = frac_part * 100
 		yy  = builtins.round(raw)
 		if abs(raw - yy) > 1e-6:
-			raise ValueError(f"dbd: too many decimal places in DDMM.YY date {d!r}")
+			raise DomainError(f"dbd: too many decimal places in DDMM.YY date {d!r}")
 		day, month = divmod(int_part, 100)
 	else:
-		raise ValueError(f"dbd: invalid date {d!r} (integer part {int_part} is ambiguous: must be ≤12 or ≥100)")
+		raise DomainError(f"dbd: invalid date {d!r} (integer part {int_part} is ambiguous: must be ≤12 or ≥100)")
 
 	year = (2000 if yy < 50 else 1900) + yy
 	return date(year, month, day)
@@ -644,7 +649,7 @@ def dbd(date1: float, date2: float):
 def _regularized_inc_gamma(a, x):
 	"""Lower regularized incomplete gamma function P(a, x) via series."""
 	if x < 0:
-		raise ValueError("x must be >= 0")
+		raise DomainError("x must be >= 0")
 	if x == 0:
 		return 0.0
 	# Use series representation for x < a+1, continued fraction otherwise
@@ -685,7 +690,7 @@ def _regularized_inc_gamma(a, x):
 def _inc_beta(a, b, x):
 	"""Regularized incomplete beta function I_x(a,b)."""
 	if x < 0 or x > 1:
-		raise ValueError("x must be in [0,1]")
+		raise DomainError("x must be in [0,1]")
 	if x == 0:
 		return 0.0
 	if x == 1:

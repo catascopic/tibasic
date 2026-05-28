@@ -8,7 +8,7 @@ from tokens import (
 	LIST_PREFIX, RAND, DIM, SCI_E, DEG, RAD, APOS,
 )
 from environment import Environment, Variable, UserListVar
-from errors import TiSyntaxError, ArgumentError
+from errors import TiSyntaxError, ArgumentError, DataTypeError
 
 
 EOF_TOKEN = Token(b'\x00', None, '<END-OF-INPUT>')
@@ -544,7 +544,8 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('List►matr(', '{1,2},{3,4},', '[A]')
+	test('0!')
+	# test('List►matr(', '{1,2},{3,4},', '[A]')
 	# test('⑽^(', '{1,10')
 	# test('5°')
 	# test('5°5\'5"')

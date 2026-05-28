@@ -5,7 +5,8 @@ import random
 from contextlib import contextmanager
 from datetime import datetime, date, timedelta
 
-from tiobjects import TiList, TiMatrix, TiString, TiTypeError, require_num, require_real, require_int, require_list, require_matrix, require_str
+from tiobjects import TiList, TiMatrix, TiString, require_num, require_real, require_int, require_list, require_matrix, require_str
+from errors import DataTypeError, DomainError, IllegalNestError
 
 
 class _VarArray:
@@ -21,7 +22,7 @@ class _VarArray:
 
 	def __setitem__(self, idx: int, value):
 		self._data[idx] = value
-	
+
 	def iter_values(self):
 		for i, x in enumerate(self._data):
 			if x is not None:
@@ -127,7 +128,7 @@ class StatVar(Variable):
 		return env.stat[self._idx]
 
 	def set(self, env, value):
-		raise TiTypeError("Stat variables are read-only")
+		raise DataTypeError("Stat variables are read-only")
 
 
 class WindowVar(Variable):
@@ -141,7 +142,7 @@ class WindowVar(Variable):
 
 	def set(self, env, value):
 		if isinstance(value, complex):
-			raise TiTypeError("Cannot store complex number in window variable")
+			raise DataTypeError("Cannot store complex number in window variable")
 		env.window[self._idx] = float(value)
 
 
@@ -154,10 +155,6 @@ class _NumericVarArray(_VarArray):
 		if val is None:
 			val = self._data[idx] = 0
 		return val
-
-
-class IllegalNestError(ValueError):
-	pass
 
 
 class Environment:
@@ -213,19 +210,19 @@ class Environment:
 	def set_dt_fmt(self, fmt):
 		fmt = require_int(fmt)
 		if fmt not in {1, 2, 3}:
-			raise ValueError(f"setDtFmt: expected 1, 2, or 3; got {fmt}")
+			raise DomainError(f"setDtFmt: expected 1, 2, or 3; got {fmt}")
 		self.dt_fmt = fmt
 
 	def set_tm_fmt(self, fmt):
 		fmt = require_int(fmt)
 		if fmt not in {12, 24}:
-			raise ValueError(f"setTmFmt: expected 12 or 24; got {fmt}")
+			raise DomainError(f"setTmFmt: expected 12 or 24; got {fmt}")
 		self.tm_fmt = fmt
 
 	def get_dt_str(self, fmt):
 		fmt = require_int(fmt)
 		if fmt not in {1, 2, 3}:
-			raise ValueError(f"getDtStr: invalid format {fmt}")
+			raise DomainError(f"getDtStr: invalid format {fmt}")
 		return TiString.from_str(self._now().strftime(['%m/%d/%y', '%d/%m/%y', '%y/%m/%d'][fmt - 1]))
 
 	def get_tm_str(self, fmt):
@@ -236,12 +233,12 @@ class Environment:
 		elif fmt == 12:
 			time_str = now.strftime('%I:%M %p').lstrip('0')
 		else:
-			raise ValueError(f"getTmStr: invalid format {fmt}")
+			raise DomainError(f"getTmStr: invalid format {fmt}")
 		return TiString.from_str(time_str)
 
 	def clock_on(self):
 		self.clock_on = True
-	
+
 	def clock_off(self):
 		self.clock_on = False
 

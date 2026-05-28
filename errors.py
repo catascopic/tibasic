@@ -63,3 +63,14 @@ class StatError(TiError):
 	"""ERR:STAT — invalid input to a statistics function
 	(e.g. empty list, all-identical values when variance is required)."""
 	code = 'STAT'
+
+
+class IncrementError(TiError):
+	"""ERR:INCREMENT — the step/increment value is zero, or its sign is inconsistent
+	with the start and end values (e.g. positive step but start > end)."""
+	code = 'INCREMENT'
+
+
+class IllegalNestError(TiError):
+	"""ERR:ILLEGAL NEST — a function that cannot be nested has been called recursively."""
+	code = 'ILLEGAL NEST'

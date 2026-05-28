@@ -3,9 +3,10 @@ import operator
 from itertools import repeat
 from numbers import Number
 
-
-class TiTypeError(Exception):
-	pass
+from errors import (
+	DataTypeError, DimMismatchError, InvalidDimError,
+	SingularMatrixError, DomainError,
+)
 
 
 def repr_num(value):
@@ -28,7 +29,7 @@ class DMS(float):
 
 def _require_type(value, tp):
 	if not isinstance(value, tp):
-		raise TiTypeError(f"Invalid value: {value!r}; required: {tp.__name__}")
+		raise DataTypeError(f"Invalid value: {value!r}; required: {tp.__name__}")
 	return value
 
 def require_num(value):
@@ -37,13 +38,13 @@ def require_num(value):
 def require_real(value):
 	require_num(value)
 	if isinstance(value, complex):
-		raise TiTypeError(f"Expected real number, got complex: {value}")
+		raise DataTypeError(f"Expected real number, got complex: {value}")
 	return value
 
 def require_int(value):
 	require_real(value)
 	if not value.is_integer():
-		raise TiTypeError(f"Expected integer, got {value}")
+		raise DataTypeError(f"Expected integer, got {value}")
 	return int(value)
 
 def require_list(value):
@@ -64,14 +65,14 @@ class TiList:
 
 	def __getitem__(self, index):
 		if index != int(index) or not (1 <= index <= len(self)):
-			raise IndexError(f"{index=}")
+			raise InvalidDimError(f"{index=}")
 		return self.data[int(index) - 1]
 
 	def __setitem__(self, index, value):
 		if index == len(self) + 1:
 			self.data.append(value)
 		elif index != int(index) or not (1 <= index <= len(self)):
-			raise ValueError(f"out of bounds: {index}; dim: {len(self)}")
+			raise InvalidDimError(f"out of bounds: {index}; dim: {len(self)}")
 		else:
 			self.data[int(index) - 1] = value
 
@@ -80,7 +81,7 @@ class TiList:
 
 	def __iter__(self):
 		return iter(self.data)
-	
+
 	def __neg__(self):
 		return TiList([-a for a in self.data])
 
@@ -102,7 +103,9 @@ class TiList:
 def _vectorize_op(op):
 	def list_op(self, other):
 		if isinstance(other, TiList):
-			return TiList([op(a, b) for a, b in zip(self, other, strict=True)])
+			if len(self) != len(other):
+				raise DimMismatchError(f"Dim mismatch: {len(self)} vs {len(other)}")
+			return TiList([op(a, b) for a, b in zip(self, other)])
 		return TiList([op(a, other) for a in self.data])
 	return list_op
 
@@ -132,9 +135,9 @@ def _check_valid_dim(rows, cols):
 	rows = require_int(rows)
 	cols = require_int(cols)
 	if not (1 <= rows <= 99):
-		raise IndexError(f"{rows=}")
+		raise InvalidDimError(f"{rows=}")
 	if not (1 <= cols <= 99):
-		raise IndexError(f"{cols=}")
+		raise InvalidDimError(f"{cols=}")
 	return rows, cols
 
 
@@ -151,17 +154,17 @@ class TiMatrix:
 	@property
 	def cols(self):
 		return len(self.data[0]) if self.data else 0
-		
+
 	def _check_index(self, index):
 		if len(index) != 2:
-			raise ValueError(f"Matrix index must have 2 elements but got {index}")
+			raise ArgumentError(f"Matrix index must have 2 elements but got {index}")
 		row_index, col_index = index
 		row_index = require_int(row_index)
 		col_index = require_int(col_index)
 		if not (1 <= row_index <= self.rows):
-			raise IndexError(f"{row_index=}")
+			raise InvalidDimError(f"{row_index=}")
 		if not (1 <= col_index <= self.cols):
-			raise IndexError(f"{col_index=}")
+			raise InvalidDimError(f"{col_index=}")
 		return row_index, col_index
 
 	def __getitem__(self, index):
@@ -184,44 +187,44 @@ class TiMatrix:
 	def get_row(self, r) -> list:
 		n = require_int(r)
 		if not (1 <= n <= self.rows):
-			raise IndexError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
+			raise InvalidDimError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
 		return self.data[n - 1]
 
 	def set_row(self, r, row: list) -> None:
 		n = require_int(r)
 		if not (1 <= n <= self.rows):
-			raise IndexError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
+			raise InvalidDimError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
 		self.data[n - 1] = row
 
 	def transform(self, func):
 		return TiMatrix([[func(x) for x in row] for row in self.data])
-	
+
 	def transform_zip(self, other, func):
 		if self.rows != other.rows or self.cols != other.cols:
-			raise ValueError(
-				"Operation not allowed in matrices with different sizes: "
+			raise DimMismatchError(
+				"Operation not allowed on matrices with different sizes: "
 				f"{self.rows}×{self.cols} vs. {other.rows}×{other.cols}"
 			)
 		return TiMatrix([
 			[func(a, b) for a, b in zip(row_a, row_b)]
 			for row_a, row_b in zip(self.data, other.data)
 		])
-	
+
 	def __add__(self, other):
 		return self.transform_zip(other, operator.add) if isinstance(other, TiMatrix) else self.transform(lambda x: x + other)
-	
+
 	def __radd__(self, other):
 		return self + other
 
 	def __sub__(self, other):
 		return self.transform_zip(other, operator.sub) if isinstance(other, TiMatrix) else self.transform(lambda x: x - other)
-	
+
 	def __rsub__(self, other):
 		return self.transform(lambda x: other - x)
 
 	def __matmul__(self, other):
 		if self.cols != other.rows:
-			raise ValueError(f"Dimension mismatch: ({self.rows}×{self.cols}) @ ({other.rows}×{other.cols})")
+			raise DimMismatchError(f"Dimension mismatch: ({self.rows}×{self.cols}) @ ({other.rows}×{other.cols})")
 		return TiMatrix([
 			[
 				builtins.sum(
@@ -229,14 +232,14 @@ class TiMatrix:
 				) for c in range(other.cols)
 			] for r in range(self.rows)
 		])
-	
+
 	def __mul__(self, other):
 		if isinstance(other, Number):
 			return self.transform(lambda x: x * other)
 		if isinstance(other, TiMatrix):
 			return self @ other
 		return NotImplemented
-	
+
 	def __rmul__(self, other):
 		if isinstance(other, Number):
 			return self.transform(lambda x: other * x)
@@ -245,9 +248,9 @@ class TiMatrix:
 	def __pow__(self, n):
 		n = require_int(n)
 		if self.rows != self.cols:
-			raise ValueError(f"Matrix power requires a square matrix, got {self.rows}×{self.cols}")
+			raise DomainError(f"Matrix power requires a square matrix, got {self.rows}×{self.cols}")
 		if n < 0:
-			raise ValueError("Negative matrix power not supported")
+			raise DomainError("Negative matrix power not supported")
 		size = self.rows
 		result = TiMatrix([[int(r == c) for c in range(size)] for r in range(size)])
 		base = self
@@ -261,26 +264,26 @@ class TiMatrix:
 	def __eq__(self, other):
 		if isinstance(other, TiMatrix):
 			return self.data == other.data
-		raise TiTypeError(f"Cannot compare matrix with {type(other).__name__}")
-	
+		raise DataTypeError(f"Cannot compare matrix with {type(other).__name__}")
+
 	# get __ne__ for free
-	
+
 	def __neg__(self):
 		return self.transform(operator.neg)
-	
+
 	def inv(self):
 		n = self.rows
 		if self.cols != n:
-			raise ValueError(f"inv: matrix must be square, got {self.rows}×{self.cols}")
-		
+			raise InvalidDimError(f"inv: matrix must be square, got {self.rows}×{self.cols}")
+
 		aug = [row.copy() + [1 if i == j else 0 for j in range(n)] for i, row in enumerate(self.data)]
 		for col in range(n):
 			pivot_row = max(range(col, n), key=lambda r: abs(aug[r][col]))
 			aug[col], aug[pivot_row] = aug[pivot_row], aug[col]
 			pivot = aug[col][col]
 			if abs(pivot) < 1e-12:
-				raise ValueError("inv: matrix is singular")
-				
+				raise SingularMatrixError("inv: matrix is singular")
+
 			for j in range(2 * n):
 				aug[col][j] /= pivot
 			for r in range(n):
@@ -319,14 +322,14 @@ class TiString:
 	def __add__(self, other):
 		if isinstance(other, TiString):
 			if not self.tokens or not other.tokens:
-				raise ValueError(f"Cannot concatenate with an empty string (God knows why)!")
+				raise InvalidDimError(f"Cannot concatenate with an empty string (God knows why)!")
 			return TiString(self.tokens + other.tokens)
-		raise TiTypeError(f"Expected string but got {other}")
+		raise DataTypeError(f"Expected string but got {other}")
 
 	def __eq__(self, other):
 		if isinstance(other, TiString):
 			return self.tokens == other.tokens
-		raise TiTypeError(f"Expected string but got {other}")
+		raise DataTypeError(f"Expected string but got {other}")
 
 	def __str__(self):
 		return ''.join(t.text for t in self.tokens)

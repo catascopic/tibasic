@@ -1,3 +1,6 @@
+from errors import TiSyntaxError
+
+
 def _exec_if(parser):
 	return IfResult(bool(parser.parse_expr()))
 
@@ -10,7 +13,7 @@ def _exec_repeat(parser):
 def _exec_for(parser):
 	var_tok = parser.advance()
 	if not var_tok.is_numeric_var():
-		raise ValueError("For: first arg must be a variable")
+		raise TiSyntaxError("For: first arg must be a variable")
 	parser.expect(COMMA)
 	start = parser.parse_expr()
 	parser.expect(COMMA)
