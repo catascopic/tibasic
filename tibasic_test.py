@@ -6,7 +6,10 @@ from pytest import approx
 
 import purefunctions as pf
 from environment import Environment
-from errors import TiSyntaxError, IllegalNestError, DomainError, DimMismatchError, StatError, IncrementError
+from errors import (
+	TiSyntaxError, IllegalNestError, DomainError, DimMismatchError,
+	StatError, IncrementError, DataTypeError, InvalidDimError, ArgumentError,
+)
 from parser import parse_line
 import tokens
 from tokens import (
@@ -17,6 +20,7 @@ from tokens import (
 from tiobjects import TiList, TiMatrix, TiString
 
 L1 = LISTS[0]
+L2 = LISTS[1]
 MAT_A = MATRICES[0]
 STR_1 = STRINGS[0]
 
@@ -485,6 +489,83 @@ class TestMatrixRowOps:
 	def test_times_row_plus(self):
 		result = pf.times_row_plus(2, self.mat, 1, 2)
 		assert result.data == [[1, 2], [5, 8], [5, 6]]
+
+
+# ── Matr►list( / List►matr( ───────────────────────────────────────────────────
+
+class TestMatrToList:
+	def test_single_column_first(self, env):
+		# Matr►list([A], 1, L1) extracts column 1 into L1
+		calc('[[1,2][3,4][5,6]]@', MAT_A, env=env)
+		calc('Matr►list(', MAT_A, ',1,', L1, env=env)
+		assert L1.variable.get(env).data == [1, 3, 5]
+
+	def test_single_column_second(self, env):
+		# Matr►list([A], 2, L1) extracts column 2
+		calc('[[1,2][3,4][5,6]]@', MAT_A, env=env)
+		calc('Matr►list(', MAT_A, ',2,', L1, env=env)
+		assert L1.variable.get(env).data == [2, 4, 6]
+
+	def test_multi_list_all_columns(self, env):
+		# Matr►list([A], L1, L2) — each list gets one column
+		calc('[[1,2][3,4]]@', MAT_A, env=env)
+		calc('Matr►list(', MAT_A, ',', L1, ',', L2, env=env)
+		assert L1.variable.get(env).data == [1, 3]
+		assert L2.variable.get(env).data == [2, 4]
+
+	def test_multi_list_single_column_matrix(self, env):
+		# 1-column matrix: one list var is enough
+		calc('[[7][8][9]]@', MAT_A, env=env)
+		calc('Matr►list(', MAT_A, ',', L1, env=env)
+		assert L1.variable.get(env).data == [7, 8, 9]
+
+	def test_column_out_of_range(self, env):
+		calc('[[1,2][3,4]]@', MAT_A, env=env)
+		with pytest.raises(InvalidDimError):
+			calc('Matr►list(', MAT_A, ',3,', L1, env=env)
+
+	def test_too_many_list_args(self, env):
+		# 2-column matrix but 3 list destinations → InvalidDimError
+		calc('[[1,2][3,4]]@', MAT_A, env=env)
+		with pytest.raises(InvalidDimError):
+			calc('Matr►list(', MAT_A, ',', L1, ',', L2, ',', LISTS[2], env=env)
+
+	def test_non_matrix_raises(self, env):
+		with pytest.raises(DataTypeError):
+			calc('Matr►list(', '{1,2,3},1,', L1, env=env)
+
+
+class TestListToMatr:
+	def test_basic_two_lists(self, env):
+		# List►matr({1,3},{2,4},[A]) → [[1,2],[3,4]]  (lists become columns)
+		calc('List►matr(', '{1,3},{2,4},', MAT_A, env=env)
+		assert MAT_A.variable.get(env).data == [[1, 2], [3, 4]]
+
+	def test_single_list(self, env):
+		calc('List►matr(', '{5,6,7},', MAT_A, env=env)
+		assert MAT_A.variable.get(env).data == [[5], [6], [7]]
+
+	def test_unequal_lengths_pads_zero(self, env):
+		# Shorter list gets zero-padded to match the longest
+		calc('List►matr(', '{1,2,3},{4,5},', MAT_A, env=env)
+		assert MAT_A.variable.get(env).data == [[1, 4], [2, 5], [3, 0]]
+
+	def test_roundtrip_with_matr_to_list(self, env):
+		# Store a matrix, round-trip through List►matr
+		calc('[[10,20][30,40]]@', MAT_A, env=env)
+		calc('Matr►list(', MAT_A, ',', L1, ',', L2, env=env)
+		calc('List►matr(', L1, ',', L2, ',', MAT_A, env=env)
+		assert MAT_A.variable.get(env).data == [[10, 20], [30, 40]]
+
+	def test_non_list_raises(self, env):
+		# Scalar where a list is expected → DataTypeError
+		with pytest.raises(DataTypeError):
+			calc('List►matr(', '5,{1,2},', MAT_A, env=env)
+
+	def test_no_matrix_raises(self, env):
+		# Missing matrix destination → ArgumentError
+		with pytest.raises(ArgumentError):
+			calc('List►matr(', '{1,2},{3,4}', env=env)
 
 
 # ── Complex numbers ───────────────────────────────────────────────────────────
