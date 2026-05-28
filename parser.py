@@ -156,12 +156,10 @@ class Parser:
 	def parse_list_literal(self) -> TiList:
 		"""{ already consumed."""
 		self._struct_depth += 1
-		items = []
-		if not self.eat_if(R_BRACE):
-			items.append(self.parse_expr())
-			while self.eat_if(COMMA):
-				items.append(require_num(self.parse_expr()))
-			self.close_delimiter(R_BRACE)
+		items = [require_num(self.parse_expr())]
+		while self.eat_if(COMMA):
+			items.append(require_num(self.parse_expr()))
+		self.close_delimiter(R_BRACE)
 		self._struct_depth -= 1
 		return TiList(items)
 
@@ -572,7 +570,8 @@ if __name__ == '__main__':
 
 	# env.angle_mode = 'DEG'
 
-	test("1E2°2'°2")
+	test('{}')
+	# test("1E2°2'°2")
 	# test('1E~1°2\'3"')
 	# test("1°~30'")
 	# test('List►matr(', '{1,2},{3,4},', '[A]')

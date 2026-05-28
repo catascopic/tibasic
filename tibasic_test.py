@@ -351,6 +351,97 @@ class TestListOperations:
 		assert list(TiList([2, 4, 6]) / 2) == [1, 2, 3]
 
 
+# ── Empty-list behaviour ──────────────────────────────────────────────────────
+
+class TestEmptyList:
+	"""
+	{} is a syntax error.  An empty TiList (created programmatically) causes
+	InvalidDimError in every aggregate function except dim(), which returns 0.
+	0→dim(L₁) is also rejected with InvalidDimError.
+	"""
+
+	_empty = TiList([])   # created directly, not via the parser
+
+	# ── Parser rejects {} ─────────────────────────────────────────────────────
+
+	def test_empty_literal_raises(self):
+		with pytest.raises(TiSyntaxError):
+			calc('{}')
+
+	def test_empty_literal_unclosed_raises(self):
+		# { with nothing before implicit close is equally invalid
+		with pytest.raises(TiSyntaxError):
+			calc('{')
+
+	# ── dim() is the one exception ────────────────────────────────────────────
+
+	def test_dim_empty_returns_zero(self):
+		assert pf.dim(self._empty) == 0
+
+	# ── 0→dim(L₁) is rejected ────────────────────────────────────────────────
+
+	def test_store_dim_zero_raises(self, env):
+		calc('{1,2,3@', L1, env=env)
+		with pytest.raises(InvalidDimError):
+			calc('0@', 'dim(', L1, env=env)
+
+	# ── Aggregate functions ───────────────────────────────────────────────────
+
+	def test_sum_empty(self):
+		with pytest.raises(InvalidDimError):
+			pf.sum(self._empty)
+
+	def test_prod_empty(self):
+		with pytest.raises(InvalidDimError):
+			pf.prod(self._empty)
+
+	def test_mean_empty(self):
+		with pytest.raises(InvalidDimError):
+			pf.mean(self._empty)
+
+	def test_median_empty(self):
+		with pytest.raises(InvalidDimError):
+			pf.median(self._empty)
+
+	def test_max_empty(self):
+		with pytest.raises(InvalidDimError):
+			pf.max(self._empty)
+
+	def test_min_empty(self):
+		with pytest.raises(InvalidDimError):
+			pf.min(self._empty)
+
+	def test_variance_empty(self):
+		with pytest.raises(InvalidDimError):
+			pf.variance(self._empty)
+
+	def test_stddev_empty(self):
+		with pytest.raises(InvalidDimError):
+			pf.stddev(self._empty)
+
+	def test_cum_sum_empty(self):
+		with pytest.raises(InvalidDimError):
+			pf.cum_sum(self._empty)
+
+	def test_delta_list_empty(self):
+		with pytest.raises(InvalidDimError):
+			pf.delta_list(self._empty)
+
+	# ── augment ───────────────────────────────────────────────────────────────
+
+	def test_augment_empty_left(self):
+		with pytest.raises(InvalidDimError):
+			pf.augment(self._empty, TiList([1, 2]))
+
+	def test_augment_empty_right(self):
+		with pytest.raises(InvalidDimError):
+			pf.augment(TiList([1, 2]), self._empty)
+
+	def test_augment_both_empty(self):
+		with pytest.raises(InvalidDimError):
+			pf.augment(self._empty, self._empty)
+
+
 # ── Stat functions with freq_list ─────────────────────────────────────────────
 
 class TestStatWithFreqList:

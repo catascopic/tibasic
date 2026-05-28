@@ -138,15 +138,23 @@ def cum_sum(lst):
 				for c in range(cols)]
 			for r in range(rows)
 		])
-	return TiList(list(accumulate(require_list(lst))))
+	lst = require_list(lst)
+	if len(lst) == 0:
+		raise InvalidDimError("cumSum: list is empty")
+	return TiList(list(accumulate(lst)))
 
 
 def delta_list(lst):
-	return TiList([b - a for a, b in pairwise(require_list(lst))])
+	lst = require_list(lst)
+	if len(lst) == 0:
+		raise InvalidDimError("ΔList: list is empty")
+	return TiList([b - a for a, b in pairwise(lst)])
 
 
 def augment(a, b):
 	if isinstance(a, TiList) and isinstance(b, TiList):
+		if len(a) == 0 or len(b) == 0:
+			raise InvalidDimError("augment: cannot augment an empty list")
 		return TiList(a.data + b.data)
 	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix):
 		if a.rows != b.rows:
@@ -235,6 +243,8 @@ def sub_string(*args):
 
 def variance(lst, freqlist=None):
 	require_list(lst)
+	if len(lst) == 0:
+		raise InvalidDimError("variance: list is empty")
 	if freqlist is None:
 		n = len(lst)
 		if n < 2:
@@ -262,7 +272,10 @@ def round(a, b=9):
 
 def _minmax(fn, a, b):
 	if b is None:
-		return fn(require_list(a))
+		lst = require_list(a)
+		if len(lst) == 0:
+			raise InvalidDimError(f"{fn.__name__}: list is empty")
+		return fn(lst)
 	if isinstance(a, TiList) and isinstance(b, TiList):
 		if len(a) != len(b):
 			raise DimMismatchError(f"{fn.__name__}: dim mismatch ({len(a)} vs {len(b)})")
@@ -282,11 +295,11 @@ def min(a, b=None):
 
 def median(lst, freqlist=None):
 	require_list(lst)
+	if len(lst) == 0:
+		raise InvalidDimError("median: list is empty")
 	if freqlist is None:
 		s = sorted(lst)
 		n = len(s)
-		if n == 0:
-			raise StatError("median: empty list")
 		mid = n // 2
 		return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
 
@@ -312,6 +325,8 @@ def median(lst, freqlist=None):
 
 def mean(lst, freqlist=None):
 	require_list(lst)
+	if len(lst) == 0:
+		raise InvalidDimError("mean: list is empty")
 	if freqlist is None:
 		return builtins.sum(lst) / len(lst)
 	require_list(freqlist)
@@ -357,6 +372,8 @@ def transpose(mat):
 
 def sum(lst, start=None, end=None):
 	data = require_list(lst).data
+	if not data:
+		raise InvalidDimError("sum: list is empty")
 	if start is None:
 		return builtins.sum(data)
 	start = require_int(start)
@@ -368,6 +385,8 @@ def sum(lst, start=None, end=None):
 
 def prod(lst, start=None, end=None):
 	data = require_list(lst).data
+	if not data:
+		raise InvalidDimError("prod: list is empty")
 	if start is None:
 		return math.prod(data)
 	start = require_int(start)
