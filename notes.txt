@@ -1,3 +1,5 @@
+$RFLCTA should be an error
+
 Aho-Corasick parser for testing
 
 Do we need a purefunctions equivalent for Environment?

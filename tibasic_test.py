@@ -652,6 +652,142 @@ class TestListToMatr:
 			calc('List►matr(', '{1,2},{3,4}', env=env)
 
 
+# ── User-named lists (ᴸNAME) ─────────────────────────────────────────────────
+
+class TestUserLists:
+	"""User-named lists stored and read back via the $ (LIST_PREFIX) proxy.
+	'$AB' is tokenised as LIST_PREFIX + VAR_A + VAR_B, which the parser reads
+	as the user list named 'AB'.
+	"""
+
+	# ── Basic store / retrieve ────────────────────────────────────────────────
+
+	def test_store_and_retrieve_with_prefix(self, env):
+		calc('{1,2,3}@$AB', env=env)
+		assert list(calc('$AB', env=env)) == [1, 2, 3]
+
+	def test_store_bare_name(self, env):
+		# When the value is already a list, →NAME (no ᴸ) stores as a user list
+		calc('{4,5}@AB', env=env)
+		assert list(calc('$AB', env=env)) == [4, 5]
+
+	def test_single_char_name(self, env):
+		calc('{7,8}@$Z', env=env)
+		assert list(calc('$Z', env=env)) == [7, 8]
+
+	def test_overwrite(self, env):
+		calc('{1,2,3}@$AB', env=env)
+		calc('{9,8}@$AB', env=env)
+		assert list(calc('$AB', env=env)) == [9, 8]
+
+	# ── Indexing ──────────────────────────────────────────────────────────────
+
+	def test_index_read(self, env):
+		calc('{10,20,30}@$AB', env=env)
+		assert calc('$AB(2)', env=env) == 20
+
+	def test_index_first_element(self, env):
+		calc('{10,20,30}@$AB', env=env)
+		assert calc('$AB(1)', env=env) == 10
+
+	def test_index_write(self, env):
+		calc('{1,2,3}@$AB', env=env)
+		calc('99@$AB(2)', env=env)
+		assert list(calc('$AB', env=env)) == [1, 99, 3]
+
+	# ── Arithmetic — behaves the same as L1–L6 ───────────────────────────────
+
+	def test_scalar_multiply(self, env):
+		calc('{2,4,6}@$AB', env=env)
+		assert list(calc('$AB/2', env=env)) == [1, 2, 3]
+
+	def test_add_two_user_lists(self, env):
+		calc('{1,2,3}@$AB', env=env)
+		calc('{4,5,6}@$CD', env=env)
+		assert list(calc('$AB+$CD', env=env)) == [5, 7, 9]
+
+	def test_add_user_list_and_regular_list(self, env):
+		calc('{1,2,3}@$AB', env=env)
+		calc('{4,5,6}@', L1, env=env)
+		assert list(calc('$AB+', L1, env=env)) == [5, 7, 9]
+
+	def test_dim_mismatch_raises(self, env):
+		calc('{1,2}@$AB', env=env)
+		calc('{3,4,5}@$CD', env=env)
+		with pytest.raises(DimMismatchError):
+			calc('$AB+$CD', env=env)
+
+	# ── Aggregate functions ───────────────────────────────────────────────────
+
+	def test_dim(self, env):
+		calc('{1,2,3,4}@$AB', env=env)
+		assert calc('dim(', '$AB', env=env) == 4
+
+	def test_sum(self, env):
+		calc('{1,2,3}@$AB', env=env)
+		assert calc('sum(', '$AB', env=env) == 6
+
+	def test_max(self, env):
+		calc('{3,1,4,1,5}@$AB', env=env)
+		assert calc('max(', '$AB', env=env) == 5
+
+	def test_augment_two_user_lists(self, env):
+		calc('{1,2}@$AB', env=env)
+		calc('{3,4}@$CD', env=env)
+		assert list(calc('augment(', '$AB,$CD', env=env)) == [1, 2, 3, 4]
+
+	def test_cum_sum(self, env):
+		calc('{1,2,3}@$AB', env=env)
+		assert list(calc('cumSum(', '$AB', env=env)) == [1, 3, 6]
+
+	def test_seq_result_stored_in_user_list(self, env):
+		calc('seq(', 'X,X,1,5)@$AB', env=env)
+		assert list(calc('$AB', env=env)) == [1, 2, 3, 4, 5]
+
+	# ── Matr►list / List►matr ────────────────────────────────────────────────
+
+	def test_matr_to_list_single_column(self, env):
+		# Matr►list([A], 1, ᴸAB) — extract column 1 into the user list
+		calc('[[1,2][3,4][5,6]]@', MAT_A, env=env)
+		calc('Matr►list(', MAT_A, ',1,$AB', env=env)
+		assert env.user_lists['AB'].data == [1, 3, 5]
+
+	def test_matr_to_list_multi(self, env):
+		# Matr►list([A], ᴸAB, ᴸCD) — extract each column into a user list
+		calc('[[1,2][3,4]]@', MAT_A, env=env)
+		calc('Matr►list(', MAT_A, ',$AB,$CD', env=env)
+		assert env.user_lists['AB'].data == [1, 3]
+		assert env.user_lists['CD'].data == [2, 4]
+
+	def test_matr_to_list_mixed(self, env):
+		# Matr►list([A], L1, ᴸAB) — one regular list, one user list
+		calc('[[1,2][3,4][5,6]]@', MAT_A, env=env)
+		calc('Matr►list(', MAT_A, ',', L1, ',$AB', env=env)
+		assert L1.variable.get(env).data == [1, 3, 5]
+		assert env.user_lists['AB'].data == [2, 4, 6]
+
+	def test_list_to_matr_from_user_lists(self, env):
+		# List►matr(ᴸAB, ᴸCD, [A])
+		calc('{1,3,5}@$AB', env=env)
+		calc('{2,4,6}@$CD', env=env)
+		calc('List►matr(', '$AB,$CD,', MAT_A, env=env)
+		assert MAT_A.variable.get(env).data == [[1, 2], [3, 4], [5, 6]]
+
+	def test_list_to_matr_mixed(self, env):
+		# Mix a regular list and a user list as sources
+		calc('{1,3,5}@', L1, env=env)
+		calc('{2,4,6}@$AB', env=env)
+		calc('List►matr(', L1, ',$AB,', MAT_A, env=env)
+		assert MAT_A.variable.get(env).data == [[1, 2], [3, 4], [5, 6]]
+
+	def test_roundtrip(self, env):
+		# Store a matrix → Matr►list → List►matr → should recover original
+		calc('[[10,20][30,40]]@', MAT_A, env=env)
+		calc('Matr►list(', MAT_A, ',$AB,$CD', env=env)
+		calc('List►matr(', '$AB,$CD,', MAT_A, env=env)
+		assert MAT_A.variable.get(env).data == [[10, 20], [30, 40]]
+
+
 # ── Complex numbers ───────────────────────────────────────────────────────────
 
 class TestComplex:
