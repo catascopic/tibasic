@@ -25,7 +25,8 @@
       "Bash(python -m pytest tibasic_test.py::TestMatrToList -v)",
       "Bash(python -m pytest tibasic_test.py::TestEffNom tibasic_test.py -q)",
       "Bash(python -m pytest tibasic_test.py::TestEffNom::test_eff_via_calc -v)",
-      "Bash(python -c \"content = open\\('environment.py'\\).read\\(\\); idx = content.find\\('RealVar'\\); print\\(repr\\(content[idx:idx+300]\\)\\)\")"
+      "Bash(python -c \"content = open\\('environment.py'\\).read\\(\\); idx = content.find\\('RealVar'\\); print\\(repr\\(content[idx:idx+300]\\)\\)\")",
+      "Bash(python -m pytest tibasic_test.py tifile_test.py -q)"
     ]
   }
 }

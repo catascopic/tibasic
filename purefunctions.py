@@ -464,11 +464,16 @@ def rand_list(n):
 	return TiList([random.random() for _ in range(require_int(n))])
 
 
-def rand_int(low, high, n=1):
+@vectorized
+def _rand_int_single(low, high):
+	return random.randint(require_int(low), require_int(high))
+
+
+def rand_int(low, high, n=None):
+	if n is None:
+		return _rand_int_single(low, high)
 	low = require_int(low)
 	high = require_int(high)
-	if n == 1:
-		return random.randint(low, high)
 	return TiList([random.randint(low, high) for _ in range(require_int(n))])
 
 
@@ -596,6 +601,8 @@ def rand_bin(n, p, simulations=None):
 	n = require_int(n)
 	if not (0 <= p <= 1):
 		raise DomainError("randBin: p must be in [0, 1]")
+	if n <= 0:
+		raise DomainError("randBin: n must be positive")
 	if simulations is None:
 		return builtins.sum(1 for _ in range(n) if random.random() < p)
 	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(require_int(simulations))])

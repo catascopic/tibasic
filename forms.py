@@ -13,6 +13,16 @@ from environment import Variable, Environment
 from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError
 
 
+# ── env_func decorator ────────────────────────────────────────────────────────
+
+def env_func(func):
+	"""Convert an (env, arg1, ...) function into an ArgParser handler."""
+	@wraps(func)
+	def wrapper(a: ArgParser):
+		return func(a.env, *a.parse_args())
+	return wrapper
+
+
 def ans_index_or_mul(a: ArgParser):
 	ans = a.env.ans
 	args = a.parse_args()
@@ -195,34 +205,40 @@ def _bal(env, m: int, roundvalue=None):
 	return pv * (1 + r) ** m + pmt * ((1 + r) ** m - 1) / r
 
 
-def bal(a: ArgParser):
+@env_func
+def bal(env, n, roundvalue=None):
 	"""bal(n[,roundvalue]) — remaining balance after n payments."""
-	n = require_int(a.expr())
+	n = require_int(n)
 	if n < 0:
 		raise DomainError("bal: n must be non-negative")
-	roundvalue = require_int(a.expr()) if a.has_next() else None
-	return _bal(a.env, n, roundvalue)
+	if roundvalue is not None:
+		roundvalue = require_int(roundvalue)
+	return _bal(env, n, roundvalue)
 
 
-def sigma_prn(a: ArgParser):
+@env_func
+def sigma_prn(env, n1, n2, roundvalue=None):
 	"""ΣPrn(n1,n2[,roundvalue]) — principal paid from payment n1 through n2."""
-	n1 = require_int(a.expr())
-	n2 = require_int(a.expr())
-	roundvalue = require_int(a.expr()) if a.has_next() else None
+	n1 = require_int(n1)
+	n2 = require_int(n2)
+	if roundvalue is not None:
+		roundvalue = require_int(roundvalue)
 	if n1 < 1 or n2 < 0:
 		raise DomainError("ΣPrn: payment numbers must be positive")
-	return _bal(a.env, n2, roundvalue) - _bal(a.env, n1 - 1, roundvalue)
+	return _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
 
 
-def sigma_int(a: ArgParser):
+@env_func
+def sigma_int(env, n1, n2, roundvalue=None):
 	"""ΣInt(n1,n2[,roundvalue]) — interest paid from payment n1 through n2."""
-	n1 = require_int(a.expr())
-	n2 = require_int(a.expr())
-	roundvalue = require_int(a.expr()) if a.has_next() else None
+	n1 = require_int(n1)
+	n2 = require_int(n2)
+	if roundvalue is not None:
+		roundvalue = require_int(roundvalue)
 	if n1 < 1 or n2 < 0:
 		raise DomainError("ΣInt: payment numbers must be positive")
-	sprn = _bal(a.env, n2, roundvalue) - _bal(a.env, n1 - 1, roundvalue)
-	return (n2 - n1 + 1) * a.env.pmt - sprn
+	sprn = _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
+	return (n2 - n1 + 1) * env.pmt - sprn
 
 
 # ── Sorting / filling ────────────────────────────────────────────────────────────
@@ -268,25 +284,15 @@ def fill(a: ArgParser):
 			lst.data[i] = x
 
 
-# ── env_func decorator ────────────────────────────────────────────────────────
-
-def env_func(func):
-	"""Convert an (env, arg1, ...) function into an ArgParser handler."""
-	@wraps(func)
-	def wrapper(a: ArgParser):
-		return func(a.env, *a.parse_args())
-	return wrapper
-
-
 # ── expr( ─────────────────────────────────────────────────────────────────────
 
-def expr(a: ArgParser):
+@env_func
+def expr(env, string):
 	"""Evaluate a TiString as a TI-BASIC expression."""
 	from parser import Parser
-	string = require_str(a.expr())
-	a.end()
-	with a.env.nest_guard(expr):
-		return Parser(string.tokens, a.env).parse_expr()
+	string = require_str(string)
+	with env.nest_guard(expr):
+		return Parser(string.tokens, env).parse_expr()
 
 
 # ── Clock / date-time commands and functions ──────────────────────────────────
