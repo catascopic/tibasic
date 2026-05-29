@@ -76,21 +76,12 @@ CHARS = {}
 def get_token(code: int | Sequence[int]) -> Token:
 	if isinstance(code, int):
 		code = code.to_bytes(1 + (code > 0xFF))
-
-	b0 = code[0]
-	if len(code) == 1:
-		tbl = _TABLE
-		idx = b0
-	else:
-		tbl = _TABLE[b0]
-		if tbl is None:
-			raise KeyError(code)
-		idx = code[1]
-
-	token = tbl[idx] if idx < len(tbl) else None
-	if token is None:
+	item = _TABLE[code[0]]
+	if len(code) > 1:
+		item = item[code[1]] if isinstance(item, list) and code[1] < len(item) else None
+	if not isinstance(item, Token):
 		raise KeyError(code)
-	return token
+	return item
 
 
 def _set_token(token: Token):
@@ -111,18 +102,13 @@ def _set_token(token: Token):
 	tbl[idx] = token
 
 
-def read_token(f: BytesIO):
-	(b,) = f.read(1)
-	item = _TABLE[b]
-	if isinstance(item, Token):
-		return item
-	if item is None:
-		raise ValueError(f"Invalid token code: 0x{b:02X}")
-	(b2,) = f.read(1)
-	item = item[b2]
-	if item is None:
-		raise ValueError(f"Invalid token code: 0x{b:02X}{b2:02X}")
-	return item
+def read_token(f: BytesIO) -> Token:
+	first = f.read(1)
+	code = first + f.read(1) if isinstance(_TABLE[first[0]], list) else first
+	try:
+		return get_token(code)
+	except KeyError:
+		raise ValueError(f"Invalid token code: 0x{int.from_bytes(code):0{2 * len(code)}X}")
 
 
 def _make_pure_func(f):
@@ -346,13 +332,13 @@ token(0x6326, 'ΔX', var=WindowVar(17))
 token(0x6327, 'ΔY', var=WindowVar(18))
 token(0x6328, 'XFact', var=WindowVar(19))
 token(0x6329, 'YFact', var=WindowVar(20))
-token(0x632B, '𝐍')
-token(0x632C, 'I%')
-token(0x632D, 'PV')
-token(0x632E, 'PMT')
-token(0x632F, 'FV')
-token(0x6330, 'P/Y')
-token(0x6331, 'C/Y')
+token(0x632B, '𝐍',   var=RealVar('n_tvm'))
+token(0x632C, 'I%',  var=RealVar('i_pct'))
+token(0x632D, 'PV',  var=RealVar('pv'))
+token(0x632E, 'PMT', var=RealVar('pmt'))
+token(0x632F, 'FV',  var=RealVar('fv'))
+token(0x6330, 'P/Y', var=RealVar('py'))
+token(0x6331, 'C/Y', var=RealVar('cy'))
 token(0x6334, 'PlotStep')
 token(0x6336, 'Xres')
 
@@ -482,13 +468,13 @@ token(0xBA, 'fPart(', pure=pf.f_part)
 
 # ── 0xBB xx: extended tokens ──────────────────────────────────────────────────
 
-token(0xBB00, 'npv(')
-token(0xBB01, 'irr(')
-token(0xBB02, 'bal(')
-token(0xBB03, 'Σprn(')
-token(0xBB04, 'ΣInt(')
-token(0xBB05, '►Nom(')
-token(0xBB06, '►Eff(')
+token(0xBB00, 'npv(',  pure=pf.npv)
+token(0xBB01, 'irr(',  pure=pf.irr)
+token(0xBB02, 'bal(',  func=forms.bal)
+token(0xBB03, 'Σprn(', func=forms.sigma_prn)
+token(0xBB04, 'ΣInt(', func=forms.sigma_int)
+token(0xBB05, '►Nom(', pure=pf.nom)
+token(0xBB06, '►Eff(', pure=pf.eff)
 token(0xBB07, 'dbd(',           pure=pf.dbd)
 token(0xBB08, 'lcm(',           pure=pf.lcm)
 token(0xBB09, 'gcd(',           pure=pf.gcd)

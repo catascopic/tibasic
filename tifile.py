@@ -23,26 +23,25 @@ class TiProgram:
 		print(''.join(t.text for t in self.tokens))
 
 	@classmethod
-	def read(cls, file):
-		with open(file, 'rb') as f:
-			signature = f.read(8)
-			if not signature.startswith(b'**TI8'):  # could be 82, 83, 83F
-				raise ValueError(f"{file}: Invalid .8xp signature: {signature}")
+	def read_from(cls, f):
+		signature = f.read(8)
+		if not signature.startswith(b'**TI8'):  # could be 82, 83, 83F
+			raise ValueError(f"Invalid .8xp signature: {signature!r}")
 
-			f.seek(3, 1)  # skip 1a 0a 00
-			comment = f.read(42).rstrip(b'\x00 ').decode('ascii', errors='replace')
-			f.seek(2, 1)  # skip meta/body length
-			entry_type = int.from_bytes(f.read(2), 'little')  # 0x000B or 0x000D
-			f.seek(2, 1)  # skip body/checksum length
-			(file_type,) = f.read(1)
-			name = f.read(8).rstrip(b'\x00').decode('ascii')
-			_version, archived = f.read(2)  # TODO: field missing when entry_type != 0x000d???
-			f.seek(2, 1)  # skip body/checksum length duplicate
-			end = int.from_bytes(f.read(2), 'little') + f.tell()
-			tokens = []
-			while f.tell() < end:
-				tokens.append(read_token(f))
-		
+		f.seek(3, 1)  # skip 1a 0a 00
+		comment = f.read(42).rstrip(b'\x00 ').decode('ascii', errors='replace')
+		f.seek(2, 1)  # skip meta/body length
+		entry_type = int.from_bytes(f.read(2), 'little')  # 0x000B or 0x000D
+		f.seek(2, 1)  # skip body/checksum length
+		(file_type,) = f.read(1)
+		name = f.read(8).rstrip(b'\x00').decode('ascii')
+		_version, archived = f.read(2)  # TODO: field missing when entry_type != 0x000d???
+		f.seek(2, 1)  # skip body/checksum length duplicate
+		end = int.from_bytes(f.read(2), 'little') + f.tell()
+		tokens = []
+		while f.tell() < end:
+			tokens.append(read_token(f))
+
 		# TODO: checksum check
 		return cls(
 			name     = name,
@@ -52,7 +51,12 @@ class TiProgram:
 			locked   = file_type == 0x06,
 		)
 
-	def write(self, file):
+	@classmethod
+	def read(cls, file):
+		with open(file, 'rb') as f:
+			return cls.read_from(f)
+
+	def write_to(self, f):
 		program    = b''.join(t.code for t in self.tokens)
 		name_bytes = self.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
 		locked     = 0x06 if self.locked else 0x05
@@ -72,14 +76,17 @@ class TiProgram:
 		)
 
 		comment_bytes = self.comment.encode('ascii')[:42].ljust(42, b'\x00')
-		checksum  = sum(var_entry) & 0xFFFF
+		checksum = sum(var_entry) & 0xFFFF
+		f.write(b'**TI83F*')
+		f.write(b'\x1a\x0a\x00')
+		f.write(comment_bytes)
+		f.write(len(var_entry).to_bytes(2, 'little'))
+		f.write(var_entry)
+		f.write(checksum.to_bytes(2, 'little'))
+
+	def write(self, file):
 		with open(file, 'wb') as f:
-			f.write(b'**TI83F*')
-			f.write(b'\x1a\x0a\x00')
-			f.write(comment_bytes)
-			f.write(len(var_entry).to_bytes(2, 'little'))
-			f.write(var_entry)
-			f.write(checksum.to_bytes(2, 'little'))
+			self.write_to(f)
 
 
 if __name__ == '__main__':

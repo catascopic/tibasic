@@ -1,7 +1,7 @@
-from collections import defaultdict
 import math
 import random
-
+from abc import ABC
+from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, date, timedelta
 
@@ -29,22 +29,10 @@ class _VarArray:
 				yield self._formatter(i), x
 
 
-
-class _NumericVarArray(_VarArray):
-	def __init__(self):
-		super().__init__(27, None, lambda n: chr(65+n) if n < 26 else 'θ')
-
-	def __getitem__(self, idx: int):
-		val = self._data[idx]
-		if val is None:
-			val = self._data[idx] = 0
-		return val
-
-
 class Environment:
 
 	def __init__(self):
-		self.numerics   = _NumericVarArray()                               # A–Z, θ
+		self.numerics   = _VarArray(27, None, lambda n: chr(65+n) if n < 26 else 'θ') # A–Z, θ
 		self.lists      = _VarArray(6,  None, lambda n: f"L{n+1}")         # L1–L6
 		self.matrices   = _VarArray(10, None, lambda n: f"[{chr(65+n)}]")  # [A]–[J]
 		self.strings    = _VarArray(10, None, lambda n: f"Str{n+1}")       # Str0–9
@@ -53,6 +41,14 @@ class Environment:
 		self.user_lists = {}                                               # ᴸNAME lists
 		self.n = None
 		self.ans              = 0
+		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
+		self.n_tvm = 0   # 𝐍  — number of payments
+		self.i_pct = 0   # I% — interest rate per period (as percentage)
+		self.pv    = 0   # PV — present value
+		self.pmt   = 0   # PMT — payment amount
+		self.fv    = 0   # FV — future value
+		self.py    = 1   # P/Y — payments per year
+		self.cy    = 1   # C/Y — compounding periods per year
 		self.angle_mode       = 'RAD'
 		self.dt_fmt           = 1
 		self.tm_fmt           = 12
@@ -195,115 +191,81 @@ class Environment:
 
 # ── Variable hierarchy ────────────────────────────────────────────────────────────
 
-class Variable:
+class Variable(ABC):
 	"""Base class for typed, storable token variables."""
 	def get(self, env): ...
 	def set(self, env, value): ...
 
+class OffsetVar(Variable):
+	__slots__ = ('index',)
+	def __init__(self, index: int):
+		self.index = index	
 
-class NumericVar(Variable):
-	__slots__ = ('_idx',)
+class NamedVar(Variable):
+	__slots__ = ('name',)
+	def __init__(self, name: str):
+		self.name = name
+	
 
-	def __init__(self, idx: int):
-		self._idx = idx
-
+class NumericVar(OffsetVar):
 	def get(self, env):
-		return env.numerics[self._idx]
-
-	def set(self, env, value):
-		env.numerics[self._idx] = require_num(value)
-
-
-class RealVar(Variable):
-	__slots__ = ('_name',)
-
-	def __init__(self, name: int):
-		self._name = name
-
-	def get(self, env):
-		val = getattr(env, name)
+		val = env.numerics[self.index]
 		if val is None:
-			setattr(env, name, 0)
+			val = env.numerics[self.index] = 0
+		return val
+		
+	def set(self, env, value):
+		env.numerics[self.index] = require_num(value)
+
+class RealVar(NamedVar):
+	def get(self, env):
+		val = getattr(env, self.name)
+		if val is None:
+			setattr(env, self.name, 0)
 			val = 0
 		return val
 
 	def set(self, env, value):
-		return setattr(env, name, require_real(value))
+		setattr(env, self.name, require_real(value))
 
-
-class ListVar(Variable):
-	__slots__ = ('_idx',)
-
-	def __init__(self, idx: int):
-		self._idx = idx
-
+class ListVar(OffsetVar):
 	def get(self, env):
-		return env.lists[self._idx]
-
+		return env.lists[self.index]
+		
 	def set(self, env, value):
-		env.lists[self._idx] = require_list(value)
+		env.lists[self.index] = require_list(value)
 
-
-class UserListVar(Variable):
-	__slots__ = ('_name',)
-
-	def __init__(self, name: str):
-		self._name = name
-
+class UserListVar(NamedVar):
 	def get(self, env):
-		return env.user_lists[self._name]
-
+		return env.user_lists[self.name]
+		
 	def set(self, env, value):
-		env.user_lists[self._name] = require_list(value)
+		env.user_lists[self.name] = require_list(value)
 
-
-class MatrixVar(Variable):
-	__slots__ = ('_idx',)
-
-	def __init__(self, idx: int):
-		self._idx = idx
-
+class MatrixVar(OffsetVar):
 	def get(self, env):
-		return env.matrices[self._idx]
-
+		return env.matrices[self.index]
+		
 	def set(self, env, value):
-		env.matrices[self._idx] = require_matrix(value)
+		env.matrices[self.index] = require_matrix(value)
 
-
-class StringVar(Variable):
-	__slots__ = ('_idx',)
-
-	def __init__(self, idx: int):
-		self._idx = idx
-
+class StringVar(OffsetVar):
 	def get(self, env):
-		return env.strings[self._idx]
-
+		return env.strings[self.index]
+		
 	def set(self, env, value):
-		env.strings[self._idx] = require_str(value)
+		env.strings[self.index] = require_str(value)
 
-
-class StatVar(Variable):
-	__slots__ = ('_idx',)
-
-	def __init__(self, idx: int):
-		self._idx = idx
-
+class StatVar(OffsetVar):
 	def get(self, env):
-		return env.stat[self._idx]
-
+		return env.stat[self.index]
+		
 	def set(self, env, value):
 		raise DataTypeError("Stat variables are read-only")
 
-
-class WindowVar(Variable):
-	__slots__ = ('_idx',)
-
-	def __init__(self, idx: int):
-		self._idx = idx
-
+class WindowVar(OffsetVar):
 	def get(self, env):
-		return env.window[self._idx]
-
+		return env.window[self.index]
+		
 	def set(self, env, value):
-		env.window[self._idx] = require_real(value)
+		env.window[self.index] = require_real(value)

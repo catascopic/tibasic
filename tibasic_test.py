@@ -793,6 +793,261 @@ class TestUserLists:
 		with pytest.raises(TiSyntaxError):
 			calc('{1}@$ABCDEF')
 
+# ── ►Eff( / ►Nom( ────────────────────────────────────────────────────────────
+
+class TestEffNom:
+	# ── ►Eff( ─────────────────────────────────────────────────────────────────
+
+	def test_eff_example_from_docs(self):
+		# ►Eff(7.5, 12) → 7.763259886  (the docs say 7.663 but that's a typo)
+		assert pf.eff(7.5, 12) == approx(7.763259886, rel=1e-8)
+
+	def test_eff_annual(self):
+		# 1 compounding period is a pass-through
+		assert pf.eff(10, 1) == 10
+
+	def test_eff_quarterly(self):
+		assert pf.eff(8, 4) == approx(100 * ((1 + 0.08 / 4) ** 4 - 1), rel=1e-12)
+
+	def test_eff_zero_rate(self):
+		assert pf.eff(0, 12) == approx(0)
+
+	def test_eff_domain_zero_periods(self):
+		with pytest.raises(DomainError):
+			pf.eff(10, 0)
+
+	def test_eff_domain_negative_periods(self):
+		with pytest.raises(DomainError):
+			pf.eff(10, -1)
+
+	def test_eff_domain_rate_at_minus_100(self):
+		with pytest.raises(DomainError):
+			pf.eff(-100, 12)
+
+	def test_eff_domain_rate_below_minus_100(self):
+		with pytest.raises(DomainError):
+			pf.eff(-200, 12)
+
+	def test_eff_minus_100_with_one_period_is_passthrough(self):
+		# cp=1 is always a pass-through, even for extreme rates
+		assert pf.eff(-100, 1) == -100
+
+	# ── ►Nom( ─────────────────────────────────────────────────────────────────
+
+	def test_nom_example_from_docs(self):
+		# ►Nom(10, 12) → 9.568968515
+		assert pf.nom(10, 12) == approx(9.568968515, rel=1e-8)
+
+	def test_nom_annual(self):
+		# 1 compounding period is a pass-through
+		assert pf.nom(10, 1) == 10
+
+	def test_nom_quarterly(self):
+		assert pf.nom(8, 4) == approx(100 * 4 * ((1.08 ** (1/4)) - 1), rel=1e-12)
+
+	def test_nom_zero_rate(self):
+		assert pf.nom(0, 12) == approx(0)
+
+	def test_nom_domain_zero_periods(self):
+		with pytest.raises(DomainError):
+			pf.nom(10, 0)
+
+	def test_nom_domain_negative_periods(self):
+		with pytest.raises(DomainError):
+			pf.nom(10, -1)
+
+	def test_nom_domain_rate_at_minus_100(self):
+		with pytest.raises(DomainError):
+			pf.nom(-100, 12)
+
+	def test_nom_domain_rate_below_minus_100(self):
+		with pytest.raises(DomainError):
+			pf.nom(-200, 12)
+
+	def test_nom_minus_100_with_one_period_is_passthrough(self):
+		assert pf.nom(-100, 1) == -100
+
+	# ── Roundtrip ─────────────────────────────────────────────────────────────
+
+	def test_roundtrip_eff_then_nom(self):
+		# nom → eff → nom should recover the original rate
+		assert pf.nom(pf.eff(7.5, 12), 12) == approx(7.5, rel=1e-10)
+
+	def test_roundtrip_nom_then_eff(self):
+		assert pf.eff(pf.nom(10, 12), 12) == approx(10, rel=1e-10)
+
+	# ── Via interpreter ───────────────────────────────────────────────────────
+
+	def test_eff_via_calc(self):
+		assert calc('►Eff( 7.5,12') == approx(7.763259886, rel=1e-8)
+
+	def test_nom_via_calc(self):
+		assert calc('►Nom( 10,12') == approx(9.568968515, rel=1e-8)
+
+
+# ── npv( / irr( / bal( / ΣPrn( / ΣInt( ──────────────────────────────────────
+
+class TestNpv:
+	def test_basic_no_freq(self):
+		# npv(5, 500, {1250,1333,1575,1100,1900}) — example from docs
+		cflist = TiList([1250, 1333, 1575, 1100, 1900])
+		r = 1.05
+		expected = 500 + 1250/r + 1333/r**2 + 1575/r**3 + 1100/r**4 + 1900/r**5
+		assert pf.npv(5, 500, cflist) == approx(expected, rel=1e-10)
+
+	def test_zero_rate(self):
+		# At 0% all cash flows just sum
+		cflist = TiList([100, 200, 300])
+		assert pf.npv(0, 50, cflist) == approx(650)
+
+	def test_with_freq(self):
+		# npv(8, 0, {200,300}, {2,3}) same as npv(8, 0, {200,200,300,300,300})
+		cflist  = TiList([200, 300])
+		cffreq  = TiList([2, 3])
+		flat    = TiList([200, 200, 300, 300, 300])
+		assert pf.npv(8, 0, cflist, cffreq) == approx(pf.npv(8, 0, flat), rel=1e-10)
+
+	def test_freq_dim_mismatch(self):
+		with pytest.raises(DimMismatchError):
+			pf.npv(5, 0, TiList([100, 200]), TiList([1]))
+
+	def test_data_type_error_on_complex_rate(self):
+		with pytest.raises(DataTypeError):
+			pf.npv(1j, 0, TiList([100]))
+
+	def test_single_cash_flow(self):
+		# npv(10, -100, {110}) = -100 + 110/1.1 = 0
+		assert pf.npv(10, -100, TiList([110])) == approx(0, abs=1e-10)
+
+
+class TestIrr:
+	def test_simple_one_period(self):
+		# Invest 100, get 110 back → IRR = 10%
+		assert pf.irr(-100, TiList([110])) == approx(10.0, rel=1e-6)
+
+	def test_two_periods(self):
+		# npv(irr) = 0 check
+		cflist = TiList([500, 600])
+		rate = pf.irr(-1000, cflist)
+		assert pf.npv(rate, -1000, cflist) == approx(0, abs=1e-4)
+
+	def test_with_freq(self):
+		# Same cash flow with and without frequencies
+		cflist = TiList([110])
+		cffreq = TiList([1])
+		assert pf.irr(-100, cflist, cffreq) == approx(10.0, rel=1e-6)
+
+	def test_no_positive_solution_raises(self):
+		# All positive cash flows → no sign change → no real positive IRR
+		with pytest.raises(DomainError):
+			pf.irr(100, TiList([100, 100]))
+
+	def test_npv_is_zero_at_irr(self):
+		cflist = TiList([300, 400, 500])
+		rate = pf.irr(-900, cflist)
+		assert pf.npv(rate, -900, cflist) == approx(0, abs=1e-3)
+
+
+class TestBal:
+	"""Uses a 30-year mortgage: PV=100000, I%=8/12 per month, N=360, PMT≈-733.76."""
+
+	@pytest.fixture
+	def mortgage(self):
+		env = Environment()
+		env.pv    = 100_000
+		env.i_pct = 8 / 12           # monthly rate as percentage
+		env.n_tvm = 360
+		# Exact PMT for zero FV
+		r = env.i_pct / 100
+		env.pmt = -env.pv * r / (1 - (1 + r) ** -env.n_tvm)
+		return env
+
+	def test_bal_zero_is_pv(self, mortgage):
+		assert calc('bal( 0', mortgage) == approx(mortgage.pv)
+
+	def test_bal_180(self, mortgage):
+		# After 15 years (180 payments) — docs quote ~$76781.55
+		assert calc('bal( 180', mortgage) == approx(76781.55, rel=1e-3)
+
+	def test_bal_360_is_zero(self, mortgage):
+		# After all payments the loan is paid off
+		assert calc('bal( 360', mortgage) == approx(0, abs=0.01)
+
+	def test_bal_negative_raises(self, mortgage):
+		with pytest.raises(DomainError):
+			calc('bal( ~1', mortgage)
+
+	def test_bal_zero_interest(self):
+		env = Environment()
+		env.pv = 1200
+		env.i_pct = 0
+		env.pmt = -100
+		assert calc('bal( 6', env) == approx(600)
+
+	def test_bal_with_rounding(self, mortgage):
+		# With roundvalue=2, result should still be roughly correct
+		result = calc('bal( 180,2', mortgage)
+		assert result == approx(76781.55, rel=0.01)
+
+
+class TestSigmaPrn:
+	@pytest.fixture
+	def mortgage(self):
+		env = Environment()
+		env.pv    = 100_000
+		env.i_pct = 8 / 12
+		env.n_tvm = 360
+		r = env.i_pct / 100
+		env.pmt = -env.pv * r / (1 - (1 + r) ** -env.n_tvm)
+		return env
+
+	def test_sigma_prn_first_60(self, mortgage):
+		# Docs quote ≈ -$4930.14 for first 5 years
+		assert calc('Σprn( 1,60', mortgage) == approx(-4930.14, rel=1e-2)
+
+	def test_sigma_prn_equals_bal_difference(self, mortgage):
+		# ΣPrn(n1,n2) = bal(n2) - bal(n1-1)
+		from forms import _bal
+		sprn = calc('Σprn( 13,24', mortgage)
+		expected = _bal(mortgage, 24) - _bal(mortgage, 12)
+		assert sprn == approx(expected, rel=1e-10)
+
+	def test_sigma_prn_full_term(self, mortgage):
+		# Principal paid over all 360 payments should equal -PV
+		sprn = calc('Σprn( 1,360', mortgage)
+		assert sprn == approx(-mortgage.pv, rel=1e-6)
+
+
+class TestSigmaInt:
+	@pytest.fixture
+	def mortgage(self):
+		env = Environment()
+		env.pv    = 100_000
+		env.i_pct = 8 / 12
+		env.n_tvm = 360
+		r = env.i_pct / 100
+		env.pmt = -env.pv * r / (1 - (1 + r) ** -env.n_tvm)
+		return env
+
+	def test_sigma_int_first_60(self, mortgage):
+		# Docs quote ≈ -$39095.73 for first 5 years
+		assert calc('ΣInt( 1,60', mortgage) == approx(-39095.73, rel=1e-2)
+
+	def test_prn_plus_int_equals_total_payments(self, mortgage):
+		# ΣPrn + ΣInt should equal total PMT paid
+		n1, n2 = 1, 60
+		sprn = calc('Σprn( 1,60', mortgage)
+		sint = calc('ΣInt( 1,60', mortgage)
+		total_pmt = n2 * mortgage.pmt  # 60 payments
+		assert sprn + sint == approx(total_pmt, rel=1e-8)
+
+	def test_sigma_int_full_term(self, mortgage):
+		# Total interest = total paid - principal = 360*PMT - (-PV) = 360*PMT + PV
+		sint = calc('ΣInt( 1,360', mortgage)
+		expected = 360 * mortgage.pmt + mortgage.pv  # negative (outflow)
+		assert sint == approx(expected, rel=1e-6)
+
+
 # ── Complex numbers ───────────────────────────────────────────────────────────
 
 class TestComplex:

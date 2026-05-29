@@ -660,6 +660,97 @@ def dbd(date1: float, date2: float):
 	return (_parse_dbd_date(date2) - _parse_dbd_date(date1)).days
 
 
+# ── Finance ──────────────────────────────────────────────────────────────────
+
+def _expand_cash_flows(cflist, cffreq):
+	"""Expand a cash flow list with optional frequencies into a flat list."""
+	require_list(cflist)
+	if cffreq is None:
+		return list(cflist)
+	require_list(cffreq)
+	if len(cflist) != len(cffreq):
+		raise DimMismatchError("npv/irr: CFList and CFFreq must have the same dimension")
+	result = []
+	for cf, freq in zip(cflist, cffreq):
+		n = require_int(freq)
+		if n < 1:
+			raise DomainError("npv/irr: frequencies must be positive integers")
+		result.extend([cf] * n)
+	return result
+
+
+def npv(rate, cf0, cflist, cffreq=None):
+	"""Net present value: CF0 + Σ CFj·(1+rate/100)^-j over expanded cash flows."""
+	rate  = require_real(rate)
+	cf0   = require_real(cf0)
+	flows = _expand_cash_flows(cflist, cffreq)
+	if rate == 0:
+		return cf0 + builtins.sum(flows)
+	r = 1 + rate / 100
+	return cf0 + builtins.sum(cf * r ** -j for j, cf in enumerate(flows, 1))
+
+
+def irr(cf0, cflist, cffreq=None):
+	"""Internal rate of return: the rate (%) at which NPV equals zero."""
+	cf0       = require_real(cf0)
+	flows     = _expand_cash_flows(cflist, cffreq)
+	all_flows = [cf0] + flows
+
+	def _f(rate):
+		if builtins.abs(rate) < 1e-10:
+			return builtins.sum(all_flows)
+		r = 1 + rate / 100
+		return builtins.sum(cf * r ** -j for j, cf in enumerate(all_flows))
+
+	def _df(rate):
+		r = 1 + rate / 100
+		return builtins.sum(-j / 100 * cf * r ** (-j - 1) for j, cf in enumerate(all_flows))
+
+	for start in (10.0, 50.0, 100.0, 1.0, 200.0):
+		rate = float(start)
+		for _ in range(200):
+			f  = _f(rate)
+			df = _df(rate)
+			if builtins.abs(df) < 1e-15:
+				break
+			step = f / df
+			rate -= step
+			if builtins.abs(step) < 1e-10 and builtins.abs(f) < 1e-6:
+				break
+		if rate > 1e-8 and builtins.abs(_f(rate)) < 1e-4:
+			return rate
+
+	raise DomainError("irr: no positive real solution found (ERR:NO SIGN CHG)")
+
+
+@vectorized
+def eff(nom, cp):
+	"""►Eff(: convert nominal interest rate to effective interest rate."""
+	require_real(nom)
+	require_real(cp)
+	if cp <= 0:
+		raise DomainError("►Eff: compounding periods must be positive")
+	if cp == 1:
+		return nom
+	if nom <= -100:
+		raise DomainError("►Eff: nominal rate must be > -100%")
+	return 100 * ((1 + nom / (100 * cp)) ** cp - 1)
+
+
+@vectorized
+def nom(eff_rate, cp):
+	"""►Nom(: convert effective interest rate to nominal interest rate."""
+	require_real(eff_rate)
+	require_real(cp)
+	if cp <= 0:
+		raise DomainError("►Nom: compounding periods must be positive")
+	if cp == 1:
+		return eff_rate
+	if eff_rate <= -100:
+		raise DomainError("►Nom: effective rate must be > -100%")
+	return 100 * cp * ((eff_rate / 100 + 1) ** (1 / cp) - 1)
+
+
 # ── Probability distributions ────────────────────────────────────────────────
 
 def _regularized_inc_gamma(a, x):

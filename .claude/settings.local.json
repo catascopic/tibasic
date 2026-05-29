@@ -22,7 +22,10 @@
       "Bash(python -c \"import purefunctions as pf; print\\(pf.factorial\\(0.5\\)\\); print\\(pf.factorial\\(5\\)\\); print\\(pf.factorial\\(-0.5\\)\\)\")",
       "Bash(python -m pytest tibasic_test.py -q -x)",
       "Bash(python -m pytest tibasic_test.py -x -q)",
-      "Bash(python -m pytest tibasic_test.py::TestMatrToList -v)"
+      "Bash(python -m pytest tibasic_test.py::TestMatrToList -v)",
+      "Bash(python -m pytest tibasic_test.py::TestEffNom tibasic_test.py -q)",
+      "Bash(python -m pytest tibasic_test.py::TestEffNom::test_eff_via_calc -v)",
+      "Bash(python -c \"content = open\\('environment.py'\\).read\\(\\); idx = content.find\\('RealVar'\\); print\\(repr\\(content[idx:idx+300]\\)\\)\")"
     ]
   }
 }

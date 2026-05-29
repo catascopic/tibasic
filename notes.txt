@@ -1,9 +1,9 @@
-Improve parameter names in purefunctions
-
 solve( fMin( fMax(
-npv( irr( bal( Σprn( ΣInt( 
-Converters? ►Nom( ►Eff(
+
+
 ClrAllLists GetCalc( DelVar Equ►String( String►Equ(
+
+test: undefined numerics initalize to 0, lists/matrices error
 
 Improve get_token, read_token
 
@@ -29,6 +29,9 @@ Add aliases to any token that has a character that can't be typed on the keyboar
 
 ********
 
+►Nom( ►Eff(
+
+Improve parameter names in purefunctions
 matr_to_list: lists do not have to equal matrix columns. there can be fewer or extra (which are ignored)
 
 $RFLCTA should be an error

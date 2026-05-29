@@ -1,0 +1,168 @@
+"""Tests for TiProgram binary file format (read_from / write_to)."""
+import pytest
+from io import BytesIO
+
+from tifile import TiProgram
+from tokens import get_token, DIGITS, LETTERS, ADD, SUB, MUL, DIV, NEWLINE, STORE
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def roundtrip(prog: TiProgram) -> TiProgram:
+	"""Write prog to a BytesIO buffer, seek back, and read it out again."""
+	buf = BytesIO()
+	prog.write_to(buf)
+	buf.seek(0)
+	return TiProgram.read_from(buf)
+
+
+def make_prog(**kwargs) -> TiProgram:
+	"""Construct a TiProgram with sensible defaults."""
+	kwargs.setdefault('name', 'TEST')
+	kwargs.setdefault('tokens', [])
+	return TiProgram(**kwargs)
+
+
+# ── Roundtrip: metadata ───────────────────────────────────────────────────────
+
+class TestRoundtripMetadata:
+	def test_name(self):
+		assert roundtrip(make_prog(name='HELLO')).name == 'HELLO'
+
+	def test_name_lowercase_normalised(self):
+		# write() uppercases the name in the binary; read() decodes it as-is
+		prog = TiProgram(name='hello', tokens=[])
+		assert roundtrip(prog).name == 'HELLO'
+
+	def test_name_short(self):
+		assert roundtrip(make_prog(name='A')).name == 'A'
+
+	def test_comment(self):
+		assert roundtrip(make_prog(comment='my comment')).comment == 'my comment'
+
+	def test_comment_empty(self):
+		assert roundtrip(make_prog(comment='')).comment == ''
+
+	def test_comment_truncated_to_42(self):
+		long = 'X' * 100
+		result = roundtrip(make_prog(comment=long))
+		assert result.comment == 'X' * 42
+
+	def test_archived_true(self):
+		assert roundtrip(make_prog(archived=True)).archived is True
+
+	def test_archived_false(self):
+		assert roundtrip(make_prog(archived=False)).archived is False
+
+	def test_locked_true(self):
+		assert roundtrip(make_prog(locked=True)).locked is True
+
+	def test_locked_false(self):
+		assert roundtrip(make_prog(locked=False)).locked is False
+
+	def test_archived_and_locked(self):
+		result = roundtrip(make_prog(archived=True, locked=True))
+		assert result.archived is True
+		assert result.locked is True
+
+
+# ── Roundtrip: tokens ─────────────────────────────────────────────────────────
+
+class TestRoundtripTokens:
+	def test_empty_program(self):
+		assert roundtrip(make_prog(tokens=[])).tokens == []
+
+	def test_single_digit(self):
+		prog = make_prog(tokens=[DIGITS[3]])
+		assert roundtrip(prog).tokens == [DIGITS[3]]
+
+	def test_single_letter(self):
+		prog = make_prog(tokens=[LETTERS[0]])  # A
+		assert roundtrip(prog).tokens == [LETTERS[0]]
+
+	def test_arithmetic_expression(self):
+		# 1+2*3
+		toks = [DIGITS[1], ADD, DIGITS[2], MUL, DIGITS[3]]
+		result = roundtrip(make_prog(tokens=toks))
+		assert result.tokens == toks
+
+	def test_two_byte_token(self):
+		# stdDev( is a two-byte token (0xBB0D)
+		stddev = get_token(0xBB0D)
+		result = roundtrip(make_prog(tokens=[stddev]))
+		assert result.tokens == [stddev]
+
+	def test_mixed_one_and_two_byte_tokens(self):
+		cumsum = get_token(0xBB29)  # cumSum(
+		toks = [cumsum, DIGITS[1], DIGITS[0]]
+		result = roundtrip(make_prog(tokens=toks))
+		assert result.tokens == toks
+
+	def test_multiline_program(self):
+		# A→B\nB+1
+		toks = [LETTERS[0], STORE, LETTERS[1], NEWLINE, LETTERS[1], ADD, DIGITS[1]]
+		result = roundtrip(make_prog(tokens=toks))
+		assert result.tokens == toks
+
+	def test_token_count_preserved(self):
+		toks = list(DIGITS) * 5  # 50 tokens
+		assert len(roundtrip(make_prog(tokens=toks)).tokens) == 50
+
+
+# ── Binary format: write_to ───────────────────────────────────────────────────
+
+class TestWriteFormat:
+	def _write(self, **kwargs) -> bytes:
+		buf = BytesIO()
+		make_prog(**kwargs).write_to(buf)
+		return buf.getvalue()
+
+	def test_signature(self):
+		assert self._write().startswith(b'**TI83F*')
+
+	def test_file_header_bytes(self):
+		data = self._write()
+		assert data[8:11] == b'\x1a\x0a\x00'
+
+	def test_comment_field_is_42_bytes(self):
+		data = self._write(comment='hi')
+		# comment starts at byte 11
+		assert len(data[11:53]) == 42
+		assert data[11:13] == b'hi'
+		assert data[13:53] == b'\x00' * 40
+
+	def test_checksum_correct(self):
+		buf = BytesIO()
+		make_prog(tokens=[DIGITS[5]]).write_to(buf)
+		data = buf.getvalue()
+		# var_entry starts at byte 55 (8 sig + 3 header + 42 comment + 2 length)
+		var_entry = data[55:-2]
+		expected = sum(var_entry) & 0xFFFF
+		actual = int.from_bytes(data[-2:], 'little')
+		assert actual == expected
+
+	def test_archived_flag_byte(self):
+		archived = self._write(archived=True)
+		not_archived = self._write(archived=False)
+		# flag byte is at a fixed offset within var_entry; just check they differ
+		assert archived != not_archived
+
+	def test_locked_file_type_byte(self):
+		locked = self._write(locked=True)
+		not_locked = self._write(locked=False)
+		assert locked != not_locked
+
+
+# ── read_from: error handling ─────────────────────────────────────────────────
+
+class TestReadErrors:
+	def test_bad_signature_raises(self):
+		buf = BytesIO(b'BADSIG!!' + b'\x00' * 100)
+		with pytest.raises(ValueError, match='signature'):
+			TiProgram.read_from(buf)
+
+	def test_wrong_signature_prefix(self):
+		# Starts with **TI but not **TI8x
+		buf = BytesIO(b'**TIXX**' + b'\x00' * 100)
+		with pytest.raises(ValueError):
+			TiProgram.read_from(buf)

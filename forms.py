@@ -178,6 +178,53 @@ def list_to_matr(a: ArgParser) -> None:
 	]))
 
 
+# ── Amortization: bal(, ΣPrn(, ΣInt( ────────────────────────────────────────────
+
+def _bal(env, m: int, roundvalue=None):
+	"""Balance after m payments, using TVM variables from env."""
+	r = env.i_pct / 100
+	pv = env.pv
+	pmt = env.pmt
+	if roundvalue is not None:
+		b = pv
+		for _ in range(m):
+			b = round(b * (1 + r) + pmt, roundvalue)
+		return b
+	if r == 0:
+		return pv + pmt * m
+	return pv * (1 + r) ** m + pmt * ((1 + r) ** m - 1) / r
+
+
+def bal(a: ArgParser):
+	"""bal(n[,roundvalue]) — remaining balance after n payments."""
+	n = require_int(a.expr())
+	if n < 0:
+		raise DomainError("bal: n must be non-negative")
+	roundvalue = require_int(a.expr()) if a.has_next() else None
+	return _bal(a.env, n, roundvalue)
+
+
+def sigma_prn(a: ArgParser):
+	"""ΣPrn(n1,n2[,roundvalue]) — principal paid from payment n1 through n2."""
+	n1 = require_int(a.expr())
+	n2 = require_int(a.expr())
+	roundvalue = require_int(a.expr()) if a.has_next() else None
+	if n1 < 1 or n2 < 0:
+		raise DomainError("ΣPrn: payment numbers must be positive")
+	return _bal(a.env, n2, roundvalue) - _bal(a.env, n1 - 1, roundvalue)
+
+
+def sigma_int(a: ArgParser):
+	"""ΣInt(n1,n2[,roundvalue]) — interest paid from payment n1 through n2."""
+	n1 = require_int(a.expr())
+	n2 = require_int(a.expr())
+	roundvalue = require_int(a.expr()) if a.has_next() else None
+	if n1 < 1 or n2 < 0:
+		raise DomainError("ΣInt: payment numbers must be positive")
+	sprn = _bal(a.env, n2, roundvalue) - _bal(a.env, n1 - 1, roundvalue)
+	return (n2 - n1 + 1) * a.env.pmt - sprn
+
+
 # ── Sorting / filling ────────────────────────────────────────────────────────────
 
 # THESE ARE COMMANDS, NOT FUNCTIONS!
