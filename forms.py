@@ -37,7 +37,7 @@ def vectorized(func):
 				len_check.add(len(a))
 				vec.append(a)
 			else:
-				vec.append(repeat(require_num(a)))
+				vec.append(repeat(a))
 		if not len_check:
 			return func(env, *args)
 		if len(len_check) == 1:

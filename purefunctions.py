@@ -43,7 +43,7 @@ def vectorized(func):
 				len_check.add(len(a))
 				vec.append(a)
 			else:
-				vec.append(repeat(require_num(a)))
+				vec.append(repeat(a))
 		if not len_check:
 			return func(*args)
 		if len(len_check) == 1:
@@ -103,28 +103,31 @@ def not_(x):
 @vectorized_with_matrix
 @handle_complex
 def i_part(x):
-	return math.trunc(x)
+	return math.trunc(require_num(x))
 
 @vectorized_with_matrix
 @handle_complex
 def int_(x):
-	return math.floor(x)
+	return math.floor(require_num(x))
 
 @vectorized_with_matrix
 @handle_complex
 def f_part(x):
-	return x - math.trunc(x)
+	return x - math.trunc(require_num(x))
 
 @vectorized
 def sqrt(x):
+	require_num(x)
 	return cmath.sqrt(x) if isinstance(x, complex) or x < 0 else math.sqrt(x)
 
 @vectorized
 def cbrt(x):
+	require_num(x)
 	return cmath.exp(cmath.log(x) / 3) if isinstance(x, complex) else math.cbrt(x)
 
 @vectorized
 def xth_root(n, x):
+	require_num(x)
 	return cmath.exp(cmath.log(x) / n) if isinstance(x, complex) or x < 0 else x ** (1 / n)
 
 
@@ -165,14 +168,17 @@ def augment(a, b):
 
 @vectorized
 def real(x):
+	require_num(x)
 	return x.real if isinstance(x, complex) else x
 
 @vectorized
 def imag(x):
+	require_num(x)
 	return x.imag if isinstance(x, complex) else 0
 
 @vectorized
 def conj(x):
+	require_num(x)
 	return complex(x.real, -x.imag) if isinstance(x, complex) else x
 
 # Technically works on matrices, but since matrices can't store complex numbers, the result is all 0s.
@@ -180,6 +186,7 @@ def conj(x):
 # (If you want a matrix of all 0s, you can just do 0[A].)
 @vectorized
 def angle(x):
+	require_num(x)
 	return cmath.phase(x)
 
 
@@ -259,6 +266,7 @@ def stddev(lst, freqlist=None):
 
 @vectorized_with_matrix
 def round(x, decimals=9):
+	require_num(x)
 	return builtins.round(x, require_int(decimals))
 
 
@@ -326,8 +334,8 @@ def mean(lst, freqlist=None):
 
 
 @vectorized_with_matrix
-def abs(a):
-	return builtins.abs(a)
+def abs(x):
+	return builtins.abs(require_num(a))
 
 
 def det(mat):
@@ -391,23 +399,28 @@ def prod(lst, start=None, end=None):
 # ── Transcendental functions ────────────────────────────────────────────────────
 
 @vectorized
-def pow10(a):
-	return 10 ** a
+def pow10(x):
+	return 10 ** require_num(x)
 
 @vectorized
 def ln(x):
+	require_num(x)
 	return cmath.log(x) if isinstance(x, complex) else math.log(x)
 
 @vectorized
 def exp(x):
+	require_num(x)
 	return cmath.exp(x) if isinstance(x, complex) else math.exp(x)
 
 @vectorized
 def log(x):
+	require_num(x)
 	return cmath.log10(x) if isinstance(x, complex) else math.log10(x)
 
 @vectorized
 def log_base(x, base):
+	require_num(x)
+	require_num(base)
 	return cmath.log(x, base) if isinstance(x, complex) else math.log(x, base)
 
 @vectorized
@@ -468,8 +481,13 @@ def gcd(a, b):
 
 @vectorized
 def remainder(a, b):
-	# TODO: this works like C %, not Python %
-	return require_int(a) % require_int(b)
+	a = require_int(a)
+	b = require_int(b)
+	if a < 0:
+		raise DomainError(f"a must be non-negative but got {a}")
+	if a < 1:
+		raise DomainError(f"b must be positive but got {a}")
+	return a % b
 
 # ── Random ──────────────────────────────────────────────────────────────────────
 
@@ -690,8 +708,8 @@ def npv(rate, cf0, cflist, cffreq=None):
 
 def irr(cf0, cflist, cffreq=None):
 	"""Internal rate of return: the rate (%) at which NPV equals zero."""
-	cf0       = require_real(cf0)
-	flows     = _expand_cash_flows(cflist, cffreq)
+	require_real(cf0)
+	flows = _expand_cash_flows(cflist, cffreq)
 	all_flows = [cf0] + flows
 
 	def _f(rate):
@@ -843,6 +861,8 @@ def _inc_beta(a, b, x):
 
 def normalpdf(x, mu=0, sigma=1):
 	require_real(x)
+	require_real(mu)
+	require_real(sigma)
 	z = (x - mu) / sigma
 	return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2 * math.pi))
 
@@ -850,6 +870,8 @@ def normalpdf(x, mu=0, sigma=1):
 def normalcdf(lower, upper, mu=0, sigma=1):
 	require_real(lower)
 	require_real(upper)
+	require_real(mu)
+	require_real(sigma)
 	def _cdf(z):
 		return 0.5 * (1 + math.erf(z / math.sqrt(2)))
 	return _cdf((upper - mu) / sigma) - _cdf((lower - mu) / sigma)
@@ -857,6 +879,8 @@ def normalcdf(lower, upper, mu=0, sigma=1):
 
 def inv_norm(p, mu=0, sigma=1):
 	require_real(p)
+	require_real(mu)
+	require_real(sigma)
 	if p <= 0:
 		return -1e99
 	if p >= 1:

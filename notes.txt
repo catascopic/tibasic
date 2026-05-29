@@ -1,3 +1,5 @@
+vectorized: require_number???
+
 solve( fMin( fMax(
 
 ClrAllLists GetCalc( DelVar Equ►String( String►Equ(
