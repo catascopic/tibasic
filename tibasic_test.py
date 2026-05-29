@@ -242,12 +242,33 @@ class TestNumericFunctions:
 
 
 class TestTrig:
-	def test_sin(self):   assert pf.sin(math.pi / 6) == approx(0.5)
-	def test_cos(self):   assert pf.cos(0) == approx(1)
-	def test_tan(self):   assert pf.tan(math.pi / 4) == approx(1)
-	def test_asin(self):  assert pf.asin(0.5) == approx(math.pi / 6)
-	def test_acos(self):  assert pf.acos(1) == approx(0)
-	def test_atan(self):  assert pf.atan(1) == approx(math.pi / 4)
+	# RAD mode (default)
+	def test_sin(self):   assert calc(f'sin( {math.pi / 6}') == approx(0.5)
+	def test_cos(self):   assert calc(f'cos( 0') == approx(1)
+	def test_tan(self):   assert calc(f'tan( {math.pi / 4}') == approx(1)
+	def test_asin(self):  assert calc(f'sin¹( 0.5') == approx(math.pi / 6)
+	def test_acos(self):  assert calc(f'cos¹( 1') == approx(0)
+	def test_atan(self):  assert calc(f'tan¹( 1') == approx(math.pi / 4)
+	# DEG mode
+	def test_sin_deg(self):
+		env = Environment(); env.angle_mode = 'DEG'
+		assert calc('sin( 30', env) == approx(0.5)
+	def test_cos_deg(self):
+		env = Environment(); env.angle_mode = 'DEG'
+		assert calc('cos( 0', env) == approx(1)
+	def test_tan_deg(self):
+		env = Environment(); env.angle_mode = 'DEG'
+		assert calc('tan( 45', env) == approx(1)
+	def test_asin_deg(self):
+		env = Environment(); env.angle_mode = 'DEG'
+		assert calc('sin¹( 0.5', env) == approx(30)
+	def test_acos_deg(self):
+		env = Environment(); env.angle_mode = 'DEG'
+		assert calc('cos¹( 1', env) == approx(0)
+	def test_atan_deg(self):
+		env = Environment(); env.angle_mode = 'DEG'
+		assert calc('tan¹( 1', env) == approx(45)
+	# Hyperbolics stay in purefunctions, no angle mode
 	def test_sinh(self):  assert pf.sinh(0) == approx(0)
 	def test_cosh(self):  assert pf.cosh(0) == approx(1)
 	def test_tanh(self):  assert pf.tanh(0) == approx(0)
@@ -1063,24 +1084,35 @@ class TestComplex:
 
 class TestCoordinates:
 	def test_r_pr(self):
-		assert pf.rect_to_polar_radius(3, 4) == approx(5)
+		assert calc('R►Pr( 3,4') == approx(5)
 
 	def test_r_ptheta(self):
-		assert pf.rect_to_polar_angle(1, 0) == approx(0)
+		assert calc('R►Pθ( 1,0') == approx(0)
 
 	def test_p_rx(self):
-		assert pf.polar_to_rect_x(5, 0) == approx(5)
+		assert calc('P►Rx( 5,0') == approx(5)
 
 	def test_p_ry(self):
-		assert pf.polar_to_rect_y(5, math.pi / 2) == approx(5)
+		assert calc(f'P►Ry( 5,{math.pi / 2}') == approx(5)
 
 	def test_roundtrip(self):
-		# (r, θ) → (x, y) → r
 		r, theta = 5, math.pi / 3
-		x = pf.polar_to_rect_x(r, theta)
-		y = pf.polar_to_rect_y(r, theta)
-		assert pf.rect_to_polar_radius(x, y) == approx(r)
-		assert pf.rect_to_polar_angle(x, y) == approx(theta)
+		x = calc(f'P►Rx( {r},{theta}')
+		y = calc(f'P►Ry( {r},{theta}')
+		assert calc(f'R►Pr( {x},{y}') == approx(r)
+		assert calc(f'R►Pθ( {x},{y}') == approx(theta)
+
+	def test_r_ptheta_deg(self):
+		env = Environment(); env.angle_mode = 'DEG'
+		assert calc('R►Pθ( 1,0', env) == approx(0)
+
+	def test_p_rx_deg(self):
+		env = Environment(); env.angle_mode = 'DEG'
+		assert calc('P►Rx( 5,0', env) == approx(5)
+
+	def test_p_ry_deg(self):
+		env = Environment(); env.angle_mode = 'DEG'
+		assert calc('P►Ry( 5,90', env) == approx(5)
 
 
 # ── Probability distributions ─────────────────────────────────────────────────

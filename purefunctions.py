@@ -394,32 +394,45 @@ def prod(lst, start=None, end=None):
 def pow10(a):
 	return 10 ** a
 
+@vectorized
+def ln(x):
+	return cmath.log(x) if isinstance(x, complex) else math.log(x)
 
-def _make_dispatch(name, real_fn, cpx_fn):
-	def fn(x):
-		return cpx_fn(x) if isinstance(x, complex) else real_fn(x)
-	fn.__name__ = fn.__qualname__ = name
-	return vectorized(fn)
+@vectorized
+def exp(x):
+	return cmath.exp(x) if isinstance(x, complex) else math.exp(x)
 
-for _name, _real_fn, _cpx_fn in [
-	('sin',   math.sin,   cmath.sin),
-	('asin',  math.asin,  cmath.asin),
-	('cos',   math.cos,   cmath.cos),
-	('acos',  math.acos,  cmath.acos),
-	('tan',   math.tan,   cmath.tan),
-	('atan',  math.atan,  cmath.atan),
-	('sinh',  math.sinh,  cmath.sinh),
-	('asinh', math.asinh, cmath.asinh),
-	('cosh',  math.cosh,  cmath.cosh),
-	('acosh', math.acosh, cmath.acosh),
-	('tanh',  math.tanh,  cmath.tanh),
-	('atanh', math.atanh, cmath.atanh),
-	('ln',    math.log,   cmath.log),
-	('exp',   math.exp,   cmath.exp),
-	('log',   math.log10, cmath.log10),
-	('log_base', math.log, cmath.log),
-]:
-	globals()[_name] = _make_dispatch(_name, _real_fn, _cpx_fn)
+@vectorized
+def log(x):
+	return cmath.log10(x) if isinstance(x, complex) else math.log10(x)
+
+@vectorized
+def log_base(x, base):
+	return cmath.log(x, base) if isinstance(x, complex) else math.log(x, base)
+
+@vectorized
+def sinh(x):
+	return math.sinh(require_real(x))
+
+@vectorized
+def cosh(x):
+	return math.cosh(require_real(x))
+
+@vectorized
+def tanh(x):
+	return math.tanh(require_real(x))
+
+@vectorized
+def asinh(x):
+	return math.asinh(require_real(x))
+
+@vectorized
+def acosh(x):
+	return math.acosh(require_real(x))
+
+@vectorized
+def atanh(x):
+	return math.atanh(require_real(x))
 
 
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
@@ -561,28 +574,6 @@ def ref(mat):
 
 def rref(mat):
 	return _row_reduce(mat, lambda pivot_row, rows: range(rows))
-
-
-# ── Coordinate conversions ───────────────────────────────────────────────────
-
-@vectorized
-def rect_to_polar_radius(x, y):
-	return math.hypot(require_real(x), require_real(y))
-
-
-@vectorized
-def rect_to_polar_angle(x, y):
-	return math.atan2(require_real(y), require_real(x))
-
-
-@vectorized
-def polar_to_rect_x(r, theta):
-	return require_real(r) * math.cos(require_real(theta))
-
-
-@vectorized
-def polar_to_rect_y(r, theta):
-	return require_real(r) * math.sin(require_real(theta))
 
 
 # ── randM / randBin ──────────────────────────────────────────────────────────

@@ -57,11 +57,17 @@ class Environment:
 		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
 		self._nest_depth: dict[object, int] = defaultdict(lambda: 0)  # tracks nesting depth for ILLEGAL NEST guards
 
-	def to_radians(self, x):
-		return x / (180 / math.pi) if self.angle_mode == 'RAD' else x
+	def to_rad(self, x):
+		"""Convert x from the current angle mode to radians (for trig input)."""
+		return x * (math.pi / 180) if self.angle_mode == 'DEG' else x
 
-	def to_degrees(self, x):
-		return x / (math.pi / 180) if self.angle_mode == 'DEG' else x
+	def from_rad(self, r):
+		"""Convert r (radians) to the current angle mode (for inverse trig output)."""
+		return r * (180 / math.pi) if self.angle_mode == 'DEG' else r
+
+	def from_deg(self, x):
+		"""Convert x (in degrees) to the current angle mode (for DMS literals)."""
+		return x * (math.pi / 180) if self.angle_mode == 'RAD' else x
 
 	def set_random_seed(self, value):
 		random.seed(require_int(value))

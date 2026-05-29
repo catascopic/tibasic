@@ -1,12 +1,8 @@
 solve( fMin( fMax(
 
-
-
 ClrAllLists GetCalc( DelVar Equ►String( String►Equ(
 
 test: undefined numerics initalize to 0, lists/matrices error
-
-Improve get_token, read_token
 
 Custom numeric classes for formatting?
 
@@ -31,6 +27,7 @@ Add aliases to any token that has a character that can't be typed on the keyboar
 ********
 
 ►Nom( ►Eff(
+Improve get_token, read_token
 
 Improve parameter names in purefunctions
 matr_to_list: lists do not have to equal matrix columns. there can be fewer or extra (which are ignored)

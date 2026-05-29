@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 import operator
 import purefunctions
 from functools import wraps
@@ -21,6 +22,70 @@ def env_func(func):
 	def wrapper(a: ArgParser):
 		return func(a.env, *a.parse_args())
 	return wrapper
+
+
+# ── Trig / coordinate helpers ─────────────────────────────────────────────────
+
+def vectorized(func):
+	"""Vectorize an (env, x) function element-wise over x if it is a TiList."""
+	@wraps(func)
+	def wrapper(env, x):
+		if isinstance(x, TiList):
+			return TiList([func(env, v) for v in x])
+		return func(env, x)
+	return wrapper
+
+
+# ── Trig functions ────────────────────────────────────────────────────────────
+
+@env_func
+@vectorized
+def sin(env, x):
+	return math.sin(env.to_rad(require_real(x)))
+
+@env_func
+@vectorized
+def cos(env, x):
+	return math.cos(env.to_rad(require_real(x)))
+
+@env_func
+@vectorized
+def tan(env, x):
+	return math.tan(env.to_rad(require_real(x)))
+
+@env_func
+@vectorized
+def asin(env, x):
+	return env.from_rad(math.asin(require_real(x)))
+
+@env_func
+@vectorized
+def acos(env, x):
+	return env.from_rad(math.acos(require_real(x)))
+
+@env_func
+@vectorized
+def atan(env, x):
+	return env.from_rad(math.atan(require_real(x)))
+
+
+# ── Coordinate conversions ────────────────────────────────────────────────────
+
+@env_func
+def rect_to_polar_radius(env, x, y):
+	return math.hypot(require_real(x), require_real(y))
+
+@env_func
+def rect_to_polar_angle(env, x, y):
+	return env.from_rad(math.atan2(require_real(y), require_real(x)))
+
+@env_func
+def polar_to_rect_x(env, r, theta):
+	return require_real(r) * math.cos(env.to_rad(require_real(theta)))
+
+@env_func
+def polar_to_rect_y(env, r, theta):
+	return require_real(r) * math.sin(env.to_rad(require_real(theta)))
 
 
 def ans_index_or_mul(a: ArgParser):

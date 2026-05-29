@@ -130,7 +130,7 @@ class Parser:
 			if self.peek() is SCI_E:
 				raise TiSyntaxError("ᴇ cannot follow a DMS literal")
 			return result
-		return self.env.to_radians(value)
+		return self.env.from_deg(value)
 
 	def parse_num_literal(self, first: Token) -> Number:
 		"""Parse a numeric literal: digits, optional ᴇ exponent, optional DMS/° suffix."""
@@ -333,10 +333,10 @@ class Parser:
 			# DMS (°minutes'seconds") is handled inside parse_num_literal, so ° here is
 			# always the plain degrees→radians conversion, valid on any expression result.
 			if self.eat_if(DEG):
-				lhs = self.env.to_radians(lhs)
+				lhs = self.env.from_deg(lhs)
 				continue
 			if self.eat_if(RAD):
-				lhs = self.env.to_degrees(lhs)
+				lhs = self.env.from_rad(lhs)
 				continue
 
 			t = self.peek()
