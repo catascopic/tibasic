@@ -3,15 +3,15 @@ import math
 import operator
 import purefunctions
 from functools import wraps
-from itertools import zip_longest
+from itertools import zip_longest, repeat
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from tiobjects import TiList, TiMatrix, require_real, require_int, require_str, require_list
+from tiobjects import TiList, TiMatrix, require_num, require_real, require_int, require_str, require_list
 from environment import Variable, Environment
-from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError
+from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError
 
 
 # ── env_func decorator ────────────────────────────────────────────────────────
@@ -27,63 +27,83 @@ def env_func(func):
 # ── Trig / coordinate helpers ─────────────────────────────────────────────────
 
 def vectorized(func):
-	"""Vectorize an (env, x) function element-wise over x if it is a TiList."""
+	"""Vectorize an (env, *args) function element-wise over any TiList args, then wrap with env_func."""
+	@wraps(func)
+	def apply(env, *args):
+		len_check = set()
+		vec = []
+		for a in args:
+			if isinstance(a, TiList):
+				len_check.add(len(a))
+				vec.append(a)
+			else:
+				vec.append(repeat(require_num(a)))
+		if not len_check:
+			return func(env, *args)
+		if len(len_check) == 1:
+			return TiList([func(env, *v) for v in zip(*vec)])
+		raise DimMismatchError(f"Dim mismatch: {len_check}")
+	return env_func(apply)
+
+
+def trig(func):
+	"""Decorator for trig functions: vectorize and convert input from current angle mode."""
 	@wraps(func)
 	def wrapper(env, x):
-		if isinstance(x, TiList):
-			return TiList([func(env, v) for v in x])
-		return func(env, x)
-	return wrapper
+		return func(env.to_rad(require_real(x)))
+	return vectorized(wrapper)
+
+
+def inv_trig(func):
+	"""Decorator for inverse trig functions: vectorize and convert output to current angle mode."""
+	@wraps(func)
+	def wrapper(env, x):
+		return env.from_rad(func(require_real(x)))
+	return vectorized(wrapper)
 
 
 # ── Trig functions ────────────────────────────────────────────────────────────
 
-@env_func
-@vectorized
-def sin(env, x):
-	return math.sin(env.to_rad(require_real(x)))
+@trig
+def sin(x):
+	return math.sin(x)
 
-@env_func
-@vectorized
-def cos(env, x):
-	return math.cos(env.to_rad(require_real(x)))
+@trig
+def cos(x):
+	return math.cos(x)
 
-@env_func
-@vectorized
-def tan(env, x):
-	return math.tan(env.to_rad(require_real(x)))
+@trig
+def tan(x):
+	return math.tan(x)
 
-@env_func
-@vectorized
-def asin(env, x):
-	return env.from_rad(math.asin(require_real(x)))
+@inv_trig
+def asin(x):
+	return math.asin(x)
 
-@env_func
-@vectorized
-def acos(env, x):
-	return env.from_rad(math.acos(require_real(x)))
+@inv_trig
+def acos(x):
+	return math.acos(x)
 
-@env_func
-@vectorized
-def atan(env, x):
-	return env.from_rad(math.atan(require_real(x)))
+@inv_trig
+def atan(x):
+	return math.atan(x)
 
 
 # ── Coordinate conversions ────────────────────────────────────────────────────
 
-@env_func
+@vectorized
 def rect_to_polar_radius(env, x, y):
 	return math.hypot(require_real(x), require_real(y))
 
-@env_func
+@vectorized
 def rect_to_polar_angle(env, x, y):
 	return env.from_rad(math.atan2(require_real(y), require_real(x)))
 
-@env_func
+@vectorized
 def polar_to_rect_x(env, r, theta):
 	return require_real(r) * math.cos(env.to_rad(require_real(theta)))
 
-@env_func
+@vectorized
 def polar_to_rect_y(env, r, theta):
 	return require_real(r) * math.sin(env.to_rad(require_real(theta)))
 
