@@ -19,6 +19,7 @@ from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
 	DomainError, StatError, ArgumentError,
 )
+from decorators import pure_func, pure_vectorized
 
 
 
@@ -32,31 +33,12 @@ def handle_complex(func):
 	return apply
 
 
-def vectorized(func):
-	"""Allow a scalar function to accept TiList arguments, applying element-wise."""
-	@wraps(func)
-	def apply(*args):
-		len_check = set()
-		vec = []
-		for a in args:
-			if isinstance(a, TiList):
-				len_check.add(len(a))
-				vec.append(a)
-			else:
-				vec.append(repeat(a))
-		if not len_check:
-			return func(*args)
-		if len(len_check) == 1:
-			return TiList([func(*v) for v in zip(*vec)])
-		raise DimMismatchError(f"Dim mismatch: {len_check}")
-	return apply
-
-
-def vectorized_with_matrix(func):
+def matrix_vectorized(func):
 	"""Like vectorized, but also applies element-wise to a TiMatrix first argument."""
-	vec = vectorized(func)
+	vec = pure_vectorized(func)
 	@wraps(func)
 	def apply(a, *args):
+		print(a)
 		if isinstance(a, TiMatrix):
 			return a.transform(lambda x: func(x, *args))
 		return vec(a, *args)
@@ -65,19 +47,19 @@ def vectorized_with_matrix(func):
 
 # ── Logical operators ────────────────────────────────────────────────────────────
 
-@vectorized
+@pure_vectorized
 def and_(a, b):
 	return int(bool(require_real(a)) and bool(require_real(b)))
 
-@vectorized
+@pure_vectorized
 def or_(a, b):
 	return int(bool(require_real(a)) or bool(require_real(b)))
 
-@vectorized
+@pure_vectorized
 def xor(a, b):
 	return int(bool(require_real(a)) ^ bool(require_real(b)))
 
-
+@pure_func
 def inv(x):
 	if isinstance(x, TiMatrix):
 		return x.inv()
@@ -86,6 +68,7 @@ def inv(x):
 
 # ── dim ───────────────────────────────────────────────────────────────────────────
 
+@pure_func
 def dim(value):
 	if isinstance(value, TiList):
 		return len(value)
@@ -96,41 +79,41 @@ def dim(value):
 
 # ── Numeric functions ────────────────────────────────────────────────────────────
 
-@vectorized
+@pure_vectorized
 def not_(x):
 	return int(not require_real(x))
 
-@vectorized_with_matrix
+@matrix_vectorized
 @handle_complex
 def i_part(x):
 	return math.trunc(require_num(x))
 
-@vectorized_with_matrix
+@matrix_vectorized
 @handle_complex
 def int_(x):
 	return math.floor(require_num(x))
 
-@vectorized_with_matrix
+@matrix_vectorized
 @handle_complex
 def f_part(x):
 	return x - math.trunc(require_num(x))
 
-@vectorized
+@pure_vectorized
 def sqrt(x):
 	require_num(x)
 	return cmath.sqrt(x) if isinstance(x, complex) or x < 0 else math.sqrt(x)
 
-@vectorized
+@pure_vectorized
 def cbrt(x):
 	require_num(x)
 	return cmath.exp(cmath.log(x) / 3) if isinstance(x, complex) else math.cbrt(x)
 
-@vectorized
+@pure_vectorized
 def xth_root(n, x):
 	require_num(x)
 	return cmath.exp(cmath.log(x) / n) if isinstance(x, complex) or x < 0 else x ** (1 / n)
 
-
+@pure_func
 def cum_sum(lst):
 	if isinstance(lst, TiMatrix):
 		cols = lst.cols
@@ -146,14 +129,14 @@ def cum_sum(lst):
 		raise InvalidDimError("cumSum: list is empty")
 	return TiList(list(accumulate(lst)))
 
-
+@pure_func
 def delta_list(lst):
 	lst = require_list(lst)
 	if not lst == 0:
 		raise InvalidDimError("ΔList: list is empty")
 	return TiList([b - a for a, b in pairwise(lst)])
 
-
+@pure_func
 def augment(a, b):
 	if isinstance(a, TiList) and isinstance(b, TiList):
 		if not a or not b:
@@ -165,18 +148,17 @@ def augment(a, b):
 		return TiMatrix([r1 + r2 for r1, r2 in zip(a.data, b.data)])
 	raise DataTypeError("augment: both args must be lists or both must be matrices")
 
-
-@vectorized
+@pure_vectorized
 def real(x):
 	require_num(x)
 	return x.real if isinstance(x, complex) else x
 
-@vectorized
+@pure_vectorized
 def imag(x):
 	require_num(x)
 	return x.imag if isinstance(x, complex) else 0
 
-@vectorized
+@pure_vectorized
 def conj(x):
 	require_num(x)
 	return complex(x.real, -x.imag) if isinstance(x, complex) else x
@@ -184,28 +166,15 @@ def conj(x):
 # Technically works on matrices, but since matrices can't store complex numbers, the result is all 0s.
 # TiBasicDev thinks this is basically a bug, so I'm not implementing it in order to discourage it.
 # (If you want a matrix of all 0s, you can just do 0[A].)
-@vectorized
+@pure_vectorized
 def angle(x):
 	require_num(x)
 	return cmath.phase(x)
 
 
-# ── Converters (►DMS, ►Dec, ►Frac) ─────────────────────────────────────────────
-
-def to_dms(x):
-	return DMS(require_real(x))
-
-def to_dec(x):
-	return require_real(x)
-
-def to_frac(x):
-	x = require_real(x)
-	f = Fraction(x).limit_denominator(10000)
-	return float(f) if f.denominator == 1 else f"{f.numerator}/{f.denominator}"
-
-
 # ── String functions ────────────────────────────────────────────────────────────
 
+@pure_func
 def in_string(string, substring, start=1):
 	v = require_str(string).tokens
 	s = require_str(substring).tokens
@@ -215,11 +184,11 @@ def in_string(string, substring, start=1):
 			return i + 1
 	return 0
 
-
+@pure_func
 def length(string):
 	return len(require_str(string))
 
-
+@pure_func
 def sub(*args):
 	# DO NOT REMOVE THIS!
 	# This is a weird feature of sub(, but it's true: with a single numeric
@@ -240,6 +209,7 @@ def sub(*args):
 
 # ── Aggregate / statistics ───────────────────────────────────────────────────────
 
+@pure_func
 def variance(lst, freqlist=None):
 	require_list(lst)
 	if len(lst) == 0:
@@ -259,16 +229,14 @@ def variance(lst, freqlist=None):
 		raise StatError("stdDev: total frequency must be > 1")
 	return builtins.sum(w * (x - m) ** 2 for x, w in zip(lst, freqlist)) / (total_w - 1)
 
-
+@pure_func
 def stddev(lst, freqlist=None):
 	return math.sqrt(variance(lst, freqlist))
 
-
-@vectorized_with_matrix
+@matrix_vectorized
 def round(x, decimals=9):
 	require_num(x)
 	return builtins.round(x, require_int(decimals))
-
 
 def _minmax(fn, a, b):
 	if b is None:
@@ -284,15 +252,15 @@ def _minmax(fn, a, b):
 		return fn(a, b)
 	raise DataTypeError(f"{fn.__name__}: both args must be the same type (both numeric or both list)")
 
-
+@pure_func
 def max(a, b=None):
 	return _minmax(builtins.max, a, b)
 
-
+@pure_func
 def min(a, b=None):
 	return _minmax(builtins.min, a, b)
 
-
+@pure_func
 def median(lst, freqlist=None):
 	require_list(lst)
 	if len(lst) == 0:
@@ -322,7 +290,7 @@ def median(lst, freqlist=None):
 		return nth(total // 2)
 	return (nth(total // 2 - 1) + nth(total // 2)) / 2
 
-
+@pure_func
 def mean(lst, freqlist=None):
 	require_list(lst)
 	if len(lst) == 0:
@@ -333,11 +301,11 @@ def mean(lst, freqlist=None):
 	return builtins.sum(x * w for x, w in zip(lst, freqlist)) / builtins.sum(freqlist)
 
 
-@vectorized_with_matrix
+@matrix_vectorized
 def abs(x):
 	return builtins.abs(require_num(a))
 
-
+@pure_func
 def det(mat):
 	require_matrix(mat)
 	n = mat.rows
@@ -359,17 +327,17 @@ def det(mat):
 					work[row][j] -= factor * work[col][j]
 	return sign * math.prod(work[i][i] for i in range(n))
 
-
+@pure_func
 def identity(n):
 	n = require_int(n)
 	return TiMatrix([[1 if r == c else 0 for c in range(n)] for r in range(n)])
 
-
+@pure_func
 def transpose(mat):
 	require_matrix(mat)
 	return TiMatrix([[mat.data[r][c] for r in range(mat.rows)] for c in range(mat.cols)])
 
-
+@pure_func
 def sum(lst, start=None, end=None):
 	data = require_list(lst).data
 	if not data:
@@ -382,7 +350,7 @@ def sum(lst, start=None, end=None):
 		raise InvalidDimError(f"sum: index out of range (start={start}, end={end}, dim={len(data)})")
 	return builtins.sum(data[start - 1 : end])
 
-
+@pure_func
 def prod(lst, start=None, end=None):
 	data = require_list(lst).data
 	if not data:
@@ -398,88 +366,87 @@ def prod(lst, start=None, end=None):
 
 # ── Transcendental functions ────────────────────────────────────────────────────
 
-@vectorized
+@pure_vectorized
 def pow10(x):
 	return 10 ** require_num(x)
 
-@vectorized
+@pure_vectorized
 def ln(x):
 	require_num(x)
 	return cmath.log(x) if isinstance(x, complex) else math.log(x)
 
-@vectorized
+@pure_vectorized
 def exp(x):
 	require_num(x)
 	return cmath.exp(x) if isinstance(x, complex) else math.exp(x)
 
-@vectorized
+@pure_vectorized
 def log(x):
 	require_num(x)
 	return cmath.log10(x) if isinstance(x, complex) else math.log10(x)
 
-@vectorized
+@pure_vectorized
 def log_base(x, base):
 	require_num(x)
 	require_num(base)
 	return cmath.log(x, base) if isinstance(x, complex) else math.log(x, base)
 
-@vectorized
+@pure_vectorized
 def sinh(x):
 	return math.sinh(require_real(x))
 
-@vectorized
+@pure_vectorized
 def cosh(x):
 	return math.cosh(require_real(x))
 
-@vectorized
+@pure_vectorized
 def tanh(x):
 	return math.tanh(require_real(x))
 
-@vectorized
+@pure_vectorized
 def asinh(x):
 	return math.asinh(require_real(x))
 
-@vectorized
+@pure_vectorized
 def acosh(x):
 	return math.acosh(require_real(x))
 
-@vectorized
+@pure_vectorized
 def atanh(x):
 	return math.atanh(require_real(x))
 
-
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
 
-@vectorized
+@pure_vectorized
 def factorial(n):
 	try:
 		return math.gamma(require_real(n) + 1)
 	except ValueError:
 		raise DomainError(f"factorial: undefined for {n} (negative integer)")
 
-@vectorized
+@pure_vectorized
 def ncr(n, r):
 	try:
 		return math.comb(require_int(n), require_int(r))
 	except ValueError:
 		raise DomainError(f"nCr: invalid arguments ({n}, {r})")
 
-@vectorized
+@pure_vectorized
 def npr(n, r):
 	try:
 		return math.perm(require_int(n), require_int(r))
 	except ValueError:
 		raise DomainError(f"nPr: invalid arguments ({n}, {r})")
 
-@vectorized
+@pure_vectorized
 def lcm(a, b):
 	return math.lcm(require_int(a), require_int(b))
 
-@vectorized
+@pure_vectorized
 def gcd(a, b):
 	return math.gcd(require_int(a), require_int(b))
 
-@vectorized
+@pure_vectorized
 def remainder(a, b):
 	a = require_int(a)
 	b = require_int(b)
@@ -491,15 +458,15 @@ def remainder(a, b):
 
 # ── Random ──────────────────────────────────────────────────────────────────────
 
+@pure_func
 def rand_list(n):
 	return TiList([random.random() for _ in range(require_int(n))])
 
-
-@vectorized
+# TODO: @vectorized
 def _rand_int_single(low, high):
 	return random.randint(require_int(low), require_int(high))
 
-
+@pure_func
 def rand_int(low, high, n=None):
 	if n is None:
 		return _rand_int_single(low, high)
@@ -507,7 +474,7 @@ def rand_int(low, high, n=None):
 	high = require_int(high)
 	return TiList([random.randint(low, high) for _ in range(require_int(n))])
 
-
+@pure_func
 def rand_norm(mu, sigma, n=None):
 	require_real(mu)
 	require_real(sigma)
@@ -515,15 +482,15 @@ def rand_norm(mu, sigma, n=None):
 		return random.gauss(mu, sigma)
 	return TiList([random.gauss(mu, sigma) for _ in range(require_int(n))])
 
-
+@pure_func
 def rand_int_no_rep(low, high):
 	lst = list(range(require_int(low), require_int(high) + 1))
 	random.shuffle(lst)
 	return TiList(lst)
 
-
 # ── Matrix row operations ────────────────────────────────────────────────────
 
+@pure_func
 def row_swap(mat, row1, row2):
 	require_matrix(mat)
 	result = mat.copy()
@@ -531,27 +498,26 @@ def row_swap(mat, row1, row2):
 	result.set_row(row2, mat.get_row(row1))
 	return result
 
-
+@pure_func
 def row_plus(mat, row1, row2):
 	require_matrix(mat)
 	result = mat.copy()
 	result.set_row(row2, [a + b for a, b in zip(mat.get_row(row2), mat.get_row(row1))])
 	return result
 
-
+@pure_func
 def times_row(factor, mat, row):
 	require_matrix(mat)
 	result = mat.copy()
 	result.set_row(row, [factor * x for x in mat.get_row(row)])
 	return result
 
-
+@pure_func
 def times_row_plus(factor, mat, row1, row2):
 	require_matrix(mat)
 	result = mat.copy()
 	result.set_row(row2, [factor * a + b for a, b in zip(mat.get_row(row1), mat.get_row(row2))])
 	return result
-
 
 # ── ref / rref ───────────────────────────────────────────────────────────────
 
@@ -585,17 +551,18 @@ def _row_reduce(mat, get_range):
 		pivot_row += 1
 	return TiMatrix(result)
 
-
+@pure_func
 def ref(mat):
 	return _row_reduce(mat, lambda pivot_row, rows: range(pivot_row + 1, rows))
 
-
+@pure_func
 def rref(mat):
 	return _row_reduce(mat, lambda pivot_row, rows: range(rows))
 
 
 # ── randM / randBin ──────────────────────────────────────────────────────────
 
+@pure_func
 def rand_m(rows, cols):
 	rows = require_int(rows)
 	cols = require_int(cols)
@@ -605,7 +572,7 @@ def rand_m(rows, cols):
 	data = [random.randint(-9, 9) for _ in range(rows * cols)]
 	return TiMatrix([list(row) for row in batched(reversed(data), cols)])
 
-
+@pure_func
 def rand_bin(n, p, simulations=None):
 	n = require_int(n)
 	if not (0 <= p <= 1):
@@ -619,6 +586,7 @@ def rand_bin(n, p, simulations=None):
 
 # ── Date / time utilities ────────────────────────────────────────────────────
 
+@pure_func
 def timecnv(seconds):
 	"""Convert a number of seconds into {days, hours, minutes, seconds}."""
 	seconds = require_int(seconds)
@@ -628,13 +596,13 @@ def timecnv(seconds):
 	days, hours = divmod(remaining, 24)
 	return sign * TiList([days, hours, minutes, secs])
 
-
+@pure_func
 def dayofwk(year, month, day):
 	"""Day of week: 1=Sunday, 2=Monday, …, 7=Saturday."""
 	d = date(require_int(year), require_int(month), require_int(day))
 	return d.isoweekday() % 7 + 1
 
-
+@pure_func
 def _parse_dbd_date(d):
 	"""Parse a TI Finance date float into a date object.
 
@@ -670,11 +638,10 @@ def _parse_dbd_date(d):
 	return date(year, month, day)
 
 
-@vectorized
+@pure_vectorized
 def dbd(date1: float, date2: float):
 	"""Days between two dates in TI Finance format (MM.DDYY or DDMM.YY)."""
 	return (_parse_dbd_date(date2) - _parse_dbd_date(date1)).days
-
 
 # ── Finance ──────────────────────────────────────────────────────────────────
 
@@ -694,7 +661,7 @@ def _expand_cash_flows(cflist, cffreq):
 		result.extend([cf] * n)
 	return result
 
-
+@pure_func
 def npv(rate, cf0, cflist, cffreq=None):
 	"""Net present value: CF0 + Σ CFj·(1+rate/100)^-j over expanded cash flows."""
 	rate  = require_real(rate)
@@ -705,7 +672,7 @@ def npv(rate, cf0, cflist, cffreq=None):
 	r = 1 + rate / 100
 	return cf0 + builtins.sum(cf * r ** -j for j, cf in enumerate(flows, 1))
 
-
+@pure_func
 def irr(cf0, cflist, cffreq=None):
 	"""Internal rate of return: the rate (%) at which NPV equals zero."""
 	require_real(cf0)
@@ -738,8 +705,7 @@ def irr(cf0, cflist, cffreq=None):
 
 	raise DomainError("irr: no positive real solution found (ERR:NO SIGN CHG)")
 
-
-@vectorized
+@pure_vectorized
 def eff(nom, cp):
 	"""►Eff(: convert nominal interest rate to effective interest rate."""
 	require_real(nom)
@@ -752,8 +718,7 @@ def eff(nom, cp):
 		raise DomainError("►Eff: nominal rate must be > -100%")
 	return 100 * ((1 + nom / (100 * cp)) ** cp - 1)
 
-
-@vectorized
+@pure_vectorized
 def nom(eff_rate, cp):
 	"""►Nom(: convert effective interest rate to nominal interest rate."""
 	require_real(eff_rate)
@@ -765,7 +730,6 @@ def nom(eff_rate, cp):
 	if eff_rate <= -100:
 		raise DomainError("►Nom: effective rate must be > -100%")
 	return 100 * cp * ((eff_rate / 100 + 1) ** (1 / cp) - 1)
-
 
 # ── Probability distributions ────────────────────────────────────────────────
 
@@ -808,7 +772,6 @@ def _regularized_inc_gamma(a, x):
 			if builtins.abs(delta - 1) < 1e-15:
 				break
 		return 1.0 - math.exp(-x + a * math.log(x) - math.lgamma(a)) * h
-
 
 def _inc_beta(a, b, x):
 	"""Regularized incomplete beta function I_x(a,b)."""
@@ -858,7 +821,7 @@ def _inc_beta(a, b, x):
 			break
 	return math.exp(a * math.log(x) + b * math.log(1 - x) - lbeta) * h / a
 
-
+@pure_func
 def normalpdf(x, mu=0, sigma=1):
 	require_real(x)
 	require_real(mu)
@@ -866,7 +829,7 @@ def normalpdf(x, mu=0, sigma=1):
 	z = (x - mu) / sigma
 	return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2 * math.pi))
 
-
+@pure_func
 def normalcdf(lower, upper, mu=0, sigma=1):
 	require_real(lower)
 	require_real(upper)
@@ -876,7 +839,7 @@ def normalcdf(lower, upper, mu=0, sigma=1):
 		return 0.5 * (1 + math.erf(z / math.sqrt(2)))
 	return _cdf((upper - mu) / sigma) - _cdf((lower - mu) / sigma)
 
-
+@pure_func
 def inv_norm(p, mu=0, sigma=1):
 	require_real(p)
 	require_real(mu)
@@ -905,14 +868,14 @@ def inv_norm(p, mu=0, sigma=1):
 	z = _inv_std(p)
 	return mu + sigma * z
 
-
+@pure_func
 def tpdf(t, df):
 	require_real(t)
 	require_real(df)
 	log_coeff = math.lgamma((df + 1) / 2) - 0.5 * math.log(df * math.pi) - math.lgamma(df / 2)
 	return math.exp(log_coeff - (df + 1) / 2 * math.log(1 + t * t / df))
 
-
+@pure_func
 def tcdf(lower, upper, df):
 	require_real(lower)
 	require_real(upper)
@@ -928,7 +891,7 @@ def tcdf(lower, upper, df):
 			return 0.5 * ib
 	return _t_cdf(upper, df) - _t_cdf(lower, df)
 
-
+@pure_func
 def invt(p, df):
 	require_real(p)
 	require_real(df)
@@ -950,7 +913,7 @@ def invt(p, df):
 			break
 	return x
 
-
+@pure_func
 def chi_sq_pdf(x, df):
 	require_real(x)
 	require_real(df)
@@ -959,7 +922,7 @@ def chi_sq_pdf(x, df):
 	k = df
 	return math.exp((k / 2 - 1) * math.log(x) - x / 2 - (k / 2) * math.log(2) - math.lgamma(k / 2))
 
-
+@pure_func
 def chi_sq_cdf(lower, upper, df):
 	require_real(lower)
 	require_real(upper)
@@ -970,7 +933,7 @@ def chi_sq_cdf(lower, upper, df):
 		return _regularized_inc_gamma(k / 2, x / 2)
 	return _cdf(upper, df) - _cdf(lower, df)
 
-
+@pure_func
 def f_pdf(x, df1, df2):
 	require_real(x)
 	require_real(df1)
@@ -981,7 +944,7 @@ def f_pdf(x, df1, df2):
 	log_den = math.log(x) + math.lgamma(df1 / 2) + math.lgamma(df2 / 2) - math.lgamma((df1 + df2) / 2)
 	return math.exp(log_num - log_den)
 
-
+@pure_func
 def fcdf(lower, upper, df1, df2):
 	require_real(lower)
 	require_real(upper)
@@ -994,7 +957,7 @@ def fcdf(lower, upper, df1, df2):
 		return _inc_beta(d1 / 2, d2 / 2, z)
 	return _cdf(upper, df1, df2) - _cdf(lower, df1, df2)
 
-
+@pure_func
 def binompdf(n, p, k=None):
 	n = require_int(n)
 	require_real(p)
@@ -1003,7 +966,7 @@ def binompdf(n, p, k=None):
 	k = require_int(k)
 	return math.comb(n, k) * p ** k * (1 - p) ** (n - k)
 
-
+@pure_func
 def binomcdf(n, p, k=None):
 	n = require_int(n)
 	require_real(p)
@@ -1017,25 +980,25 @@ def binomcdf(n, p, k=None):
 	k = require_int(k)
 	return builtins.sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(k + 1))
 
-
+@pure_func
 def poissonpdf(lam, k):
 	require_real(lam)
 	k = require_int(k)
 	return math.exp(-lam) * lam ** k / math.factorial(k)
 
-
+@pure_func
 def poissoncdf(lam, k):
 	require_real(lam)
 	k = require_int(k)
 	return builtins.sum(math.exp(-lam) * lam ** i / math.factorial(i) for i in range(k + 1))
 
-
+@pure_func
 def geometpdf(p, n):
 	require_real(p)
 	n = require_int(n)
 	return p * (1 - p) ** (n - 1)
 
-
+@pure_func
 def geometcdf(p, n):
 	require_real(p)
 	n = require_int(n)

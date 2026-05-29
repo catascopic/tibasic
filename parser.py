@@ -577,7 +577,7 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('SQRT "A"')
+	test('round( [[1')
 	
 	# test('55@A:99@B')
 	# test('int( log( 2) INV log( max( {A,B')

@@ -9,58 +9,27 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from tiobjects import TiList, TiMatrix, require_num, require_real, require_int, require_str, require_list
+from decorators import env_func, env_vectorized
 from environment import Variable, Environment
 from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError
-
-
-# ── env_func decorator ────────────────────────────────────────────────────────
-
-def env_func(func):
-	"""Convert an (env, arg1, ...) function into an ArgParser handler."""
-	@wraps(func)
-	def wrapper(a: ArgParser):
-		return func(a.env, *a.parse_args())
-	return wrapper
+from tiobjects import TiList, TiMatrix, require_num, require_real, require_int, require_str, require_list
 
 
 # ── Trig / coordinate helpers ─────────────────────────────────────────────────
 
-def vectorized(func):
-	"""Vectorize an (env, *args) function element-wise over any TiList args, then wrap with env_func."""
-	@wraps(func)
-	def apply(env, *args):
-		len_check = set()
-		vec = []
-		for a in args:
-			if isinstance(a, TiList):
-				len_check.add(len(a))
-				vec.append(a)
-			else:
-				vec.append(repeat(a))
-		if not len_check:
-			return func(env, *args)
-		if len(len_check) == 1:
-			return TiList([func(env, *v) for v in zip(*vec)])
-		raise DimMismatchError(f"Dim mismatch: {len_check}")
-	return env_func(apply)
-
-
 def trig(func):
 	"""Decorator for trig functions: vectorize and convert input from current angle mode."""
 	@wraps(func)
-	def wrapper(env, x):
+	def apply(env, x):
 		return func(env.to_rad(require_real(x)))
-	return vectorized(wrapper)
-
+	return env_vectorized(apply)
 
 def inv_trig(func):
 	"""Decorator for inverse trig functions: vectorize and convert output to current angle mode."""
 	@wraps(func)
-	def wrapper(env, x):
+	def apply(env, x):
 		return env.from_rad(func(require_real(x)))
-	return vectorized(wrapper)
-
+	return env_vectorized(apply)
 
 # ── Trig functions ────────────────────────────────────────────────────────────
 
@@ -91,19 +60,19 @@ def atan(x):
 
 # ── Coordinate conversions ────────────────────────────────────────────────────
 
-@vectorized
+@env_vectorized
 def rect_to_polar_radius(env, x, y):
 	return math.hypot(require_real(x), require_real(y))
 
-@vectorized
+@env_vectorized
 def rect_to_polar_angle(env, x, y):
 	return env.from_rad(math.atan2(require_real(y), require_real(x)))
 
-@vectorized
+@env_vectorized
 def polar_to_rect_x(env, r, theta):
 	return require_real(r) * math.cos(env.to_rad(require_real(theta)))
 
-@vectorized
+@env_vectorized
 def polar_to_rect_y(env, r, theta):
 	return require_real(r) * math.sin(env.to_rad(require_real(theta)))
 
