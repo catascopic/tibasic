@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from decorators import env_func, env_vectorized
+from decorators import env_func, env_vectorized, forms_func
 from environment import Variable, Environment
 from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError
 from tiobjects import TiList, TiMatrix, require_num, require_real, require_int, require_str, require_list
@@ -77,6 +77,7 @@ def polar_to_rect_y(env, r, theta):
 	return require_real(r) * math.sin(env.to_rad(require_real(theta)))
 
 
+@forms_func
 def ans_index_or_mul(a: ArgParser):
 	ans = a.env.ans
 	args = a.parse_args()
@@ -90,6 +91,7 @@ def ans_index_or_mul(a: ArgParser):
 	return ans * arg
 
 
+@forms_func
 def seq(a: ArgParser) -> TiList:
 	formula = a.thunk()
 	var = a.numeric_var()
@@ -120,6 +122,7 @@ def seq(a: ArgParser) -> TiList:
 	return TiList(result)
 
 
+@forms_func
 def sigma(a: ArgParser) -> float:
 	formula = a.thunk()
 	var = a.numeric_var()
@@ -137,6 +140,7 @@ def sigma(a: ArgParser) -> float:
 	return total
 
 
+@forms_func
 def n_deriv(a: ArgParser) -> float:
 	formula = a.thunk()
 	var = a.numeric_var()
@@ -193,6 +197,7 @@ def _adaptive_gk15(f, lo, hi, tol, depth=0):
 	)
 
 
+@forms_func
 def fn_int(a: ArgParser) -> float:
 	formula = a.thunk()
 	var = a.numeric_var()

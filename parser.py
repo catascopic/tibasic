@@ -244,6 +244,10 @@ class Parser:
 
 	# ── Atom parser ────────────────────────────────────────────────────────────
 
+	def _call_function(self, t: Token):
+		"""Dispatch a token function via its call_with_parser interface."""
+		return t.function.call_with_parser(ArgParser(self))
+
 	def parse_atom(self):
 		if self.at_end():
 			raise TiSyntaxError("Expected an expression")
@@ -284,11 +288,11 @@ class Parser:
 		if t.nullary is not None:
 			if self.peek() is L_PAREN and t.function is not None:
 				self.advance()
-				return t.function(ArgParser(self))
+				return self._call_function(t)
 			return t.nullary(self.env)
 
 		if t.function is not None:
-			return t.function(ArgParser(self))
+			return self._call_function(t)
 
 		if t.is_list_var():
 			return self.parse_list_atom(t.variable)

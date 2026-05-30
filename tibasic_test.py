@@ -352,6 +352,106 @@ class TestListOperations:
 		assert list(TiList([2, 4, 6]) / 2) == [1, 2, 3]
 
 
+# ── Stat unit tests (plain-value interface) ───────────────────────────────────
+
+import purefunctions as pf
+
+class TestStatUnit:
+	"""Direct unit tests for statistical functions via TiFunction.__call__.
+
+	These complement the calc()-based integration tests by isolating the
+	numerical algorithms from the parser and token machinery.
+	"""
+
+	def _lst(self, *values):
+		return TiList(list(values))
+
+	# ── mean ──────────────────────────────────────────────────────────────────
+
+	def test_mean_basic(self):
+		assert pf.mean(self._lst(1, 2, 3, 4, 5)) == approx(3.0)
+
+	def test_mean_weighted(self):
+		# [0, 0, 0, 10] → 10/4 = 2.5
+		assert pf.mean(self._lst(0, 10), self._lst(3, 1)) == approx(2.5)
+
+	def test_mean_single(self):
+		assert pf.mean(self._lst(7)) == approx(7.0)
+
+	# ── variance ──────────────────────────────────────────────────────────────
+
+	def test_variance_known(self):
+		# Classic dataset; sample variance = 32/7
+		assert pf.variance(self._lst(2, 4, 4, 4, 5, 5, 7, 9)) == approx(32 / 7)
+
+	def test_variance_two_elements(self):
+		# mean=2; ((1-2)²+(3-2)²)/(2-1) = 2
+		assert pf.variance(self._lst(1, 3)) == approx(2.0)
+
+	def test_variance_weighted(self):
+		# mean=1; 3*(0-1)² + 1*(4-1)² = 12; 12/(4-1) = 4.0
+		assert pf.variance(self._lst(0, 4), self._lst(3, 1)) == approx(4.0)
+
+	# ── stddev ────────────────────────────────────────────────────────────────
+
+	def test_stddev_known(self):
+		assert pf.stddev(self._lst(2, 4, 4, 4, 5, 5, 7, 9)) == approx(math.sqrt(32 / 7))
+
+	def test_stddev_is_sqrt_variance(self):
+		lst = self._lst(3, 7, 7, 19)
+		assert pf.stddev(lst) == approx(math.sqrt(pf.variance(lst)))
+
+	def test_stddev_weighted_is_sqrt_variance(self):
+		lst, freq = self._lst(0, 4), self._lst(3, 1)
+		assert pf.stddev(lst, freq) == approx(math.sqrt(pf.variance(lst, freq)))
+
+	# ── median ────────────────────────────────────────────────────────────────
+
+	def test_median_odd(self):
+		assert pf.median(self._lst(3, 1, 4, 1, 5)) == approx(3.0)
+
+	def test_median_even(self):
+		assert pf.median(self._lst(1, 2, 3, 4)) == approx(2.5)
+
+	def test_median_weighted_odd_total(self):
+		# Expanded: [10, 10, 20, 30, 30] → middle is 20
+		assert pf.median(self._lst(10, 20, 30), self._lst(2, 1, 2)) == approx(20.0)
+
+	def test_median_weighted_even_total(self):
+		# Expanded: [10, 10, 30, 30] → (10+30)/2 = 20
+		assert pf.median(self._lst(10, 30), self._lst(2, 2)) == approx(20.0)
+
+	# ── normalcdf: 68–95–99.7 rule ────────────────────────────────────────────
+
+	def test_normalcdf_full_range(self):
+		assert pf.normalcdf(float('-inf'), float('inf')) == approx(1.0, rel=1e-6)
+
+	def test_normalcdf_median(self):
+		assert pf.normalcdf(float('-inf'), 0) == approx(0.5, rel=1e-6)
+
+	def test_normalcdf_one_sigma(self):
+		assert pf.normalcdf(-1, 1) == approx(0.6827, rel=1e-3)
+
+	def test_normalcdf_two_sigma(self):
+		assert pf.normalcdf(-2, 2) == approx(0.9545, rel=1e-3)
+
+	def test_normalcdf_three_sigma(self):
+		assert pf.normalcdf(-3, 3) == approx(0.9973, rel=1e-3)
+
+	# ── tcdf ──────────────────────────────────────────────────────────────────
+
+	def test_tcdf_symmetric(self):
+		# t distribution is symmetric around 0
+		assert pf.tcdf(float('-inf'), 0, 10) == approx(0.5, rel=1e-6)
+
+	def test_tcdf_full_range(self):
+		assert pf.tcdf(float('-inf'), float('inf'), 10) == approx(1.0, rel=1e-6)
+
+	def test_tcdf_converges_to_normal(self):
+		# At large df the t-distribution approaches normal; ±1.96 ≈ 95%
+		assert pf.tcdf(-1.96, 1.96, 1000) == approx(0.95, rel=1e-2)
+
+
 # ── Empty-list behaviour ──────────────────────────────────────────────────────
 
 class TestEmptyList:

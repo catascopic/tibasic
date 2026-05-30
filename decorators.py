@@ -1,5 +1,5 @@
 from __future__ import annotations
-from functools import partial, wraps
+from functools import partial, wraps, update_wrapper
 from itertools import repeat
 from typing import TYPE_CHECKING
 
@@ -35,34 +35,64 @@ def vectorized(func):
 	return apply
 
 
-def pure_vectorized(func):
-	"""ArgParser handler: parse args, vectorize, call func(*args)."""
-	vec = vectorized(func)
+def _vectorized_env(func):
+	"""Wraps func(env, *args) so that *args are vectorized while env is held fixed."""
 	@wraps(func)
-	def apply(a: ArgParser):
-		return vec(*a.parse_args())
+	def apply(env, *args):
+		return _call_vectorized(partial(func, env), args)
 	return apply
 
 
-def env_vectorized(func):
-	"""ArgParser handler: parse args, vectorize, call func(env, *args)."""
-	@wraps(func)
-	def apply(a: ArgParser):
-		return _call_vectorized(partial(func, a.env), a.parse_args())
-	return apply
+class TiFunction:
+	"""Wraps a calculator function with a plain-value __call__ and a parser interface."""
+
+	def __init__(self, func, env=False):
+		self._func = func
+		self._env = env
+		update_wrapper(self, func)
+
+	def __call__(self, *args):
+		return self._func(*args)
+
+	def call_with_parser(self, a: ArgParser):
+		args = a.parse_args()
+		return self(a.env, *args) if self._env else self(*args)
 
 
-def env_func(func):
-	"""ArgParser handler: parse args, call func(env, *args)."""
-	@wraps(func)
-	def apply(a: ArgParser):
-		return func(a.env, *a.parse_args())
-	return apply
+class FormsFunction:
+	"""Wraps a custom-parsing function with call_with_parser passing ArgParser directly."""
+
+	def __init__(self, func):
+		self._func = func
+		update_wrapper(self, func)
+
+	def __call__(self, *args):
+		return self._func(*args)
+
+	def call_with_parser(self, a: ArgParser):
+		return self._func(a)
+
+
+def forms_func(func):
+	"""Forms function: receives ArgParser directly for custom parsing."""
+	return FormsFunction(func)
 
 
 def pure_func(func):
-	"""ArgParser handler: parse args, call func(*args)."""
-	@wraps(func)
-	def apply(a: ArgParser):
-		return func(*a.parse_args())
-	return apply
+	"""TiFunction: parse args, call func(*args)."""
+	return TiFunction(func)
+
+
+def pure_vectorized(func):
+	"""TiFunction: parse args, vectorize, call func(*args)."""
+	return TiFunction(vectorized(func))
+
+
+def env_func(func):
+	"""TiFunction: parse args, call func(env, *args)."""
+	return TiFunction(func, env=True)
+
+
+def env_vectorized(func):
+	"""TiFunction: parse args, vectorize, call func(env, *args)."""
+	return TiFunction(_vectorized_env(func), env=True)
