@@ -44,26 +44,6 @@ def matrix_vectorized(func):
 	return pure_func(apply)
 
 
-# ── Logical operators ────────────────────────────────────────────────────────────
-
-@vectorized
-def and_(a, b):
-	return int(bool(require_real(a)) and bool(require_real(b)))
-
-@vectorized
-def or_(a, b):
-	return int(bool(require_real(a)) or bool(require_real(b)))
-
-@vectorized
-def xor(a, b):
-	return int(bool(require_real(a)) ^ bool(require_real(b)))
-
-def inv(x):
-	if isinstance(x, TiMatrix):
-		return x.inv()
-	return 1 / x
-
-
 # ── dim ───────────────────────────────────────────────────────────────────────────
 
 @pure_func
@@ -105,11 +85,6 @@ def sqrt(x):
 def cbrt(x):
 	require_num(x)
 	return cmath.exp(cmath.log(x) / 3) if isinstance(x, complex) else math.cbrt(x)
-
-@vectorized
-def xth_root(n, x):
-	require_num(x)
-	return cmath.exp(cmath.log(x) / n) if isinstance(x, complex) or x < 0 else x ** (1 / n)
 
 @pure_func
 def cum_sum(lst):
@@ -330,10 +305,6 @@ def identity(n):
 	n = require_int(n)
 	return TiMatrix([[1 if r == c else 0 for c in range(n)] for r in range(n)])
 
-def transpose(mat):
-	require_matrix(mat)
-	return TiMatrix([[mat.data[r][c] for r in range(mat.rows)] for c in range(mat.cols)])
-
 @pure_func
 def sum(lst, start=None, end=None):
 	data = require_list(lst).data
@@ -413,27 +384,6 @@ def atanh(x):
 	return math.atanh(require_real(x))
 
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
-
-@vectorized
-def factorial(n):
-	try:
-		return math.gamma(require_real(n) + 1)
-	except ValueError:
-		raise DomainError(f"factorial: undefined for {n} (negative integer)")
-
-@vectorized
-def ncr(n, r):
-	try:
-		return math.comb(require_int(n), require_int(r))
-	except ValueError:
-		raise DomainError(f"nCr: invalid arguments ({n}, {r})")
-
-@vectorized
-def npr(n, r):
-	try:
-		return math.perm(require_int(n), require_int(r))
-	except ValueError:
-		raise DomainError(f"nPr: invalid arguments ({n}, {r})")
 
 @pure_vectorized
 def lcm(a, b):
