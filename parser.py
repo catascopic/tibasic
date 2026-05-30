@@ -505,17 +505,25 @@ class ArgParser:
 		self._parser = parser
 		self._next = True  # True = next arg token is already exposed (no leading comma to eat)
 
+	def _is_closing(self) -> bool:
+		"""True when the current position marks the natural end of the argument list."""
+		return self._parser.at_end() or self._parser.peek() is R_PAREN
+
+	def _eat_close(self) -> None:
+		"""Consume the closing delimiter if present."""
+		self._parser.eat_if(R_PAREN)
+
 	def _arg(self, parse_fn, optional=False, default=None):
 		if not self._next:
 			if optional:
 				return default
 			raise ArgumentError("Missing argument: expected comma before next argument")
-		if optional and (self._parser.at_end() or self._parser.peek() is R_PAREN):
+		if optional and self._is_closing():
 			return default
 		val = parse_fn()
 		self._next = self._parser.eat_if(COMMA)
 		if not self._next:
-			self._parser.eat_if(R_PAREN)
+			self._eat_close()
 		return val
 
 	@_parse_method
@@ -579,6 +587,28 @@ class ArgParser:
 
 	def peek(self):
 		return self._parser.peek()
+
+
+class StatementArgParser(ArgParser):
+	"""ArgParser variant for no-paren commands.
+
+	Overrides only the two closing-delimiter hooks so that _arg needs no duplication:
+	- _is_closing: treats COLON/NEWLINE/EOF as the argument-list terminator.
+	- _eat_close:  no-op (there is no closing paren to consume).
+	end() is also overridden to assert a statement boundary explicitly if needed.
+	"""
+
+	def _is_closing(self) -> bool:
+		return self._parser.at_end() or self._parser.peek() in {COLON, NEWLINE}
+
+	def _eat_close(self) -> None:
+		pass  # no closing paren in no-paren commands
+
+	def end(self):
+		"""Assert that the token stream is at a statement boundary (COLON, NEWLINE, or EOF)."""
+		t = self._parser.peek()
+		if not self._parser.at_end() and t not in {COLON, NEWLINE}:
+			raise TiSyntaxError(f"Expected end of statement after command, got {t}")
 
 
 if __name__ == '__main__':

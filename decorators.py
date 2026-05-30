@@ -73,9 +73,34 @@ class FormsFunction:
 		return self._func(a)
 
 
+class NoParen:
+	"""Wraps a no-paren command: passes a StatementArgParser to the body.
+
+	StatementArgParser does not eat a closing ) after arguments and checks
+	COLON/NEWLINE/EOF (not )) for optional-arg termination.  End-of-statement
+	validation is left to parse_statement, which already calls expect(EOF_TOKEN).
+	"""
+
+	def __init__(self, func):
+		self._func = func
+		update_wrapper(self, func)
+
+	def __call__(self, *args):
+		return self._func(*args)
+
+	def call_with_parser(self, a: ArgParser):
+		from parser import StatementArgParser   # lazy: avoids circular import
+		return self._func(StatementArgParser(a._parser))
+
+
 def forms_func(func):
 	"""Forms function: receives ArgParser directly for custom parsing."""
 	return FormsFunction(func)
+
+
+def no_paren_func(func):
+	"""No-paren command: receives StatementArgParser; end-of-statement is validated automatically."""
+	return NoParen(func)
 
 
 def pure_func(func):

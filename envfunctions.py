@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from decorators import env_func, env_vectorized, forms_func
+from decorators import env_func, env_vectorized
 from environment import Environment
 from errors import DomainError
 from tiobjects import require_real, require_int, require_str
