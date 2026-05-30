@@ -79,13 +79,3 @@ class IllegalNestError(TiError):
 class LabelError(TiError):
 	"""ERR:LABEL — a Goto references a label that does not exist in the program."""
 	code = 'LABEL'
-
-
-class ReturnSignal(TiError):
-	"""Raised by Return to unwind execution to the calling program."""
-	code = 'RETURN'
-
-
-class StopSignal(TiError):
-	"""Raised by Stop to terminate all program execution."""
-	code = 'STOP'

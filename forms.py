@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 from decorators import forms_func, no_paren_func
 from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, TiSyntaxError
+from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
 
 
@@ -248,16 +249,6 @@ def string_to_equ(a: ArgParser) -> None:
 
 # ── Control flow ──────────────────────────────────────────────────────────────
 
-def _for_continues(val: float, end_val: float, step: float) -> bool:
-	"""True if the For loop body should execute for the given variable value."""
-	if step > 0:
-		return val <= end_val + 1e-10
-	elif step < 0:
-		return val >= end_val - 1e-10
-	else:
-		raise IncrementError("For: step cannot be zero")
-
-
 @no_paren_func
 def if_cmd(a):
 	"""If condition — execute or skip the next statement (or delegate to Then)."""
@@ -271,7 +262,7 @@ def if_cmd(a):
 	p.pos = saved
 	from tokens import THEN
 	if next_tok is THEN:
-		prog = p.env.current_program
+		prog = a.current_program
 		if prog is None:
 			raise TiSyntaxError("Then without enclosing program")
 		prog._pending_if_result = cond
@@ -286,7 +277,7 @@ def then_cmd(a):
 	"""Then — begin the body of a conditional block."""
 	a.end()
 	p = a._parser
-	prog = p.env.current_program
+	prog = a.current_program
 	if prog is None:
 		raise TiSyntaxError("Then without enclosing program")
 	result = prog._pending_if_result
@@ -311,7 +302,7 @@ def else_cmd(a):
 	"""Else — skip the else-body (we just finished executing the then-body)."""
 	a.end()
 	p = a._parser
-	prog = p.env.current_program
+	prog = a.current_program
 	if prog is None:
 		raise TiSyntaxError("Else without enclosing program")
 	from program import ThenBlock
@@ -333,8 +324,7 @@ def while_cmd(a):
 		from parser import Thunk
 		from program import WhileBlock
 		thunk = Thunk(p.tokens[cond_start:cond_end], p.env)
-		prog = p.env.current_program
-		prog.push_block(WhileBlock(pos=p.pos, condition=thunk))
+		a.current_program.push_block(WhileBlock(pos=p.pos, condition=thunk))
 	else:
 		p.scan_block_end()
 
@@ -350,14 +340,13 @@ def repeat_cmd(a):
 	from parser import Thunk
 	from program import RepeatBlock
 	thunk = Thunk(p.tokens[cond_start:cond_end], p.env)
-	prog = p.env.current_program
-	prog.push_block(RepeatBlock(pos=p.pos, condition=thunk))
+	a.current_program.push_block(RepeatBlock(pos=p.pos, condition=thunk))
 
 
 @forms_func
 def for_cmd(a):
 	"""For(var, start, end[, step]) — iterate a numeric variable over a range."""
-	from program import ForBlock
+	from program import ForBlock, _for_continues
 	var_tok = a.numeric_var()
 	variable = var_tok.variable
 	start   = require_real(a.expr())
@@ -365,10 +354,9 @@ def for_cmd(a):
 	step    = require_real(a.expr(optional=True, default=1.0))
 	a.end()
 	p = a._parser
-	prog = p.env.current_program
-	variable.set(p.env, start)
+	variable.set(a.env, start)
 	if _for_continues(start, end_val, step):
-		prog.push_block(ForBlock(pos=p.pos, var=variable, end_val=end_val, step=step))
+		a.current_program.push_block(ForBlock(pos=p.pos, var=variable, end_val=end_val, step=step))
 	else:
 		p.scan_block_end()
 
@@ -378,48 +366,31 @@ def end_cmd(a):
 	"""End — close the innermost active block (For / While / Repeat / Then)."""
 	a.end()
 	p = a._parser
-	prog = p.env.current_program
+	prog = a.current_program
 	if prog is None:
 		raise TiSyntaxError("End without enclosing program")
-	from program import ForBlock, WhileBlock, RepeatBlock, ThenBlock
-	block = prog.pop_block()
-	if isinstance(block, ForBlock):
-		new_val = block.var.get(p.env) + block.step
-		block.var.set(p.env, new_val)
-		if _for_continues(new_val, block.end_val, block.step):
-			p.pos = block.pos  # jump back to the separator before the loop body
-	elif isinstance(block, WhileBlock):
-		if block.condition.eval():
-			p.pos = block.pos
-	elif isinstance(block, RepeatBlock):
-		if not block.condition.eval():
-			p.pos = block.pos  # condition False → keep looping
-		# condition True → fall through (exit loop)
-	# ThenBlock: just pop and fall through
+	prog.pop_block().on_end(prog, p)
 
 
 @no_paren_func
 def lbl_cmd(a):
-	"""Lbl name — mark a label; no-op at runtime (consumed as an identifier)."""
-	a._parser.parse_label_name()
+	"""Lbl name — mark a label; no-op at runtime."""
+	a.label_name()
 
 
 @no_paren_func
 def goto_cmd(a):
 	"""Goto name — jump to the named label in the current program."""
-	p = a._parser
-	prog = p.env.current_program
+	prog = a.current_program
 	if prog is None:
 		raise TiSyntaxError("Goto outside program")
-	name = p.parse_label_name()
-	prog.goto(name)
+	prog.goto(a.label_name())
 
 
 @no_paren_func
 def return_cmd(a):
 	"""Return — exit the current sub-program and return to the caller."""
 	a.end()
-	from errors import ReturnSignal
 	raise ReturnSignal()
 
 
@@ -427,7 +398,6 @@ def return_cmd(a):
 def stop_cmd(a):
 	"""Stop — terminate all program execution immediately."""
 	a.end()
-	from errors import StopSignal
 	raise StopSignal()
 
 
@@ -439,8 +409,8 @@ def is_gt_cmd(a):
 	threshold = require_real(a.expr())
 	a.end()
 	p = a._parser
-	new_val = require_real(variable.get(p.env)) + 1
-	variable.set(p.env, new_val)
+	new_val = require_real(variable.get(a.env)) + 1
+	variable.set(a.env, new_val)
 	if new_val > threshold:
 		p.eat_statement_sep()
 		p.skip_statement()
@@ -454,8 +424,8 @@ def ds_lt_cmd(a):
 	threshold = require_real(a.expr())
 	a.end()
 	p = a._parser
-	new_val = require_real(variable.get(p.env)) - 1
-	variable.set(p.env, new_val)
+	new_val = require_real(variable.get(a.env)) - 1
+	variable.set(a.env, new_val)
 	if new_val < threshold:
 		p.eat_statement_sep()
 		p.skip_statement()

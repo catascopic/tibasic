@@ -1,1 +1,1 @@
-python -m pytest tibasic_test.py
+python -m pytest program_test.py

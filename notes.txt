@@ -1,7 +1,12 @@
-RerturnSignal/StopSignal are clever, but I don't think they should be TiErrors!
+Commands that can't be run outside a program raise ERR:INVALID on the calculator. Can you make InvalidCommandError and throw that in these cases?
+Lbl: no .end() call to ArgParser
+Helper method to get numeric vars, using indices is awkward. Something like var(env, 'A')
+I'm thinking it could look up any variable by matching to the general token lookup.
+This would probably only be for testing, so we probably wouldn't want to put it on Environment.
 
-Should eat_close in CommandArgParser raise an error if the next token is not COMMA/NEWLINE/R_PAREN? Or will Parser do that on its own?
-Also, I added COLON to the set of tokens _is_closing can match in the base ArgParser, is that correct?
+
+
+rename end_val
 
 
 vectorized: require_number???
@@ -27,6 +32,15 @@ make them IntEnums for easier testing?
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+Looks great so far, here's some feedback:
+RerturnSignal/StopSignal are clever, but I don't think they should be TiErrors! I'd argue these exceptions don't even belong in errors.py.
+Also, where is StopSignal caught? It should be caught somewhere!
+All the instanceof checks in end_cmd suggest this should be done with polymorphism!
+ArgParser should probably have a "currently executing program" property, otherwise it seesm kind of wrong to read the "private" parser field!
+parse_label_name probably should be a member of ArgParser, not Parser
+Should eat_close in CommandArgParser raise an error if the next token is not COMMA/NEWLINE/R_PAREN? Or will Parser do that on its own?
+Finally, please write some program tests! I think these should go in a new file, program_test.py.
 
 Looks like a good start, and I guess all the commands need to be implemented in forms. But for now, a few issues:
 It would be nice if the variable in ForFrame chould have the actual Variable type. Is there a way to resolve that dependency?

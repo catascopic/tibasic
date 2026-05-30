@@ -3,43 +3,83 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-	from parser import Thunk
+	from parser import Parser, Thunk
 
 from environment import Environment, Variable
-from errors import TiSyntaxError, ReturnSignal
-from parser import Parser, EOF_TOKEN
+from errors import TiSyntaxError, IncrementError, LabelError
+from signals import ReturnSignal
 from tokens import COLON, NEWLINE, QUOTE
 
 
-# ── Block Types ────────────────────────────────────────────────────────
+# ── For-loop continuation helper ─────────────────────────────────────────────
+
+def _for_continues(val: float, end_val: float, step: float) -> bool:
+	"""Return True if the For loop should continue (val has not exceeded end_val)."""
+	if step > 0:
+		return val <= end_val + 1e-10
+	elif step < 0:
+		return val >= end_val - 1e-10
+	else:
+		raise IncrementError("For: step cannot be zero")
+
+
+# ── Block types ───────────────────────────────────────────────────────────────
 
 class Block:
-	"""Base class for all blocks."""
-	pass
+	"""Base class for all control-flow blocks.
+
+	Each concrete subclass overrides on_end to implement the End logic for
+	that block type, eliminating isinstance checks in end_cmd.
+	"""
+
+	def on_end(self, prog: Program, parser: Parser) -> None:
+		"""Handle End for this block.  Default implementation is a no-op (ThenBlock)."""
+		pass
+
 
 @dataclass
 class ForBlock(Block):
 	"""State for an active For( loop."""
-	pos: int         # token index of the first token in the loop body
+	pos: int         # token index of the separator before the loop body
 	var: Variable    # loop variable
-	end_val: float   # loop exits when var exceeds this (or goes below it for negative step)
+	end_val: float   # loop exits when var exceeds this (or drops below it for negative step)
 	step: float      # added to var at each End
+
+	def on_end(self, prog: Program, parser: Parser) -> None:
+		new_val = self.var.get(parser.env) + self.step
+		self.var.set(parser.env, new_val)
+		if _for_continues(new_val, self.end_val, self.step):
+			prog.push_block(self)         # keep alive for the next iteration
+			parser.pos = self.pos         # jump back to separator before body
+
 
 @dataclass
 class WhileBlock(Block):
 	"""State for an active While loop."""
-	pos: int         # token index of the first token in the loop body
-	condition: Thunk # re-evaluated at End; True → jump back to body, False → exit
+	pos: int          # token index of the separator before the loop body
+	condition: Thunk  # re-evaluated at End; True → repeat, False → exit
+
+	def on_end(self, prog: Program, parser: Parser) -> None:
+		if self.condition.eval():
+			prog.push_block(self)
+			parser.pos = self.pos
+
 
 @dataclass
 class RepeatBlock(Block):
 	"""State for an active Repeat loop."""
-	pos: int         # token index of the first token in the loop body
-	condition: Thunk # evaluated at End; True → exit loop, False → jump back to body
+	pos: int          # token index of the separator before the loop body
+	condition: Thunk  # evaluated at End; True → exit, False → repeat
+
+	def on_end(self, prog: Program, parser: Parser) -> None:
+		if not self.condition.eval():
+			prog.push_block(self)
+			parser.pos = self.pos
+
 
 @dataclass
 class ThenBlock(Block):
-	"""Marker for an active If/Then or Else block.  End simply pops it."""
+	"""Marker for an active If/Then or Else block.  End simply pops it (no-op on_end)."""
 	pass
 
 
@@ -58,6 +98,7 @@ class Program:
 	"""
 
 	def __init__(self, tokens: list, env: Environment):
+		from parser import Parser  # lazy: program → parser → tokens → forms → program
 		self._parser = Parser(tokens, env)
 		self._env = env
 		self.block_stack: list[Block] = []
@@ -96,17 +137,14 @@ class Program:
 		Scans from the beginning, respecting string literals.
 		Raises LabelError if the label is not found.
 		"""
-		from errors import LabelError
-		from tokens import LBL  # imported lazily; token defined when control-flow tokens are added
+		from tokens import LBL  # lazy: avoids circular import at module load time
 		p = self._parser
 		in_string = False
 		i = 0
 		while i < len(p.tokens):
 			t = p.tokens[i]
 			if in_string:
-				if t is QUOTE:
-					in_string = False
-				elif t is NEWLINE:
+				if t is QUOTE or t is NEWLINE:
 					in_string = False
 			elif t is QUOTE:
 				in_string = True

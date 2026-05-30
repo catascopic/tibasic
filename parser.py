@@ -558,8 +558,17 @@ class Parser:
 # ── Public API ─────────────────────────────────────────────────────────────────
 
 def run_line(tokens: list[Token], env: Environment):
-	"""Tokenize and execute a single input line (may contain multiple statements)."""
-	Parser(tokens, env).run()
+	"""Tokenize and execute a single input line (may contain multiple statements).
+
+	StopSignal is caught here (the top-level entry point) and silently
+	suppressed, matching the calculator's behaviour of returning to the home
+	screen without displaying an error.
+	"""
+	from signals import StopSignal
+	try:
+		Parser(tokens, env).run()
+	except StopSignal:
+		pass
 
 
 def _parse_method(method):
@@ -652,6 +661,15 @@ class ArgParser:
 	def env(self):
 		return self._parser.env
 
+	@property
+	def current_program(self):
+		"""The innermost currently-executing Program, or None if running interactively."""
+		return self._parser.env.current_program
+
+	def label_name(self) -> str:
+		"""Read up to 2 alphanumeric characters as a label name (for Lbl / Goto)."""
+		return self._parser.parse_label_name()
+
 	def has_next(self) -> bool:
 		return self._next
 
@@ -668,17 +686,19 @@ class ArgParser:
 class CommandArgParser(ArgParser):
 	"""ArgParser variant for no-paren commands.
 
-	Overrides only the two closing-delimiter hooks so that _arg needs no duplication:
+	Overrides the two closing-delimiter hooks so that _arg needs no duplication:
 	- _is_closing: treats COLON/NEWLINE/EOF as the argument-list terminator.
-	- _eat_close:  no-op (there is no closing paren to consume).
-	end() is also overridden to assert a statement boundary explicitly if needed.
+	- _eat_close:  no paren to consume; raises if a stray ')' is found.
+	end() is also overridden to assert a statement boundary.
 	"""
 
 	def _is_closing(self) -> bool:
 		return self._parser.at_statement_end()
 
 	def _eat_close(self) -> None:
-		pass  # no closing paren in no-paren commands
+		"""No closing paren in no-paren commands; raise if a stray ')' appears."""
+		if self._parser.peek() is R_PAREN:
+			raise TiSyntaxError("Unexpected ')' after no-paren command argument")
 
 	def end(self):
 		"""Assert that the token stream is at a statement boundary (COLON, NEWLINE, or EOF)."""
