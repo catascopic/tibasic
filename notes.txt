@@ -1,4 +1,14 @@
 Statements vs lines: Lines are separated by NEWLINE, statements are separated by NEWLINE or COLON. Can you go through the parser and make sure this terminology is consistent? For example, parse_statement seems like it parses the entire input; the inner loop parses "statements" (which are treated the same as lines, I guess, other than colons don't break strings.) Both that method and the public API "parse_line" should probably signal that they parse the entire token stream (which they do, right?)
+I guess this depends on how programs work, which I've given some thought to, and I think that's the next step. But for now, how should this be organized?
+
+Program should be a class that primarily keeps track of loops. I'm thinking maybe Parser should actually keep track of the program's position within the token stream. The Program class would push some kind of object on the stack whenever it encounters For/Repeat/While that tracks the parser's current position, and resets it to that position when End is encountered. It probably also handles labels, though I think labels are implemented in the calculator in a pretty lazy way: whenever Goto is encountered, the program jumps to the beginning, then iterates through statements (this is a little complicated because it can't just split on colon/newline since colons can be in strings) looking for the corresponding label. If it gets to the end and doesn't find it, it raises ERR:LABEL. I don't think it registers labels if it encounters the during standard execution, and it doesn't cache them either. In theory, Parser could already handle labels as is, though Goto/Lbl are invalid outside of a program.
+Environment will also have a stack (maybe use deque) of currently active programs, because programs can call programs and then return to the calling program. Overall I don't think Programs are that complicated, they just add some extra features to the existing token evaluation.
+The structure is a little cyclical:
+Environment has a list of programs, stored as a dict. Here, programs might just be a list of tokens, though in theory they need a protected and archived flag... though many variables need an archived flag, so let's worry about that later.
+It also has a stack of currently active programs. These are the aforementioned Program objects.
+Programs contain a Parser and a stack of Loop trackers. They may not need much more than that. The parser invokes commands that operate on the current program on the stack, which can begin/end loops. If/Then/Else also needs some kind of handling, though this probably doesn't need to use the loop stack.
+Still not sure how to best implement labels. I don't like the idea of having to scan every token, but it might be necessary because we need to split on non-quoted colons plus newlines. There may be an alternate parsing method that would speed this up, but I'm not even sure that's what the calculator is doing.
+
 
 vectorized: require_number???
 

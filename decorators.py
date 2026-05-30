@@ -78,7 +78,7 @@ class NoParen:
 
 	CommandArgParser does not eat a closing ) after arguments and checks
 	COLON/NEWLINE/EOF (not )) for optional-arg termination.  End-of-statement
-	validation is left to parse_statement, which already calls expect(EOF_TOKEN).
+	validation is left to Parser.run(), which already calls expect(EOF_TOKEN).
 	"""
 
 	def __init__(self, func):

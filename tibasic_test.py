@@ -10,7 +10,7 @@ from errors import (
 	TiSyntaxError, IllegalNestError, DomainError, DimMismatchError,
 	StatError, IncrementError, DataTypeError, InvalidDimError, ArgumentError,
 )
-from parser import parse_line
+from parser import run_line
 import tokens
 from tokens import ALL_TOKENS, Token, get_token
 from tiobjects import TiList, TiMatrix, TiString
@@ -53,7 +53,7 @@ def calc(items, env: Environment | None = None):
 	"""Evaluate a token sequence and return Ans."""
 	if env is None:
 		env = Environment()
-	parse_line(toks(items), env)
+	run_line(toks(items), env)
 	return env.ans
 
 

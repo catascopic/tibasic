@@ -470,37 +470,39 @@ class Parser:
 
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 
-	def parse_statement(self):
+	def _exec_statement(self):
+		"""Execute one statement (up to but not including the next separator)."""
+		if self.eat_if(PRGM):
+			name = self._read_name(8)
+			self.env.programs[name].execute()
+
+		elif self.peek().command is not None:
+			self.advance().command.call_with_parser(ArgParser(self))
+
+		else:
+			value = self.parse_expr()
+			if self.eat_if(STORE):
+				self.parse_store(value)
+			elif self.peek().converter is not None:
+				value = self.advance().converter(value)
+			self.env.ans = value
+
+	def run(self):
+		"""Execute all statements in the token stream until EOF."""
 		while True:
 			if self.at_statement_end():
 				return
-
-			if self.eat_if(PRGM):
-				name = self._read_name(8)
-				val = self.env.programs[name].execute()
-
-			elif self.peek().command is not None:
-				self.advance().command.call_with_parser(ArgParser(self))
-
-			else:
-				value = self.parse_expr()
-				if self.eat_if(STORE):
-					self.parse_store(value)
-				elif self.peek().converter is not None:
-					value = self.advance().converter(value)
-				self.env.ans = value
-				
+			self._exec_statement()
 			if not self.eat_if({COLON, NEWLINE}):
 				break
-
 		self.expect(EOF_TOKEN)
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-def parse_line(tokens: list[Token], env: Environment):
-	"""Parse and evaluate a single program line."""
-	Parser(tokens, env).parse_statement()
+def run_line(tokens: list[Token], env: Environment):
+	"""Tokenize and execute a single input line (may contain multiple statements)."""
+	Parser(tokens, env).run()
 
 
 def _parse_method(method):
@@ -636,7 +638,7 @@ if __name__ == '__main__':
 	def test(*line):
 		tokens = toks(*line)
 		print('>>', ''.join(t.text for t in tokens))
-		parse_line(tokens, env)
+		run_line(tokens, env)
 		print('<<', env.ans)
 
 	env.angle_mode = 'DEG'
