@@ -26,7 +26,10 @@
       "Bash(python -m pytest tibasic_test.py::TestEffNom tibasic_test.py -q)",
       "Bash(python -m pytest tibasic_test.py::TestEffNom::test_eff_via_calc -v)",
       "Bash(python -c \"content = open\\('environment.py'\\).read\\(\\); idx = content.find\\('RealVar'\\); print\\(repr\\(content[idx:idx+300]\\)\\)\")",
-      "Bash(python -m pytest tibasic_test.py tifile_test.py -q)"
+      "Bash(python -m pytest tibasic_test.py tifile_test.py -q)",
+      "Bash(python -m pytest tibasic_test.py::TestParserFeatures::test_inv_postfix -q)",
+      "Bash(python -c \"from tokens import ALL_TOKENS; [print\\(t.text, t.postfix\\) for t in ALL_TOKENS if t.postfix]\")",
+      "Bash(python -m pytest tibasic_test.py::TestDateTime::test_dbd_mmddyy_doc_example -q)"
     ]
   }
 }

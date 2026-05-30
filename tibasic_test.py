@@ -4,7 +4,6 @@ import math
 import pytest
 from pytest import approx
 
-import purefunctions as pf
 from environment import Environment
 from errors import (
 	TiSyntaxError, IllegalNestError, DomainError, DimMismatchError,
@@ -219,26 +218,26 @@ class TestSciE:
 # ── Numeric functions ─────────────────────────────────────────────────────────
 
 class TestNumericFunctions:
-	def test_abs_pos(self):       assert pf.abs(5) == 5
-	def test_abs_neg(self):       assert pf.abs(-5) == 5
-	def test_abs_complex(self):   assert pf.abs(3+4j) == approx(5)
-	def test_round_2dp(self):     assert pf.round(3.14159, 2) == approx(3.14)
-	def test_round_default(self): assert pf.round(1/3) == approx(1/3)
-	def test_i_part_pos(self):    assert pf.i_part(3.9) == 3
-	def test_i_part_neg(self):    assert pf.i_part(-3.9) == -3   # toward zero
-	def test_f_part_pos(self):    assert pf.f_part(3.7) == approx(0.7)
-	def test_f_part_neg(self):    assert pf.f_part(-3.7) == approx(-0.7)
-	def test_int_floor_pos(self): assert pf.int_(3.9) == 3
-	def test_int_floor_neg(self): assert pf.int_(-3.1) == -4     # floor, not truncate
-	def test_sqrt(self):          assert pf.sqrt(9) == approx(3)
-	def test_sqrt_negative(self): assert pf.sqrt(-1) == approx(1j)
-	def test_cbrt(self):          assert pf.cbrt(8) == approx(2)
-	def test_ln(self):            assert pf.ln(math.e) == approx(1)
-	def test_log(self):           assert pf.log(100) == approx(2)
-	def test_exp(self):           assert pf.exp(0) == approx(1)
-	def test_pow10(self):         assert pf.pow10(3) == approx(1000)
-	def test_not_false(self):     assert pf.not_(0) == 1
-	def test_not_true(self):      assert pf.not_(5) == 0
+	def test_abs_pos(self):       assert calc('abs( 5') == 5
+	def test_abs_neg(self):       assert calc('abs( ~5') == 5
+	def test_abs_complex(self):   assert calc('abs( 3+4i') == approx(5)
+	def test_round_2dp(self):     assert calc('round( 3.14159,2') == approx(3.14)
+	def test_round_default(self): assert calc(f'round( {1/3}') == approx(1/3)
+	def test_i_part_pos(self):    assert calc('iPart( 3.9') == 3
+	def test_i_part_neg(self):    assert calc('iPart( ~3.9') == -3   # toward zero
+	def test_f_part_pos(self):    assert calc('fPart( 3.7') == approx(0.7)
+	def test_f_part_neg(self):    assert calc('fPart( ~3.7') == approx(-0.7)
+	def test_int_floor_pos(self): assert calc('int( 3.9') == 3
+	def test_int_floor_neg(self): assert calc('int( ~3.1') == -4     # floor, not truncate
+	def test_sqrt(self):          assert calc('SQRT 9') == approx(3)
+	def test_sqrt_negative(self): assert calc('SQRT ~1') == approx(1j)
+	def test_cbrt(self):          assert calc('CBRT 8') == approx(2)
+	def test_ln(self):            assert calc(f'ln( {math.e}') == approx(1)
+	def test_log(self):           assert calc('log( 100') == approx(2)
+	def test_exp(self):           assert calc('𝑒^( 0') == approx(1)
+	def test_pow10(self):         assert calc('⑽^( 3') == approx(1000)
+	def test_not_false(self):     assert calc('not( 0') == 1
+	def test_not_true(self):      assert calc('not( 5') == 0
 
 
 class TestTrig:
@@ -269,87 +268,82 @@ class TestTrig:
 		env = Environment(); env.angle_mode = 'DEG'
 		assert calc('tan¹( 1', env) == approx(45)
 	# Hyperbolics stay in purefunctions, no angle mode
-	def test_sinh(self):  assert pf.sinh(0) == approx(0)
-	def test_cosh(self):  assert pf.cosh(0) == approx(1)
-	def test_tanh(self):  assert pf.tanh(0) == approx(0)
-	def test_asinh(self): assert pf.asinh(0) == approx(0)
-	def test_acosh(self): assert pf.acosh(1) == approx(0)
-	def test_atanh(self): assert pf.atanh(0) == approx(0)
+	def test_sinh(self):  assert calc('sinh( 0') == approx(0)
+	def test_cosh(self):  assert calc('cosh( 0') == approx(1)
+	def test_tanh(self):  assert calc('tanh( 0') == approx(0)
+	def test_asinh(self): assert calc('sinh¹( 0') == approx(0)
+	def test_acosh(self): assert calc('cosh¹( 1') == approx(0)
+	def test_atanh(self): assert calc('tanh¹( 0') == approx(0)
 
 
 class TestLogic:
-	def test_and_tt(self):  assert pf.and_(1, 1) == 1
-	def test_and_tf(self):  assert pf.and_(1, 0) == 0
-	def test_or_ff(self):   assert pf.or_(0, 0) == 0
-	def test_or_tf(self):   assert pf.or_(1, 0) == 1
-	def test_xor_tt(self):  assert pf.xor(1, 1) == 0
-	def test_xor_tf(self):  assert pf.xor(1, 0) == 1
+	def test_and_tt(self):  assert calc('1 and 1') == 1
+	def test_and_tf(self):  assert calc('1 and 0') == 0
+	def test_or_ff(self):   assert calc('0 or 0') == 0
+	def test_or_tf(self):   assert calc('1 or 0') == 1
+	def test_xor_tt(self):  assert calc('1 xor 1') == 0
+	def test_xor_tf(self):  assert calc('1 xor 0') == 1
 
 
 # ── Combinatorics ─────────────────────────────────────────────────────────────
 
 class TestCombinatorics:
-	def test_factorial(self):  assert pf.factorial(5) == 120
-	def test_ncr(self):        assert pf.ncr(10, 3) == 120
-	def test_npr(self):        assert pf.npr(5, 3) == 60
-	def test_lcm(self):        assert pf.lcm(12, 8) == 24
-	def test_gcd(self):        assert pf.gcd(12, 8) == 4
-	def test_remainder(self):  assert pf.remainder(17, 5) == 2
-
-	# Through the parser (NPR/NCR are binary operators; FACT is postfix)
-	def test_fact_parser(self): assert calc('5!') == 120
-	def test_npr_parser(self):  assert calc('5 nPr 3') == 60
-	def test_ncr_parser(self):  assert calc('5 nCr 3') == 10
+	def test_factorial(self):  assert calc('5!') == 120
+	def test_ncr(self):        assert calc('10 nCr 3') == 120
+	def test_npr(self):        assert calc('5 nPr 3') == 60
+	def test_lcm(self):        assert calc('lcm( 12,8') == 24
+	def test_gcd(self):        assert calc('gcd( 12,8') == 4
+	def test_remainder(self):  assert calc('remainder( 17,5') == 2
 
 
 # ── List operations ───────────────────────────────────────────────────────────
 
 class TestListOperations:
 	def test_augment(self):
-		assert list(pf.augment(TiList([1, 2]), TiList([3, 4]))) == [1, 2, 3, 4]
+		assert list(calc('augment( {1,2},{3,4}')) == [1, 2, 3, 4]
 
 	def test_cum_sum(self):
-		assert list(pf.cum_sum(TiList([1, 2, 3, 4]))) == [1, 3, 6, 10]
+		assert list(calc('cumSum( {1,2,3,4}')) == [1, 3, 6, 10]
 
 	def test_delta_list(self):
-		assert list(pf.delta_list(TiList([1, 3, 6, 10]))) == [2, 3, 4]
+		assert list(calc('ΔList( {1,3,6,10}')) == [2, 3, 4]
 
 	def test_sum_full(self):
-		assert pf.sum(TiList([1, 2, 3, 4, 5])) == 15
+		assert calc('sum( {1,2,3,4,5}') == 15
 
 	def test_sum_partial(self):
-		assert pf.sum(TiList([1, 2, 3, 4, 5]), 2, 4) == 9
+		assert calc('sum( {1,2,3,4,5},2,4') == 9
 
 	def test_prod(self):
-		assert pf.prod(TiList([1, 2, 3, 4])) == 24
+		assert calc('prod( {1,2,3,4}') == 24
 
 	def test_mean(self):
-		assert pf.mean(TiList([1, 2, 3, 4, 5])) == approx(3)
+		assert calc('mean( {1,2,3,4,5}') == approx(3)
 
 	def test_median_odd(self):
-		assert pf.median(TiList([3, 1, 4, 1, 5])) == 3
+		assert calc('median( {3,1,4,1,5}') == 3
 
 	def test_median_even(self):
-		assert pf.median(TiList([1, 2, 3, 4])) == 2.5
+		assert calc('median( {1,2,3,4}') == 2.5
 
 	def test_max_list(self):
-		assert pf.max(TiList([3, 1, 4, 1, 5, 9])) == 9
+		assert calc('max( {3,1,4,1,5,9}') == 9
 
 	def test_min_list(self):
-		assert pf.min(TiList([3, 1, 4, 1, 5, 9])) == 1
+		assert calc('min( {3,1,4,1,5,9}') == 1
 
 	def test_max_two_scalars(self):
-		assert pf.max(3, 7) == 7
+		assert calc('max( 3,7') == 7
 
 	def test_variance(self):
 		# known result: sum of squared deviations / (n-1)
-		assert pf.variance(TiList([2, 4, 4, 4, 5, 5, 7, 9])) == approx(32 / 7)
+		assert calc('variance( {2,4,4,4,5,5,7,9}') == approx(32 / 7)
 
 	def test_stddev(self):
-		assert pf.stddev(TiList([2, 4, 4, 4, 5, 5, 7, 9])) == approx(math.sqrt(32 / 7))
+		assert calc('stdDev( {2,4,4,4,5,5,7,9}') == approx(math.sqrt(32 / 7))
 
 	def test_dim_list(self):
-		assert pf.dim(TiList([1, 2, 3])) == 3
+		assert calc('dim( {1,2,3}') == 3
 
 	def test_vectorized_add(self):
 		assert list(TiList([1, 2, 3]) + TiList([4, 5, 6])) == [5, 7, 9]
@@ -362,12 +356,18 @@ class TestListOperations:
 
 class TestEmptyList:
 	"""
-	{} is a syntax error.  An empty TiList (created programmatically) causes
+	{} is a syntax error.  An empty TiList (via 0→dim(L₁)) causes
 	InvalidDimError in every aggregate function except dim(), which returns 0.
 	0→dim(L₁) is also rejected with InvalidDimError.
 	"""
 
-	_empty = TiList([])   # created directly, not via the parser
+	@pytest.fixture
+	def empty(self, env):
+		"""L1 = empty list, L2 = {1,2}."""
+		calc('{1@ L1', env)
+		calc('0@ dim( L1', env)
+		calc('{1,2@ L2', env)
+		return env
 
 	# ── Parser rejects {} ─────────────────────────────────────────────────────
 
@@ -382,8 +382,8 @@ class TestEmptyList:
 
 	# ── dim() is the one exception ────────────────────────────────────────────
 
-	def test_dim_empty_returns_zero(self):
-		assert pf.dim(self._empty) == 0
+	def test_dim_empty_returns_zero(self, empty):
+		assert calc('dim( L1', empty) == 0
 
 	def test_store_dim_zero(self, env):
 		calc('{1,2,3@ L1', env)
@@ -392,59 +392,60 @@ class TestEmptyList:
 
 	# ── Aggregate functions ───────────────────────────────────────────────────
 
-	def test_sum_empty(self):
+	def test_sum_empty(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.sum(self._empty)
+			calc('sum( L1', empty)
 
-	def test_prod_empty(self):
+	def test_prod_empty(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.prod(self._empty)
+			calc('prod( L1', empty)
 
-	def test_mean_empty(self):
+	def test_mean_empty(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.mean(self._empty)
+			calc('mean( L1', empty)
 
-	def test_median_empty(self):
+	def test_median_empty(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.median(self._empty)
+			calc('median( L1', empty)
 
-	def test_max_empty(self):
+	def test_max_empty(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.max(self._empty)
+			calc('max( L1', empty)
 
-	def test_min_empty(self):
+	def test_min_empty(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.min(self._empty)
+			calc('min( L1', empty)
 
-	def test_variance_empty(self):
+	def test_variance_empty(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.variance(self._empty)
+			calc('variance( L1', empty)
 
-	def test_stddev_empty(self):
+	def test_stddev_empty(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.stddev(self._empty)
+			calc('stdDev( L1', empty)
 
-	def test_cum_sum_empty(self):
+	def test_cum_sum_empty(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.cum_sum(self._empty)
+			calc('cumSum( L1', empty)
 
-	def test_delta_list_empty(self):
+	def test_delta_list_empty(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.delta_list(self._empty)
+			calc('ΔList( L1', empty)
 
 	# ── augment ───────────────────────────────────────────────────────────────
 
-	def test_augment_empty_left(self):
+	def test_augment_empty_left(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.augment(self._empty, TiList([1, 2]))
+			calc('augment( L1 , L2', empty)
 
-	def test_augment_empty_right(self):
+	def test_augment_empty_right(self, empty):
 		with pytest.raises(InvalidDimError):
-			pf.augment(TiList([1, 2]), self._empty)
+			calc('augment( L2 , L1', empty)
 
-	def test_augment_both_empty(self):
+	def test_augment_both_empty(self, empty):
+		calc('0@ dim( L2', empty)
 		with pytest.raises(InvalidDimError):
-			pf.augment(self._empty, self._empty)
+			calc('augment( L1 , L2', empty)
 
 
 # ── Stat functions with freq_list ─────────────────────────────────────────────
@@ -456,134 +457,125 @@ class TestStatWithFreqList:
 
 	def test_mean_uniform(self):
 		# Uniform weights → same result as plain mean
-		assert pf.mean(TiList([1, 2, 3]), TiList([1, 1, 1])) == approx(2.0)
+		assert calc('mean( {1,2,3},{1,1,1}') == approx(2.0)
 
 	def test_mean_weighted(self):
 		# [0,0,0,10] → mean = 10/4 = 2.5
-		assert pf.mean(TiList([0, 10]), TiList([3, 1])) == approx(2.5)
+		assert calc('mean( {0,10},{3,1}') == approx(2.5)
 
 	def test_mean_integer_counts(self):
 		# [1,1,1,2,3,3] → mean = (3+2+6)/6 = 11/6
-		assert pf.mean(TiList([1, 2, 3]), TiList([3, 1, 2])) == approx(11 / 6)
+		assert calc('mean( {1,2,3},{3,1,2}') == approx(11 / 6)
 
 	# ── median ────────────────────────────────────────────────────────────────
 
 	def test_median_odd_total(self):
 		# Expanded: [10,10,20,30,30] → middle element is 20
-		assert pf.median(TiList([10, 20, 30]), TiList([2, 1, 2])) == 20
+		assert calc('median( {10,20,30},{2,1,2}') == 20
 
 	def test_median_even_total(self):
 		# Expanded: [10,10,30,30] → (10+30)/2 = 20
-		assert pf.median(TiList([10, 30]), TiList([2, 2])) == approx(20.0)
+		assert calc('median( {10,30},{2,2}') == approx(20.0)
 
 	def test_median_unsorted_input(self):
 		# Must sort by value: {3:1,1:2,2:1} → [1,1,2,3] → (1+2)/2 = 1.5
-		assert pf.median(TiList([3, 1, 2]), TiList([1, 2, 1])) == approx(1.5)
+		assert calc('median( {3,1,2},{1,2,1}') == approx(1.5)
 
 	def test_median_uniform_matches_plain(self):
-		plain    = pf.median(TiList([1, 2, 3, 4, 5]))
-		weighted = pf.median(TiList([1, 2, 3, 4, 5]), TiList([1, 1, 1, 1, 1]))
+		plain    = calc('median( {1,2,3,4,5}')
+		weighted = calc('median( {1,2,3,4,5},{1,1,1,1,1}')
 		assert weighted == approx(plain)
 
 	def test_median_dim_mismatch(self):
 		with pytest.raises(DimMismatchError):
-			pf.median(TiList([1, 2, 3]), TiList([1, 1]))
+			calc('median( {1,2,3},{1,1}')
 
 	# ── variance ──────────────────────────────────────────────────────────────
 
 	def test_variance_weighted(self):
 		# mean=1; 3*(0-1)² + 1*(4-1)² = 3+9=12; 12/(4-1) = 4.0
-		assert pf.variance(TiList([0, 4]), TiList([3, 1])) == approx(4.0)
+		assert calc('variance( {0,4},{3,1}') == approx(4.0)
 
 	def test_variance_uniform_matches_plain(self):
-		plain    = pf.variance(TiList([2, 4, 6]))
-		weighted = pf.variance(TiList([2, 4, 6]), TiList([1, 1, 1]))
+		plain    = calc('variance( {2,4,6}')
+		weighted = calc('variance( {2,4,6},{1,1,1}')
 		assert weighted == approx(plain)
 
 	def test_variance_total_freq_le_one(self):
 		# total freq = 1 → denominator (n-1) = 0
 		with pytest.raises(StatError, match="total frequency"):
-			pf.variance(TiList([5]), TiList([1]))
+			calc('variance( {5},{1}')
 
 	def test_variance_dim_mismatch(self):
 		with pytest.raises(DimMismatchError):
-			pf.variance(TiList([1, 2, 3]), TiList([1, 1]))
+			calc('variance( {1,2,3},{1,1}')
 
 	# ── stddev ────────────────────────────────────────────────────────────────
 
 	def test_stddev_weighted(self):
-		assert pf.stddev(TiList([0, 4]), TiList([3, 1])) == approx(2.0)
+		assert calc('stdDev( {0,4},{3,1}') == approx(2.0)
 
 	def test_stddev_uniform_matches_plain(self):
-		plain    = pf.stddev(TiList([2, 4, 4, 4, 5, 5, 7, 9]))
-		weighted = pf.stddev(TiList([2, 4, 4, 4, 5, 5, 7, 9]), TiList([1, 1, 1, 1, 1, 1, 1, 1]))
+		plain    = calc('stdDev( {2,4,4,4,5,5,7,9}')
+		weighted = calc('stdDev( {2,4,4,4,5,5,7,9},{1,1,1,1,1,1,1,1}')
 		assert weighted == approx(plain)
 
 	def test_stddev_dim_mismatch(self):
 		with pytest.raises(DimMismatchError):
-			pf.stddev(TiList([1, 2]), TiList([1]))
+			calc('stdDev( {1,2},{1}')
 
 
 # ── Matrix operations ─────────────────────────────────────────────────────────
 
 class TestMatrixOperations:
 	def test_det_2x2(self):
-		assert pf.det(TiMatrix([[1, 2], [3, 4]])) == approx(-2)
+		assert calc('det( [[1,2][3,4]]') == approx(-2)
 
 	def test_det_identity(self):
-		assert pf.det(pf.identity(4)) == approx(1)
+		assert calc('det( identity( 4') == approx(1)
 
 	def test_identity(self):
-		mat = pf.identity(3)
-		assert mat.data == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+		result = calc('identity( 3')
+		assert result.data == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
 
 	def test_transpose(self):
-		result = pf.transpose(TiMatrix([[1, 2, 3], [4, 5, 6]]))
+		result = calc('[[1,2,3][4,5,6]] TRANSPOSE')
 		assert result.data == [[1, 4], [2, 5], [3, 6]]
 
 	def test_matmul(self):
-		a = TiMatrix([[1, 2], [3, 4]])
-		b = TiMatrix([[5, 6], [7, 8]])
-		assert (a * b).data == [[19, 22], [43, 50]]
+		assert calc('[[1,2][3,4]]*[[5,6][7,8]]').data == [[19, 22], [43, 50]]
 
 	def test_inv_roundtrip(self):
-		mat = TiMatrix([[1, 2], [3, 4]])
-		product = mat * mat.inv()
-		assert product.data == approx_mat([[1, 0], [0, 1]])
+		result = calc('[[1,2][3,4]]*[[1,2][3,4]] INV')
+		assert result.data == approx_mat([[1, 0], [0, 1]])
 
 	def test_dim_matrix(self):
-		assert list(pf.dim(TiMatrix([[1, 2, 3], [4, 5, 6]]))) == [2, 3]
+		assert list(calc('dim( [[1,2,3][4,5,6]]')) == [2, 3]
 
 	def test_augment_matrix(self):
-		a = TiMatrix([[1, 2], [3, 4]])
-		b = TiMatrix([[5], [6]])
-		assert pf.augment(a, b).data == [[1, 2, 5], [3, 4, 6]]
+		assert calc('augment( [[1,2][3,4]],[[5][6]]').data == [[1, 2, 5], [3, 4, 6]]
 
 	def test_rref_solve(self):
 		# 2x + y = 5, x - y = 1  →  x=2, y=1
-		result = pf.rref(TiMatrix([[2, 1, 5], [1, -1, 1]]))
+		result = calc('rref( [[2,1,5][1,~1,1]]')
 		assert result.data == approx_mat([[1, 0, 2], [0, 1, 1]])
 
 
 class TestMatrixRowOps:
-	def setup_method(self):
-		self.mat = TiMatrix([[1, 2], [3, 4], [5, 6]])
-
 	def test_row_swap(self):
-		result = pf.row_swap(self.mat, 1, 3)
+		result = calc('rowSwap( [[1,2][3,4][5,6]],1,3')
 		assert result.data == [[5, 6], [3, 4], [1, 2]]
-		assert self.mat.data == [[1, 2], [3, 4], [5, 6]]  # original unchanged
 
 	def test_row_plus(self):
-		result = pf.row_plus(self.mat, 1, 2)
+		result = calc('row+( [[1,2][3,4][5,6]],1,2')
 		assert result.data == [[1, 2], [4, 6], [5, 6]]
 
 	def test_times_row(self):
-		result = pf.times_row(3, self.mat, 1)
+		result = calc('*row( 3,[[1,2][3,4][5,6]],1')
 		assert result.data == [[3, 6], [3, 4], [5, 6]]
 
 	def test_times_row_plus(self):
-		result = pf.times_row_plus(2, self.mat, 1, 2)
+		result = calc('*row+( 2,[[1,2][3,4][5,6]],1,2')
 		assert result.data == [[1, 2], [5, 8], [5, 6]]
 
 
@@ -821,89 +813,83 @@ class TestEffNom:
 
 	def test_eff_example_from_docs(self):
 		# ►Eff(7.5, 12) → 7.763259886  (the docs say 7.663 but that's a typo)
-		assert pf.eff(7.5, 12) == approx(7.763259886, rel=1e-8)
+		assert calc('►Eff( 7.5,12') == approx(7.763259886, rel=1e-8)
 
 	def test_eff_annual(self):
 		# 1 compounding period is a pass-through
-		assert pf.eff(10, 1) == 10
+		assert calc('►Eff( 10,1') == 10
 
 	def test_eff_quarterly(self):
-		assert pf.eff(8, 4) == approx(100 * ((1 + 0.08 / 4) ** 4 - 1), rel=1e-12)
+		assert calc('►Eff( 8,4') == approx(100 * ((1 + 0.08 / 4) ** 4 - 1), rel=1e-12)
 
 	def test_eff_zero_rate(self):
-		assert pf.eff(0, 12) == approx(0)
+		assert calc('►Eff( 0,12') == approx(0)
 
 	def test_eff_domain_zero_periods(self):
 		with pytest.raises(DomainError):
-			pf.eff(10, 0)
+			calc('►Eff( 10,0')
 
 	def test_eff_domain_negative_periods(self):
 		with pytest.raises(DomainError):
-			pf.eff(10, -1)
+			calc('►Eff( 10,~1')
 
 	def test_eff_domain_rate_at_minus_100(self):
 		with pytest.raises(DomainError):
-			pf.eff(-100, 12)
+			calc('►Eff( ~100,12')
 
 	def test_eff_domain_rate_below_minus_100(self):
 		with pytest.raises(DomainError):
-			pf.eff(-200, 12)
+			calc('►Eff( ~200,12')
 
 	def test_eff_minus_100_with_one_period_is_passthrough(self):
 		# cp=1 is always a pass-through, even for extreme rates
-		assert pf.eff(-100, 1) == -100
+		assert calc('►Eff( ~100,1') == -100
 
 	# ── ►Nom( ─────────────────────────────────────────────────────────────────
 
 	def test_nom_example_from_docs(self):
 		# ►Nom(10, 12) → 9.568968515
-		assert pf.nom(10, 12) == approx(9.568968515, rel=1e-8)
+		assert calc('►Nom( 10,12') == approx(9.568968515, rel=1e-8)
 
 	def test_nom_annual(self):
 		# 1 compounding period is a pass-through
-		assert pf.nom(10, 1) == 10
+		assert calc('►Nom( 10,1') == 10
 
 	def test_nom_quarterly(self):
-		assert pf.nom(8, 4) == approx(100 * 4 * ((1.08 ** (1/4)) - 1), rel=1e-12)
+		assert calc('►Nom( 8,4') == approx(100 * 4 * ((1.08 ** (1/4)) - 1), rel=1e-12)
 
 	def test_nom_zero_rate(self):
-		assert pf.nom(0, 12) == approx(0)
+		assert calc('►Nom( 0,12') == approx(0)
 
 	def test_nom_domain_zero_periods(self):
 		with pytest.raises(DomainError):
-			pf.nom(10, 0)
+			calc('►Nom( 10,0')
 
 	def test_nom_domain_negative_periods(self):
 		with pytest.raises(DomainError):
-			pf.nom(10, -1)
+			calc('►Nom( 10,~1')
 
 	def test_nom_domain_rate_at_minus_100(self):
 		with pytest.raises(DomainError):
-			pf.nom(-100, 12)
+			calc('►Nom( ~100,12')
 
 	def test_nom_domain_rate_below_minus_100(self):
 		with pytest.raises(DomainError):
-			pf.nom(-200, 12)
+			calc('►Nom( ~200,12')
 
 	def test_nom_minus_100_with_one_period_is_passthrough(self):
-		assert pf.nom(-100, 1) == -100
+		assert calc('►Nom( ~100,1') == -100
 
 	# ── Roundtrip ─────────────────────────────────────────────────────────────
 
 	def test_roundtrip_eff_then_nom(self):
-		# nom → eff → nom should recover the original rate
-		assert pf.nom(pf.eff(7.5, 12), 12) == approx(7.5, rel=1e-10)
+		# ►Eff then ►Nom should recover the original rate
+		x = calc('►Eff( 7.5,12')
+		assert calc(f'►Nom( {x},12') == approx(7.5, rel=1e-10)
 
 	def test_roundtrip_nom_then_eff(self):
-		assert pf.eff(pf.nom(10, 12), 12) == approx(10, rel=1e-10)
-
-	# ── Via interpreter ───────────────────────────────────────────────────────
-
-	def test_eff_via_calc(self):
-		assert calc('►Eff( 7.5,12') == approx(7.763259886, rel=1e-8)
-
-	def test_nom_via_calc(self):
-		assert calc('►Nom( 10,12') == approx(9.568968515, rel=1e-8)
+		x = calc('►Nom( 10,12')
+		assert calc(f'►Eff( {x},12') == approx(10, rel=1e-10)
 
 
 # ── npv( / irr( / bal( / ΣPrn( / ΣInt( ──────────────────────────────────────
@@ -911,62 +897,55 @@ class TestEffNom:
 class TestNpv:
 	def test_basic_no_freq(self):
 		# npv(5, 500, {1250,1333,1575,1100,1900}) — example from docs
-		cflist = TiList([1250, 1333, 1575, 1100, 1900])
 		r = 1.05
 		expected = 500 + 1250/r + 1333/r**2 + 1575/r**3 + 1100/r**4 + 1900/r**5
-		assert pf.npv(5, 500, cflist) == approx(expected, rel=1e-10)
+		assert calc('npv( 5,500,{1250,1333,1575,1100,1900}') == approx(expected, rel=1e-10)
 
 	def test_zero_rate(self):
 		# At 0% all cash flows just sum
-		cflist = TiList([100, 200, 300])
-		assert pf.npv(0, 50, cflist) == approx(650)
+		assert calc('npv( 0,50,{100,200,300}') == approx(650)
 
 	def test_with_freq(self):
 		# npv(8, 0, {200,300}, {2,3}) same as npv(8, 0, {200,200,300,300,300})
-		cflist  = TiList([200, 300])
-		cffreq  = TiList([2, 3])
-		flat    = TiList([200, 200, 300, 300, 300])
-		assert pf.npv(8, 0, cflist, cffreq) == approx(pf.npv(8, 0, flat), rel=1e-10)
+		with_freq = calc('npv( 8,0,{200,300},{2,3}')
+		flat      = calc('npv( 8,0,{200,200,300,300,300}')
+		assert with_freq == approx(flat, rel=1e-10)
 
 	def test_freq_dim_mismatch(self):
 		with pytest.raises(DimMismatchError):
-			pf.npv(5, 0, TiList([100, 200]), TiList([1]))
+			calc('npv( 5,0,{100,200},{1}')
 
 	def test_data_type_error_on_complex_rate(self):
 		with pytest.raises(DataTypeError):
-			pf.npv(1j, 0, TiList([100]))
+			calc('npv( 1i,0,{100}')
 
 	def test_single_cash_flow(self):
 		# npv(10, -100, {110}) = -100 + 110/1.1 = 0
-		assert pf.npv(10, -100, TiList([110])) == approx(0, abs=1e-10)
+		assert calc('npv( 10,~100,{110}') == approx(0, abs=1e-10)
 
 
 class TestIrr:
 	def test_simple_one_period(self):
 		# Invest 100, get 110 back → IRR = 10%
-		assert pf.irr(-100, TiList([110])) == approx(10.0, rel=1e-6)
+		assert calc('irr( ~100,{110}') == approx(10.0, rel=1e-6)
 
 	def test_two_periods(self):
 		# npv(irr) = 0 check
-		cflist = TiList([500, 600])
-		rate = pf.irr(-1000, cflist)
-		assert pf.npv(rate, -1000, cflist) == approx(0, abs=1e-4)
+		rate = calc('irr( ~1000,{500,600}')
+		assert calc(f'npv( {rate},~1000,{{500,600}}') == approx(0, abs=1e-4)
 
 	def test_with_freq(self):
 		# Same cash flow with and without frequencies
-		cflist = TiList([110])
-		cffreq = TiList([1])
-		assert pf.irr(-100, cflist, cffreq) == approx(10.0, rel=1e-6)
+		assert calc('irr( ~100,{110},{1}') == approx(10.0, rel=1e-6)
 
 	def test_no_positive_solution_raises(self):
 		# All positive cash flows → no sign change → no real positive IRR
 		with pytest.raises(DomainError):
-			pf.irr(100, TiList([100, 100]))
+			calc('irr( 100,{100,100}')
 
 	def test_npv_is_zero_at_irr(self):
-		cflist = TiList([300, 400, 500])
-		rate = pf.irr(-900, cflist)
-		assert pf.npv(rate, -900, cflist) == approx(0, abs=1e-3)
+		rate = calc('irr( ~900,{300,400,500}')
+		assert calc(f'npv( {rate},~900,{{300,400,500}}') == approx(0, abs=1e-3)
 
 
 class TestBal:
@@ -1072,12 +1051,12 @@ class TestSigmaInt:
 # ── Complex numbers ───────────────────────────────────────────────────────────
 
 class TestComplex:
-	def test_real(self):         assert pf.real(3+4j) == 3
-	def test_imag(self):         assert pf.imag(3+4j) == 4
-	def test_conj(self):         assert pf.conj(3+4j) == 3-4j
-	def test_angle(self):        assert pf.angle(1j) == approx(math.pi / 2)
-	def test_real_on_real(self): assert pf.real(5) == 5
-	def test_imag_on_real(self): assert pf.imag(5) == 0
+	def test_real(self):         assert calc('real( 3+4i') == 3
+	def test_imag(self):         assert calc('imag( 3+4i') == 4
+	def test_conj(self):         assert calc('conj( 3+4i') == 3-4j
+	def test_angle(self):        assert calc('angle( 1i') == approx(math.pi / 2)
+	def test_real_on_real(self): assert calc('real( 5') == 5
+	def test_imag_on_real(self): assert calc('imag( 5') == 0
 
 
 # ── Coordinate conversions ────────────────────────────────────────────────────
@@ -1119,73 +1098,74 @@ class TestCoordinates:
 
 class TestDistributions:
 	def test_normalcdf_median(self):
-		assert pf.normalcdf(-1e99, 0) == approx(0.5, rel=1e-4)
+		assert calc('normalcdf( ~1e99,0') == approx(0.5, rel=1e-4)
 
 	def test_normalcdf_68_rule(self):
-		assert pf.normalcdf(-1, 1) == approx(0.6827, rel=1e-3)
+		assert calc('normalcdf( ~1,1') == approx(0.6827, rel=1e-3)
 
 	def test_inv_norm_median(self):
-		assert pf.inv_norm(0.5) == approx(0, abs=1e-6)
+		assert calc('invNorm( 0.5') == approx(0, abs=1e-6)
 
 	def test_inv_norm_roundtrip(self):
-		assert pf.normalcdf(-1e99, pf.inv_norm(0.9)) == approx(0.9, rel=1e-4)
+		x = calc('invNorm( 0.9')
+		assert calc(f'normalcdf( ~1e99,{x}') == approx(0.9, rel=1e-4)
 
 	def test_normalpdf_peak(self):
 		# PDF peaks at x=μ with value 1/sqrt(2π)
-		assert pf.normalpdf(0) == approx(1 / math.sqrt(2 * math.pi))
+		assert calc('normalpdf( 0') == approx(1 / math.sqrt(2 * math.pi))
 
 	def test_binompdf(self):
 		# P(X=5) for Binomial(10, 0.5) = C(10,5)/2^10
-		assert pf.binompdf(10, 0.5, 5) == approx(252 / 1024)
+		assert calc('binompdf( 10,0.5,5') == approx(252 / 1024)
 
 	def test_binomcdf_all(self):
-		assert pf.binomcdf(10, 0.5, 10) == approx(1)
+		assert calc('binomcdf( 10,0.5,10') == approx(1)
 
 	def test_poissonpdf(self):
-		assert pf.poissonpdf(3, 3) == approx(math.exp(-3) * 27 / 6)
+		assert calc('poissonpdf( 3,3') == approx(math.exp(-3) * 27 / 6)
 
 	def test_poissoncdf_all(self):
-		assert pf.poissoncdf(3, 50) == approx(1)
+		assert calc('poissoncdf( 3,50') == approx(1)
 
 	def test_geometpdf_first(self):
 		# P(X=1) = p
-		assert pf.geometpdf(0.3, 1) == approx(0.3)
+		assert calc('geometpdf( 0.3,1') == approx(0.3)
 
 	def test_geometcdf(self):
-		assert pf.geometcdf(0.5, 1) == approx(0.5)
+		assert calc('geometcdf( 0.5,1') == approx(0.5)
 
 	def test_tcdf_symmetric(self):
 		# t-distribution is symmetric; CDF(-∞, 0) = 0.5
-		assert pf.tcdf(-1e9, 0, df=10) == approx(0.5, rel=1e-4)
+		assert calc('tcdf( ~1e9,0,10') == approx(0.5, rel=1e-4)
 
 	def test_chi_sq_cdf_zero(self):
-		assert pf.chi_sq_cdf(0, 0, df=5) == approx(0, abs=1e-6)
+		assert calc('χ²cdf( 0,0,5') == approx(0, abs=1e-6)
 
 	def test_invt_roundtrip(self):
-		from purefunctions import invt
-		assert pf.tcdf(-1e9, invt(0.9, 10), 10) == approx(0.9, rel=1e-4)
+		x = calc('invT( 0.9,10')
+		assert calc(f'tcdf( ~1e9,{x},10') == approx(0.9, rel=1e-4)
 
 
 # ── String functions ──────────────────────────────────────────────────────────
 
 class TestStrings:
 	def test_length(self):
-		assert pf.length(TiString.from_str("HELLO")) == 5
+		assert calc('length( "HELLO"') == 5
 
 	def test_length_empty(self):
-		assert pf.length(TiString.from_str("")) == 0
+		assert calc('length( ""') == 0
 
 	def test_in_string_found(self):
-		assert pf.in_string(TiString.from_str("HELLO"), TiString.from_str("ELL")) == 2
+		assert calc('inString( "HELLO","ELL"') == 2
 
 	def test_in_string_not_found(self):
-		assert pf.in_string(TiString.from_str("HELLO"), TiString.from_str("XYZ")) == 0
+		assert calc('inString( "HELLO","XYZ"') == 0
 
 	def test_in_string_with_start(self):
-		assert pf.in_string(TiString.from_str("ABAB"), TiString.from_str("AB"), 3) == 3
+		assert calc('inString( "ABAB","AB",3') == 3
 
 	def test_sub(self):
-		result = pf.sub(TiString.from_str("HELLO"), 2, 3)
+		result = calc('sub( "HELLO",2,3')
 		assert str(result) == "ELL"
 
 
@@ -1193,60 +1173,60 @@ class TestStrings:
 
 class TestDateTime:
 	def test_timecnv(self):
-		assert list(pf.timecnv(3661)) == [0, 1, 1, 1]
+		assert list(calc('timeCnv( 3661')) == [0, 1, 1, 1]
 
 	def test_timecnv_days(self):
 		# 1 day + 1 hr + 1 min + 1 sec = 86400+3600+60+1 = 90061
-		assert list(pf.timecnv(90061)) == [1, 1, 1, 1]
+		assert list(calc('timeCnv( 90061')) == [1, 1, 1, 1]
 
 	def test_timecnv_negative(self):
-		assert list(pf.timecnv(-3661)) == [0, -1, -1, -1]
+		assert list(calc('timeCnv( ~3661')) == [0, -1, -1, -1]
 
 	def test_dayofwk_wednesday(self):
-		assert pf.dayofwk(2024, 12, 25) == 4   # Wednesday
+		assert calc('dayOfWk( 2024,12,25') == 4   # Wednesday
 
 	def test_dayofwk_sunday(self):
-		assert pf.dayofwk(2023, 1, 1) == 1     # Sunday
+		assert calc('dayOfWk( 2023,1,1') == 1     # Sunday
 
 	def test_dbd_mmddyy(self):
 		# MM.DDYY: Dec 25 → Dec 31 2024
-		assert pf.dbd(12.2524, 12.3124) == 6
+		assert calc('dbd( 12.2524,12.3124') == 6
 
 	def test_dbd_negative(self):
-		assert pf.dbd(12.3124, 12.2524) == -6
+		assert calc('dbd( 12.3124,12.2524') == -6
 
 	def test_dbd_ddmmyy_leap(self):
 		# DDMM.YY: Jan 17 1996 → Jan 17 1997 (1996 is a leap year → 366 days)
-		assert pf.dbd(1701.96, 1701.97) == 366
+		assert calc('dbd( 1701.96,1701.97') == 366
 
 	def test_dbd_mmddyy_leap(self):
 		# MM.DDYY same dates — formats can be mixed or used separately
-		assert pf.dbd(1.1796, 1.1797) == 366
+		assert calc('dbd( 1.1796,1.1797') == 366
 
 	def test_dbd_mixed_formats(self):
 		# Doc example: dbd(612.07, 2512.07) = 19
 		# DDMM.YY: 612.07 → Dec 6 2007; 2512.07 → Dec 25 2007
-		assert pf.dbd(612.07, 2512.07) == 19
+		assert calc('dbd( 612.07,2512.07') == 19
 
 	def test_dbd_mmddyy_doc_example(self):
 		# Doc example: dbd(1.0207, 1.0107) = -1
 		# MM.DDYY: Jan 2 2007 → Jan 1 2007
-		assert pf.dbd(1.0207, 1.0107) == -1
+		assert calc('dbd( 1.0207,1.0107') == -1
 
 	def test_dbd_too_many_decimals_mmddyy(self):
 		# 5 decimal places in MM.DDYY → ERR:DOMAIN
 		with pytest.raises(DomainError, match="too many decimal places"):
-			pf.dbd(1.01075, 1.0107)
+			calc('dbd( 1.01075,1.0107')
 
 	def test_dbd_too_many_decimals_ddmmyy(self):
 		# 3 decimal places in DDMM.YY → ERR:DOMAIN
 		with pytest.raises(DomainError, match="too many decimal places"):
-			pf.dbd(1701.961, 1701.97)
+			calc('dbd( 1701.961,1701.97')
 
 	def test_dbd_ambiguous_integer(self):
 		# Integer part 13–99 is invalid
 		with pytest.raises(DomainError, match="ambiguous"):
-			pf.dbd(50.0101, 51.0101)
+			calc('dbd( 50.0101,51.0101')
 
 	def test_setdate_getdate(self):
 		e = Environment()

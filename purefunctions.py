@@ -19,7 +19,7 @@ from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
 	DomainError, StatError, ArgumentError,
 )
-from decorators import pure_func, pure_vectorized
+from decorators import pure_func, pure_vectorized, vectorized
 
 
 
@@ -34,32 +34,30 @@ def handle_complex(func):
 
 
 def matrix_vectorized(func):
-	"""Like vectorized, but also applies element-wise to a TiMatrix first argument."""
-	vec = pure_vectorized(func)
+	"""Like pure_vectorized, but also applies element-wise to a TiMatrix first argument."""
+	vec = vectorized(func)
 	@wraps(func)
 	def apply(a, *args):
-		print(a)
 		if isinstance(a, TiMatrix):
 			return a.transform(lambda x: func(x, *args))
 		return vec(a, *args)
-	return apply
+	return pure_func(apply)
 
 
 # ── Logical operators ────────────────────────────────────────────────────────────
 
-@pure_vectorized
+@vectorized
 def and_(a, b):
 	return int(bool(require_real(a)) and bool(require_real(b)))
 
-@pure_vectorized
+@vectorized
 def or_(a, b):
 	return int(bool(require_real(a)) or bool(require_real(b)))
 
-@pure_vectorized
+@vectorized
 def xor(a, b):
 	return int(bool(require_real(a)) ^ bool(require_real(b)))
 
-@pure_func
 def inv(x):
 	if isinstance(x, TiMatrix):
 		return x.inv()
@@ -108,7 +106,7 @@ def cbrt(x):
 	require_num(x)
 	return cmath.exp(cmath.log(x) / 3) if isinstance(x, complex) else math.cbrt(x)
 
-@pure_vectorized
+@vectorized
 def xth_root(n, x):
 	require_num(x)
 	return cmath.exp(cmath.log(x) / n) if isinstance(x, complex) or x < 0 else x ** (1 / n)
@@ -209,8 +207,7 @@ def sub(*args):
 
 # ── Aggregate / statistics ───────────────────────────────────────────────────────
 
-@pure_func
-def variance(lst, freqlist=None):
+def _variance(lst, freqlist=None):
 	require_list(lst)
 	if len(lst) == 0:
 		raise InvalidDimError("variance: list is empty")
@@ -218,20 +215,22 @@ def variance(lst, freqlist=None):
 		n = len(lst)
 		if n < 2:
 			raise StatError("stdDev: need at least 2 elements")
-		m = mean(lst)
+		m = _mean(lst)
 		return builtins.sum((x - m) ** 2 for x in lst) / (n - 1)
 	require_list(freqlist)
 	if len(lst) != len(freqlist):
 		raise DimMismatchError("stdDev: dim mismatch")
-	m = mean(lst, freqlist)
+	m = _mean(lst, freqlist)
 	total_w = builtins.sum(freqlist)
 	if total_w <= 1:
 		raise StatError("stdDev: total frequency must be > 1")
 	return builtins.sum(w * (x - m) ** 2 for x, w in zip(lst, freqlist)) / (total_w - 1)
 
+variance = pure_func(_variance)
+
 @pure_func
 def stddev(lst, freqlist=None):
-	return math.sqrt(variance(lst, freqlist))
+	return math.sqrt(_variance(lst, freqlist))
 
 @matrix_vectorized
 def round(x, decimals=9):
@@ -290,8 +289,7 @@ def median(lst, freqlist=None):
 		return nth(total // 2)
 	return (nth(total // 2 - 1) + nth(total // 2)) / 2
 
-@pure_func
-def mean(lst, freqlist=None):
+def _mean(lst, freqlist=None):
 	require_list(lst)
 	if len(lst) == 0:
 		raise InvalidDimError("mean: list is empty")
@@ -300,10 +298,12 @@ def mean(lst, freqlist=None):
 	require_list(freqlist)
 	return builtins.sum(x * w for x, w in zip(lst, freqlist)) / builtins.sum(freqlist)
 
+mean = pure_func(_mean)
+
 
 @matrix_vectorized
 def abs(x):
-	return builtins.abs(require_num(a))
+	return builtins.abs(require_num(x))
 
 @pure_func
 def det(mat):
@@ -332,7 +332,6 @@ def identity(n):
 	n = require_int(n)
 	return TiMatrix([[1 if r == c else 0 for c in range(n)] for r in range(n)])
 
-@pure_func
 def transpose(mat):
 	require_matrix(mat)
 	return TiMatrix([[mat.data[r][c] for r in range(mat.rows)] for c in range(mat.cols)])
@@ -417,21 +416,21 @@ def atanh(x):
 
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
 
-@pure_vectorized
+@vectorized
 def factorial(n):
 	try:
 		return math.gamma(require_real(n) + 1)
 	except ValueError:
 		raise DomainError(f"factorial: undefined for {n} (negative integer)")
 
-@pure_vectorized
+@vectorized
 def ncr(n, r):
 	try:
 		return math.comb(require_int(n), require_int(r))
 	except ValueError:
 		raise DomainError(f"nCr: invalid arguments ({n}, {r})")
 
-@pure_vectorized
+@vectorized
 def npr(n, r):
 	try:
 		return math.perm(require_int(n), require_int(r))
@@ -452,8 +451,8 @@ def remainder(a, b):
 	b = require_int(b)
 	if a < 0:
 		raise DomainError(f"a must be non-negative but got {a}")
-	if a < 1:
-		raise DomainError(f"b must be positive but got {a}")
+	if b < 1:
+		raise DomainError(f"b must be positive but got {b}")
 	return a % b
 
 # ── Random ──────────────────────────────────────────────────────────────────────
@@ -462,7 +461,7 @@ def remainder(a, b):
 def rand_list(n):
 	return TiList([random.random() for _ in range(require_int(n))])
 
-# TODO: @vectorized
+@vectorized
 def _rand_int_single(low, high):
 	return random.randint(require_int(low), require_int(high))
 
@@ -591,7 +590,7 @@ def timecnv(seconds):
 	"""Convert a number of seconds into {days, hours, minutes, seconds}."""
 	seconds = require_int(seconds)
 	sign = -1 if seconds < 0 else 1
-	remaining, secs = divmod(abs(seconds), 60)
+	remaining, secs = divmod(builtins.abs(seconds), 60)
 	remaining, minutes = divmod(remaining, 60)
 	days, hours = divmod(remaining, 24)
 	return sign * TiList([days, hours, minutes, secs])
@@ -602,7 +601,6 @@ def dayofwk(year, month, day):
 	d = date(require_int(year), require_int(month), require_int(day))
 	return d.isoweekday() % 7 + 1
 
-@pure_func
 def _parse_dbd_date(d):
 	"""Parse a TI Finance date float into a date object.
 
@@ -620,7 +618,7 @@ def _parse_dbd_date(d):
 		# MM.DDYY: 4 decimal digits expected
 		raw = frac_part * 10000
 		ddyy = builtins.round(raw)
-		if abs(raw - ddyy) > 1e-6:
+		if builtins.abs(raw - ddyy) > 1e-6:
 			raise DomainError(f"dbd: too many decimal places in MM.DDYY date {d!r}")
 		month = int_part
 		day, yy = divmod(ddyy, 100)
@@ -628,7 +626,7 @@ def _parse_dbd_date(d):
 		# DDMM.YY: 2 decimal digits expected
 		raw = frac_part * 100
 		yy  = builtins.round(raw)
-		if abs(raw - yy) > 1e-6:
+		if builtins.abs(raw - yy) > 1e-6:
 			raise DomainError(f"dbd: too many decimal places in DDMM.YY date {d!r}")
 		day, month = divmod(int_part, 100)
 	else:
@@ -839,8 +837,7 @@ def normalcdf(lower, upper, mu=0, sigma=1):
 		return 0.5 * (1 + math.erf(z / math.sqrt(2)))
 	return _cdf((upper - mu) / sigma) - _cdf((lower - mu) / sigma)
 
-@pure_func
-def inv_norm(p, mu=0, sigma=1):
+def _inv_norm(p, mu=0, sigma=1):
 	require_real(p)
 	require_real(mu)
 	require_real(sigma)
@@ -868,15 +865,17 @@ def inv_norm(p, mu=0, sigma=1):
 	z = _inv_std(p)
 	return mu + sigma * z
 
-@pure_func
-def tpdf(t, df):
+inv_norm = pure_func(_inv_norm)
+
+def _tpdf(t, df):
 	require_real(t)
 	require_real(df)
 	log_coeff = math.lgamma((df + 1) / 2) - 0.5 * math.log(df * math.pi) - math.lgamma(df / 2)
 	return math.exp(log_coeff - (df + 1) / 2 * math.log(1 + t * t / df))
 
-@pure_func
-def tcdf(lower, upper, df):
+tpdf = pure_func(_tpdf)
+
+def _tcdf(lower, upper, df):
 	require_real(lower)
 	require_real(upper)
 	require_real(df)
@@ -891,6 +890,8 @@ def tcdf(lower, upper, df):
 			return 0.5 * ib
 	return _t_cdf(upper, df) - _t_cdf(lower, df)
 
+tcdf = pure_func(_tcdf)
+
 @pure_func
 def invt(p, df):
 	require_real(p)
@@ -900,10 +901,10 @@ def invt(p, df):
 	if p >= 1:
 		return 1e99
 	# Newton's method starting from normal approximation
-	x = inv_norm(p)
+	x = _inv_norm(p)
 	for _ in range(50):
-		fx = tcdf(-1e99, x, df) - p
-		fpx = tpdf(x, df)
+		fx = _tcdf(-1e99, x, df) - p
+		fpx = _tpdf(x, df)
 		# TODO: calculator doesn't go below 1e-99
 		if builtins.abs(fpx) < 1e-300:
 			break
