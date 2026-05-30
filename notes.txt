@@ -1,3 +1,5 @@
+Statements vs lines: Lines are separated by NEWLINE, statements are separated by NEWLINE or COLON. Can you go through the parser and make sure this terminology is consistent? For example, parse_statement seems like it parses the entire input; the inner loop parses "statements" (which are treated the same as lines, I guess, other than colons don't break strings.) Both that method and the public API "parse_line" should probably signal that they parse the entire token stream (which they do, right?)
+
 vectorized: require_number???
 
 solve( fMin( fMax(
@@ -10,23 +12,30 @@ Custom numeric classes for formatting?
 
 Aho-Corasick parser for testing
 
-Do we need a purefunctions equivalent for Environment?
-
 Make sure deg symbol vs D/M/S format is working
-
-trig functions actually do need access to the environment so they can see what mode the calculator is in!
-Coordinate conversion use these trig functions so they also need it.
 
 move vectorized to tiobjects
 
 new function paradigm: decorators for everything
 
-enum for RADIAN/DEGREE
 make them IntEnums for easier testing?
 
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+Do we need a purefunctions equivalent for Environment?
+enum for RADIAN/DEGREE
+trig functions actually do need access to the environment so they can see what mode the calculator is in!
+Coordinate conversion use these trig functions so they also need it.
+
+So there are basically three types of functions: pure functions (consume all available params), env functions(same as pure, but also pass env), and forms (custom parsing)
+Here are some other ideas for reorganization:
+* Basically keep the decorators I have, but the four that transform the function into taking ArgParser as input actually return a full object with a __call__ method. __call__ calls the original method (with vectorization, if applicable), but the new object also has a method call_wuth_parser (or something else) that only the TI-Basic parser calls.
+* Go back to using different optional params: pure, env, or form, which apply one of two wrappers (or no wrapper). Basically what I was doing before, but add a third field for wrapping functions that need env but no special parsong.
+* Decorators more like this: ti_function(env=True, vectorized=True) just to be more explicit
+* Don't do anything radical and just move some of the code around to organize it better.
+What do you think of these?
 
 Equ►String( String►Equ(
 ►Nom( ►Eff(

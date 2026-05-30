@@ -1819,8 +1819,9 @@ class TestThunkCapture:
 		assert env.ans.data == [3, 3, 3]
 
 	def test_colon_inside_thunk_raises(self, env):
-		# seq(X:5, X, 1, 3) — colon crosses a statement boundary; rejected at capture time
-		with pytest.raises(TiSyntaxError, match="arguments"):
+		# seq(X:5, X, 1, 3) — colon terminates the statement; seq sees only 'X' as its
+		# formula and then fails on the missing variable argument (ERR:ARGUMENT on hardware)
+		with pytest.raises(ArgumentError):
 			calc('seq( X:5,X,1,3)', env)
 
 	def test_store_inside_thunk_raises(self, env):

@@ -50,8 +50,15 @@ class Parser:
 		self.pos += 1
 		return t
 
-	def eat_if(self, tok: Token) -> bool:
-		if self.peek() is tok:
+	def eat_if(self, tok) -> bool:
+		"""Consume the next token if it matches.
+
+		tok may be a single Token (identity check) or a set/frozenset of Tokens
+		(membership check).  Returns True and advances iff the token matched.
+		"""
+		t = self.peek()
+		matched = t in tok if isinstance(tok, (set, frozenset)) else t is tok
+		if matched:
 			self.pos += 1
 			return True
 		return False
@@ -61,8 +68,9 @@ class Parser:
 			raise TiSyntaxError(f"Expected {tok}, got {self.peek()}")
 		self.pos += 1
 
-	def at_end(self) -> bool:
-		return self.peek() is EOF_TOKEN
+	def at_statement_end(self) -> bool:
+		"""True when the current position is at a statement boundary (COLON, NEWLINE, or EOF)."""
+		return self.peek() in {COLON, NEWLINE, EOF_TOKEN}
 
 	def close_delimiter(self, expected: Token) -> bool:
 		"""Consume expected closer, or implicitly close at statement boundaries.
@@ -142,9 +150,10 @@ class Parser:
 		return self._parse_dms_num(value)
 
 	def parse_string_literal(self) -> TiString:
-		"""Opening \" already consumed. Reads until the next \" or end of line."""
+		"""Opening \" already consumed. Reads until closing \", STORE, NEWLINE, or EOF.
+		Colons are valid string content; newlines implicitly terminate the string."""
 		tokens = []
-		while not (self.at_end() or self.peek() is STORE):
+		while not self.peek() in {STORE, NEWLINE, EOF_TOKEN}:
 			if self.eat_if(QUOTE):
 				break
 			tokens.append(self.advance())
@@ -187,8 +196,11 @@ class Parser:
 		"""Return a Thunk for the tokens up to the next top-level COMMA or R_PAREN.
 		Tracks open delimiters on a stack so interior commas in nested
 		groups (function calls, {…}, [[…]], "…") are not mistaken for
-		argument separators. Raises on COLON, NEWLINE, and STORE — statement-
-		level tokens that must not appear inside a formula argument."""
+		argument separators.
+
+		NEWLINE implicitly closes all open delimiters (including inside strings).
+		COLON is a statement separator outside strings but is valid string content.
+		STORE (→) is always an error inside a formula argument."""
 		start = self.pos
 		stack: list[Token] = []   # expected closers, innermost on top
 		in_string = False
@@ -197,8 +209,14 @@ class Parser:
 			if in_string:
 				if t is QUOTE:
 					in_string = False
-			elif t in {STORE, COLON, NEWLINE}:
-				raise TiSyntaxError(f"Unexpected {t} inside function arguments")
+				elif t is NEWLINE:
+					in_string = False  # newline terminates the string
+					break              # …and implicitly closes all delimiters
+			elif t is STORE:
+				# I'm not sure this comes up, but is this right? STORE should maybe break line COLON
+				raise TiSyntaxError(f"Unexpected → inside function arguments")
+			elif t in {COLON, NEWLINE, EOF_TOKEN}:
+				break  # statement boundary: implicitly close all open delimiters
 			elif t is QUOTE:
 				in_string = True
 			elif not stack and t in {COMMA, R_PAREN}:
@@ -249,7 +267,7 @@ class Parser:
 		return t.function.call_with_parser(ArgParser(self))
 
 	def parse_atom(self):
-		if self.at_end():
+		if self.at_statement_end():
 			raise TiSyntaxError("Expected an expression")
 
 		t = self.advance()
@@ -454,7 +472,7 @@ class Parser:
 
 	def parse_statement(self):
 		while True:
-			if self.at_end():
+			if self.at_statement_end():
 				return
 
 			if self.eat_if(PRGM):
@@ -472,7 +490,7 @@ class Parser:
 					value = self.advance().converter(value)
 				self.env.ans = value
 				
-			if not self.eat_if(COLON):
+			if not self.eat_if({COLON, NEWLINE}):
 				break
 
 		self.expect(EOF_TOKEN)
@@ -483,7 +501,6 @@ class Parser:
 def parse_line(tokens: list[Token], env: Environment):
 	"""Parse and evaluate a single program line."""
 	Parser(tokens, env).parse_statement()
-
 
 
 def _parse_method(method):
@@ -507,7 +524,7 @@ class ArgParser:
 
 	def _is_closing(self) -> bool:
 		"""True when the current position marks the natural end of the argument list."""
-		return self._parser.at_end() or self._parser.peek() is R_PAREN
+		return self._parser.peek() in {R_PAREN, NEWLINE, EOF_TOKEN}
 
 	def _eat_close(self) -> None:
 		"""Consume the closing delimiter if present."""
@@ -589,7 +606,7 @@ class ArgParser:
 		return self._parser.peek()
 
 
-class StatementArgParser(ArgParser):
+class CommandArgParser(ArgParser):
 	"""ArgParser variant for no-paren commands.
 
 	Overrides only the two closing-delimiter hooks so that _arg needs no duplication:
@@ -599,16 +616,15 @@ class StatementArgParser(ArgParser):
 	"""
 
 	def _is_closing(self) -> bool:
-		return self._parser.at_end() or self._parser.peek() in {COLON, NEWLINE}
+		return self._parser.at_statement_end()
 
 	def _eat_close(self) -> None:
 		pass  # no closing paren in no-paren commands
 
 	def end(self):
 		"""Assert that the token stream is at a statement boundary (COLON, NEWLINE, or EOF)."""
-		t = self._parser.peek()
-		if not self._parser.at_end() and t not in {COLON, NEWLINE}:
-			raise TiSyntaxError(f"Expected end of statement after command, got {t}")
+		if not self._parser.at_statement_end():
+			raise TiSyntaxError(f"Expected end of statement after command, got {self._parser.peek()}")
 
 
 if __name__ == '__main__':
