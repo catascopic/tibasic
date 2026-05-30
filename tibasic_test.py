@@ -57,6 +57,21 @@ def calc(items, env: Environment | None = None):
 	return env.ans
 
 
+def var(env: Environment, name: str):
+	"""Read a numeric variable by its TI-BASIC name (e.g. 'A', 'Z', 'θ').
+
+	Returns the raw stored value (None if the variable has never been written),
+	bypassing NumericVar's auto-initialise-to-zero side-effect.  Intended for
+	test assertions only — not for production use.
+	"""
+	from environment import NumericVar
+	tok = lookup[name]
+	v = tok.variable
+	if not isinstance(v, NumericVar):
+		raise TypeError(f"{name!r} is not a numeric variable")
+	return env.numerics[v.index]
+
+
 @pytest.fixture
 def env():
 	return Environment()

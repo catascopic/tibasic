@@ -79,3 +79,9 @@ class IllegalNestError(TiError):
 class LabelError(TiError):
 	"""ERR:LABEL — a Goto references a label that does not exist in the program."""
 	code = 'LABEL'
+
+
+class InvalidCommandError(TiError):
+	"""ERR:INVALID — a command was executed in a context where it is not allowed
+	(e.g. a block-level command run from the home screen instead of a program)."""
+	code = 'INVALID'

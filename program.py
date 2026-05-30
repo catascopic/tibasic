@@ -49,8 +49,8 @@ class ForBlock(Block):
 		new_val = self.var.get(parser.env) + self.step
 		self.var.set(parser.env, new_val)
 		if _for_continues(new_val, self.end_val, self.step):
-			prog.push_block(self)         # keep alive for the next iteration
-			parser.pos = self.pos         # jump back to separator before body
+			prog.push_block(self)  # keep alive for the next iteration
+			parser.pos = self.pos  # jump back to separator before body
 
 
 @dataclass

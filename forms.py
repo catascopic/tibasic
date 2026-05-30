@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 from decorators import forms_func, no_paren_func
-from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, TiSyntaxError
+from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, TiSyntaxError, InvalidCommandError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
 
@@ -264,7 +264,7 @@ def if_cmd(a):
 	if next_tok is THEN:
 		prog = a.current_program
 		if prog is None:
-			raise TiSyntaxError("Then without enclosing program")
+			raise InvalidCommandError("If/Then cannot be used outside a program")
 		prog._pending_if_result = cond
 	elif not cond:
 		# One-line If: condition is False → skip the following statement
@@ -279,7 +279,7 @@ def then_cmd(a):
 	p = a._parser
 	prog = a.current_program
 	if prog is None:
-		raise TiSyntaxError("Then without enclosing program")
+		raise InvalidCommandError("Then cannot be used outside a program")
 	result = prog._pending_if_result
 	prog._pending_if_result = None
 	if result is None:
@@ -304,7 +304,7 @@ def else_cmd(a):
 	p = a._parser
 	prog = a.current_program
 	if prog is None:
-		raise TiSyntaxError("Else without enclosing program")
+		raise InvalidCommandError("Else cannot be used outside a program")
 	from program import ThenBlock
 	block = prog.pop_block()
 	if not isinstance(block, ThenBlock):
@@ -315,6 +315,9 @@ def else_cmd(a):
 @no_paren_func
 def while_cmd(a):
 	"""While condition — loop while condition is True."""
+	prog = a.current_program
+	if prog is None:
+		raise InvalidCommandError("While cannot be used outside a program")
 	p = a._parser
 	cond_start = p.pos
 	val = bool(a.expr())
@@ -324,7 +327,7 @@ def while_cmd(a):
 		from parser import Thunk
 		from program import WhileBlock
 		thunk = Thunk(p.tokens[cond_start:cond_end], p.env)
-		a.current_program.push_block(WhileBlock(pos=p.pos, condition=thunk))
+		prog.push_block(WhileBlock(pos=p.pos, condition=thunk))
 	else:
 		p.scan_block_end()
 
@@ -332,6 +335,9 @@ def while_cmd(a):
 @no_paren_func
 def repeat_cmd(a):
 	"""Repeat condition — loop until condition is True (body executes at least once)."""
+	prog = a.current_program
+	if prog is None:
+		raise InvalidCommandError("Repeat cannot be used outside a program")
 	p = a._parser
 	cond_start = p.pos
 	a.expr()  # parse but discard — condition is only checked at End
@@ -340,12 +346,15 @@ def repeat_cmd(a):
 	from parser import Thunk
 	from program import RepeatBlock
 	thunk = Thunk(p.tokens[cond_start:cond_end], p.env)
-	a.current_program.push_block(RepeatBlock(pos=p.pos, condition=thunk))
+	prog.push_block(RepeatBlock(pos=p.pos, condition=thunk))
 
 
 @forms_func
 def for_cmd(a):
 	"""For(var, start, end[, step]) — iterate a numeric variable over a range."""
+	prog = a.current_program
+	if prog is None:
+		raise InvalidCommandError("For( cannot be used outside a program")
 	from program import ForBlock, _for_continues
 	var_tok = a.numeric_var()
 	variable = var_tok.variable
@@ -356,7 +365,7 @@ def for_cmd(a):
 	p = a._parser
 	variable.set(a.env, start)
 	if _for_continues(start, end_val, step):
-		a.current_program.push_block(ForBlock(pos=p.pos, var=variable, end_val=end_val, step=step))
+		prog.push_block(ForBlock(pos=p.pos, var=variable, end_val=end_val, step=step))
 	else:
 		p.scan_block_end()
 
@@ -368,7 +377,7 @@ def end_cmd(a):
 	p = a._parser
 	prog = a.current_program
 	if prog is None:
-		raise TiSyntaxError("End without enclosing program")
+		raise InvalidCommandError("End cannot be used outside a program")
 	prog.pop_block().on_end(prog, p)
 
 
@@ -376,6 +385,7 @@ def end_cmd(a):
 def lbl_cmd(a):
 	"""Lbl name — mark a label; no-op at runtime."""
 	a.label_name()
+	a.end()
 
 
 @no_paren_func
@@ -383,7 +393,7 @@ def goto_cmd(a):
 	"""Goto name — jump to the named label in the current program."""
 	prog = a.current_program
 	if prog is None:
-		raise TiSyntaxError("Goto outside program")
+		raise InvalidCommandError("Goto cannot be used outside a program")
 	prog.goto(a.label_name())
 
 

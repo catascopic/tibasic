@@ -708,7 +708,6 @@ class CommandArgParser(ArgParser):
 
 if __name__ == '__main__':
 	from tibasic_test import toks, calc
-	from tokens import INV
 
 	env = Environment()
 
