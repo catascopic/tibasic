@@ -4,9 +4,10 @@ from numbers import Number
 from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
 	Token,
-	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE, 
+	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
 	COMMA, DOT, NEG, COLON, NEWLINE, PRGM,
 	LIST_PREFIX, RAND, DIM, SCI_E, DEG, RAD, APOS,
+	THEN, FOR, WHILE, REPEAT, END, ELSE,
 )
 from environment import Environment, Variable, UserListVar
 from errors import TiSyntaxError, ArgumentError, DataTypeError
@@ -71,6 +72,10 @@ class Parser:
 	def at_statement_end(self) -> bool:
 		"""True when the current position is at a statement boundary (COLON, NEWLINE, or EOF)."""
 		return self.peek() in {COLON, NEWLINE, EOF_TOKEN}
+
+	def eat_statement_sep(self) -> bool:
+		"""Consume one COLON or NEWLINE separator if present.  Returns True iff consumed."""
+		return self.eat_if({COLON, NEWLINE})
 
 	def close_delimiter(self, expected: Token) -> bool:
 		"""Consume expected closer, or implicitly close at statement boundaries.
@@ -488,10 +493,38 @@ class Parser:
 				value = self.advance().converter(value)
 			self.env.ans = value
 
+	def scan_block_end(self, also_stop_at_else: bool = False) -> Token:
+		"""Scan forward to the matching End (or Else if *also_stop_at_else* is True).
+
+		Tracks block depth: THEN / FOR / WHILE / REPEAT increase depth; END
+		decreases it.  At depth 0 the scan stops at END (always) or ELSE (when
+		*also_stop_at_else*).  Leaves pos just past the stopping token.
+		Respects string literals.  Raises TiSyntaxError if no match is found.
+		"""
+		depth = 0
+		in_string = False
+		while self.pos < len(self.tokens):
+			t = self.tokens[self.pos]
+			self.pos += 1
+			if in_string:
+				if t is QUOTE or t is NEWLINE:
+					in_string = False
+			elif t is QUOTE:
+				in_string = True
+			elif t in {THEN, FOR, WHILE, REPEAT}:
+				depth += 1
+			elif t is END:
+				if depth == 0:
+					return t
+				depth -= 1
+			elif also_stop_at_else and t is ELSE and depth == 0:
+				return t
+		raise TiSyntaxError("Unmatched block: End not found")
+
 	def run(self):
 		"""Execute all statements in the token stream until EOF."""
 		while True:
-			if not self.eat_if(EOF_TOKEN):
+			if self.peek() is EOF_TOKEN:
 				return
 			if not self.at_statement_end():  # empty statements are valid no-ops
 				self._exec_statement()
@@ -550,7 +583,7 @@ class ArgParser:
 
 	def _is_closing(self) -> bool:
 		"""True when the current position marks the natural end of the argument list."""
-		return self._parser.peek() in {R_PAREN, NEWLINE, EOF_TOKEN}
+		return self._parser.peek() in {R_PAREN, COLON, NEWLINE, EOF_TOKEN}
 
 	def _eat_close(self) -> None:
 		"""Consume the closing delimiter if present."""

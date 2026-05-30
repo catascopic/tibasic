@@ -6,7 +6,7 @@ if TYPE_CHECKING:
 	from parser import Thunk
 
 from environment import Environment, Variable
-from errors import TiSyntaxError
+from errors import TiSyntaxError, ReturnSignal
 from parser import Parser, EOF_TOKEN
 from tokens import COLON, NEWLINE, QUOTE
 
@@ -70,6 +70,8 @@ class Program:
 		self._env.program_stack.append(self)
 		try:
 			self._parser.run()
+		except ReturnSignal:
+			pass  # normal sub-program return; stop executing this program
 		finally:
 			self._env.program_stack.pop()
 
