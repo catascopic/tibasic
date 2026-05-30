@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 from decorators import env_func, env_vectorized
+from environment import Environment
 from errors import DomainError
 from tiobjects import require_real, require_int, require_str
 
@@ -139,30 +140,10 @@ def expr(env, string):
 
 # ── Clock / date-time ─────────────────────────────────────────────────────────
 
-@env_func
-def set_date(env, year, month, day):
-	env.set_date(year, month, day)
-
-@env_func
-def set_time(env, hour, minute, second):
-	env.set_time(hour, minute, second)
-
-@env_func
-def check_tmr(env, start):
-	return env.check_tmr(start)
-
-@env_func
-def set_dt_fmt(env, fmt):
-	env.set_dt_fmt(fmt)
-
-@env_func
-def set_tm_fmt(env, fmt):
-	env.set_tm_fmt(fmt)
-
-@env_func
-def get_dt_str(env, fmt):
-	return env.get_dt_str(fmt)
-
-@env_func
-def get_tm_str(env, fmt):
-	return env.get_tm_str(fmt)
+set_date   = env_func(Environment.set_date)
+set_time   = env_func(Environment.set_time)
+check_tmr  = env_func(Environment.check_tmr)
+set_dt_fmt = env_func(Environment.set_dt_fmt)
+set_tm_fmt = env_func(Environment.set_tm_fmt)
+get_dt_str = env_func(Environment.get_dt_str)
+get_tm_str = env_func(Environment.get_tm_str)
