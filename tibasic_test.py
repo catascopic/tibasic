@@ -5,6 +5,7 @@ import pytest
 from pytest import approx
 
 from environment import Environment
+from modes import AngleMode
 from errors import (
 	TiSyntaxError, IllegalNestError, DomainError, DimMismatchError,
 	StatError, IncrementError, DataTypeError, InvalidDimError, ArgumentError,
@@ -63,7 +64,7 @@ def env():
 @pytest.fixture
 def deg():
 	e = Environment()
-	e.angle_mode = 'DEG'
+	e.angle_mode = AngleMode.DEG
 	return e
 
 
@@ -249,24 +250,12 @@ class TestTrig:
 	def test_acos(self):  assert calc(f'cos¹( 1') == approx(0)
 	def test_atan(self):  assert calc(f'tan¹( 1') == approx(math.pi / 4)
 	# DEG mode
-	def test_sin_deg(self):
-		env = Environment(); env.angle_mode = 'DEG'
-		assert calc('sin( 30', env) == approx(0.5)
-	def test_cos_deg(self):
-		env = Environment(); env.angle_mode = 'DEG'
-		assert calc('cos( 0', env) == approx(1)
-	def test_tan_deg(self):
-		env = Environment(); env.angle_mode = 'DEG'
-		assert calc('tan( 45', env) == approx(1)
-	def test_asin_deg(self):
-		env = Environment(); env.angle_mode = 'DEG'
-		assert calc('sin¹( 0.5', env) == approx(30)
-	def test_acos_deg(self):
-		env = Environment(); env.angle_mode = 'DEG'
-		assert calc('cos¹( 1', env) == approx(0)
-	def test_atan_deg(self):
-		env = Environment(); env.angle_mode = 'DEG'
-		assert calc('tan¹( 1', env) == approx(45)
+	def test_sin_deg(self, deg):  assert calc('sin( 30',   deg) == approx(0.5)
+	def test_cos_deg(self, deg):  assert calc('cos( 0',    deg) == approx(1)
+	def test_tan_deg(self, deg):  assert calc('tan( 45',   deg) == approx(1)
+	def test_asin_deg(self, deg): assert calc('sin¹( 0.5', deg) == approx(30)
+	def test_acos_deg(self, deg): assert calc('cos¹( 1',   deg) == approx(0)
+	def test_atan_deg(self, deg): assert calc('tan¹( 1',   deg) == approx(45)
 	# Hyperbolics stay in purefunctions, no angle mode
 	def test_sinh(self):  assert calc('sinh( 0') == approx(0)
 	def test_cosh(self):  assert calc('cosh( 0') == approx(1)
@@ -1181,17 +1170,9 @@ class TestCoordinates:
 		assert calc(f'R►Pr( {x},{y}') == approx(r)
 		assert calc(f'R►Pθ( {x},{y}') == approx(theta)
 
-	def test_r_ptheta_deg(self):
-		env = Environment(); env.angle_mode = 'DEG'
-		assert calc('R►Pθ( 1,0', env) == approx(0)
-
-	def test_p_rx_deg(self):
-		env = Environment(); env.angle_mode = 'DEG'
-		assert calc('P►Rx( 5,0', env) == approx(5)
-
-	def test_p_ry_deg(self):
-		env = Environment(); env.angle_mode = 'DEG'
-		assert calc('P►Ry( 5,90', env) == approx(5)
+	def test_r_ptheta_deg(self, deg): assert calc('R►Pθ( 1,0',  deg) == approx(0)
+	def test_p_rx_deg(self, deg):    assert calc('P►Rx( 5,0',  deg) == approx(5)
+	def test_p_ry_deg(self, deg):    assert calc('P►Ry( 5,90', deg) == approx(5)
 
 
 # ── Probability distributions ─────────────────────────────────────────────────

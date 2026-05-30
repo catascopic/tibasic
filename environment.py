@@ -7,6 +7,7 @@ from datetime import datetime, date, timedelta
 
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation
 from errors import DataTypeError, DomainError, IllegalNestError, UndefinedError
+from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 
 
 class _VarArray:
@@ -32,6 +33,7 @@ class _VarArray:
 class Environment:
 
 	def __init__(self):
+		# VARIABLES
 		self.numerics   = _VarArray(27, None, lambda n: chr(65+n) if n < 26 else 'θ') # A–Z, θ
 		self.lists      = _VarArray(6,  None, lambda n: f"L{n+1}")         # L1–L6
 		self.matrices   = _VarArray(10, None, lambda n: f"[{chr(65+n)}]")  # [A]–[J]
@@ -44,7 +46,26 @@ class Environment:
 		self.polar_equations = _VarArray(6,  None, lambda n: f'r{n + 1}')               # r1–r6
 		self.seq_equations   = _VarArray(3,  None, lambda n: 'uvw'[n])                  # u, v, w
 		self.n = None
-		self.ans              = 0
+		self.ans = 0
+		self.key_code = 0
+		# MODES
+		self.angle_mode    = AngleMode.RAD
+		self.number_mode   = NumberMode.NORMAL
+		self.fix_digits    = None           # None = Float, 0–9 = Fix N
+		self.graph_mode    = GraphMode.FUNC
+		self.complex_mode  = ComplexMode.REAL
+		self.draw_mode     = DrawMode.CONNECTED
+		self.graph_order   = GraphOrder.SEQUENTIAL
+		self.coord_on      = True
+		self.polar_gc      = False
+		self.axes_on       = True
+		self.grid_on       = False
+		self.label_on      = False
+		self.expr_on       = True
+		self.diagnostic_on = False
+		self.dt_fmt        = 1
+		self.tm_fmt        = 12
+		self.clock_on      = True
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
 		self.n_tvm = 0   # 𝐍  — number of payments
 		self.i_pct = 0   # I% — interest rate per period (as percentage)
@@ -53,25 +74,21 @@ class Environment:
 		self.fv    = 0   # FV — future value
 		self.py    = 1   # P/Y — payments per year
 		self.cy    = 1   # C/Y — compounding periods per year
-		self.angle_mode       = 'RAD'
-		self.dt_fmt           = 1
-		self.tm_fmt           = 12
-		self.clock_on         = True
-		self.key_code         = 0
+		# Internal data
 		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
 		self._nest_depth: dict[object, int] = defaultdict(lambda: 0)  # tracks nesting depth for ILLEGAL NEST guards
 
 	def to_rad(self, x):
 		"""Convert x from the current angle mode to radians (for trig input)."""
-		return x * (math.pi / 180) if self.angle_mode == 'DEG' else x
+		return x * (math.pi / 180) if self.angle_mode is AngleMode.DEG else x
 
 	def from_rad(self, r):
 		"""Convert r (radians) to the current angle mode (for inverse trig output)."""
-		return r * (180 / math.pi) if self.angle_mode == 'DEG' else r
+		return r * (180 / math.pi) if self.angle_mode is AngleMode.DEG else r
 
 	def from_deg(self, x):
 		"""Convert x (in degrees) to the current angle mode (for DMS literals)."""
-		return x * (math.pi / 180) if self.angle_mode == 'RAD' else x
+		return x * (math.pi / 180) if self.angle_mode is AngleMode.RAD else x
 
 	def set_random_seed(self, value):
 		random.seed(require_int(value))

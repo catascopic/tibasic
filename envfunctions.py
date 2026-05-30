@@ -147,17 +147,3 @@ set_dt_fmt = env_func(Environment.set_dt_fmt)
 set_tm_fmt = env_func(Environment.set_tm_fmt)
 get_dt_str = env_func(Environment.get_dt_str)
 get_tm_str = env_func(Environment.get_tm_str)
-
-# No-argument commands — bodies act on a.env directly; nothing is parsed from ArgParser.
-
-@forms_func
-def clock_on(a):
-	a.env.clock_on = True
-
-@forms_func
-def clock_off(a):
-	a.env.clock_on = False
-
-@forms_func
-def print_screen(a):
-	a.env.print_screen()
