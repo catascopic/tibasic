@@ -102,7 +102,3 @@ re_theta_i = _mode('complex_mode', ComplexMode.RE_THETA_I)
 # Clock
 clock_on  = _mode('clock_on', True)
 clock_off = _mode('clock_on', False)
-
-@no_paren_func
-def print_screen(a):
-	a.env.print_screen()

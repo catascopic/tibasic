@@ -74,3 +74,8 @@ class IncrementError(TiError):
 class IllegalNestError(TiError):
 	"""ERR:ILLEGAL NEST — a function that cannot be nested has been called recursively."""
 	code = 'ILLEGAL NEST'
+
+
+class LabelError(TiError):
+	"""ERR:LABEL — a Goto references a label that does not exist in the program."""
+	code = 'LABEL'

@@ -1,7 +1,7 @@
 import math
 import random
 from abc import ABC
-from collections import defaultdict
+from collections import defaultdict, deque
 from contextlib import contextmanager
 from datetime import datetime, date, timedelta
 
@@ -74,6 +74,9 @@ class Environment:
 		self.fv    = 0   # FV — future value
 		self.py    = 1   # P/Y — payments per year
 		self.cy    = 1   # C/Y — compounding periods per year
+		# Programs
+		self.programs: dict[str, list] = {}  # name → token list for stored programs
+		self.program_stack: deque = deque()  # currently executing programs (innermost last)
 		# Internal data
 		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
 		self._nest_depth: dict[object, int] = defaultdict(lambda: 0)  # tracks nesting depth for ILLEGAL NEST guards
@@ -205,6 +208,11 @@ class Environment:
 	
 	def __repr__(self):
 		return f"ENV({';'.join(f"{name}={value!r}" for name, value in self._iter_values())})"
+
+	@property
+	def current_program(self):
+		"""The innermost currently-executing Program, or None if running interactively."""
+		return self.program_stack[-1] if self.program_stack else None
 
 	def print_screen(self):
 		pass

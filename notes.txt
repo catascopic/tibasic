@@ -1,3 +1,11 @@
+Looks like a good start, and I guess all the commands need to be implemented in forms. But for now, a few issues:
+It would be nice if the variable in ForFrame chould have the actual Variable type. Is there a way to resolve that dependency?
+Can you make the Frame objects have a base class for typing purposes?
+The try-finally doesn't match how the calculator works: an error anywhere terminates the whole execution.
+Why does run_loop skip empty statements? They're valid and the parser correctly handles them by doing nothing. And an If statement will actually skip an empty line, so we can't pretend they don't exist.
+
+If, Then, Else, For(, While, Repeat, End, Lbl, Goto, IS>(, DS<(, Return, Stop
+
 Statements vs lines: Lines are separated by NEWLINE, statements are separated by NEWLINE or COLON. Can you go through the parser and make sure this terminology is consistent? For example, parse_statement seems like it parses the entire input; the inner loop parses "statements" (which are treated the same as lines, I guess, other than colons don't break strings.) Both that method and the public API "parse_line" should probably signal that they parse the entire token stream (which they do, right?)
 I guess this depends on how programs work, which I've given some thought to, and I think that's the next step. But for now, how should this be organized?
 

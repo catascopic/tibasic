@@ -473,8 +473,9 @@ class Parser:
 	def _exec_statement(self):
 		"""Execute one statement (up to but not including the next separator)."""
 		if self.eat_if(PRGM):
+			from program import Program  # lazy: avoids circular import (program → parser → ...)
 			name = self._read_name(8)
-			self.env.programs[name].execute()
+			Program(self.env.programs[name], self.env).run()
 
 		elif self.peek().command is not None:
 			self.advance().command.call_with_parser(ArgParser(self))
@@ -490,12 +491,35 @@ class Parser:
 	def run(self):
 		"""Execute all statements in the token stream until EOF."""
 		while True:
-			if self.at_statement_end():
+			if not self.eat_if(EOF_TOKEN):
 				return
-			self._exec_statement()
+			if not self.at_statement_end():  # empty statements are valid no-ops
+				self._exec_statement()
 			if not self.eat_if({COLON, NEWLINE}):
 				break
 		self.expect(EOF_TOKEN)
+
+	def skip_statement(self) -> None:
+		"""Advance past one statement without executing it.
+
+		Used by skip-commands (one-line If, IS>(, DS<() to consume the next
+		statement after eating the separator themselves.  Leaves pos at the
+		trailing separator (COLON/NEWLINE) or EOF so the run-loop's eat_if
+		handles it as usual.  Respects string literals.
+		"""
+		in_string = False
+		while self.pos < len(self.tokens):
+			t = self.tokens[self.pos]
+			if in_string:
+				if t is QUOTE:
+					in_string = False
+				elif t is NEWLINE:
+					break  # newline closes string and ends the statement
+			elif t in {COLON, NEWLINE}:
+				break
+			elif t is QUOTE:
+				in_string = True
+			self.pos += 1
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
