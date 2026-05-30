@@ -347,3 +347,24 @@ class TiString:
 
 	def __repr__(self):
 		return '"' + str(self) + '"'
+
+
+class TiEquation:
+	__slots__ = ('tokens',)
+
+	def __init__(self, tokens: list['Token']):
+		self.tokens = tokens
+
+	def eval(self, env):
+		from parser import Parser, EOF_TOKEN
+		parser = Parser(self.tokens, env)
+		value = parser.parse_expr()
+		parser.expect(EOF_TOKEN)
+		return value
+
+	def __repr__(self):
+		return ''.join(t.text for t in self.tokens)
+
+
+def require_equation(value):
+	return _require_type(value, TiEquation)

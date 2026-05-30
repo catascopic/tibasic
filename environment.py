@@ -5,8 +5,8 @@ from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, date, timedelta
 
-from tiobjects import TiList, TiMatrix, TiString, require_num, require_real, require_int, require_list, require_matrix, require_str
-from errors import DataTypeError, DomainError, IllegalNestError
+from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation
+from errors import DataTypeError, DomainError, IllegalNestError, UndefinedError
 
 
 class _VarArray:
@@ -38,7 +38,11 @@ class Environment:
 		self.strings    = _VarArray(10, None, lambda n: f"Str{n+1}")       # Str0–9
 		self.stat       = _VarArray(0x3D, None, repr)                      # stat vars
 		self.window     = _VarArray(0x37, None, repr)                      # window vars
-		self.user_lists = {}                                               # ᴸNAME lists
+		self.user_lists      = {}                                           # ᴸNAME lists
+		self.y_equations     = _VarArray(10, None, lambda n: f'Y{(n + 1) % 10}')        # Y1–Y0
+		self.param_equations = _VarArray(12, None, lambda n: f"{'XY'[n % 2]}{n // 2 + 1}T") # X1T–Y6T
+		self.polar_equations = _VarArray(6,  None, lambda n: f'r{n + 1}')               # r1–r6
+		self.seq_equations   = _VarArray(3,  None, lambda n: 'uvw'[n])                  # u, v, w
 		self.n = None
 		self.ans              = 0
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
@@ -121,12 +125,6 @@ class Environment:
 		else:
 			raise DomainError(f"getTmStr: invalid format {fmt}")
 		return TiString.from_str(time_str)
-
-	def clock_on(self):
-		self.clock_on = True
-
-	def clock_off(self):
-		self.clock_on = False
 
 	# ── Nullary helpers (used by nullary= fields in tokens) ──────────────────────
 
@@ -261,6 +259,22 @@ class StringVar(OffsetVar):
 		
 	def set(self, env, value):
 		env.strings[self.index] = require_str(value)
+
+class EquationVar(Variable):
+	__slots__ = ('table', 'index')
+
+	def __init__(self, table: str, index: int):
+		self.table = table
+		self.index = index
+
+	def get(self, env):
+		val = getattr(env, self.table)[self.index]
+		if val is None:
+			raise UndefinedError("Equation variable is undefined")
+		return val
+
+	def set(self, env, value):
+		getattr(env, self.table)[self.index] = require_equation(value)
 
 class StatVar(OffsetVar):
 	def get(self, env):

@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 from decorators import forms_func
 from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError
-from tiobjects import TiList, TiMatrix, require_num, require_real, require_int, require_list
+from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
 
 
 @forms_func
@@ -148,8 +148,8 @@ def fn_int(a: ArgParser) -> float:
 
 
 # ── Matr►list( and List►matr( ────────────────────────────────────────────────
-# These are commands (cmd=), not functions — called as cmd(ArgParser) directly.
 
+@forms_func
 def matr_to_list(a: ArgParser) -> None:
 	mat = a.expr()
 	if not isinstance(mat, TiMatrix):
@@ -170,6 +170,7 @@ def matr_to_list(a: ArgParser) -> None:
 		ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))
 
 
+@forms_func
 def list_to_matr(a: ArgParser) -> None:
 	list_vals = []
 	while True:
@@ -224,3 +225,22 @@ def fill(a: ArgParser):
 		a.end()
 		for i in range(len(lst.data)):
 			lst.data[i] = x
+
+
+# ── Equ►String( and String►Equ( ──────────────────────────────────────────────
+
+@forms_func
+def equ_to_string(a: ArgParser) -> None:
+	"""Equ►String(equvar, strvar) — copy the equation's tokens into a string variable."""
+	equ_var = a.equation_var()
+	str_var = a.string_var()
+	equ = equ_var.get(a.env)
+	str_var.set(a.env, TiString(list(equ.tokens)))
+
+
+@forms_func
+def string_to_equ(a: ArgParser) -> None:
+	"""String►Equ(str_expr, equvar) — parse a string value into an equation variable."""
+	string = require_str(a.expr())
+	equ_var = a.equation_var()
+	equ_var.set(a.env, TiEquation(list(string.tokens)))

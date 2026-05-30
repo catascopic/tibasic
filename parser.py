@@ -462,7 +462,7 @@ class Parser:
 				val = self.env.programs[name].execute()
 
 			elif self.peek().command is not None:
-				self.advance().command(ArgParser(self))
+				self.advance().command.call_with_parser(ArgParser(self))
 
 			else:
 				value = self.parse_expr()
@@ -543,6 +543,20 @@ class ArgParser:
 		if t.is_matrix_var():
 			return t.variable
 		raise DataTypeError(f"Expected a matrix variable, got {t}")
+
+	@_parse_method
+	def string_var(self) -> Variable:
+		t = self._parser.advance()
+		if t.is_string_var():
+			return t.variable
+		raise DataTypeError(f"Expected a string variable, got {t}")
+
+	@_parse_method
+	def equation_var(self) -> Variable:
+		t = self._parser.advance()
+		if t.is_equation_var():
+			return t.variable
+		raise DataTypeError(f"Expected an equation variable, got {t}")
 
 	def end(self):
 		"""Assert no surplus arguments remain.  The closing ) is already consumed

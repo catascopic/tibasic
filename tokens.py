@@ -5,7 +5,7 @@ from io import BytesIO
 from typing import Any
 import math, itertools
 from environment import (
-	Environment, Variable, NumericVar, ListVar, MatrixVar, StringVar, StatVar, WindowVar, RealVar,
+	Environment, Variable, NumericVar, ListVar, MatrixVar, StringVar, EquationVar, StatVar, WindowVar, RealVar,
 )
 import purefunctions as pf
 import operators as ops
@@ -43,6 +43,9 @@ class Token:
 
 	def is_matrix_var(self) -> bool:
 		return self.code[0] == 0x5C
+
+	def is_equation_var(self) -> bool:
+		return self.code[0] == 0x5E
 
 	def is_string_var(self) -> bool:
 		return self.code[0] == 0xAA
@@ -215,16 +218,16 @@ LISTS = tuple(token(0x5D00 | i, f'L{chr(0x2081 + i)}', var=ListVar(i)) for i in 
 
 # ── 0x5E xx: equation and sequence variables ──────────────────────────────────
 
-Y_EQUATIONS = tuple(token(0x5E10 + i, f'Y{chr(0x2080 + (i + 1) % 10)}') for i in range(10))
+Y_EQUATIONS = tuple(token(0x5E10 + i, f'Y{chr(0x2080 + (i + 1) % 10)}', var=EquationVar('y_equations', i)) for i in range(10))
 PARAM_EQUATIONS = tuple(
-	token(0x5E20 + i, f'{x}{chr(0x2080 + n)}ₜ')
+	token(0x5E20 + i, f'{x}{chr(0x2080 + n)}ₜ', var=EquationVar('param_equations', i))
 	for i, (n, x) in enumerate(itertools.product(range(1, 7), 'XY'))
 )
-POLAR_EQUATIONS = tuple(token(0x5E40 + i, f'r{chr(0x2081 + i)}') for i in range(6))
+POLAR_EQUATIONS = tuple(token(0x5E40 + i, f'r{chr(0x2081 + i)}', var=EquationVar('polar_equations', i)) for i in range(6))
 
-token(0x5E80, '𝑢')
-token(0x5E81, '𝑣')
-token(0x5E82, '𝑤')
+token(0x5E80, '𝑢', var=EquationVar('seq_equations', 0))
+token(0x5E81, '𝑣', var=EquationVar('seq_equations', 1))
+token(0x5E82, '𝑤', var=EquationVar('seq_equations', 2))
 
 PRGM = token(0x5F, 'prgm')
 
@@ -404,7 +407,7 @@ token(0x8D, 'ZPrevious')
 token(0x8E, 'ZDecimal')
 token(0x8F, 'ZoomStat')
 token(0x90, 'ZoomRcl')
-token(0x91, 'PrintScreen', cmd=Environment.print_screen)
+token(0x91, 'PrintScreen', cmd=ef.print_screen)
 token(0x92, 'ZoomSto')
 token(0x93, 'Text(')
 
@@ -543,8 +546,8 @@ token(0xBB51, 'ExprOff')
 token(0xBB52, 'ClrAllLists')
 token(0xBB53, 'GetCalc(')
 token(0xBB54, 'DelVar ')
-token(0xBB55, 'Equ►String(')
-token(0xBB56, 'String►Equ(')
+token(0xBB55, 'Equ►String(', cmd=forms.equ_to_string)
+token(0xBB56, 'String►Equ(', cmd=forms.string_to_equ)
 token(0xBB57, 'Clear Entries')
 token(0xBB58, 'Select(')
 token(0xBB59, 'ANOVA(')
@@ -760,8 +763,8 @@ token(0xEF0B, 'startTmr',    res=Environment.start_tmr)
 token(0xEF0C, 'getDtFmt',    res=Environment.get_dt_fmt)
 token(0xEF0D, 'getTmFmt',    res=Environment.get_tm_fmt)
 token(0xEF0E, 'isClockOn',   res=Environment.is_clock_on)
-token(0xEF0F, 'ClockOff',    cmd=Environment.clock_off)
-token(0xEF10, 'ClockOn',     cmd=Environment.clock_on)
+token(0xEF0F, 'ClockOff',    cmd=ef.clock_off)
+token(0xEF10, 'ClockOn',     cmd=ef.clock_on)
 token(0xEF11, 'OpenLib(')
 token(0xEF12, 'ExecLib')
 token(0xEF13, 'invT(',       func=pf.invt)

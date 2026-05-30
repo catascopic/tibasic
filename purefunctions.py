@@ -12,7 +12,7 @@ from math import prod
 from numbers import Number
 from tiobjects import (
 	TiList, TiMatrix, TiString, DMS,
-	require_num, require_real, require_int, 
+	require_num, require_real, require_int,
 	require_list, require_matrix, require_str,
 )
 from errors import (
