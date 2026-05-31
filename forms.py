@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 from decorators import forms_func, no_paren_func
-from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError
+from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, UndefinedError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
 
@@ -250,7 +250,7 @@ def string_to_equ(a: ArgParser) -> None:
 # ── Control flow ──────────────────────────────────────────────────────────────
 
 @no_paren_func
-def if_cmd(a):
+def if_cmd(a: ArgParser):
 	"""If condition — execute or skip the next statement (or delegate to Then)."""
 	cond = bool(a.expr())
 	a.end()
@@ -258,21 +258,21 @@ def if_cmd(a):
 
 
 @no_paren_func
-def then_cmd(a):
+def then_cmd(a: ArgParser):
 	"""Then — begin the body of a conditional block."""
 	a.end()
 	a.current_program('Then').begin_then()
 
 
 @no_paren_func
-def else_cmd(a):
+def else_cmd(a: ArgParser):
 	"""Else — skip the else-body (we just finished executing the then-body)."""
 	a.end()
 	a.current_program('Else').begin_else()
 
 
 @no_paren_func
-def while_cmd(a):
+def while_cmd(a: ArgParser):
 	"""While condition — loop while condition is True."""
 	thunk = a.thunk()
 	a.end()
@@ -280,7 +280,7 @@ def while_cmd(a):
 
 
 @no_paren_func
-def repeat_cmd(a):
+def repeat_cmd(a: ArgParser):
 	"""Repeat condition — loop until condition is True (body executes at least once)."""
 	thunk = a.thunk()
 	a.end()
@@ -288,7 +288,7 @@ def repeat_cmd(a):
 
 
 @forms_func
-def for_cmd(a):
+def for_cmd(a: ArgParser):
 	"""For(var, start, end[, step]) — iterate a numeric variable over a range."""
 	var_tok = a.numeric_var()
 	start   = require_real(a.expr())
@@ -299,21 +299,21 @@ def for_cmd(a):
 
 
 @no_paren_func
-def end_cmd(a):
+def end_cmd(a: ArgParser):
 	"""End — close the innermost active block (For / While / Repeat / Then)."""
 	a.end()
 	a.current_program('End').end_block()
 
 
 @no_paren_func
-def lbl_cmd(a):
+def lbl_cmd(a: ArgParser):
 	"""Lbl name — mark a label; no-op at runtime."""
 	a.label_name()
 	a.end()
 
 
 @no_paren_func
-def goto_cmd(a):
+def goto_cmd(a: ArgParser):
 	"""Goto name — jump to the named label in the current program."""
 	name = a.label_name()
 	a.end()
@@ -321,21 +321,21 @@ def goto_cmd(a):
 
 
 @no_paren_func
-def return_cmd(a):
+def return_cmd(a: ArgParser):
 	"""Return — exit the current sub-program and return to the caller."""
 	a.end()
 	raise ReturnSignal()
 
 
 @no_paren_func
-def stop_cmd(a):
+def stop_cmd(a: ArgParser):
 	"""Stop — terminate all program execution immediately."""
 	a.end()
 	raise StopSignal()
 
 
 @forms_func
-def is_gt_cmd(a):
+def is_gt_cmd(a: ArgParser):
 	"""IS>(var, value) — increment var; skip the next statement if var > value."""
 	var_tok = a.numeric_var()
 	threshold = require_real(a.expr())
@@ -344,7 +344,7 @@ def is_gt_cmd(a):
 
 
 @forms_func
-def ds_lt_cmd(a):
+def ds_lt_cmd(a: ArgParser):
 	"""DS<(var, value) — decrement var; skip the next statement if var < value."""
 	var_tok = a.numeric_var()
 	threshold = require_real(a.expr())
@@ -353,13 +353,13 @@ def ds_lt_cmd(a):
 
 
 @no_paren_func
-def prgm_cmd(a):
+def prgm(a: ArgParser):
 	"""prgm NAME — execute the stored sub-program named NAME."""
 	name = a.program_name()
 	a.end()
-	from program import Program
-	from errors import UndefinedError
-	tokens = a.env.programs.get(name)
-	if tokens is None:
+	try:
+		prgm_code = a.env.programs[name]
+	except KeyError:	
 		raise UndefinedError(f"Program not found: {name!r}")
-	Program(tokens, a.env).run()
+	from program import Program
+	Program(prgm_code, a.env).run()

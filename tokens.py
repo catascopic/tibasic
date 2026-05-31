@@ -230,7 +230,7 @@ token(0x5E80, '𝑢', var=EquationVar('seq_equations', 0))
 token(0x5E81, '𝑣', var=EquationVar('seq_equations', 1))
 token(0x5E82, '𝑤', var=EquationVar('seq_equations', 2))
 
-PRGM = token(0x5F, 'prgm', cmd=forms.prgm_cmd)
+PRGM = token(0x5F, 'prgm', cmd=forms.prgm)
 
 # ── 0x60 xx: picture variables (Pic1–Pic0) ───────────────────────────────────
 

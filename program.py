@@ -193,7 +193,7 @@ class Program:
 			self.push_block(ThenBlock())
 		else:
 			from tokens import ELSE
-			found = self._parser.skip_block(also_stop_at_else=True)
+			found = self._parser.skip_block(else_mode=True)
 			if found is ELSE:
 				self.push_block(ThenBlock())  # execute else-body; End will pop this block
 

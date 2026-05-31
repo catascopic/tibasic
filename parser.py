@@ -7,7 +7,7 @@ from tokens import (
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
 	COMMA, DOT, NEG, COLON, NEWLINE,
 	LIST_PREFIX, RAND, DIM, SCI_E, DEG, RAD, APOS,
-	THEN, FOR, WHILE, REPEAT, END, ELSE,
+	IF, THEN, FOR, WHILE, REPEAT, END, ELSE,
 )
 from environment import Environment, Variable, UserListVar
 from errors import TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError
@@ -491,29 +491,45 @@ class Parser:
 	def skip_block(self, else_mode: bool = False) -> Token:
 		"""Scan forward to the matching End (or Else if *else_mode* is True).
 
-		Tracks block depth: THEN / FOR / WHILE / REPEAT increase depth; END
-		decreases it.  At depth 0 the scan stops at END (always) or ELSE (when
-		*else_mode*).  Leaves pos just past the stopping token.
-		Respects string literals.  Raises TiSyntaxError if no match is found.
+		Processes the stream statement-by-statement via skip_statement.
+		FOR/WHILE/REPEAT always open a new block; THEN opens one only when the
+		immediately preceding non-empty statement was IF — a bare Then (without a
+		preceding If) is transparent to the depth counter.  At depth 0 the scan
+		stops at END (always) or ELSE (when *else_mode*).  Leaves pos just past
+		the stopping token.  Raises TiSyntaxError if no match is found.
 		"""
 		depth = 0
-		in_string = False
-		while self.pos < len(self.tokens):
-			t = self.tokens[self.pos]
-			self.pos += 1
-			if in_string:
-				if t is QUOTE or t is NEWLINE:
-					in_string = False
-			elif t is QUOTE:
-				in_string = True
-			elif t in {THEN, FOR, WHILE, REPEAT}:
+		prev_was_if = False
+
+		while True:
+			while self.eat_statement_sep():
+				pass
+			t = self.peek()
+			if t is EOF_TOKEN:
+				break
+			self.advance()
+			if t is IF:
+				prev_was_if = True
+				self.skip_statement()
+			elif t is THEN:
+				if prev_was_if:
+					depth += 1
+				prev_was_if = False
+			elif t in {FOR, WHILE, REPEAT}:
 				depth += 1
+				prev_was_if = False
+				self.skip_statement()
 			elif t is END:
 				if depth == 0:
 					return t
 				depth -= 1
+				prev_was_if = False
 			elif else_mode and t is ELSE and depth == 0:
 				return t
+			else:
+				prev_was_if = False
+				self.skip_statement()
+
 		raise TiSyntaxError("Unmatched block: End not found")
 
 	def run(self):

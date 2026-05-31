@@ -167,7 +167,7 @@ class TestIfThenElse:
 		assert var(env, 'B') == 42
 
 	def test_then_false_nested_inside(self):
-		# Outer If is False; scan_block_end must skip nested blocks correctly
+		# Outer If is False; skip_block must skip nested blocks correctly
 		env = run('If 0 : Then : For( A , 1 , 5 ) : End : End : 99 @ B')
 		assert var(env, 'B') == 99   # outer block was skipped cleanly
 
@@ -175,6 +175,22 @@ class TestIfThenElse:
 		# Count how many values A takes that are > 3
 		env = run('For( A , 1 , 5 ) : If A > 3 : Then : B + 1 @ B : End : End')
 		assert var(env, 'B') == 2   # A=4 and A=5
+
+	def test_bare_then_not_counted_as_block_when_skipping(self):
+		# A Then not preceded by If must not open a new depth level while
+		# skip_block scans for the matching End.
+		# If 0 → skip body; the bare Then inside should be transparent;
+		# the first End closes the outer If/Then; the second End is unmatched.
+		with pytest.raises(TiSyntaxError):
+			run('If 0 : Then : 1 @ A : Then : End : 2 @ B : End : 3 @ C')
+
+	def test_end_without_block_raises(self):
+		with pytest.raises(TiSyntaxError):
+			run('End')
+
+	def test_end_after_block_closed_raises(self):
+		with pytest.raises(TiSyntaxError):
+			run('If 1 : Then : 1 @ A : End : End')
 
 
 # ── Lbl / Goto ────────────────────────────────────────────────────────────────

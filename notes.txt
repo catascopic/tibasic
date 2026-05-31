@@ -1,4 +1,5 @@
-scan_block_end: Else without If doesn't count
+Interface: Input, Prompt, Disp, Menu
+prgm_cmd -> prgm
 
 move signals
 
@@ -28,12 +29,14 @@ Add aliases to any token that has a character that can't be typed on the keyboar
 
 ********
 
+skip_block: Else without If doesn't count
+
 More ideas:
 * Would current_program make more sense as a method that also throws InvalidCommandError if there's no running program? It could also take as a parameter the name of the calling command.
 * Could the goto function in Program use parse_label_name?
 * As an FYI, in the tests, I prefer using the command name rather than the token name, so For( instead of FOR.
 * _for_continues: I'd make this non-private and rename it check_for_condition
-* I'm trying to avoid having functions that use ArgParser access the inner parser object, since it could cause a desync. Instead of a._parser.scan_block_end(), would it make sense to do a.current_program.scan_block_end or something()?
+* I'm trying to avoid having functions that use ArgParser access the inner parser object, since it could cause a desync. Instead of a._parser.skip_block(), would it make sense to do a.current_program.skip_block or something()?
 
 Commands that can't be run outside a program raise ERR:INVALID on the calculator. Can you make InvalidCommandError and throw that in these cases?
 Lbl: no .end() call to ArgParser
