@@ -675,17 +675,6 @@ class ArgParser:
 	def env(self):
 		return self._parser.env
 
-	def current_program(self, cmd_name: str):
-		"""Return the innermost currently-executing Program.
-
-		Raises InvalidCommandError if called from outside a program (e.g. from the
-		home screen), attributing the error to *cmd_name* (e.g. 'While', 'For(').
-		"""
-		prog = self._parser.env.current_program
-		if prog is None:
-			raise InvalidCommandError(f"{cmd_name} cannot be used outside a program")
-		return prog
-
 	def label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name (for Lbl / Goto)."""
 		return self._parser.parse_label_name()
@@ -728,6 +717,17 @@ class CommandArgParser(ArgParser):
 		"""Assert that the token stream is at a statement boundary (COLON, NEWLINE, or EOF)."""
 		if not self._parser.at_statement_end():
 			raise TiSyntaxError(f"Expected end of statement after command, got {self._parser.peek()}")
+
+	def current_program(self, cmd_name: str):
+		"""Return the innermost currently-executing Program.
+
+		Raises InvalidCommandError if called from outside a program (e.g. from the
+		home screen), attributing the error to *cmd_name* (e.g. 'While', 'For(').
+		"""
+		prog = self._parser.env.current_program
+		if prog is None:
+			raise InvalidCommandError(f"{cmd_name} cannot be used outside a program")
+		return prog
 
 
 if __name__ == '__main__':

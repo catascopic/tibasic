@@ -94,12 +94,12 @@ class TestWhile:
 class TestRepeat:
 
 	def test_runs_until_condition_true(self):
-		env = run('0 @ A : Repeat A = 3 : A + 1 @ A : End')
+		env = run('0@A : Repeat A=3:A+1@A: End')
 		assert var(env, 'A') == 3
 
 	def test_body_runs_at_least_once(self):
 		# Condition is True from the very start, but body still runs once
-		env = run('Repeat 1 : 99 @ A : End : 42 @ B')
+		env = run('Repeat 1:99@A: End :42@B')
 		assert var(env, 'A') == 99
 		assert var(env, 'B') == 42
 
