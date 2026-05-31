@@ -1,5 +1,6 @@
-Record position of token for exceptions
-ERR:LABEL doesn't have a Goto option on the calculator, because it would just take you to the end of the program where it failed to find a label, but we can easily implement this.
+Can we Record position of token for exceptions
+
+Better pos tracking for exceptions
 
 Interface: Input, Prompt, Disp, Menu
 prgm_cmd -> prgm

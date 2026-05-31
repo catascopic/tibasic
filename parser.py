@@ -10,7 +10,7 @@ from tokens import (
 	IF, THEN, FOR, WHILE, REPEAT, END, ELSE,
 )
 from environment import Environment, Variable, UserListVar
-from errors import TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError
+from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError
 
 
 EOF_TOKEN = Token(b'\x00', None, '<END-OF-INPUT>')
@@ -477,16 +477,21 @@ class Parser:
 
 	def _exec_statement(self):
 		"""Execute one statement (up to but not including the next separator)."""
-		if self.peek().command is not None:
-			self.advance().command.call_with_parser(ArgParser(self))
-
-		else:
-			value = self.parse_expr()
-			if self.eat_if(STORE):
-				self.parse_store(value)
-			elif self.peek().converter is not None:
-				value = self.advance().converter(value)
-			self.env.ans = value
+		stmt_start = self.pos
+		try:
+			if self.peek().command is not None:
+				self.advance().command.call_with_parser(ArgParser(self))
+			else:
+				value = self.parse_expr()
+				if self.eat_if(STORE):
+					self.parse_store(value)
+				elif self.peek().converter is not None:
+					value = self.advance().converter(value)
+				self.env.ans = value
+		except TiError as e:
+			if e.pos is None:
+				e.pos = stmt_start
+			raise
 
 	def skip_block(self, else_mode: bool = False) -> Token:
 		"""Scan forward to the matching End (or Else if *else_mode* is True).

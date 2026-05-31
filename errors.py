@@ -10,6 +10,10 @@ class TiError(Exception):
 	"""Base class for all TI-BASIC errors."""
 	code = 'ERROR'
 
+	def __init__(self, message: str = '', *, pos: int | None = None):
+		super().__init__(message)
+		self.pos = pos  # token-stream index where the error occurred, if known
+
 
 class TiSyntaxError(TiError):
 	"""ERR:SYNTAX — token sequence that the parser cannot understand."""

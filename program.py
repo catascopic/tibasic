@@ -209,22 +209,17 @@ class Program:
 		"""
 		from tokens import LBL
 		p = self._parser
+		p.pos = 0
 		in_string = False
-		i = 0
-		while i < len(p.tokens):
-			t = p.tokens[i]
+		while p.pos < len(p.tokens):
+			t = p.advance()
 			if in_string:
 				if t is QUOTE or t is NEWLINE:
 					in_string = False
 			elif t is QUOTE:
 				in_string = True
 			elif t is LBL:
-				# Use parse_label_name to read the 1–2 name-char tokens after LBL
-				p.pos = i + 1
 				label = p.parse_label_name()
 				if label == name:
 					return  # p.pos now points past the label name — correct resume point
-				i = p.pos  # skip over whatever name chars were consumed
-				continue
-			i += 1
 		raise LabelError(f"Label not found: {name!r}")
