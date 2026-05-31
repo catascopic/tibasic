@@ -5,7 +5,7 @@ from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
 	Token,
 	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
-	COMMA, DOT, NEG, COLON, NEWLINE, PRGM,
+	COMMA, DOT, NEG, COLON, NEWLINE,
 	LIST_PREFIX, RAND, DIM, SCI_E, DEG, RAD, APOS,
 	THEN, FOR, WHILE, REPEAT, END, ELSE,
 )
@@ -477,12 +477,7 @@ class Parser:
 
 	def _exec_statement(self):
 		"""Execute one statement (up to but not including the next separator)."""
-		if self.eat_if(PRGM):
-			from program import Program  # lazy: avoids circular import (program → parser → ...)
-			name = self._read_name(8)
-			Program(self.env.programs[name], self.env).run()
-
-		elif self.peek().command is not None:
+		if self.peek().command is not None:
 			self.advance().command.call_with_parser(ArgParser(self))
 
 		else:
@@ -493,12 +488,12 @@ class Parser:
 				value = self.advance().converter(value)
 			self.env.ans = value
 
-	def scan_block_end(self, also_stop_at_else: bool = False) -> Token:
-		"""Scan forward to the matching End (or Else if *also_stop_at_else* is True).
+	def skip_block(self, else_mode: bool = False) -> Token:
+		"""Scan forward to the matching End (or Else if *else_mode* is True).
 
 		Tracks block depth: THEN / FOR / WHILE / REPEAT increase depth; END
 		decreases it.  At depth 0 the scan stops at END (always) or ELSE (when
-		*also_stop_at_else*).  Leaves pos just past the stopping token.
+		*else_mode*).  Leaves pos just past the stopping token.
 		Respects string literals.  Raises TiSyntaxError if no match is found.
 		"""
 		depth = 0
@@ -517,7 +512,7 @@ class Parser:
 				if depth == 0:
 					return t
 				depth -= 1
-			elif also_stop_at_else and t is ELSE and depth == 0:
+			elif else_mode and t is ELSE and depth == 0:
 				return t
 		raise TiSyntaxError("Unmatched block: End not found")
 
@@ -676,35 +671,9 @@ class ArgParser:
 		"""Read up to 2 alphanumeric characters as a label name (for Lbl / Goto)."""
 		return self._parser.parse_label_name()
 
-	# ── Parser-state proxy methods ────────────────────────────────────────────
-	# These let control-flow commands in forms.py manipulate execution position
-	# and skip tokens without reaching into the private _parser object.
-
-	@property
-	def pos(self) -> int:
-		"""Current token index in the underlying parser."""
-		return self._parser.pos
-
-	@pos.setter
-	def pos(self, value: int) -> None:
-		self._parser.pos = value
-
-	@property
-	def tokens(self) -> list:
-		"""The full token list of the underlying parser (read-only intent)."""
-		return self._parser.tokens
-
-	def eat_statement_sep(self) -> bool:
-		"""Consume one COLON or NEWLINE separator if present.  Returns True iff consumed."""
-		return self._parser.eat_statement_sep()
-
-	def skip_statement(self) -> None:
-		"""Advance past one statement without executing it."""
-		self._parser.skip_statement()
-
-	def scan_block_end(self, also_stop_at_else: bool = False):
-		"""Scan forward to the matching End (or Else).  See Parser.scan_block_end."""
-		return self._parser.scan_block_end(also_stop_at_else)
+	def program_name(self) -> str:
+		"""Read up to 8 alphanumeric characters as a program name (for prgm)."""
+		return self._parser._read_name(8)
 
 	def has_next(self) -> bool:
 		return self._next

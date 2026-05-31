@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 from decorators import forms_func, no_paren_func
-from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, TiSyntaxError
+from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
 
@@ -254,109 +254,55 @@ def if_cmd(a):
 	"""If condition — execute or skip the next statement (or delegate to Then)."""
 	cond = bool(a.expr())
 	a.end()
-	# Peek past the trailing separator to see whether the next statement is Then
-	saved = a.pos
-	a.eat_statement_sep()
-	next_tok = a.peek()
-	a.pos = saved
-	from tokens import THEN
-	if next_tok is THEN:
-		a.current_program('If').pending_if_result = cond
-	elif not cond:
-		# One-line If: condition is False → skip the following statement
-		a.eat_statement_sep()
-		a.skip_statement()
+	a.current_program('If').begin_if(cond)
 
 
 @no_paren_func
 def then_cmd(a):
 	"""Then — begin the body of a conditional block."""
 	a.end()
-	prog = a.current_program('Then')
-	result = prog.pending_if_result
-	prog.pending_if_result = None
-	if result is None:
-		raise TiSyntaxError("Then without If")
-	from program import ThenBlock
-	if result:
-		prog.push_block(ThenBlock())
-	else:
-		# Condition was False: skip to Else or End
-		from tokens import ELSE
-		found = a.scan_block_end(also_stop_at_else=True)
-		if found is ELSE:
-			# Execute the else-body; End will pop this block
-			prog.push_block(ThenBlock())
-		# If found is END, nothing more to do
+	a.current_program('Then').begin_then()
 
 
 @no_paren_func
 def else_cmd(a):
 	"""Else — skip the else-body (we just finished executing the then-body)."""
 	a.end()
-	prog = a.current_program('Else')
-	from program import ThenBlock
-	block = prog.pop_block()
-	if not isinstance(block, ThenBlock):
-		raise TiSyntaxError("Else without matching Then")
-	a.scan_block_end()
+	a.current_program('Else').begin_else()
 
 
 @no_paren_func
 def while_cmd(a):
 	"""While condition — loop while condition is True."""
-	prog = a.current_program('While')
-	cond_start = a.pos
-	val = bool(a.expr())
-	cond_end = a.pos
+	thunk = a.thunk()
 	a.end()
-	if val:
-		from parser import Thunk
-		from program import WhileBlock
-		thunk = Thunk(a.tokens[cond_start:cond_end], a.env)
-		prog.push_block(WhileBlock(pos=a.pos, condition=thunk))
-	else:
-		a.scan_block_end()
+	a.current_program('While').begin_while(thunk)
 
 
 @no_paren_func
 def repeat_cmd(a):
 	"""Repeat condition — loop until condition is True (body executes at least once)."""
-	prog = a.current_program('Repeat')
-	cond_start = a.pos
-	a.expr()  # parse but discard — condition is only checked at End
-	cond_end = a.pos
+	thunk = a.thunk()
 	a.end()
-	from parser import Thunk
-	from program import RepeatBlock
-	thunk = Thunk(a.tokens[cond_start:cond_end], a.env)
-	prog.push_block(RepeatBlock(pos=a.pos, condition=thunk))
+	a.current_program('Repeat').begin_repeat(thunk)
 
 
 @forms_func
 def for_cmd(a):
 	"""For(var, start, end[, step]) — iterate a numeric variable over a range."""
-	prog = a.current_program('For(')
-	from program import ForBlock, check_for_condition
 	var_tok = a.numeric_var()
-	variable = var_tok.variable
 	start   = require_real(a.expr())
 	end_val = require_real(a.expr())
 	step    = require_real(a.expr(optional=True, default=1.0))
 	a.end()
-	variable.set(a.env, start)
-	if check_for_condition(start, end_val, step):
-		prog.push_block(ForBlock(pos=a.pos, var=variable, end_val=end_val, step=step))
-	else:
-		a.scan_block_end()
+	a.current_program('For(').begin_for(var_tok.variable, start, end_val, step)
 
 
 @no_paren_func
 def end_cmd(a):
 	"""End — close the innermost active block (For / While / Repeat / Then)."""
 	a.end()
-	prog = a.current_program('End')
-	prog.pop_block().on_end(prog)
+	a.current_program('End').end_block()
 
 
 @no_paren_func
@@ -369,7 +315,9 @@ def lbl_cmd(a):
 @no_paren_func
 def goto_cmd(a):
 	"""Goto name — jump to the named label in the current program."""
-	a.current_program('Goto').goto(a.label_name())
+	name = a.label_name()
+	a.end()
+	a.current_program('Goto').goto(name)
 
 
 @no_paren_func
@@ -390,25 +338,28 @@ def stop_cmd(a):
 def is_gt_cmd(a):
 	"""IS>(var, value) — increment var; skip the next statement if var > value."""
 	var_tok = a.numeric_var()
-	variable = var_tok.variable
 	threshold = require_real(a.expr())
 	a.end()
-	new_val = require_real(variable.get(a.env)) + 1
-	variable.set(a.env, new_val)
-	if new_val > threshold:
-		a.eat_statement_sep()
-		a.skip_statement()
+	a.current_program('IS>(').is_gt(var_tok.variable, threshold)
 
 
 @forms_func
 def ds_lt_cmd(a):
 	"""DS<(var, value) — decrement var; skip the next statement if var < value."""
 	var_tok = a.numeric_var()
-	variable = var_tok.variable
 	threshold = require_real(a.expr())
 	a.end()
-	new_val = require_real(variable.get(a.env)) - 1
-	variable.set(a.env, new_val)
-	if new_val < threshold:
-		a.eat_statement_sep()
-		a.skip_statement()
+	a.current_program('DS<(').ds_lt(var_tok.variable, threshold)
+
+
+@no_paren_func
+def prgm_cmd(a):
+	"""prgm NAME — execute the stored sub-program named NAME."""
+	name = a.program_name()
+	a.end()
+	from program import Program
+	from errors import UndefinedError
+	tokens = a.env.programs.get(name)
+	if tokens is None:
+		raise UndefinedError(f"Program not found: {name!r}")
+	Program(tokens, a.env).run()
