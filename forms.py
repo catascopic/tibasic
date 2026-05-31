@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 from decorators import forms_func, no_paren_func
-from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, TiSyntaxError, InvalidCommandError
+from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
 
@@ -254,34 +254,27 @@ def if_cmd(a):
 	"""If condition — execute or skip the next statement (or delegate to Then)."""
 	cond = bool(a.expr())
 	a.end()
-	p = a._parser
 	# Peek past the trailing separator to see whether the next statement is Then
-	saved = p.pos
-	p.eat_statement_sep()
-	next_tok = p.peek()
-	p.pos = saved
+	saved = a.pos
+	a.eat_statement_sep()
+	next_tok = a.peek()
+	a.pos = saved
 	from tokens import THEN
 	if next_tok is THEN:
-		prog = a.current_program
-		if prog is None:
-			raise InvalidCommandError("If/Then cannot be used outside a program")
-		prog._pending_if_result = cond
+		a.current_program('If').pending_if_result = cond
 	elif not cond:
 		# One-line If: condition is False → skip the following statement
-		p.eat_statement_sep()
-		p.skip_statement()
+		a.eat_statement_sep()
+		a.skip_statement()
 
 
 @no_paren_func
 def then_cmd(a):
 	"""Then — begin the body of a conditional block."""
 	a.end()
-	p = a._parser
-	prog = a.current_program
-	if prog is None:
-		raise InvalidCommandError("Then cannot be used outside a program")
-	result = prog._pending_if_result
-	prog._pending_if_result = None
+	prog = a.current_program('Then')
+	result = prog.pending_if_result
+	prog.pending_if_result = None
 	if result is None:
 		raise TiSyntaxError("Then without If")
 	from program import ThenBlock
@@ -290,7 +283,7 @@ def then_cmd(a):
 	else:
 		# Condition was False: skip to Else or End
 		from tokens import ELSE
-		found = p.scan_block_end(also_stop_at_else=True)
+		found = a.scan_block_end(also_stop_at_else=True)
 		if found is ELSE:
 			# Execute the else-body; End will pop this block
 			prog.push_block(ThenBlock())
@@ -301,84 +294,69 @@ def then_cmd(a):
 def else_cmd(a):
 	"""Else — skip the else-body (we just finished executing the then-body)."""
 	a.end()
-	p = a._parser
-	prog = a.current_program
-	if prog is None:
-		raise InvalidCommandError("Else cannot be used outside a program")
+	prog = a.current_program('Else')
 	from program import ThenBlock
 	block = prog.pop_block()
 	if not isinstance(block, ThenBlock):
 		raise TiSyntaxError("Else without matching Then")
-	p.scan_block_end()
+	a.scan_block_end()
 
 
 @no_paren_func
 def while_cmd(a):
 	"""While condition — loop while condition is True."""
-	prog = a.current_program
-	if prog is None:
-		raise InvalidCommandError("While cannot be used outside a program")
-	p = a._parser
-	cond_start = p.pos
+	prog = a.current_program('While')
+	cond_start = a.pos
 	val = bool(a.expr())
-	cond_end = p.pos
+	cond_end = a.pos
 	a.end()
 	if val:
 		from parser import Thunk
 		from program import WhileBlock
-		thunk = Thunk(p.tokens[cond_start:cond_end], p.env)
-		prog.push_block(WhileBlock(pos=p.pos, condition=thunk))
+		thunk = Thunk(a.tokens[cond_start:cond_end], a.env)
+		prog.push_block(WhileBlock(pos=a.pos, condition=thunk))
 	else:
-		p.scan_block_end()
+		a.scan_block_end()
 
 
 @no_paren_func
 def repeat_cmd(a):
 	"""Repeat condition — loop until condition is True (body executes at least once)."""
-	prog = a.current_program
-	if prog is None:
-		raise InvalidCommandError("Repeat cannot be used outside a program")
-	p = a._parser
-	cond_start = p.pos
+	prog = a.current_program('Repeat')
+	cond_start = a.pos
 	a.expr()  # parse but discard — condition is only checked at End
-	cond_end = p.pos
+	cond_end = a.pos
 	a.end()
 	from parser import Thunk
 	from program import RepeatBlock
-	thunk = Thunk(p.tokens[cond_start:cond_end], p.env)
-	prog.push_block(RepeatBlock(pos=p.pos, condition=thunk))
+	thunk = Thunk(a.tokens[cond_start:cond_end], a.env)
+	prog.push_block(RepeatBlock(pos=a.pos, condition=thunk))
 
 
 @forms_func
 def for_cmd(a):
 	"""For(var, start, end[, step]) — iterate a numeric variable over a range."""
-	prog = a.current_program
-	if prog is None:
-		raise InvalidCommandError("For( cannot be used outside a program")
-	from program import ForBlock, _for_continues
+	prog = a.current_program('For(')
+	from program import ForBlock, check_for_condition
 	var_tok = a.numeric_var()
 	variable = var_tok.variable
 	start   = require_real(a.expr())
 	end_val = require_real(a.expr())
 	step    = require_real(a.expr(optional=True, default=1.0))
 	a.end()
-	p = a._parser
 	variable.set(a.env, start)
-	if _for_continues(start, end_val, step):
-		prog.push_block(ForBlock(pos=p.pos, var=variable, end_val=end_val, step=step))
+	if check_for_condition(start, end_val, step):
+		prog.push_block(ForBlock(pos=a.pos, var=variable, end_val=end_val, step=step))
 	else:
-		p.scan_block_end()
+		a.scan_block_end()
 
 
 @no_paren_func
 def end_cmd(a):
 	"""End — close the innermost active block (For / While / Repeat / Then)."""
 	a.end()
-	p = a._parser
-	prog = a.current_program
-	if prog is None:
-		raise InvalidCommandError("End cannot be used outside a program")
-	prog.pop_block().on_end(prog, p)
+	prog = a.current_program('End')
+	prog.pop_block().on_end(prog)
 
 
 @no_paren_func
@@ -391,10 +369,7 @@ def lbl_cmd(a):
 @no_paren_func
 def goto_cmd(a):
 	"""Goto name — jump to the named label in the current program."""
-	prog = a.current_program
-	if prog is None:
-		raise InvalidCommandError("Goto cannot be used outside a program")
-	prog.goto(a.label_name())
+	a.current_program('Goto').goto(a.label_name())
 
 
 @no_paren_func
@@ -418,12 +393,11 @@ def is_gt_cmd(a):
 	variable = var_tok.variable
 	threshold = require_real(a.expr())
 	a.end()
-	p = a._parser
 	new_val = require_real(variable.get(a.env)) + 1
 	variable.set(a.env, new_val)
 	if new_val > threshold:
-		p.eat_statement_sep()
-		p.skip_statement()
+		a.eat_statement_sep()
+		a.skip_statement()
 
 
 @forms_func
@@ -433,9 +407,8 @@ def ds_lt_cmd(a):
 	variable = var_tok.variable
 	threshold = require_real(a.expr())
 	a.end()
-	p = a._parser
 	new_val = require_real(variable.get(a.env)) - 1
 	variable.set(a.env, new_val)
 	if new_val < threshold:
-		p.eat_statement_sep()
-		p.skip_statement()
+		a.eat_statement_sep()
+		a.skip_statement()

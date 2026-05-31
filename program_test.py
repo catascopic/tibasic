@@ -75,17 +75,17 @@ class TestFor:
 class TestWhile:
 
 	def test_counts_up(self):
-		env = run('1 @ A : WHILE A < 5 : A + 1 @ A : End')
+		env = run('1 @ A : While A < 5 : A + 1 @ A : End')
 		assert var(env, 'A') == 5
 
 	def test_never_enters_when_false(self):
-		env = run('WHILE 0 : 99 @ A : End : 42 @ B')
+		env = run('While 0 : 99 @ A : End : 42 @ B')
 		assert var(env, 'A') is None   # body never ran
 		assert var(env, 'B') == 42     # continues after End
 
 	def test_condition_reevaluated_each_iteration(self):
 		# A doubles each iteration; loop exits when A ≥ 10
-		env = run('1 @ A : WHILE A < 10 : A * 2 @ A : End')
+		env = run('1 @ A : While A < 10 : A * 2 @ A : End')
 		assert var(env, 'A') == 16  # 1→2→4→8→16 (first value ≥ 10)
 
 
@@ -115,22 +115,22 @@ class TestRepeat:
 class TestIfOneLine:
 
 	def test_true_executes_next(self):
-		env = run('IF 1 : 42 @ A')
+		env = run('If 1 : 42 @ A')
 		assert var(env, 'A') == 42
 
 	def test_false_skips_next(self):
-		env = run('IF 0 : 42 @ A : 99 @ B')
+		env = run('If 0 : 42 @ A : 99 @ B')
 		assert var(env, 'A') is None
 		assert var(env, 'B') == 99
 
 	def test_false_skips_empty_statement(self):
 		# An empty statement counts as the "next" statement and is still skipped
-		env = run('IF 0 : : 99 @ A')
+		env = run('If 0 : : 99 @ A')
 		assert var(env, 'A') == 99
 
 	def test_chained_conditions(self):
 		# Two independent one-line Ifs
-		env = run('IF 1 : 10 @ A : IF 0 : 20 @ B : 30 @ C')
+		env = run('If 1 : 10 @ A : If 0 : 20 @ B : 30 @ C')
 		assert var(env, 'A') == 10
 		assert var(env, 'B') is None
 		assert var(env, 'C') == 30
@@ -141,39 +141,39 @@ class TestIfOneLine:
 class TestIfThenElse:
 
 	def test_then_true(self):
-		env = run('IF 1 : THEN : 42 @ A : End')
+		env = run('If 1 : Then : 42 @ A : End')
 		assert var(env, 'A') == 42
 
 	def test_then_false_skips_body(self):
-		env = run('IF 0 : THEN : 42 @ A : End : 99 @ B')
+		env = run('If 0 : Then : 42 @ A : End : 99 @ B')
 		assert var(env, 'A') is None
 		assert var(env, 'B') == 99
 
 	def test_then_else_takes_then_branch(self):
-		env = run('IF 1 : THEN : 10 @ A : ELSE : 20 @ A : End')
+		env = run('If 1 : Then : 10 @ A : Else : 20 @ A : End')
 		assert var(env, 'A') == 10
 
 	def test_then_else_takes_else_branch(self):
-		env = run('IF 0 : THEN : 10 @ A : ELSE : 20 @ A : End')
+		env = run('If 0 : Then : 10 @ A : Else : 20 @ A : End')
 		assert var(env, 'A') == 20
 
 	def test_nested_then(self):
-		env = run('IF 1 : THEN : IF 1 : THEN : 42 @ A : End : End')
+		env = run('If 1 : Then : If 1 : Then : 42 @ A : End : End')
 		assert var(env, 'A') == 42
 
 	def test_nested_then_inner_false(self):
-		env = run('IF 1 : THEN : IF 0 : THEN : 99 @ A : End : 42 @ B : End')
+		env = run('If 1 : Then : If 0 : Then : 99 @ A : End : 42 @ B : End')
 		assert var(env, 'A') is None
 		assert var(env, 'B') == 42
 
 	def test_then_false_nested_inside(self):
 		# Outer If is False; scan_block_end must skip nested blocks correctly
-		env = run('IF 0 : THEN : For( A , 1 , 5 ) : End : End : 99 @ B')
+		env = run('If 0 : Then : For( A , 1 , 5 ) : End : End : 99 @ B')
 		assert var(env, 'B') == 99   # outer block was skipped cleanly
 
 	def test_if_inside_for(self):
 		# Count how many values A takes that are > 3
-		env = run('For( A , 1 , 5 ) : IF A > 3 : THEN : B + 1 @ B : End : End')
+		env = run('For( A , 1 , 5 ) : If A > 3 : Then : B + 1 @ B : End : End')
 		assert var(env, 'B') == 2   # A=4 and A=5
 
 
@@ -182,18 +182,18 @@ class TestIfThenElse:
 class TestLblGoto:
 
 	def test_basic_forward_goto(self):
-		env = run('Goto A : 99 @ B : LBL A : 42 @ C')
+		env = run('Goto A : 99 @ B : Lbl A : 42 @ C')
 		assert var(env, 'B') is None   # skipped
 		assert var(env, 'C') == 42
 
 	def test_two_char_label(self):
-		env = run('Goto AB : 99 @ C : LBL AB : 42 @ D')
+		env = run('Goto AB : 99 @ C : Lbl AB : 42 @ D')
 		assert var(env, 'C') is None
 		assert var(env, 'D') == 42
 
 	def test_goto_backward_loop(self):
 		# Manually build a counting loop with Goto
-		env = run('LBL A : A + 1 @ A : IF A < 5 : Goto A : 42 @ B')
+		env = run('Lbl A : A + 1 @ A : If A < 5 : Goto A : 42 @ B')
 		assert var(env, 'A') == 5
 		assert var(env, 'B') == 42
 
@@ -210,7 +210,7 @@ class TestReturn:
 	def test_exits_subprogram(self):
 		env = Environment()
 		env.programs['P'] = toks('1 @ A : Return : 99 @ A')
-		run('PRGM P : 2 @ B', env)
+		run('prgm P : 2 @ B', env)
 		assert var(env, 'A') == 1   # Return fired before 99→A
 		assert var(env, 'B') == 2   # caller continued normally
 
@@ -218,8 +218,8 @@ class TestReturn:
 		# Return only exits the innermost program
 		env = Environment()
 		env.programs['I'] = toks('1 @ A : Return : 99 @ A')
-		env.programs['O'] = toks('PRGM I : 2 @ B : Return : 99 @ B')
-		run('PRGM O : 3 @ C', env)
+		env.programs['O'] = toks('prgm I : 2 @ B : Return : 99 @ B')
+		run('prgm O : 3 @ C', env)
 		assert var(env, 'A') == 1   # INNER's Return fired
 		assert var(env, 'B') == 2   # OUTER continued, then its own Return fired
 		assert var(env, 'C') == 3   # top-level caller continued
@@ -249,7 +249,7 @@ class TestStop:
 		env = Environment()
 		env.programs['P'] = toks('Stop')
 		with pytest.raises(StopSignal):
-			run('1 @ A : PRGM P : 99 @ B', env)
+			run('1 @ A : prgm P : 99 @ B', env)
 		assert var(env, 'A') == 1    # executed before the sub-program
 		assert var(env, 'B') is None  # skipped because Stop propagated
 

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-	from parser import Parser, Thunk
+	from parser import Thunk
 
 from environment import Environment, Variable
 from errors import TiSyntaxError, IncrementError, LabelError
@@ -13,7 +13,7 @@ from tokens import COLON, NEWLINE, QUOTE
 
 # ── For-loop continuation helper ─────────────────────────────────────────────
 
-def _for_continues(val: float, end_val: float, step: float) -> bool:
+def check_for_condition(val: float, end_val: float, step: float) -> bool:
 	"""Return True if the For loop should continue (val has not exceeded end_val)."""
 	if step > 0:
 		return val <= end_val + 1e-10
@@ -32,7 +32,7 @@ class Block:
 	that block type, eliminating isinstance checks in end_cmd.
 	"""
 
-	def on_end(self, prog: Program, parser: Parser) -> None:
+	def on_end(self, prog: 'Program') -> None:
 		"""Handle End for this block.  Default implementation is a no-op (ThenBlock)."""
 		pass
 
@@ -45,12 +45,12 @@ class ForBlock(Block):
 	end_val: float   # loop exits when var exceeds this (or drops below it for negative step)
 	step: float      # added to var at each End
 
-	def on_end(self, prog: Program, parser: Parser) -> None:
-		new_val = self.var.get(parser.env) + self.step
-		self.var.set(parser.env, new_val)
-		if _for_continues(new_val, self.end_val, self.step):
-			prog.push_block(self)  # keep alive for the next iteration
-			parser.pos = self.pos  # jump back to separator before body
+	def on_end(self, prog: 'Program') -> None:
+		new_val = self.var.get(prog.env) + self.step
+		self.var.set(prog.env, new_val)
+		if check_for_condition(new_val, self.end_val, self.step):
+			prog.push_block(self)       # keep alive for the next iteration
+			prog.jump_to(self.pos)      # jump back to separator before body
 
 
 @dataclass
@@ -59,10 +59,10 @@ class WhileBlock(Block):
 	pos: int          # token index of the separator before the loop body
 	condition: Thunk  # re-evaluated at End; True → repeat, False → exit
 
-	def on_end(self, prog: Program, parser: Parser) -> None:
+	def on_end(self, prog: 'Program') -> None:
 		if self.condition.eval():
 			prog.push_block(self)
-			parser.pos = self.pos
+			prog.jump_to(self.pos)
 
 
 @dataclass
@@ -71,10 +71,10 @@ class RepeatBlock(Block):
 	pos: int          # token index of the separator before the loop body
 	condition: Thunk  # evaluated at End; True → exit, False → repeat
 
-	def on_end(self, prog: Program, parser: Parser) -> None:
+	def on_end(self, prog: 'Program') -> None:
 		if not self.condition.eval():
 			prog.push_block(self)
-			parser.pos = self.pos
+			prog.jump_to(self.pos)
 
 
 @dataclass
@@ -102,7 +102,7 @@ class Program:
 		self._parser = Parser(tokens, env)
 		self._env = env
 		self.block_stack: list[Block] = []
-		self._pending_if_result: bool | None = None  # set by If, read by Then
+		self.pending_if_result: bool | None = None  # set by If, read by Then
 
 	# ── Execution loop ────────────────────────────────────────────────────────
 
@@ -129,6 +129,10 @@ class Program:
 	def peek_block(self) -> Block | None:
 		return self.block_stack[-1] if self.block_stack else None
 
+	def jump_to(self, pos: int) -> None:
+		"""Set the parser's execution position (used by loop blocks on_end)."""
+		self._parser.pos = pos
+
 	# ── Label search ──────────────────────────────────────────────────────────
 
 	def goto(self, name: str) -> None:
@@ -149,15 +153,13 @@ class Program:
 			elif t is QUOTE:
 				in_string = True
 			elif t is LBL:
-				# next 1–2 name-char tokens form the label name
-				label = ''
-				j = i + 1
-				while j < len(p.tokens) and p.tokens[j].is_name_char() and len(label) < 2:
-					label += p.tokens[j].char
-					j += 1
+				# Use parse_label_name to read the 1–2 name-char tokens after LBL
+				p.pos = i + 1
+				label = p.parse_label_name()
 				if label == name:
-					p.pos = j  # resume execution after the label
-					return
+					return  # p.pos now points past the label name — correct resume point
+				i = p.pos  # skip over whatever name chars were consumed
+				continue
 			i += 1
 		raise LabelError(f"Label not found: {name!r}")
 

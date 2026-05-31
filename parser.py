@@ -10,7 +10,7 @@ from tokens import (
 	THEN, FOR, WHILE, REPEAT, END, ELSE,
 )
 from environment import Environment, Variable, UserListVar
-from errors import TiSyntaxError, ArgumentError, DataTypeError
+from errors import TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError
 
 
 EOF_TOKEN = Token(b'\x00', None, '<END-OF-INPUT>')
@@ -661,14 +661,50 @@ class ArgParser:
 	def env(self):
 		return self._parser.env
 
-	@property
-	def current_program(self):
-		"""The innermost currently-executing Program, or None if running interactively."""
-		return self._parser.env.current_program
+	def current_program(self, cmd_name: str):
+		"""Return the innermost currently-executing Program.
+
+		Raises InvalidCommandError if called from outside a program (e.g. from the
+		home screen), attributing the error to *cmd_name* (e.g. 'While', 'For(').
+		"""
+		prog = self._parser.env.current_program
+		if prog is None:
+			raise InvalidCommandError(f"{cmd_name} cannot be used outside a program")
+		return prog
 
 	def label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name (for Lbl / Goto)."""
 		return self._parser.parse_label_name()
+
+	# ── Parser-state proxy methods ────────────────────────────────────────────
+	# These let control-flow commands in forms.py manipulate execution position
+	# and skip tokens without reaching into the private _parser object.
+
+	@property
+	def pos(self) -> int:
+		"""Current token index in the underlying parser."""
+		return self._parser.pos
+
+	@pos.setter
+	def pos(self, value: int) -> None:
+		self._parser.pos = value
+
+	@property
+	def tokens(self) -> list:
+		"""The full token list of the underlying parser (read-only intent)."""
+		return self._parser.tokens
+
+	def eat_statement_sep(self) -> bool:
+		"""Consume one COLON or NEWLINE separator if present.  Returns True iff consumed."""
+		return self._parser.eat_statement_sep()
+
+	def skip_statement(self) -> None:
+		"""Advance past one statement without executing it."""
+		self._parser.skip_statement()
+
+	def scan_block_end(self, also_stop_at_else: bool = False):
+		"""Scan forward to the matching End (or Else).  See Parser.scan_block_end."""
+		return self._parser.scan_block_end(also_stop_at_else)
 
 	def has_next(self) -> bool:
 		return self._next
