@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 from decorators import forms_func, no_paren_func
-from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, UndefinedError
+from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
 
@@ -259,9 +259,9 @@ def if_cmd(a: ArgParser):
 
 @no_paren_func
 def then_cmd(a: ArgParser):
-	"""Then — begin the body of a conditional block."""
+	"""Then without a preceding If — always a syntax error."""
 	a.end()
-	a.current_program('Then').begin_then()
+	raise TiSyntaxError("Then without If")
 
 
 @no_paren_func

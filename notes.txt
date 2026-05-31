@@ -1,3 +1,6 @@
+Record position of token for exceptions
+ERR:LABEL doesn't have a Goto option on the calculator, because it would just take you to the end of the program where it failed to find a label, but we can easily implement this.
+
 Interface: Input, Prompt, Disp, Menu
 prgm_cmd -> prgm
 

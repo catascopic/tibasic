@@ -320,3 +320,13 @@ class TestIsGtDsLt:
 		run('DS<( A , 3 ) : 99 @ B : 42 @ C', env)
 		assert var(env, 'B') is None   # skipped
 		assert var(env, 'C') == 42
+
+
+# ── Statement separator enforcement ───────────────────────────────────────────
+
+class TestSeparators:
+
+	def test_consecutive_commands_without_separator_raises(self):
+		# Two commands with no COLON or NEWLINE between them must be a syntax error.
+		with pytest.raises(TiSyntaxError):
+			run('ClockOn ClockOn')

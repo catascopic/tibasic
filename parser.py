@@ -499,7 +499,7 @@ class Parser:
 		the stopping token.  Raises TiSyntaxError if no match is found.
 		"""
 		depth = 0
-		prev_was_if = False
+		curr_if = False
 
 		while True:
 			while self.eat_statement_sep():
@@ -508,26 +508,23 @@ class Parser:
 			if t is EOF_TOKEN:
 				break
 			self.advance()
-			if t is IF:
-				prev_was_if = True
+			prev_if = curr_if
+			curr_if = t is IF
+			if curr_if:
 				self.skip_statement()
 			elif t is THEN:
-				if prev_was_if:
+				if prev_if:
 					depth += 1
-				prev_was_if = False
 			elif t in {FOR, WHILE, REPEAT}:
 				depth += 1
-				prev_was_if = False
 				self.skip_statement()
 			elif t is END:
 				if depth == 0:
 					return t
 				depth -= 1
-				prev_was_if = False
 			elif else_mode and t is ELSE and depth == 0:
 				return t
 			else:
-				prev_was_if = False
 				self.skip_statement()
 
 		raise TiSyntaxError("Unmatched block: End not found")
@@ -541,7 +538,8 @@ class Parser:
 				self._exec_statement()
 			if not self.eat_if({COLON, NEWLINE}):
 				break
-		self.expect(EOF_TOKEN)
+		if self.pos < len(self.tokens):
+			raise TiSyntaxError(f"End of statement reached; expected colon, newline, or end of input. Received: {self.advance()}")
 
 	def skip_statement(self) -> None:
 		"""Advance past one statement without executing it.
@@ -740,7 +738,7 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('round( [[1')
+	test('ClockOn : ClockOn')
 	
 	# test('55@A:99@B')
 	# test('int( log( 2) INV log( max( {A,B')

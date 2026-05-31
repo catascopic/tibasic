@@ -32,7 +32,8 @@
       "Bash(python -m pytest tibasic_test.py::TestDateTime::test_dbd_mmddyy_doc_example -q)",
       "Bash(python -c \"import purefunctions\")",
       "Bash(python -m pytest program_test.py -v)",
-      "Bash(python -m pytest program_test.py tibasic_test.py -q)"
+      "Bash(python -m pytest program_test.py tibasic_test.py -q)",
+      "Bash(python -c \"from tibasic_test import toks; print\\([t.text for t in toks\\('ClockOn ClockOn'\\)]\\)\")"
     ]
   }
 }

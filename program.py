@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import ABC
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -26,17 +27,14 @@ def check_for_condition(val: float, end_val: float, step: float) -> bool:
 
 # ── Block types ───────────────────────────────────────────────────────────────
 
-class Block:
+class Block(ABC):
 	"""Base class for all control-flow blocks.
 
 	Each concrete subclass overrides on_end to implement the End logic for
 	that block type, eliminating isinstance checks in end_cmd.
 	"""
-
-	def on_end(self, prog: 'Program') -> None:
-		"""Handle End for this block.  Default implementation is a no-op (ThenBlock)."""
+	def on_end(self, prog: 'Program'):
 		pass
-
 
 @dataclass
 class ForBlock(Block):
@@ -103,7 +101,6 @@ class Program:
 		self._parser = Parser(tokens, env)
 		self.env = env
 		self.block_stack: list[Block] = []
-		self.pending_if_result: bool | None = None  # set by If, read by Then
 
 	# ── Execution loop ────────────────────────────────────────────────────────
 
@@ -113,7 +110,7 @@ class Program:
 		try:
 			self._parser.run()
 		except ReturnSignal:
-			pass  # normal sub-program return; stop executing this program
+			pass
 		finally:
 			self.env.program_stack.pop()
 
@@ -124,78 +121,37 @@ class Program:
 
 	def pop_block(self) -> Block:
 		if not self.block_stack:
-			raise TiSyntaxError("End without matching block")
+			raise TiSyntaxError("End/Else without matching block")
 		return self.block_stack.pop()
-
-	def peek_block(self) -> Block | None:
-		return self.block_stack[-1] if self.block_stack else None
 
 	def jump_to(self, pos: int) -> None:
 		"""Set the parser's execution position (used by loop blocks on_end)."""
 		self._parser.pos = pos
 
-	# ── Label search ──────────────────────────────────────────────────────────
-
-	def goto(self, name: str) -> None:
-		"""Jump to the first Lbl <name> in the token stream.
-
-		Scans from the beginning, respecting string literals.
-		Raises LabelError if the label is not found.
-		"""
-		from tokens import LBL  # lazy: avoids circular import at module load time
-		p = self._parser
-		in_string = False
-		i = 0
-		while i < len(p.tokens):
-			t = p.tokens[i]
-			if in_string:
-				if t is QUOTE or t is NEWLINE:
-					in_string = False
-			elif t is QUOTE:
-				in_string = True
-			elif t is LBL:
-				# Use parse_label_name to read the 1–2 name-char tokens after LBL
-				p.pos = i + 1
-				label = p.parse_label_name()
-				if label == name:
-					return  # p.pos now points past the label name — correct resume point
-				i = p.pos  # skip over whatever name chars were consumed
-				continue
-			i += 1
-		raise LabelError(f"Label not found: {name!r}")
-
 	# ── Control-flow commands ─────────────────────────────────────────────────
-	# Each method contains the logic that was previously scattered across the
-	# command functions in forms.py.  The command functions now just parse
-	# their arguments and delegate here.
 
 	def begin_if(self, cond: bool) -> None:
-		"""Handle If: peek ahead for Then; otherwise skip the next statement if False."""
+		"""Handle If: peek 2 tokens ahead to detect a following Then.
+
+		tokens[pos] is the separator after the condition; tokens[pos+1] would be
+		Then for a block-If.  If found, advance past both and enter (or skip) the
+		block.  Otherwise handle as a single-line If — skip next statement if False.
+		"""
 		p = self._parser
-		saved = p.pos
-		p.eat_statement_sep()
-		next_tok = p.peek()
-		p.pos = saved
-		from tokens import THEN
-		if next_tok is THEN:
-			self.pending_if_result = cond
+		from tokens import THEN, ELSE
+		if (p.pos + 1 < len(p.tokens)
+				and p.tokens[p.pos] in {COLON, NEWLINE}
+				and p.tokens[p.pos + 1] is THEN):
+			p.pos += 2  # consume separator + Then
+			if cond:
+				self.push_block(ThenBlock())
+			else:
+				found = p.skip_block(else_mode=True)
+				if found is ELSE:
+					self.push_block(ThenBlock())
 		elif not cond:
 			p.eat_statement_sep()
 			p.skip_statement()
-
-	def begin_then(self) -> None:
-		"""Handle Then: open a Then-block (True branch) or skip to Else / End (False branch)."""
-		result = self.pending_if_result
-		self.pending_if_result = None
-		if result is None:
-			raise TiSyntaxError("Then without If")
-		if result:
-			self.push_block(ThenBlock())
-		else:
-			from tokens import ELSE
-			found = self._parser.skip_block(else_mode=True)
-			if found is ELSE:
-				self.push_block(ThenBlock())  # execute else-body; End will pop this block
 
 	def begin_else(self) -> None:
 		"""Handle Else: pop the Then-block and skip to the matching End."""
@@ -242,3 +198,33 @@ class Program:
 		if new_val < threshold:
 			self._parser.eat_statement_sep()
 			self._parser.skip_statement()
+
+	# ── Label search ──────────────────────────────────────────────────────────
+
+	def goto(self, name: str) -> None:
+		"""Jump to the first Lbl <name> in the token stream.
+
+		Scans from the beginning, respecting string literals.
+		Raises LabelError if the label is not found.
+		"""
+		from tokens import LBL
+		p = self._parser
+		in_string = False
+		i = 0
+		while i < len(p.tokens):
+			t = p.tokens[i]
+			if in_string:
+				if t is QUOTE or t is NEWLINE:
+					in_string = False
+			elif t is QUOTE:
+				in_string = True
+			elif t is LBL:
+				# Use parse_label_name to read the 1–2 name-char tokens after LBL
+				p.pos = i + 1
+				label = p.parse_label_name()
+				if label == name:
+					return  # p.pos now points past the label name — correct resume point
+				i = p.pos  # skip over whatever name chars were consumed
+				continue
+			i += 1
+		raise LabelError(f"Label not found: {name!r}")
