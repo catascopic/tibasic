@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
 	from parser import Thunk
-	from program import Program
 
 from environment import Environment, Variable
 from errors import TiSyntaxError, IncrementError, LabelError
@@ -14,76 +13,9 @@ from tiobjects import require_real
 from tokens import THEN, ELSE, LBL
 
 
-# ── For-loop continuation helper ─────────────────────────────────────────────
-
-def check_for_condition(value: float, end: float, step: float) -> bool:
-	"""Return True if the For loop should continue (value has not exceeded end)."""
-	if step > 0:
-		return value <= end + 1e-10
-	elif step < 0:
-		return value >= end - 1e-10
-	else:
-		raise IncrementError("For: step cannot be zero")
-
-
-# ── Block types ───────────────────────────────────────────────────────────────
-
-class Block(ABC):
-	"""Base class for all control-flow blocks.
-
-	Each concrete subclass overrides on_end to implement the End logic for
-	that block type, eliminating isinstance checks in end_cmd.
-	"""
-	def on_end(self, prog: 'Program'):
-		"""This method should not be abstract; the default action is to do nothing."""
-
-@dataclass
-class ForBlock(Block):
-	pos: int
-	var: Variable
-	end: float
-	step: float
-
-	def on_end(self, prog: Program) -> None:
-		new_val = self.var.get(prog.env) + self.step
-		self.var.set(prog.env, new_val)
-		if check_for_condition(new_val, self.end, self.step):
-			prog.jump(self.pos)
-			prog.push_block(self)
-
-
-@dataclass
-class WhileBlock(Block):
-	pos: int
-	condition: Thunk
-
-	def on_end(self, prog: 'Program') -> None:
-		if self.condition.eval():
-			prog.jump(self.pos)
-			prog.push_block(self)
-
-
-@dataclass
-class RepeatBlock(Block):
-	pos: int
-	condition: Thunk
-
-	def on_end(self, prog: 'Program') -> None:
-		if not self.condition.eval():
-			prog.jump(self.pos)
-			prog.push_block(self)
-
-
-@dataclass
-class ThenBlock(Block):
-	"""Marker for an active If/Then or Else block.  End simply pops it (no-op on_end)."""
-	pass
-
-
-# ── Program ───────────────────────────────────────────────────────────────────
-
 class Program:
-	"""Wraps a stored token stream as an executable program.
+	"""
+	Wraps a stored token stream as an executable program.
 
 	Owns the Parser (and thus the current execution position), the block
 	stack that tracks active For/While/Repeat/If-Then blocks, and the
@@ -110,7 +42,9 @@ class Program:
 		except ReturnSignal:
 			pass
 		finally:
-			self.env.program_stack.pop()
+			finished = self.env.program_stack.pop()
+			if finished is not self:
+				raise ValueError(f"Program stack out of order: expected {self}; got {finished}")
 
 	# ── Block stack ───────────────────────────────────────────────────────────
 
@@ -130,7 +64,7 @@ class Program:
 
 	def begin_if(self, cond: bool) -> None:
 		if self._parser.eat_if(THEN):
-			self._parser.expect_statement_end()
+			self._parser.end_statement()
 			if cond:
 				self.push_block(ThenBlock())
 			else:
@@ -145,13 +79,13 @@ class Program:
 			raise TiSyntaxError("Else without matching Then")
 		self._parser.skip_block()
 
-	def begin_while(self, condition: 'Thunk') -> None:
+	def begin_while(self, condition: Thunk) -> None:
 		if condition.eval():
 			self.push_block(WhileBlock(pos=self._parser.pos, condition=condition))
 		else:
 			self._parser.skip_block()
 
-	def begin_repeat(self, condition: 'Thunk') -> None:
+	def begin_repeat(self, condition: Thunk) -> None:
 		self.push_block(RepeatBlock(pos=self._parser.pos, condition=condition))
 
 	def begin_for(self, var: Variable, start: float, end: float, step: float) -> None:
@@ -188,12 +122,74 @@ class Program:
 		p = self._parser
 		goto_pos = p.pos - 2 - len(name)
 		p.pos = 0
-		while p.pos < len(p.tokens):
+		while p.has_next:
 			if p.eat_if(LBL):
 				label = p.parse_label_name()
-				p.expect_statement_end()
+				p.end_statement()
 				if label == name:
 					return
 			else:
 				p.skip_statement()
 		raise LabelError(f"Label not found: {name!r}", pos=goto_pos)
+
+
+# ── For-loop continuation helper ─────────────────────────────────────────────
+
+def check_for_condition(value: float, end: float, step: float) -> bool:
+	"""Return True if the For loop should continue (value has not exceeded end)."""
+	if step > 0:
+		return value <= end + 1e-10
+	elif step < 0:
+		return value >= end - 1e-10
+	else:
+		raise IncrementError("For: step cannot be zero")
+
+
+# ── Block types ───────────────────────────────────────────────────────────────
+
+class Block(ABC):
+	def on_end(self, prgm: 'Program'):
+		"""This method should not be abstract; the default action is to do nothing."""
+
+
+@dataclass
+class ForBlock(Block):
+	pos: int
+	var: Variable
+	end: float
+	step: float
+
+	def on_end(self, prgm: Program) -> None:
+		new_val = self.var.get(prgm.env) + self.step
+		self.var.set(prgm.env, new_val)
+		if check_for_condition(new_val, self.end, self.step):
+			prgm.jump(self.pos)
+			prgm.push_block(self)
+
+
+@dataclass
+class WhileBlock(Block):
+	pos: int
+	condition: Thunk
+
+	def on_end(self, prgm: Program) -> None:
+		if self.condition.eval():
+			prgm.jump(self.pos)
+			prgm.push_block(self)
+
+
+@dataclass
+class RepeatBlock(Block):
+	pos: int
+	condition: Thunk
+
+	def on_end(self, prgm: Program) -> None:
+		if not self.condition.eval():
+			prgm.jump(self.pos)
+			prgm.push_block(self)
+
+
+@dataclass
+class ThenBlock(Block):
+	"""Marker for an active If/Then or Else block.  End simply pops it (no-op on_end)."""
+	pass

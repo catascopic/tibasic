@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime, date, timedelta
 
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation
-from errors import DataTypeError, DomainError, IllegalNestError, UndefinedError
+from errors import TiError, DataTypeError, DomainError, IllegalNestError, UndefinedError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 from signals import StopSignal
 
@@ -291,14 +291,20 @@ class RealVar(NamedVar):
 
 class ListVar(OffsetVar):
 	def get(self, env):
-		return env.lists[self.index]
+		value = env.lists[self.index]
+		if value is None:
+			raise UndefinedError(f"List {self.index + 1}")
+		return value
 		
 	def set(self, env, value):
 		env.lists[self.index] = require_list(value)
 
 class UserListVar(NamedVar):
 	def get(self, env):
-		return env.user_lists[self.name]
+		try:
+			return env.user_lists[self.name]
+		except KeyError:
+			raise UndefinedError(f"User list {self.name}")
 		
 	def set(self, env, value):
 		env.user_lists[self.name] = require_list(value)

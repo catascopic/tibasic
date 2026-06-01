@@ -349,21 +349,33 @@ class TestReturn:
 	def test_does_not_exit_caller(self):
 		# Return only exits the innermost program
 		env = Environment()
-		env.programs['I'] = toks('1 @ A : Return : 99 @ A')
-		env.programs['O'] = toks('prgm I : 2 @ B : Return : 99 @ B')
-		run('prgm O : 3 @ C', env)
+		env.programs['I'] = toks("""
+		1@A
+		Return
+		99@A
+		""")
+		env.programs['O'] = toks("""
+		prgm I
+		2@B
+		Return
+		99@B
+		""")
+		run("""
+		prgm O
+		3@C
+		""", env)
 		assert var(env, 'A') == 1   # INNER's Return fired
 		assert var(env, 'B') == 2   # OUTER continued, then its own Return fired
 		assert var(env, 'C') == 3   # top-level caller continued
-
-	def test_return_signal_propagates_from_program_run(self):
-		# Program.run() catches ReturnSignal; calling code sees no exception
-		env = run('Return')
 		
 	def test_return_doesnt_cancel_other_statements(self):
 		env = Environment()
 		env.programs['P'] = toks('Return')
-		calc('1@A: prgm P :99@B', env)
+		calc("""
+		1@A
+		prgm P
+		99@B
+		""", env)
 		assert var(env, 'A') == 1    # executed before the sub-program
 		assert var(env, 'B') == 99   # skipped because Stop propagated
 
@@ -453,3 +465,37 @@ class TestIsGtDsLt:
 		assert var(env, 'B') is None   # skipped
 		assert var(env, 'C') == 42
 
+
+class TestRecursion:
+
+	def test_fibonacci(self):
+		env = Environment()
+		calc('{8@ARG:0@ dim( $RET:0@ dim( $TMP', env)
+		run("""
+		
+		$ARG( dim( $ARG@N
+		If N≤1
+		Then
+			N@$RET ( 1+ dim( $RET
+			dim( $ARG )-1@ dim( $ARG
+			Return
+		End
+
+		N-1@$ARG(1+ dim( $ARG
+		prgm TEST
+		$RET( dim( $RET@$TMP(1+ dim( $TMP
+		dim( $RET)-1@ dim( $RET
+
+		N-2@$ARG(1+ dim( $ARG
+		prgm TEST
+		$TMP( dim( $TMP@A
+		dim( $TMP)-1@ dim( $TMP
+		$RET( dim( $RET@B
+		dim( $RET)-1@ dim( $RET
+		
+		A+B@$RET(1+ dim( $RET
+		dim( $ARG)-1@ dim( $ARG
+		
+		""", env)
+		
+		assert calc('$RET(1', env) == 54

@@ -1,3 +1,23 @@
+How to replace peek (and kill EOF_TOKEN):
+Create these methods:
+next_is(Token): same as peek() is Token
+next_in(set[Token]): same as peek() in {...}
+Weird idea: define __in__ in token to be the same as __eq__
+next_matches(Callable[[Token], bool]): intended to usually be called by doing next_matches(Token.is_numeric_var)
+We'd also need a replacement for peek().function is not None, but that's not hard
+For cases like f"Too many arguments: unexpected {self.peek()}", we could create a method like peek only for throwing messages, which returns repr(token) or "END OF INPUT"
+Maybe EOF_TOKEN is fine! But can we make it a subclass of token that explictly defines its methods to return False?
+Maybe we could even make a common interface that EOF_TOKEN and Token both share, which could even help reduce cyclical imports!
+We could make an ABC called Token (or StreamToken), rename tokens.py to catalog.py, and rename the Token dataclass to... I don't know, something better than TokenImpl. It could be Token(StreamToken)
+
+UserListVars could be None sometimes?
+Should var.get have a "default" param?
+Is catching UndefinedError bad practice?
+Possible solution: OffsetVar defines an abstract method that just returns the right list on env, so that .get can handle the "check None, raise Undefined" logic
+
+The program table in Environment should probably be a dataclass called ProgramData, and have a reference to the name of the program. Then the class Program be given a ProgramData and then it would know its own name, which would be good for debugging if nothing else.
+
+
 Not sure what to do with no-arg commands
 Even more complex are commands that can take 0 or more args, like Disp
 With no args, Disp just shows the home screen
@@ -163,7 +183,7 @@ DataTypeError: wrong type of an argument or operand
 
 freq_list
 
-add a peek method for ArgParser that just calles _parser.peek()
+add a peek method for ArgParser that just calles _parser.peek ()
 Improve matrix methods
 rowswap, etc: better implementations that don't copy unnecessarily
 

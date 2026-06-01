@@ -301,6 +301,15 @@ class TestCombinatorics:
 # ── List operations ───────────────────────────────────────────────────────────
 
 class TestListOperations:
+
+	def test_store_index_1_undefined_list(self, env):
+		calc('1@ L1 (1', env)
+		assert var(env, 'L1').data == [1]
+	
+	def test_store_index_2_undefined_list(self):
+		with pytest.raises(InvalidDimError):
+			calc('1@ L1 (2')
+
 	def test_augment(self):
 		assert list(calc('augment( {1,2},{3,4}')) == [1, 2, 3, 4]
 
@@ -796,6 +805,14 @@ class TestUserLists:
 	def test_fail_leading_number(self):
 		with pytest.raises(TiSyntaxError):
 			calc('{1}@$7A')
+	
+	def test_store_index_1_undefined_user_list(self, env):
+		calc('1@$FOO(1', env)
+		assert env.user_lists['FOO'].data == [1]
+	
+	def test_store_index_2_undefined_user_list(self):
+		with pytest.raises(InvalidDimError):
+			calc('1@$FOO(2')
 
 	# ── Indexing ──────────────────────────────────────────────────────────────
 

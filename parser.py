@@ -4,13 +4,14 @@ from numbers import Number
 from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
 from tokens import (
 	Token,
-	STORE, L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
-	COMMA, DOT, NEG, COLON, NEWLINE,
-	LIST_PREFIX, RAND, DIM, SCI_E, DEG, RAD, APOS,
-	IF, THEN, FOR, WHILE, REPEAT, END, ELSE,
+	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
+	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
+	SCI_E, DEG, RAD, APOS,
+	LIST_PREFIX, RAND, DIM, 
+	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
 from environment import Environment, Variable, UserListVar
-from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError
+from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError, UndefinedError
 
 
 EOF_TOKEN = Token(b'\x00', None, '<END-OF-INPUT>')
@@ -24,7 +25,9 @@ class Thunk:
 	def eval(self):
 		parser = Parser(self.tokens, self.env)
 		value = parser.parse_expr()
-		parser.expect(EOF_TOKEN)
+		if parser.has_next:
+			# This is a ValueError, not a TiError, because the parser should always get this right
+			raise ValueError(f"Expected end of Thunk; remaining: {parser.tokens[parser.pos:]}")
 		return value
 
 
@@ -41,15 +44,19 @@ class Parser:
 
 	# ── Primitives ─────────────────────────────────────────────────────────────
 
+	@property
+	def has_next(self):
+		return self.pos < len(self.tokens)
+
 	def peek(self) -> Token:
-		return self.tokens[self.pos] if self.pos < len(self.tokens) else EOF_TOKEN
+		return self.tokens[self.pos] if self.has_next else EOF_TOKEN
 
 	def advance(self) -> Token:
-		t = self.peek()
-		if t is EOF_TOKEN:
-			raise TiSyntaxError("Unexpected end of input")
-		self.pos += 1
-		return t
+		if self.has_next:
+			t = self.tokens[self.pos]
+			self.pos += 1
+			return t
+		raise TiSyntaxError("Unexpected end of input")
 
 	def eat_if(self, tok) -> bool:
 		"""Consume the next token if it matches.
@@ -69,10 +76,10 @@ class Parser:
 			raise TiSyntaxError(f"Expected {tok}, got {self.peek()}")
 		self.pos += 1
 	
-	def expect_statement_end(self):
+	def end_statement(self):
 		if self.eat_if({COLON, NEWLINE}):
 			return
-		if self.pos < len(self.tokens):
+		if self.has_next:
 			raise TiSyntaxError(f"Expected end of statement; got {self.peek()}")
 
 	def close_delimiter(self, expected: Token) -> bool:
@@ -207,7 +214,7 @@ class Parser:
 		start = self.pos
 		stack: list[Token] = []   # expected closers, innermost on top
 		in_string = False
-		while self.pos < len(self.tokens):
+		while self.has_next:
 			t = self.tokens[self.pos]
 			if in_string:
 				if t is QUOTE:
@@ -323,6 +330,7 @@ class Parser:
 		
 		if t.is_matrix_var():
 			val = t.variable.get(self.env)
+			# TODO: if val is None
 			if self.eat_if(L_PAREN):
 				val = val[self.parse_row_col()]
 				self.eat_if(R_PAREN)
@@ -445,8 +453,9 @@ class Parser:
 		t = self.peek()
 		if t.is_list_var() or t is LIST_PREFIX:
 			var = self.parse_list_var()
-			lst = var.get(self.env)
-			if lst is None:
+			try:
+				lst = var.get(self.env)
+			except UndefinedError:
 				var.set(self.env, TiList.alloc(value))
 			else:
 				lst.set_dim(value)
@@ -482,7 +491,7 @@ class Parser:
 		statement), that separator is the entire statement and is consumed.
 		"""
 		in_string = False
-		while self.pos < len(self.tokens):
+		while self.has_next:
 			t = self.tokens[self.pos]
 			self.pos += 1
 			if in_string:
@@ -509,7 +518,7 @@ class Parser:
 		depth = 0
 		prev_if = False
 		start_pos = self.pos
-		while self.pos < len(self.tokens):
+		while self.has_next:
 			t = self.advance()
 			if t is THEN:
 				if prev_if:
@@ -518,7 +527,7 @@ class Parser:
 				depth += 1
 			elif t is END or (else_mode and t is ELSE):
 				if depth == 0:
-					self.expect_statement_end()
+					self.end_statement()
 					return t
 				depth -= 1
 			self.skip_statement()
@@ -547,7 +556,7 @@ class Parser:
 				elif self.peek().converter is not None:
 					value = self.advance().converter(value)
 				self.env.ans = value
-				self.expect_statement_end()
+				self.end_statement()
 		except TiError as e:
 			if e.pos is None:
 				e.pos = self.pos - 1
@@ -555,8 +564,13 @@ class Parser:
 
 	def run(self):
 		"""Execute all statements in the token stream until EOF."""
-		while self.pos < len(self.tokens):
-			self._exec_statement()
+		try:
+			while self.has_next:
+				self._exec_statement()
+		except TiError as e:
+			if e.pos is not None:
+				print(f"ERROR: {' '.join(t.text for t in self.tokens[e.pos-5 : e.pos+6])}")
+			raise
 
 
 def _parse_method(method):
@@ -660,7 +674,7 @@ class ArgParser:
 		closing ), then eats the COLON/NEWLINE that follows, completing the statement.
 		"""
 		self.end_func()
-		self._parser.expect_statement_end()
+		self._parser.end_statement()
 
 	def end_cmd(self):
 		"""Validate we are at a statement boundary and eat the trailing separator.
@@ -671,11 +685,11 @@ class ArgParser:
 		"""
 		if self._next:
 			raise ArgumentError(f"Too many arguments: unexpected {self.peek()}")
-		self._parser.expect_statement_end()
+		self._parser.end_statement()
 	
 	def no_args(self):
 		# TODO: placeholder for now; ideally should only be allowed as the first call
-		self._parser.expect_statement_end()
+		self._parser.end_statement()
 
 	def current_program(self, cmd_name: str):
 		"""Return the innermost currently-executing Program.
