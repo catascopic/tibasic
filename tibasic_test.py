@@ -58,18 +58,21 @@ def calc(items, env: Environment | None = None):
 
 
 def var(env: Environment, name: str):
-	"""Read a numeric variable by its TI-BASIC name (e.g. 'A', 'Z', 'θ').
+	"""Read any variable by its TI-BASIC name (e.g. 'A', '[A]', 'L1', 'Str1').
 
-	Returns the raw stored value (None if the variable has never been written),
-	bypassing NumericVar's auto-initialise-to-zero side-effect.  Intended for
-	test assertions only — not for production use.
+	For numeric variables, returns the raw stored value (None if never written),
+	bypassing NumericVar's auto-initialise-to-zero side-effect.  For all other
+	variable types, delegates to variable.get(env).  Intended for test assertions
+	only — not for production use.
 	"""
 	from environment import NumericVar
 	tok = lookup[name]
 	v = tok.variable
-	if not isinstance(v, NumericVar):
-		raise TypeError(f"{name!r} is not a numeric variable")
-	return env.numerics[v.index]
+	if v is None:
+		raise TypeError(f"{name!r} is not a variable")
+	if isinstance(v, NumericVar):
+		return env.numerics[v.index]
+	return v.get(env)
 
 
 @pytest.fixture
@@ -492,7 +495,7 @@ class TestEmptyList:
 	def test_store_dim_zero(self, env):
 		calc('{1,2,3@ L1', env)
 		calc('0@ dim( L1', env)
-		assert env.lists[0].data == []
+		assert var(env, 'L1').data == []
 
 	# ── Aggregate functions ───────────────────────────────────────────────────
 
@@ -689,25 +692,25 @@ class TestMatrToList:
 	def test_single_column_first(self, env):
 		# Matr►list([A], 1, L1) extracts column 1 into L1
 		calc('Matr►list( [[1,2][3,4][5,6]],1, L1', env)
-		assert env.lists[0].data == [1, 3, 5]
+		assert var(env, 'L1').data == [1, 3, 5]
 
 	def test_single_column_second(self, env):
 		# Matr►list([A], 2, L1) extracts column 2
 		calc('Matr►list( [[1,2][3,4][5,6]],2, L1', env)
-		assert env.lists[0].data == [2, 4, 6]
+		assert var(env, 'L1').data == [2, 4, 6]
 
 	def test_multi_list_all_columns(self, env):
 		# Matr►list([A], L1, L2) — each list gets one column
 		calc('[[1,2][3,4]]@ [A]', env)
 		calc('Matr►list( [A] , L1 , L2', env)
-		assert env.lists[0].data == [1, 3]
-		assert env.lists[1].data == [2, 4]
+		assert var(env, 'L1').data == [1, 3]
+		assert var(env, 'L2').data == [2, 4]
 
 	def test_multi_list_single_column_matrix(self, env):
 		# 1-column matrix: one list var is enough
 		calc('[[7][8][9', env)
 		calc('Matr►list( Ans , L1', env)
-		assert env.lists[0].data == [7, 8, 9]
+		assert var(env, 'L1').data == [7, 8, 9]
 
 	def test_column_out_of_range(self):
 		with pytest.raises(InvalidDimError):
@@ -716,15 +719,15 @@ class TestMatrToList:
 	def test_fewer_lists_than_columns(self, env):
 		# 2-column matrix, only 1 list destination → only column 1 is filled
 		calc('Matr►list( [[1,2][3,4]], L1', env=env)
-		assert env.lists[0].data == [1, 3]
-		assert env.lists[1] is None  # L2 untouched
+		assert var(env, 'L1').data == [1, 3]
+		assert var(env, 'L2') is None  # L2 untouched
 
 	def test_extra_lists_ignored(self, env):
 		# 2-column matrix but 3 list destinations → extra list is simply ignored
 		calc('Matr►list( [[1,2][3,4]], L1 , L2 , L3 )', env=env)
-		assert env.lists[0].data == [1, 3]
-		assert env.lists[1].data == [2, 4]
-		assert env.lists[2] is None  # L3 never written
+		assert var(env, 'L1').data == [1, 3]
+		assert var(env, 'L2').data == [2, 4]
+		assert var(env, 'L3') is None  # L3 never written
 
 	def test_non_matrix_raises(self, env):
 		with pytest.raises(DataTypeError):
@@ -735,22 +738,22 @@ class TestListToMatr:
 	def test_basic_two_lists(self, env):
 		# List►matr({1,3},{2,4},[A]) → [[1,2],[3,4]]  (lists become columns)
 		calc('List►matr( {1,3},{2,4}, [A]', env)
-		assert env.matrices[0].data == [[1, 2], [3, 4]]
+		assert var(env, '[A]').data == [[1, 2], [3, 4]]
 
 	def test_single_list(self, env):
 		calc('List►matr( {5,6,7}, [A]', env)
-		assert env.matrices[0].data == [[5], [6], [7]]
+		assert var(env, '[A]').data == [[5], [6], [7]]
 
 	def test_unequal_lengths_pads_zero(self, env):
 		# Shorter list gets zero-padded to match the longest
 		calc('List►matr( {1,2,3},{4,5}, [A]', env)
-		assert env.matrices[0].data == [[1, 4], [2, 5], [3, 0]]
+		assert var(env, '[A]').data == [[1, 4], [2, 5], [3, 0]]
 
 	def test_roundtrip_with_matr_to_list(self, env):
 		# Store a matrix, round-trip through List►matr
 		calc('Matr►list( [[10,20][30,40]], L1 , L2', env)
 		calc('List►matr( L1 , L2 , [A]', env)
-		assert env.matrices[0].data == [[10, 20], [30, 40]]
+		assert var(env, '[A]').data == [[10, 20], [30, 40]]
 
 	def test_non_list_raises(self, env):
 		# Scalar where a list is expected → DataTypeError
@@ -882,7 +885,7 @@ class TestUserLists:
 		# Matr►list([A], L1, ᴸAB) — one regular list, one user list
 		calc('[[1,2][3,4][5,6]]@ [A]', env)
 		calc('Matr►list( [A] , L1 ,$AB', env)
-		assert env.lists[0].data == [1, 3, 5]
+		assert var(env, 'L1').data == [1, 3, 5]
 		assert env.user_lists['AB'].data == [2, 4, 6]
 
 	def test_list_to_matr_from_user_lists(self, env):
@@ -890,21 +893,21 @@ class TestUserLists:
 		calc('{1,3,5}@$AB', env)
 		calc('{2,4,6}@$CD', env)
 		calc('List►matr( $AB,$CD, [A]', env)
-		assert env.matrices[0].data == [[1, 2], [3, 4], [5, 6]]
+		assert var(env, '[A]').data == [[1, 2], [3, 4], [5, 6]]
 
 	def test_list_to_matr_mixed(self, env):
 		# Mix a regular list and a user list as sources
 		calc('{1,3,5}@ L1', env)
 		calc('{2,4,6}@$AB', env)
 		calc('List►matr( L1 ,$AB, [A]', env)
-		assert env.matrices[0].data == [[1, 2], [3, 4], [5, 6]]
+		assert var(env, '[A]').data == [[1, 2], [3, 4], [5, 6]]
 
 	def test_roundtrip(self, env):
 		# Store a matrix → Matr►list → List►matr → should recover original
 		calc('[[10,20][30,40]]@ [A]', env)
 		calc('Matr►list( [A] ,$AB,$CD', env)
 		calc('List►matr( $AB,$CD, [A] ', env)
-		assert env.matrices[0].data == [[10, 20], [30, 40]]
+		assert var(env, '[A]').data == [[10, 20], [30, 40]]
 	
 	def test_six_char(self):
 		with pytest.raises(TiSyntaxError):
@@ -1550,7 +1553,7 @@ class TestColonStatements:
 		# 1→A:2  →  Ans=2, A=1
 		calc('1@A :2', env)
 		assert env.ans == 2
-		assert env.numerics[0] == 1
+		assert var(env, 'A') == 1
 
 	def test_colon_store_then_read(self, env):
 		# 5→A:A*3  →  Ans=15
@@ -1559,8 +1562,8 @@ class TestColonStatements:
 	def test_colon_two_stores(self, env):
 		# 1→A:3→B  →  A=1, B=3, Ans=3
 		calc('1@A:3@B', env)
-		assert env.numerics[0] == 1
-		assert env.numerics[1] == 3
+		assert var(env, 'A') == 1
+		assert var(env, 'B') == 3
 		assert env.ans == 3
 
 	def test_colon_three_segments(self, env):
@@ -1629,30 +1632,30 @@ class TestStoreDim:
 	def test_store_dim_list_create(self, env):
 		# 5→dim(L₁)  →  L₁ becomes {0,0,0,0,0}
 		calc('5@ dim( L1', env)
-		assert env.lists[0].data == [0, 0, 0, 0, 0]
+		assert var(env, 'L1').data == [0, 0, 0, 0, 0]
 
 	def test_store_dim_list_expand(self, env):
 		# {1,2,3}→L₁ : 5→dim(L₁)  →  L₁ = {1,2,3,0,0}
 		calc('{1,2,3@ L1', env)
 		calc('5@ dim( L1', env)
-		assert env.lists[0].data == [1, 2, 3, 0, 0]
+		assert var(env, 'L1').data == [1, 2, 3, 0, 0]
 
 	def test_store_dim_list_shrink(self, env):
 		# {1,2,3,4,5}→L₁ : 3→dim(L₁)  →  L₁ = {1,2,3}
 		calc('{1,2,3,4,5@ L1', env)
 		calc('3@ dim( L1', env)
-		assert env.lists[0].data == [1, 2, 3]
+		assert var(env, 'L1').data == [1, 2, 3]
 
 	def test_store_dim_matrix_create(self, env):
 		# {2,3}→dim([A])  →  [A] becomes 2×3 of zeros
 		calc('{2,3@ dim( [A]', env)
-		assert env.matrices[0].data == 2 * [3 * [0]]
+		assert var(env, '[A]').data == 2 * [3 * [0]]
 
 	def test_store_dim_matrix_resize_preserves(self, env):
 		# Build [[1,2][3,4]], then resize to 3×3; original values survive, new cells = 0
 		calc('[[1,2][3,4@ [A]', env)
 		calc('{3,3@ dim( [A]', env)
-		assert env.matrices[0].data == [[1, 2, 0], [3, 4, 0], [0, 0, 0]]
+		assert var(env, '[A]').data == [[1, 2, 0], [3, 4, 0], [0, 0, 0]]
 
 	def test_dim_read_list(self, env):
 		# dim({1,2,3,4}) = 4  (reading, not storing)

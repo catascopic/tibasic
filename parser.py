@@ -678,10 +678,8 @@ class ArgParser:
 		For paren commands (e.g. For(, IS>(, Matr►list(): eats the optional
 		closing ), then eats the COLON/NEWLINE that follows, completing the statement.
 		"""
-		if self._next:
-			raise ArgumentError(f"Too many arguments: unexpected {self.peek()}")
-		self._parser.eat_if(R_PAREN)
-		self._parser.eat_statement_sep()
+		self.end_func()
+		self.end_cmd()
 
 	def end_cmd(self):
 		"""Validate we are at a statement boundary and eat the trailing separator.

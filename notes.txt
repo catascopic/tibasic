@@ -1,25 +1,3 @@
-New idea: CommandArgParser should be responsible for eating the end-of-statement separator.
-Of course, there's a weird split between functions (always take parentheses) and commands (may or may not). So we might need three total ArgParsers, possibly with a linear heirarchy. Alternatively, CommandArgParser just has two end methods, one of which closes the parentheses; both expect a separator.
-Or maybe there's just one ArgParser after all, with three end methods!
-close_paren()/end_func()
-close_paren_and_end_statement()/end_paren_cmd()
-end_statement()/end_cmd()
-Not sure what the name should be, these might not be the best. But I do think this is better than different ArgParser subclasses, since they'd all need corresponding decorators, and it would still be up to the functions to decide how they're parsed. It's not like this distinction would move to another file; it's just a matter of which decorator they use vs. which end method they call.
-Anyway, once the command has parsed its arguments and reached the end of the line, it calls the appropriate method on Program.
-This simplifies If/Else as we now only need to peek a single token.
-It also clears up the strange situation where even after a jump, the parser expects to read the following separator. This seemed to be okay in practice, since it would always read *a* separator, but I see it as conceptually wrong.
-I'm also thinking of trying to get rid of the EOF_TOKEN if possible. Parser.run should loop while self.pos < len(self.tokens), rather than looking for EOF, though this will require some re-working as sometimes EOF is returned by peek. I'm hoping these can be changed without complicating too much.  I never liked EOF_TOKEN either since it's not a real token. I even had to give it a code value so functions like is_numeric_var wouldn't blow up. (Side note: those functions probably should be properies!)
-The non-command branch of _exec_statement will now need to consume the statement separator too after this change.
-Also, if I discontinue CommandArgParser, should I remove the "command" property on token? Commands and functions could both use the "function" field, but then use a flag to differentiate which one they are. On the other hand, I think the distinction between functions and operators is correct.
-
-
-1. Oh, I actually thought skip_statement would eat the separator. Why wouldn't it?
-2. I was thinking we wouldn't have any new decorators -- form_funcs would just be responsible for calling the right end-parse method themselves.
-3. I'm fine keeping EOF_TOKEN for peek if you think that's the right call, I just kind of don't like how we're calling is_numeric_var on it.
-
-
-Update other tests to use var()
-
 Can we Record position of token for exceptions
 
 Better pos tracking for exceptions
@@ -54,6 +32,25 @@ make them IntEnums for easier testing?
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+New idea: CommandArgParser should be responsible for eating the end-of-statement separator.
+Of course, there's a weird split between functions (always take parentheses) and commands (may or may not). So we might need three total ArgParsers, possibly with a linear heirarchy. Alternatively, CommandArgParser just has two end methods, one of which closes the parentheses; both expect a separator.
+Or maybe there's just one ArgParser after all, with three end methods!
+close_paren()/end_func()
+close_paren_and_end_statement()/end_paren_cmd()
+end_statement()/end_cmd()
+Not sure what the name should be, these might not be the best. But I do think this is better than different ArgParser subclasses, since they'd all need corresponding decorators, and it would still be up to the functions to decide how they're parsed. It's not like this distinction would move to another file; it's just a matter of which decorator they use vs. which end method they call.
+Anyway, once the command has parsed its arguments and reached the end of the line, it calls the appropriate method on Program.
+This simplifies If/Else as we now only need to peek a single token.
+It also clears up the strange situation where even after a jump, the parser expects to read the following separator. This seemed to be okay in practice, since it would always read *a* separator, but I see it as conceptually wrong.
+I'm also thinking of trying to get rid of the EOF_TOKEN if possible. Parser.run should loop while self.pos < len(self.tokens), rather than looking for EOF, though this will require some re-working as sometimes EOF is returned by peek. I'm hoping these can be changed without complicating too much.  I never liked EOF_TOKEN either since it's not a real token. I even had to give it a code value so functions like is_numeric_var wouldn't blow up. (Side note: those functions probably should be properies!)
+The non-command branch of _exec_statement will now need to consume the statement separator too after this change.
+Also, if I discontinue CommandArgParser, should I remove the "command" property on token? Commands and functions could both use the "function" field, but then use a flag to differentiate which one they are. On the other hand, I think the distinction between functions and operators is correct.
+
+
+1. Oh, I actually thought skip_statement would eat the separator. Why wouldn't it?
+2. I was thinking we wouldn't have any new decorators -- form_funcs would just be responsible for calling the right end-parse method themselves.
+3. I'm fine keeping EOF_TOKEN for peek if you think that's the right call, I just kind of don't like how we're calling is_numeric_var on it.
 
 skip_block: Else without If doesn't count
 
