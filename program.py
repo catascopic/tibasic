@@ -39,42 +39,39 @@ class Block(ABC):
 
 @dataclass
 class ForBlock(Block):
-	"""State for an active For( loop."""
-	pos: int         # token index of the first body token (separator already eaten)
-	var: Variable    # loop variable
-	end_val: float   # loop exits when var exceeds this (or drops below it for negative step)
-	step: float      # added to var at each End
+	pos: int
+	var: Variable
+	end_val: float
+	step: float
 
 	def on_end(self, prog: Program) -> None:
 		new_val = self.var.get(prog.env) + self.step
 		self.var.set(prog.env, new_val)
 		if check_for_condition(new_val, self.end_val, self.step):
-			prog.push_block(self)       # keep alive for the next iteration
-			prog.jump_to(self.pos)      # jump to first body token; run() executes it directly
+			prog.jump(self.pos)
+			prog.push_block(self)
 
 
 @dataclass
 class WhileBlock(Block):
-	"""State for an active While loop."""
-	pos: int          # token index of the first body token (separator already eaten)
-	condition: Thunk  # re-evaluated at End; True → repeat, False → exit
+	pos: int
+	condition: Thunk
 
 	def on_end(self, prog: 'Program') -> None:
 		if self.condition.eval():
+			prog.jump(self.pos)
 			prog.push_block(self)
-			prog.jump_to(self.pos)
 
 
 @dataclass
 class RepeatBlock(Block):
-	"""State for an active Repeat loop."""
-	pos: int          # token index of the first body token (separator already eaten)
-	condition: Thunk  # evaluated at End; True → exit, False → repeat
+	pos: int
+	condition: Thunk
 
 	def on_end(self, prog: 'Program') -> None:
 		if not self.condition.eval():
+			prog.jump(self.pos)
 			prog.push_block(self)
-			prog.jump_to(self.pos)
 
 
 @dataclass
@@ -125,7 +122,7 @@ class Program:
 			raise TiSyntaxError("End/Else without matching block")
 		return self.block_stack.pop()
 
-	def jump_to(self, pos: int) -> None:
+	def jump(self, pos: int) -> None:
 		"""Set the parser's execution position (used by loop blocks on_end)."""
 		self._parser.pos = pos
 
@@ -139,6 +136,7 @@ class Program:
 		"""
 		p = self._parser
 		if p.eat_if(THEN):
+			p.expect_statement_end()
 			if cond:
 				self.push_block(ThenBlock())
 			else:

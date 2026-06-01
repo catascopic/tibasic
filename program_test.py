@@ -204,21 +204,50 @@ class TestIfOneLine:
 class TestIfThenElse:
 
 	def test_then_true(self):
-		env = run('If 1 : Then : 42 @ A : End')
+		env = run("""
+		If 1
+		Then
+			42@A
+		End
+		""")
 		assert var(env, 'A') == 42
 
 	def test_then_false_skips_body(self):
-		env = run('If 0 : Then : 42 @ A : End : 99 @ B')
+		env = run("""
+		If 0
+		Then
+			42@A
+		End
+		99@B
+		""")
 		assert var(env, 'A') is None
 		assert var(env, 'B') == 99
 
 	def test_then_else_takes_then_branch(self):
-		env = run('If 1 : Then : 10 @ A : Else : 20 @ A : End')
+		env = run("""
+		If 1
+		Then
+			10@A
+		Else
+			20@A
+		End
+		99@B
+		""")
 		assert var(env, 'A') == 10
+		assert var(env, 'B') == 99
 
 	def test_then_else_takes_else_branch(self):
-		env = run('If 0 : Then : 10 @ A : Else : 20 @ A : End')
+		env = run("""
+		If 0
+		Then
+			10@A
+		Else
+			20@A
+		End
+		99@B
+		""")
 		assert var(env, 'A') == 20
+		assert var(env, 'B') == 99
 
 	def test_nested_then(self):
 		env = run('If 1 : Then : If 1 : Then : 42 @ A : End : End')
@@ -231,7 +260,14 @@ class TestIfThenElse:
 
 	def test_then_false_nested_inside(self):
 		# Outer If is False; skip_block must skip nested blocks correctly
-		env = run('If 0 : Then : For( A , 1 , 5 ) : End : End : 99 @ B')
+		env = run("""
+		If 0
+			Then
+				For( A,1,5
+				End
+			End
+		99@B
+		""")
 		assert var(env, 'B') == 99   # outer block was skipped cleanly
 
 	def test_if_inside_for(self):

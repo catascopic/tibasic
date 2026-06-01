@@ -97,7 +97,7 @@ class Environment:
 			pass
 
 	def run_program(self, prgm_name: str):
-		"""Runs a stored program."""
+		"""Runs a stored program. To simulate running a program as you would on a calculator from the home screen, use Environment.run([PRGM, ...])."""
 		try:
 			prgm_code = self.programs[prgm_name]
 		except KeyError:

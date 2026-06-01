@@ -68,6 +68,11 @@ class Parser:
 		if self.peek() is not tok:
 			raise TiSyntaxError(f"Expected {tok}, got {self.peek()}")
 		self.pos += 1
+	
+	def expect_statement_end(self):
+		if not self.at_statement_end():
+			raise TiSyntaxError(f"Expected end of statement; got {self.peek()}")
+		self.eat_statement_sep()
 
 	def at_statement_end(self) -> bool:
 		"""True when the current position is at a statement boundary (COLON, NEWLINE, or EOF)."""
@@ -514,34 +519,24 @@ class Parser:
 		"""
 		depth = 0
 		curr_if = False
-
-		while True:
-			while self.eat_statement_sep():
-				pass
-			t = self.peek()
-			if t is EOF_TOKEN:
-				break
-			self.advance()
+		start_pos = self.pos
+		while self.pos < len(self.tokens):
+			t = self.advance()
 			prev_if = curr_if
-			curr_if = t is IF
-			if curr_if:
-				self.skip_statement()
-			elif t is THEN:
-				if prev_if:
+			if not (curr_if != t is IF):
+				if t is THEN:
+					if prev_if:
+						depth += 1
+				elif t in {FOR, WHILE, REPEAT}:
 					depth += 1
-			elif t in {FOR, WHILE, REPEAT}:
-				depth += 1
-				self.skip_statement()
-			elif t is END:
-				if depth == 0:
-					return t
-				depth -= 1
-			elif else_mode and t is ELSE and depth == 0:
-				return t
-			else:
-				self.skip_statement()
+				elif t is END or (else_mode and t is ELSE):
+					if depth == 0:
+						self.expect_statement_end()
+						return t
+					depth -= 1
+			self.skip_statement()
 
-		raise TiSyntaxError("Unmatched block: End not found")
+		raise TiSyntaxError("Unmatched block: End not found", pos=self.pos)
 
 	def run(self):
 		"""Execute all statements in the token stream until EOF."""
@@ -672,9 +667,7 @@ class ArgParser:
 		unexpected follows the command's arguments, then consumes the COLON/NEWLINE
 		(or does nothing at EOF).
 		"""
-		if not self._parser.at_statement_end():
-			raise TiSyntaxError(f"Expected end of statement after command, got {self._parser.peek()}")
-		self._parser.eat_statement_sep()
+		self._parser.expect_statement_end()
 
 	def current_program(self, cmd_name: str):
 		"""Return the innermost currently-executing Program.
