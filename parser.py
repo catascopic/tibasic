@@ -468,6 +468,7 @@ class Parser:
 				mat.set_dim(value)
 		else:
 			raise TiSyntaxError(f"Invalid store-to-dim target: {t}")
+		self.eat_if(R_PAREN)
 
 	def parse_list_var(self):
 		t = self.advance()
