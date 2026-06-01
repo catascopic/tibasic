@@ -1,6 +1,6 @@
 from __future__ import annotations
 from enum import Enum, auto
-from decorators import no_paren_func
+from decorators import forms_func
 from errors import DomainError
 from tiobjects import require_int
 
@@ -35,7 +35,7 @@ class GraphOrder(Enum):
 
 
 def _mode(attr, value):
-	@no_paren_func
+	@forms_func
 	def cmd(a):
 		a.end_cmd()
 		setattr(a.env, attr, value)
@@ -54,7 +54,7 @@ eng    = _mode('number_mode', NumberMode.ENG)
 # Display precision
 float_ = _mode('fix_digits', None)
 
-@no_paren_func
+@forms_func
 def fix(a):
 	n = require_int(a.expr())
 	if not 0 <= n <= 9:

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from decorators import forms_func, no_paren_func
+from decorators import forms_func
 from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
@@ -255,7 +255,7 @@ def string_to_equ(a: ArgParser) -> None:
 
 # ── Control flow ──────────────────────────────────────────────────────────────
 
-@no_paren_func
+@forms_func
 def if_cmd(a: ArgParser):
 	"""If condition — execute or skip the next statement (or delegate to Then)."""
 	cond = bool(a.expr())
@@ -263,21 +263,21 @@ def if_cmd(a: ArgParser):
 	a.current_program('If').begin_if(cond)
 
 
-@no_paren_func
+@forms_func
 def then_cmd(a: ArgParser):
 	"""Then without a preceding If — always a syntax error."""
 	a.end_cmd()
 	raise TiSyntaxError("Then without If")
 
 
-@no_paren_func
+@forms_func
 def else_cmd(a: ArgParser):
 	"""Else — skip the else-body (we just finished executing the then-body)."""
 	a.end_cmd()
 	a.current_program('Else').begin_else()
 
 
-@no_paren_func
+@forms_func
 def while_cmd(a: ArgParser):
 	"""While condition — loop while condition is True."""
 	thunk = a.thunk()
@@ -285,7 +285,7 @@ def while_cmd(a: ArgParser):
 	a.current_program('While').begin_while(thunk)
 
 
-@no_paren_func
+@forms_func
 def repeat_cmd(a: ArgParser):
 	"""Repeat condition — loop until condition is True (body executes at least once)."""
 	thunk = a.thunk()
@@ -304,21 +304,21 @@ def for_cmd(a: ArgParser):
 	a.current_program('For(').begin_for(var_tok.variable, start, end_val, step)
 
 
-@no_paren_func
+@forms_func
 def end_cmd(a: ArgParser):
 	"""End — close the innermost active block (For / While / Repeat / Then)."""
 	a.end_cmd()
 	a.current_program('End').end_block()
 
 
-@no_paren_func
+@forms_func
 def lbl_cmd(a: ArgParser):
 	"""Lbl name — mark a label; no-op at runtime."""
 	a.label_name()
 	a.end_cmd()
 
 
-@no_paren_func
+@forms_func
 def goto_cmd(a: ArgParser):
 	"""Goto name — jump to the named label in the current program."""
 	name = a.label_name()
@@ -326,14 +326,14 @@ def goto_cmd(a: ArgParser):
 	a.current_program('Goto').goto(name)
 
 
-@no_paren_func
+@forms_func
 def return_cmd(a: ArgParser):
 	"""Return — exit the current sub-program and return to the caller."""
 	a.end_cmd()
 	raise ReturnSignal()
 
 
-@no_paren_func
+@forms_func
 def stop_cmd(a: ArgParser):
 	"""Stop — terminate all program execution immediately."""
 	a.end_cmd()
@@ -358,7 +358,7 @@ def ds_lt_cmd(a: ArgParser):
 	a.current_program('DS<(').ds_lt(var_tok.variable, threshold)
 
 
-@no_paren_func
+@forms_func
 def prgm(a: ArgParser):
 	"""prgm NAME — execute the stored sub-program named NAME."""
 	name = a.program_name()
