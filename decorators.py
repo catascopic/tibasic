@@ -57,16 +57,13 @@ class pure_func(_TiBase):
 
 
 class env_func(_TiBase):
-	def __call__(self, env, *args):
-		return self._func(env, *args)
-
 	def call_with_parser(self, a: ArgParser):
 		args = a.parse_args()
 		a.end_func()
 		return self(a.env, *args)
 
 
-class cmd_env_func(env_func):
+class cmd_env_func(_TiBase):
 	def call_with_parser(self, a: ArgParser):
 		args = a.parse_args()
 		a.end_paren_cmd()
