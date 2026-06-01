@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from decorators import env_func, env_vectorized
+from decorators import env_func, env_vectorized, cmd_env_func
 from environment import Environment
 from errors import DomainError
 from tiobjects import require_real, require_int, require_str
@@ -140,10 +140,10 @@ def expr(env, string):
 
 # ── Clock / date-time ─────────────────────────────────────────────────────────
 
-set_date   = env_func(Environment.set_date)
-set_time   = env_func(Environment.set_time)
+set_date   = cmd_env_func(Environment.set_date)
+set_time   = cmd_env_func(Environment.set_time)
 check_tmr  = env_func(Environment.check_tmr)
-set_dt_fmt = env_func(Environment.set_dt_fmt)
-set_tm_fmt = env_func(Environment.set_tm_fmt)
+set_dt_fmt = cmd_env_func(Environment.set_dt_fmt)
+set_tm_fmt = cmd_env_func(Environment.set_tm_fmt)
 get_dt_str = env_func(Environment.get_dt_str)
 get_tm_str = env_func(Environment.get_tm_str)

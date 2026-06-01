@@ -16,6 +16,7 @@ from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, requi
 def ans_index_or_mul(a: ArgParser):
 	ans = a.env.ans
 	args = a.parse_args()
+	a.end_func()
 	if isinstance(ans, TiMatrix):
 		return ans[args]
 	if len(args) != 1:
@@ -33,7 +34,7 @@ def seq(a: ArgParser) -> TiList:
 	start = a.expr()
 	end = a.expr()
 	step = a.expr(optional=True, default=1)
-	a.end()
+	a.end_func()
 	n = start
 	result = []
 	if step == 0:
@@ -63,7 +64,7 @@ def sigma(a: ArgParser) -> float:
 	var = a.numeric_var()
 	start = a.expr()
 	end = a.expr()
-	a.end()
+	a.end_func()
 	total = 0
 	n = start
 	variable = var.variable
@@ -81,7 +82,7 @@ def n_deriv(a: ArgParser) -> float:
 	var = a.numeric_var()
 	val = a.expr()
 	h = a.expr(optional=True, default=0.001)
-	a.end()
+	a.end_func()
 	variable = var.variable
 	with a.env.nest_guard(n_deriv, max_depth=1), a.env.scoped_var(variable):
 		variable.set(a.env, val + h)
@@ -139,7 +140,7 @@ def fn_int(a: ArgParser) -> float:
 	lo = a.expr()
 	hi = a.expr()
 	tol = a.expr(optional=True, default=1e-5)
-	a.end()
+	a.end_func()
 	variable = var.variable
 	with a.env.nest_guard('fnInt'), a.env.scoped_var(variable):
 		def f(x):
@@ -169,6 +170,7 @@ def matr_to_list(a: ArgParser) -> None:
 			)
 		ref = a.list_var()
 		ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))
+	a.end_paren_cmd()
 
 
 @forms_func
@@ -184,6 +186,7 @@ def list_to_matr(a: ArgParser) -> None:
 	mat_var.set(a.env, TiMatrix([
 		list(row) for row in zip_longest(*[lst.data for lst in list_vals], fillvalue=0)
 	]))
+	a.end_paren_cmd()
 
 
 # ── SortA(, SortD(, Fill( ─────────────────────────────────────────────────────
@@ -202,6 +205,7 @@ def _sort(a: ArgParser, reverse: bool):
 		main.data = [data[i] for i in indices]
 		for d in deps:
 			d.data = [d.data[i] for i in indices]
+	a.end_paren_cmd()
 
 
 def sort_a(a: ArgParser):
@@ -217,13 +221,13 @@ def fill(a: ArgParser):
 	x = require_real(a.expr())
 	if a.peek().is_matrix_var():
 		lst = a.matrix_var().get(a.env)
-		a.end()
+		a.end_paren_cmd()
 		for row in lst.data:
 			for i in range(len(row)):
 				row[i] = x
 	else:
 		lst = a.list_var().get(a.env)
-		a.end()
+		a.end_paren_cmd()
 		for i in range(len(lst.data)):
 			lst.data[i] = x
 
@@ -237,6 +241,7 @@ def equ_to_string(a: ArgParser) -> None:
 	str_var = a.string_var()
 	equ = equ_var.get(a.env)
 	str_var.set(a.env, TiString(list(equ.tokens)))
+	a.end_paren_cmd()
 
 
 @forms_func
@@ -245,6 +250,7 @@ def string_to_equ(a: ArgParser) -> None:
 	string = require_str(a.expr())
 	equ_var = a.equation_var()
 	equ_var.set(a.env, TiEquation(list(string.tokens)))
+	a.end_paren_cmd()
 
 
 # ── Control flow ──────────────────────────────────────────────────────────────
@@ -253,21 +259,21 @@ def string_to_equ(a: ArgParser) -> None:
 def if_cmd(a: ArgParser):
 	"""If condition — execute or skip the next statement (or delegate to Then)."""
 	cond = bool(a.expr())
-	a.end()
+	a.end_cmd()
 	a.current_program('If').begin_if(cond)
 
 
 @no_paren_func
 def then_cmd(a: ArgParser):
 	"""Then without a preceding If — always a syntax error."""
-	a.end()
+	a.end_cmd()
 	raise TiSyntaxError("Then without If")
 
 
 @no_paren_func
 def else_cmd(a: ArgParser):
 	"""Else — skip the else-body (we just finished executing the then-body)."""
-	a.end()
+	a.end_cmd()
 	a.current_program('Else').begin_else()
 
 
@@ -275,7 +281,7 @@ def else_cmd(a: ArgParser):
 def while_cmd(a: ArgParser):
 	"""While condition — loop while condition is True."""
 	thunk = a.thunk()
-	a.end()
+	a.end_cmd()
 	a.current_program('While').begin_while(thunk)
 
 
@@ -283,7 +289,7 @@ def while_cmd(a: ArgParser):
 def repeat_cmd(a: ArgParser):
 	"""Repeat condition — loop until condition is True (body executes at least once)."""
 	thunk = a.thunk()
-	a.end()
+	a.end_cmd()
 	a.current_program('Repeat').begin_repeat(thunk)
 
 
@@ -294,14 +300,14 @@ def for_cmd(a: ArgParser):
 	start   = require_real(a.expr())
 	end_val = require_real(a.expr())
 	step    = require_real(a.expr(optional=True, default=1.0))
-	a.end()
+	a.end_paren_cmd()
 	a.current_program('For(').begin_for(var_tok.variable, start, end_val, step)
 
 
 @no_paren_func
 def end_cmd(a: ArgParser):
 	"""End — close the innermost active block (For / While / Repeat / Then)."""
-	a.end()
+	a.end_cmd()
 	a.current_program('End').end_block()
 
 
@@ -309,28 +315,28 @@ def end_cmd(a: ArgParser):
 def lbl_cmd(a: ArgParser):
 	"""Lbl name — mark a label; no-op at runtime."""
 	a.label_name()
-	a.end()
+	a.end_cmd()
 
 
 @no_paren_func
 def goto_cmd(a: ArgParser):
 	"""Goto name — jump to the named label in the current program."""
 	name = a.label_name()
-	a.end()
+	a.end_cmd()
 	a.current_program('Goto').goto(name)
 
 
 @no_paren_func
 def return_cmd(a: ArgParser):
 	"""Return — exit the current sub-program and return to the caller."""
-	a.end()
+	a.end_cmd()
 	raise ReturnSignal()
 
 
 @no_paren_func
 def stop_cmd(a: ArgParser):
 	"""Stop — terminate all program execution immediately."""
-	a.end()
+	a.end_cmd()
 	raise StopSignal()
 
 
@@ -339,7 +345,7 @@ def is_gt_cmd(a: ArgParser):
 	"""IS>(var, value) — increment var; skip the next statement if var > value."""
 	var_tok = a.numeric_var()
 	threshold = require_real(a.expr())
-	a.end()
+	a.end_paren_cmd()
 	a.current_program('IS>(').is_gt(var_tok.variable, threshold)
 
 
@@ -348,7 +354,7 @@ def ds_lt_cmd(a: ArgParser):
 	"""DS<(var, value) — decrement var; skip the next statement if var < value."""
 	var_tok = a.numeric_var()
 	threshold = require_real(a.expr())
-	a.end()
+	a.end_paren_cmd()
 	a.current_program('DS<(').ds_lt(var_tok.variable, threshold)
 
 
@@ -356,10 +362,10 @@ def ds_lt_cmd(a: ArgParser):
 def prgm(a: ArgParser):
 	"""prgm NAME — execute the stored sub-program named NAME."""
 	name = a.program_name()
-	a.end()
+	a.end_cmd()
 	try:
 		prgm_code = a.env.programs[name]
-	except KeyError:	
+	except KeyError:
 		raise UndefinedError(f"Program not found: {name!r}")
 	from program import Program
 	Program(prgm_code, a.env).run()

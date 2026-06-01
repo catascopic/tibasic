@@ -10,7 +10,7 @@ from environment import Environment, Variable
 from errors import TiSyntaxError, IncrementError, LabelError
 from signals import ReturnSignal
 from tiobjects import require_real
-from tokens import COLON, NEWLINE, QUOTE
+from tokens import QUOTE
 
 
 # ── For-loop continuation helper ─────────────────────────────────────────────
@@ -39,7 +39,7 @@ class Block(ABC):
 @dataclass
 class ForBlock(Block):
 	"""State for an active For( loop."""
-	pos: int         # token index of the separator before the loop body
+	pos: int         # token index of the first body token (separator already eaten)
 	var: Variable    # loop variable
 	end_val: float   # loop exits when var exceeds this (or drops below it for negative step)
 	step: float      # added to var at each End
@@ -49,13 +49,13 @@ class ForBlock(Block):
 		self.var.set(prog.env, new_val)
 		if check_for_condition(new_val, self.end_val, self.step):
 			prog.push_block(self)       # keep alive for the next iteration
-			prog.jump_to(self.pos)      # jump back to separator before body
+			prog.jump_to(self.pos)      # jump to first body token; run() executes it directly
 
 
 @dataclass
 class WhileBlock(Block):
 	"""State for an active While loop."""
-	pos: int          # token index of the separator before the loop body
+	pos: int          # token index of the first body token (separator already eaten)
 	condition: Thunk  # re-evaluated at End; True → repeat, False → exit
 
 	def on_end(self, prog: 'Program') -> None:
@@ -67,7 +67,7 @@ class WhileBlock(Block):
 @dataclass
 class RepeatBlock(Block):
 	"""State for an active Repeat loop."""
-	pos: int          # token index of the separator before the loop body
+	pos: int          # token index of the first body token (separator already eaten)
 	condition: Thunk  # evaluated at End; True → exit, False → repeat
 
 	def on_end(self, prog: 'Program') -> None:
@@ -131,18 +131,15 @@ class Program:
 	# ── Control-flow commands ─────────────────────────────────────────────────
 
 	def begin_if(self, cond: bool) -> None:
-		"""Handle If: peek 2 tokens ahead to detect a following Then.
+		"""Handle If: end_cmd() already ate the separator, so peek directly for Then.
 
-		tokens[pos] is the separator after the condition; tokens[pos+1] would be
-		Then for a block-If.  If found, advance past both and enter (or skip) the
-		block.  Otherwise handle as a single-line If — skip next statement if False.
+		If Then is next, consume it and enter (or skip) the block.
+		Otherwise handle as a single-line If — skip the next statement if False.
 		"""
 		p = self._parser
 		from tokens import THEN, ELSE
-		if (p.pos + 1 < len(p.tokens)
-				and p.tokens[p.pos] in {COLON, NEWLINE}
-				and p.tokens[p.pos + 1] is THEN):
-			p.pos += 2  # consume separator + Then
+		if p.pos < len(p.tokens) and p.tokens[p.pos] is THEN:
+			p.pos += 1  # consume Then
 			if cond:
 				self.push_block(ThenBlock())
 			else:
@@ -150,8 +147,7 @@ class Program:
 				if found is ELSE:
 					self.push_block(ThenBlock())
 		elif not cond:
-			p.eat_statement_sep()
-			p.skip_statement()
+			p.skip_statement()  # skips statement tokens and trailing separator
 
 	def begin_else(self) -> None:
 		"""Handle Else: pop the Then-block and skip to the matching End."""
@@ -188,16 +184,14 @@ class Program:
 		new_val = require_real(var.get(self.env)) + 1
 		var.set(self.env, new_val)
 		if new_val > threshold:
-			self._parser.eat_statement_sep()
-			self._parser.skip_statement()
+			self._parser.skip_statement()  # end_paren_cmd() already ate IS>('s separator
 
 	def ds_lt(self, var: Variable, threshold: float) -> None:
 		"""Handle DS<(: decrement var; skip the next statement if var < threshold."""
 		new_val = require_real(var.get(self.env)) - 1
 		var.set(self.env, new_val)
 		if new_val < threshold:
-			self._parser.eat_statement_sep()
-			self._parser.skip_statement()
+			self._parser.skip_statement()  # end_paren_cmd() already ate DS<('s separator
 
 	# ── Label search ──────────────────────────────────────────────────────────
 

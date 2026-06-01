@@ -13,6 +13,10 @@ The non-command branch of _exec_statement will now need to consume the statement
 Also, if I discontinue CommandArgParser, should I remove the "command" property on token? Commands and functions could both use the "function" field, but then use a flag to differentiate which one they are. On the other hand, I think the distinction between functions and operators is correct.
 
 
+1. Oh, I actually thought skip_statement would eat the separator. Why wouldn't it?
+2. I was thinking we wouldn't have any new decorators -- form_funcs would just be responsible for calling the right end-parse method themselves.
+3. I'm fine keeping EOF_TOKEN for peek if you think that's the right call, I just kind of don't like how we're calling is_numeric_var on it.
+
 
 Update other tests to use var()
 

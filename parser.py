@@ -476,7 +476,15 @@ class Parser:
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 
 	def _exec_statement(self):
-		"""Execute one statement (up to but not including the next separator)."""
+		"""Execute one statement and its trailing separator.
+
+		An empty statement (bare COLON or NEWLINE) is consumed and returns
+		immediately — this also handles post-jump residue from Goto/loops.
+		"""
+		t = self.tokens[self.pos]
+		if t is COLON or t is NEWLINE:
+			self.pos += 1
+			return
 		stmt_start = self.pos
 		try:
 			if self.peek().command is not None:
@@ -488,6 +496,7 @@ class Parser:
 				elif self.peek().converter is not None:
 					value = self.advance().converter(value)
 				self.env.ans = value
+				self.eat_statement_sep()
 		except TiError as e:
 			if e.pos is None:
 				e.pos = stmt_start
@@ -536,37 +545,31 @@ class Parser:
 
 	def run(self):
 		"""Execute all statements in the token stream until EOF."""
-		while True:
-			if self.peek() is EOF_TOKEN:
-				return
-			if not self.at_statement_end():  # empty statements are valid no-ops
-				self._exec_statement()
-			if not self.eat_if({COLON, NEWLINE}):
-				break
-		if self.pos < len(self.tokens):
-			raise TiSyntaxError(f"End of statement reached; expected colon, newline, or end of input. Received: {self.advance()}")
+		while self.pos < len(self.tokens):
+			self._exec_statement()
 
 	def skip_statement(self) -> None:
-		"""Advance past one statement without executing it.
+		"""Advance past one statement without executing it, consuming the trailing separator.
 
-		Used by skip-commands (one-line If, IS>(, DS<() to consume the next
-		statement after eating the separator themselves.  Leaves pos at the
-		trailing separator (COLON/NEWLINE) or EOF so the run-loop's eat_if
-		handles it as usual.  Respects string literals.
+		After this call, pos is at the start of the next statement (or EOF).
+		Respects string literals — a NEWLINE inside a string closes the string
+		and also terminates the statement.  If called at a separator (empty
+		statement), that separator is the entire statement and is consumed.
 		"""
 		in_string = False
 		while self.pos < len(self.tokens):
 			t = self.tokens[self.pos]
+			self.pos += 1
 			if in_string:
 				if t is QUOTE:
 					in_string = False
 				elif t is NEWLINE:
-					break  # newline closes string and ends the statement
+					return   # newline closes string and is the separator
 			elif t in {COLON, NEWLINE}:
-				break
+				return       # separator consumed
 			elif t is QUOTE:
 				in_string = True
-			self.pos += 1
+		# reached EOF with no separator — that's fine
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
@@ -598,31 +601,24 @@ class ArgParser:
 	COMMA (if present) is consumed immediately.  This means peek() between
 	argument calls always shows the first token of the *next* argument rather
 	than a COMMA, which lets callers dispatch on argument type before consuming.
+
+	The caller is responsible for finalization via one of three end methods:
+	  - end_func()      — eat ) + check no surplus  (expression functions)
+	  - end_paren_cmd() — eat ) + check no surplus + eat separator  (paren commands)
+	  - end_cmd()       — check at statement end + eat separator  (no-paren commands)
 	"""
 
 	def __init__(self, parser: Parser):
 		self._parser = parser
 		self._next = True  # True = next arg token is already exposed (no leading comma to eat)
 
-	def _is_closing(self) -> bool:
-		"""True when the current position marks the natural end of the argument list."""
-		return self._parser.peek() in {R_PAREN, COLON, NEWLINE, EOF_TOKEN}
-
-	def _eat_close(self) -> None:
-		"""Consume the closing delimiter if present."""
-		self._parser.eat_if(R_PAREN)
-
 	def _arg(self, parse_fn, optional=False, default=None):
 		if not self._next:
 			if optional:
 				return default
 			raise ArgumentError("Missing argument: expected comma before next argument")
-		if optional and self._is_closing():
-			return default
 		val = parse_fn()
 		self._next = self._parser.eat_if(COMMA)
-		if not self._next:
-			self._eat_close()
 		return val
 
 	@_parse_method
@@ -665,11 +661,49 @@ class ArgParser:
 			return t.variable
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
-	def end(self):
-		"""Assert no surplus arguments remain.  The closing ) is already consumed
-		by the trailing-comma logic in _arg, so this is purely a validation call."""
+	def end_func(self):
+		"""Consume the closing ) and validate no surplus arguments remain.
+
+		For expression functions called from within parse_expr(): eats the
+		optional closing ) (TI-BASIC allows implicit close), then checks that
+		no surplus arguments follow.  Does not eat the statement separator.
+		"""
 		if self._next:
 			raise ArgumentError(f"Too many arguments: unexpected {self.peek()}")
+		self._parser.eat_if(R_PAREN)
+
+	def end_paren_cmd(self):
+		"""Consume ), validate no surplus args, and eat the trailing statement separator.
+
+		For paren commands (e.g. For(, IS>(, Matr►list(): eats the optional
+		closing ), then eats the COLON/NEWLINE that follows, completing the statement.
+		"""
+		if self._next:
+			raise ArgumentError(f"Too many arguments: unexpected {self.peek()}")
+		self._parser.eat_if(R_PAREN)
+		self._parser.eat_statement_sep()
+
+	def end_cmd(self):
+		"""Validate we are at a statement boundary and eat the trailing separator.
+
+		For no-paren commands (e.g. If, While, Goto, End): checks that nothing
+		unexpected follows the command's arguments, then consumes the COLON/NEWLINE
+		(or does nothing at EOF).
+		"""
+		if not self._parser.at_statement_end():
+			raise TiSyntaxError(f"Expected end of statement after command, got {self._parser.peek()}")
+		self._parser.eat_statement_sep()
+
+	def current_program(self, cmd_name: str):
+		"""Return the innermost currently-executing Program.
+
+		Raises InvalidCommandError if called from outside a program (e.g. from
+		the home screen), attributing the error to *cmd_name* (e.g. 'While').
+		"""
+		prog = self._parser.env.current_program
+		if prog is None:
+			raise InvalidCommandError(f"{cmd_name} cannot be used outside a program")
+		return prog
 
 	@property
 	def env(self):
@@ -695,39 +729,6 @@ class ArgParser:
 	def peek(self):
 		return self._parser.peek()
 
-
-class CommandArgParser(ArgParser):
-	"""ArgParser variant for no-paren commands.
-
-	Overrides the two closing-delimiter hooks so that _arg needs no duplication:
-	- _is_closing: treats COLON/NEWLINE/EOF as the argument-list terminator.
-	- _eat_close:  no paren to consume; raises if a stray ')' is found.
-	end() is also overridden to assert a statement boundary.
-	"""
-
-	def _is_closing(self) -> bool:
-		return self._parser.at_statement_end()
-
-	def _eat_close(self) -> None:
-		"""No closing paren in no-paren commands; raise if a stray ')' appears."""
-		if self._parser.peek() is R_PAREN:
-			raise TiSyntaxError("Unexpected ')' after no-paren command argument")
-
-	def end(self):
-		"""Assert that the token stream is at a statement boundary (COLON, NEWLINE, or EOF)."""
-		if not self._parser.at_statement_end():
-			raise TiSyntaxError(f"Expected end of statement after command, got {self._parser.peek()}")
-
-	def current_program(self, cmd_name: str):
-		"""Return the innermost currently-executing Program.
-
-		Raises InvalidCommandError if called from outside a program (e.g. from the
-		home screen), attributing the error to *cmd_name* (e.g. 'While', 'For(').
-		"""
-		prog = self._parser.env.current_program
-		if prog is None:
-			raise InvalidCommandError(f"{cmd_name} cannot be used outside a program")
-		return prog
 
 
 if __name__ == '__main__':

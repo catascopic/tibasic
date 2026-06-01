@@ -56,7 +56,25 @@ class TiFunction:
 
 	def call_with_parser(self, a: ArgParser):
 		args = a.parse_args()
+		a.end_func()
 		return self(a.env, *args) if self._env else self(*args)
+
+
+class cmd_env_func(TiFunction):
+	"""Decorator for env-method paren commands (setDate, setTime, etc.).
+
+	Like TiFunction(env=True) but calls end_paren_cmd() instead of end_func(),
+	so the trailing statement separator is eaten after the closing ).
+	"""
+
+	def __init__(self, func):
+		super().__init__(func, env=True)
+
+	def call_with_parser(self, a: ArgParser):
+		args = a.parse_args()
+		result = self(a.env, *args)
+		a.end_paren_cmd()
+		return result
 
 
 class FormsFunction:
@@ -73,34 +91,14 @@ class FormsFunction:
 		return self._func(a)
 
 
-class NoParen:
-	"""Wraps a no-paren command: passes a CommandArgParser to the body.
-
-	CommandArgParser does not eat a closing ) after arguments and checks
-	COLON/NEWLINE/EOF (not )) for optional-arg termination.  End-of-statement
-	validation is left to Parser.run(), which already calls expect(EOF_TOKEN).
-	"""
-
-	def __init__(self, func):
-		self._func = func
-		update_wrapper(self, func)
-
-	def __call__(self, *args):
-		return self._func(*args)
-
-	def call_with_parser(self, a: ArgParser):
-		from parser import CommandArgParser   # lazy: avoids circular import
-		return self._func(CommandArgParser(a._parser))
-
-
 def forms_func(func):
-	"""Forms function: receives ArgParser directly for custom parsing."""
+	"""Receives ArgParser directly for custom parsing."""
 	return FormsFunction(func)
 
 
 def no_paren_func(func):
-	"""No-paren command: receives CommandArgParser; end-of-statement is validated automatically."""
-	return NoParen(func)
+	"""No-paren command: receives ArgParser directly; must call a.end_cmd() to close."""
+	return FormsFunction(func)
 
 
 def pure_func(func):
@@ -121,3 +119,8 @@ def env_func(func):
 def env_vectorized(func):
 	"""TiFunction: parse args, vectorize, call func(env, *args)."""
 	return TiFunction(_vectorized_env(func), env=True)
+
+
+def cmd_env_func(func):
+	"""For env-method commands: parse args, call func(env, *args), eat separator."""
+	return TiCmdFunc(func, env=True)

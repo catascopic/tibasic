@@ -37,6 +37,7 @@ class GraphOrder(Enum):
 def _mode(attr, value):
 	@no_paren_func
 	def cmd(a):
+		a.end_cmd()
 		setattr(a.env, attr, value)
 	return cmd
 
@@ -59,6 +60,7 @@ def fix(a):
 	if not 0 <= n <= 9:
 		raise DomainError(f"Fix: argument must be 0–9, got {n}")
 	a.env.fix_digits = n
+	a.end_cmd()
 
 # Graph type
 func  = _mode('graph_mode', GraphMode.FUNC)
