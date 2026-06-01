@@ -35,7 +35,8 @@
       "Bash(python -m pytest program_test.py tibasic_test.py -q)",
       "Bash(python -c \"from tibasic_test import toks; print\\([t.text for t in toks\\('ClockOn ClockOn'\\)]\\)\")",
       "Bash(python -m pytest -x -q)",
-      "Bash(python -m pytest --tb=short -q)"
+      "Bash(python -m pytest --tb=short -q)",
+      "Bash(python -m pytest --tb=no -q)"
     ]
   }
 }

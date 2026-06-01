@@ -692,15 +692,15 @@ class ArgParser:
 		# TODO: placeholder for now; ideally should only be allowed as the first call
 		self._parser.end_statement()
 
-	def current_program(self, cmd_name: str):
+	def current_program(self):
 		"""Return the innermost currently-executing Program.
 
 		Raises InvalidCommandError if called from outside a program (e.g. from
-		the home screen), attributing the error to *cmd_name* (e.g. 'While').
+		the home screen).  The stack trace identifies the calling command.
 		"""
 		prog = self._parser.env.current_program
 		if prog is None:
-			raise InvalidCommandError(f"{cmd_name} cannot be used outside a program")
+			raise InvalidCommandError("This command cannot be used outside a program")
 		return prog
 
 	@property

@@ -61,13 +61,17 @@ def var(env: Environment, name: str):
 	only — not for production use.
 	"""
 	from environment import NumericVar
+	from errors import UndefinedError
 	tok = lookup[name]
 	v = tok.variable
 	if v is None:
 		raise TypeError(f"{name!r} is not a variable")
 	if isinstance(v, NumericVar):
 		return env.numerics[v.index]
-	return v.get(env)
+	try:
+		return v.get(env)
+	except UndefinedError:
+		return None
 
 
 @pytest.fixture
