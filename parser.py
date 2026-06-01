@@ -70,17 +70,10 @@ class Parser:
 		self.pos += 1
 	
 	def expect_statement_end(self):
-		if not self.at_statement_end():
+		if self.eat_if({COLON, NEWLINE}):
+			return
+		if self.pos < len(self.tokens):
 			raise TiSyntaxError(f"Expected end of statement; got {self.peek()}")
-		self.eat_statement_sep()
-
-	def at_statement_end(self) -> bool:
-		"""True when the current position is at a statement boundary (COLON, NEWLINE, or EOF)."""
-		return self.peek() in {COLON, NEWLINE, EOF_TOKEN}
-
-	def eat_statement_sep(self) -> bool:
-		"""Consume one COLON or NEWLINE separator if present.  Returns True iff consumed."""
-		return self.eat_if({COLON, NEWLINE})
 
 	def close_delimiter(self, expected: Token) -> bool:
 		"""Consume expected closer, or implicitly close at statement boundaries.
@@ -277,7 +270,7 @@ class Parser:
 		return t.function.call_with_parser(ArgParser(self))
 
 	def parse_atom(self):
-		if self.at_statement_end():
+		if self.peek() in {COLON, NEWLINE, EOF_TOKEN}:
 			raise TiSyntaxError("Expected an expression")
 
 		t = self.advance()
@@ -514,23 +507,22 @@ class Parser:
 		the stopping token.  Raises TiSyntaxError if no match is found.
 		"""
 		depth = 0
-		curr_if = False
+		prev_if = False
 		start_pos = self.pos
 		while self.pos < len(self.tokens):
 			t = self.advance()
-			prev_if = curr_if
-			if not (curr_if != t is IF):
-				if t is THEN:
-					if prev_if:
-						depth += 1
-				elif t in {FOR, WHILE, REPEAT}:
+			if t is THEN:
+				if prev_if:
 					depth += 1
-				elif t is END or (else_mode and t is ELSE):
-					if depth == 0:
-						self.expect_statement_end()
-						return t
-					depth -= 1
+			elif t in {FOR, WHILE, REPEAT}:
+				depth += 1
+			elif t is END or (else_mode and t is ELSE):
+				if depth == 0:
+					self.expect_statement_end()
+					return t
+				depth -= 1
 			self.skip_statement()
+			prev_if = t is IF
 
 		raise TiSyntaxError("Unmatched block: End not found", pos=self.pos)
 
@@ -555,7 +547,7 @@ class Parser:
 				elif self.peek().converter is not None:
 					value = self.advance().converter(value)
 				self.env.ans = value
-				self.eat_statement_sep()
+				self.expect_statement_end()
 		except TiError as e:
 			if e.pos is None:
 				e.pos = self.pos - 1
@@ -640,6 +632,16 @@ class ArgParser:
 			return t.variable
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
+	@_parse_method
+	def label_name(self) -> str:
+		"""Read up to 2 alphanumeric characters as a label name (for Lbl / Goto)."""
+		return self._parser.parse_label_name()
+
+	@_parse_method
+	def program_name(self) -> str:
+		"""Read up to 8 alphanumeric characters as a program name (for prgm)."""
+		return self._parser._read_name(8)
+
 	def end_func(self):
 		"""Consume the closing ) and validate no surplus arguments remain.
 
@@ -658,7 +660,7 @@ class ArgParser:
 		closing ), then eats the COLON/NEWLINE that follows, completing the statement.
 		"""
 		self.end_func()
-		self.end_cmd()
+		self._parser.expect_statement_end()
 
 	def end_cmd(self):
 		"""Validate we are at a statement boundary and eat the trailing separator.
@@ -667,6 +669,12 @@ class ArgParser:
 		unexpected follows the command's arguments, then consumes the COLON/NEWLINE
 		(or does nothing at EOF).
 		"""
+		if self._next:
+			raise ArgumentError(f"Too many arguments: unexpected {self.peek()}")
+		self._parser.expect_statement_end()
+	
+	def no_args(self):
+		# TODO: placeholder for now; ideally should only be allowed as the first call
 		self._parser.expect_statement_end()
 
 	def current_program(self, cmd_name: str):
@@ -683,14 +691,6 @@ class ArgParser:
 	@property
 	def env(self):
 		return self._parser.env
-
-	def label_name(self) -> str:
-		"""Read up to 2 alphanumeric characters as a label name (for Lbl / Goto)."""
-		return self._parser.parse_label_name()
-
-	def program_name(self) -> str:
-		"""Read up to 8 alphanumeric characters as a program name (for prgm)."""
-		return self._parser._read_name(8)
 
 	def has_next(self) -> bool:
 		return self._next

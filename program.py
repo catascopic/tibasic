@@ -16,12 +16,12 @@ from tokens import THEN, ELSE, LBL
 
 # ── For-loop continuation helper ─────────────────────────────────────────────
 
-def check_for_condition(val: float, end_val: float, step: float) -> bool:
-	"""Return True if the For loop should continue (val has not exceeded end_val)."""
+def check_for_condition(value: float, end: float, step: float) -> bool:
+	"""Return True if the For loop should continue (value has not exceeded end)."""
 	if step > 0:
-		return val <= end_val + 1e-10
+		return value <= end + 1e-10
 	elif step < 0:
-		return val >= end_val - 1e-10
+		return value >= end - 1e-10
 	else:
 		raise IncrementError("For: step cannot be zero")
 
@@ -41,13 +41,13 @@ class Block(ABC):
 class ForBlock(Block):
 	pos: int
 	var: Variable
-	end_val: float
+	end: float
 	step: float
 
 	def on_end(self, prog: Program) -> None:
 		new_val = self.var.get(prog.env) + self.step
 		self.var.set(prog.env, new_val)
-		if check_for_condition(new_val, self.end_val, self.step):
+		if check_for_condition(new_val, self.end, self.step):
 			prog.jump(self.pos)
 			prog.push_block(self)
 
@@ -129,65 +129,52 @@ class Program:
 	# ── Control-flow commands ─────────────────────────────────────────────────
 
 	def begin_if(self, cond: bool) -> None:
-		"""Handle If: end_cmd() already ate the separator, so peek directly for Then.
-
-		If Then is next, consume it and enter (or skip) the block.
-		Otherwise handle as a single-line If — skip the next statement if False.
-		"""
-		p = self._parser
-		if p.eat_if(THEN):
-			p.expect_statement_end()
+		if self._parser.eat_if(THEN):
+			self._parser.expect_statement_end()
 			if cond:
 				self.push_block(ThenBlock())
 			else:
-				found = p.skip_block(else_mode=True)
+				found = self._parser.skip_block(else_mode=True)
 				if found is ELSE:
 					self.push_block(ThenBlock())
 		elif not cond:
-			p.skip_statement()  # skips statement tokens and trailing separator
+			self._parser.skip_statement()
 
 	def begin_else(self) -> None:
-		"""Handle Else: pop the Then-block and skip to the matching End."""
 		if not isinstance(self.pop_block(), ThenBlock):
 			raise TiSyntaxError("Else without matching Then")
 		self._parser.skip_block()
 
 	def begin_while(self, condition: 'Thunk') -> None:
-		"""Handle While: evaluate condition; enter loop body or skip to End."""
 		if condition.eval():
 			self.push_block(WhileBlock(pos=self._parser.pos, condition=condition))
 		else:
 			self._parser.skip_block()
 
 	def begin_repeat(self, condition: 'Thunk') -> None:
-		"""Handle Repeat: always enter the body; End will check the condition."""
 		self.push_block(RepeatBlock(pos=self._parser.pos, condition=condition))
 
-	def begin_for(self, var: Variable, start: float, end_val: float, step: float) -> None:
-		"""Handle For(: initialise the loop variable; enter body or skip to End."""
+	def begin_for(self, var: Variable, start: float, end: float, step: float) -> None:
 		var.set(self.env, start)
-		if check_for_condition(start, end_val, step):
-			self.push_block(ForBlock(pos=self._parser.pos, var=var, end_val=end_val, step=step))
+		if check_for_condition(start, end, step):
+			self.push_block(ForBlock(self._parser.pos, var, end, step))
 		else:
 			self._parser.skip_block()
 
 	def end_block(self) -> None:
-		"""Handle End: dispatch to the innermost block's on_end."""
 		self.pop_block().on_end(self)
 
 	def is_gt(self, var: Variable, threshold: float) -> None:
-		"""Handle IS>(: increment var; skip the next statement if var > threshold."""
 		new_val = require_real(var.get(self.env)) + 1
 		var.set(self.env, new_val)
 		if new_val > threshold:
-			self._parser.skip_statement()  # end_paren_cmd() already ate IS>('s separator
+			self._parser.skip_statement()
 
 	def ds_lt(self, var: Variable, threshold: float) -> None:
-		"""Handle DS<(: decrement var; skip the next statement if var < threshold."""
 		new_val = require_real(var.get(self.env)) - 1
 		var.set(self.env, new_val)
 		if new_val < threshold:
-			self._parser.skip_statement()  # end_paren_cmd() already ate DS<('s separator
+			self._parser.skip_statement()
 
 	# ── Label search ──────────────────────────────────────────────────────────
 
@@ -204,9 +191,9 @@ class Program:
 		while p.pos < len(p.tokens):
 			if p.eat_if(LBL):
 				label = p.parse_label_name()
+				p.expect_statement_end()
 				if label == name:
-					return  # p.pos now points past the label name — correct resume point
-				p.eat_statement_sep()
+					return
 			else:
 				p.skip_statement()
 		raise LabelError(f"Label not found: {name!r}", pos=goto_pos)

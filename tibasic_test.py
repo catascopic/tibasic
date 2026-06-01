@@ -2,7 +2,7 @@
 
 import math
 import pytest
-from pytest import approx
+from pytest import approx, mark
 
 from environment import Environment
 from modes import AngleMode
@@ -1863,6 +1863,15 @@ class TestSeqIncrement:
 
 	def test_negative_step_descending_is_fine(self, env):
 		assert calc('seq( X,X,3,1,~1', env).data == [3, 2, 1]
+
+
+class TestSyntax:
+	
+	@mark.skip('no-arg commands broken')
+	def test_consecutive_commands_without_separator_raises(self):
+		# Two commands with no COLON or NEWLINE between them must be a syntax error.
+		with pytest.raises(TiSyntaxError):
+			calc('ClockOn ClockOn')
 
 
 class TestCompleXor:

@@ -266,14 +266,14 @@ def if_cmd(a: ArgParser):
 @forms_func
 def then_cmd(a: ArgParser):
 	"""Then without a preceding If — always a syntax error."""
-	a.end_cmd()
+	a.no_args()
 	raise TiSyntaxError("Then without If")
 
 
 @forms_func
 def else_cmd(a: ArgParser):
 	"""Else — skip the else-body (we just finished executing the then-body)."""
-	a.end_cmd()
+	a.no_args()
 	a.current_program('Else').begin_else()
 
 
@@ -307,7 +307,7 @@ def for_cmd(a: ArgParser):
 @forms_func
 def end_cmd(a: ArgParser):
 	"""End — close the innermost active block (For / While / Repeat / Then)."""
-	a.end_cmd()
+	a.no_args()
 	a.current_program('End').end_block()
 
 
@@ -330,7 +330,7 @@ def goto_cmd(a: ArgParser):
 @forms_func
 def return_cmd(a: ArgParser):
 	"""Return — exit the current sub-program and return to the caller."""
-	a.end_cmd()
+	a.no_args()
 	a.current_program('Return')
 	raise ReturnSignal()
 
@@ -338,7 +338,7 @@ def return_cmd(a: ArgParser):
 @forms_func
 def stop_cmd(a: ArgParser):
 	"""Stop — terminate all program execution immediately."""
-	a.end_cmd()
+	a.no_args()
 	a.current_program('Stop')
 	raise StopSignal()
 

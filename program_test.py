@@ -188,7 +188,11 @@ class TestIfOneLine:
 
 	def test_false_skips_empty_statement(self):
 		# An empty statement counts as the "next" statement and is still skipped
-		env = run('If 0 : : 99 @ A')
+		env = run("""
+		If 0
+
+		99@A
+		""")
 		assert var(env, 'A') == 99
 
 	def test_chained_conditions(self):
@@ -409,6 +413,8 @@ class TestIsGtDsLt:
 		42@C
 		""", env)
 		assert var(env, 'A') == 4
+		assert var(env, 'B') == 99
+		assert var(env, 'C') == 42
 
 	def test_is_gt_no_skip_when_not_exceeded(self):
 		env = Environment()
@@ -430,10 +436,14 @@ class TestIsGtDsLt:
 		assert var(env, 'A') == 3
 
 	def test_ds_lt_no_skip_when_not_below(self):
-		env = Environment()
-		env.numerics[0] = 4   # A → 3, not < 3
-		run('DS<( A , 3 ) : 99 @ B : 42 @ C', env)
-		assert var(env, 'B') == 99   # not skipped
+		env = run("""
+		3@A
+		DS<( A,3)
+		99@B
+		42@C
+		""")
+		assert var(env, 'A') == 2
+		assert var(env, 'B') is None
 		assert var(env, 'C') == 42
 
 	def test_ds_lt_skips_when_below(self):
@@ -443,12 +453,3 @@ class TestIsGtDsLt:
 		assert var(env, 'B') is None   # skipped
 		assert var(env, 'C') == 42
 
-
-# ── Statement separator enforcement ───────────────────────────────────────────
-
-class TestSeparators:
-
-	def test_consecutive_commands_without_separator_raises(self):
-		# Two commands with no COLON or NEWLINE between them must be a syntax error.
-		with pytest.raises(TiSyntaxError):
-			run('ClockOn ClockOn')

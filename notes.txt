@@ -1,3 +1,23 @@
+Not sure what to do with no-arg commands
+Even more complex are commands that can take 0 or more args, like Disp
+With no args, Disp just shows the home screen
+With args, it prints them
+
+Maybe we do need a CommandArgParser after all!
+Upon creation, it could check if it's at EOL, and have that as a property.
+It would also have the no_args() function that ensures this flag is set.
+
+I'm also wondering if we can redo nullaries using this. Like instead of nullary and function being different fields, they'd be combined somehow?
+
+Another thing: ClockOnClockOn is actually valid! *Some* commands that take no args can be bunched up like that. ClockOn is one of them.
+However, you can't do NormalFloat.
+Also, note that DelVar (deletes a variable) can be bunched up, like DelVar ADelVar BDelVar C.
+This actually might not be hard to implement: the command parser could just have an alternate ending method that doesn't consume the separator.
+DelVar takes exactly one argument, so this makes sense.
+
+Also, currently, NormalFloat raises ArgumentError, because it's parsing it as Float being an argument of Normal. It should just raise a TiSyntaxError, though.
+
+
 Rename Environment to Calculator
 
 I don't like that current_program is called with a name.

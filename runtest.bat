@@ -1,5 +1,5 @@
 @ECHO off
 python -m pytest program_test.py
-EXIT /B
-PAUSE
+REM EXIT /B
+REM PAUSE
 python -m pytest tibasic_test.py
