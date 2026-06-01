@@ -10,7 +10,7 @@ from environment import Environment, Variable
 from errors import TiSyntaxError, IncrementError, LabelError
 from signals import ReturnSignal
 from tiobjects import require_real
-from tokens import QUOTE
+from tokens import THEN, ELSE, LBL
 
 
 # ── For-loop continuation helper ─────────────────────────────────────────────
@@ -137,9 +137,7 @@ class Program:
 		Otherwise handle as a single-line If — skip the next statement if False.
 		"""
 		p = self._parser
-		from tokens import THEN, ELSE
-		if p.pos < len(p.tokens) and p.tokens[p.pos] is THEN:
-			p.pos += 1  # consume Then
+		if p.eat_if(THEN):
 			if cond:
 				self.push_block(ThenBlock())
 			else:
@@ -198,22 +196,18 @@ class Program:
 	def goto(self, name: str) -> None:
 		"""Jump to the first Lbl <name> in the token stream.
 
-		Scans from the beginning, respecting string literals.
+		Scans from the beginning, skipping statements with skip_statement()
+		(which correctly ignores LBL tokens inside string literals).
 		Raises LabelError if the label is not found.
 		"""
-		from tokens import LBL
 		p = self._parser
 		p.pos = 0
-		in_string = False
 		while p.pos < len(p.tokens):
-			t = p.advance()
-			if in_string:
-				if t is QUOTE or t is NEWLINE:
-					in_string = False
-			elif t is QUOTE:
-				in_string = True
-			elif t is LBL:
+			if p.eat_if(LBL):
 				label = p.parse_label_name()
 				if label == name:
 					return  # p.pos now points past the label name — correct resume point
+				p.eat_statement_sep()
+			else:
+				p.skip_statement()
 		raise LabelError(f"Label not found: {name!r}")
