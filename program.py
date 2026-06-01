@@ -148,8 +148,7 @@ class Program:
 
 	def begin_else(self) -> None:
 		"""Handle Else: pop the Then-block and skip to the matching End."""
-		block = self.pop_block()
-		if not isinstance(block, ThenBlock):
+		if not isinstance(self.pop_block(), ThenBlock):
 			raise TiSyntaxError("Else without matching Then")
 		self._parser.skip_block()
 
@@ -200,6 +199,7 @@ class Program:
 		Raises LabelError if the label is not found.
 		"""
 		p = self._parser
+		goto_pos = p.pos - 2 - len(name)
 		p.pos = 0
 		while p.pos < len(p.tokens):
 			if p.eat_if(LBL):
@@ -209,4 +209,4 @@ class Program:
 				p.eat_statement_sep()
 			else:
 				p.skip_statement()
-		raise LabelError(f"Label not found: {name!r}")
+		raise LabelError(f"Label not found: {name!r}", pos=goto_pos)

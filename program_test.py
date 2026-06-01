@@ -318,14 +318,13 @@ class TestLblGoto:
 
 	def test_label_error_carries_goto_position(self):
 		# pos is set by _exec_statement to the index of the Goto token itself
-		tokens = toks('1 @ A : Goto Z')
+		tokens = toks("""
+		1@A
+		Goto Z
+		""")
 		with pytest.raises(LabelError) as exc_info:
-			from program import Program
-			from environment import Environment
 			Program(tokens, Environment()).run()
-		# Goto is at index 3 (after '1', '@', 'A', ':')
-		goto_idx = next(i for i, t in enumerate(tokens) if t.text == 'Goto ')
-		assert exc_info.value.pos == goto_idx
+		assert exc_info.value.pos == 4
 
 
 # ── Return ────────────────────────────────────────────────────────────────────

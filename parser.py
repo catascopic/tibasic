@@ -477,35 +477,31 @@ class Parser:
 	
 	def _parse_user_list_var(self):
 		return UserListVar(self._read_name(5))
+		
+	# SKIPPING
 
-	# ── Statement dispatcher ───────────────────────────────────────────────────
+	def skip_statement(self) -> None:
+		"""Advance past one statement without executing it, consuming the trailing separator.
 
-	def _exec_statement(self):
-		"""Execute one statement and its trailing separator.
-
-		An empty statement (bare COLON or NEWLINE) is consumed and returns
-		immediately — this also handles post-jump residue from Goto/loops.
+		After this call, pos is at the start of the next statement (or EOF).
+		Respects string literals — a NEWLINE inside a string closes the string
+		and also terminates the statement.  If called at a separator (empty
+		statement), that separator is the entire statement and is consumed.
 		"""
-		t = self.tokens[self.pos]
-		if t is COLON or t is NEWLINE:
+		in_string = False
+		while self.pos < len(self.tokens):
+			t = self.tokens[self.pos]
 			self.pos += 1
-			return
-		stmt_start = self.pos
-		try:
-			if self.peek().command is not None:
-				self.advance().command.call_with_parser(ArgParser(self))
-			else:
-				value = self.parse_expr()
-				if self.eat_if(STORE):
-					self.parse_store(value)
-				elif self.peek().converter is not None:
-					value = self.advance().converter(value)
-				self.env.ans = value
-				self.eat_statement_sep()
-		except TiError as e:
-			if e.pos is None:
-				e.pos = stmt_start
-			raise
+			if in_string:
+				if t is QUOTE:
+					in_string = False
+				elif t is NEWLINE:
+					return   # newline closes string and is the separator
+			elif t in {COLON, NEWLINE}:
+				return       # separator consumed
+			elif t is QUOTE:
+				in_string = True
+		# reached EOF with no separator — that's fine
 
 	def skip_block(self, else_mode: bool = False) -> Token:
 		"""Scan forward to the matching End (or Else if *else_mode* is True).
@@ -538,33 +534,37 @@ class Parser:
 
 		raise TiSyntaxError("Unmatched block: End not found", pos=self.pos)
 
+	# ── Statement dispatcher ───────────────────────────────────────────────────
+
+	def _exec_statement(self):
+		"""Execute one statement and its trailing separator.
+
+		An empty statement (bare COLON or NEWLINE) is consumed and returns
+		immediately — this also handles post-jump residue from Goto/loops.
+		"""
+		if self.eat_if({COLON, NEWLINE}):
+			return
+
+		try:
+			if self.peek().command is not None:
+				self.advance().command.call_with_parser(ArgParser(self))
+			else:
+				value = self.parse_expr()
+				if self.eat_if(STORE):
+					self.parse_store(value)
+				elif self.peek().converter is not None:
+					value = self.advance().converter(value)
+				self.env.ans = value
+				self.eat_statement_sep()
+		except TiError as e:
+			if e.pos is None:
+				e.pos = self.pos - 1
+			raise
+
 	def run(self):
 		"""Execute all statements in the token stream until EOF."""
 		while self.pos < len(self.tokens):
 			self._exec_statement()
-
-	def skip_statement(self) -> None:
-		"""Advance past one statement without executing it, consuming the trailing separator.
-
-		After this call, pos is at the start of the next statement (or EOF).
-		Respects string literals — a NEWLINE inside a string closes the string
-		and also terminates the statement.  If called at a separator (empty
-		statement), that separator is the entire statement and is consumed.
-		"""
-		in_string = False
-		while self.pos < len(self.tokens):
-			t = self.tokens[self.pos]
-			self.pos += 1
-			if in_string:
-				if t is QUOTE:
-					in_string = False
-				elif t is NEWLINE:
-					return   # newline closes string and is the separator
-			elif t in {COLON, NEWLINE}:
-				return       # separator consumed
-			elif t is QUOTE:
-				in_string = True
-		# reached EOF with no separator — that's fine
 
 
 def _parse_method(method):
