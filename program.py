@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
 	from parser import Thunk
+	from program import Program
 
 from environment import Environment, Variable
 from errors import TiSyntaxError, IncrementError, LabelError
@@ -34,7 +35,7 @@ class Block(ABC):
 	that block type, eliminating isinstance checks in end_cmd.
 	"""
 	def on_end(self, prog: 'Program'):
-		pass
+		"""This method should not be abstract; the default action is to do nothing."""
 
 @dataclass
 class ForBlock(Block):
@@ -44,7 +45,7 @@ class ForBlock(Block):
 	end_val: float   # loop exits when var exceeds this (or drops below it for negative step)
 	step: float      # added to var at each End
 
-	def on_end(self, prog: 'Program') -> None:
+	def on_end(self, prog: Program) -> None:
 		new_val = self.var.get(prog.env) + self.step
 		self.var.set(prog.env, new_val)
 		if check_for_condition(new_val, self.end_val, self.step):

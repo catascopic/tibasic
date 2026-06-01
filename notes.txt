@@ -1,3 +1,15 @@
+Rename Environment to Calculator
+
+I don't like that current_program is called with a name.
+Maybe we can make a dummy program that's returned if there aren't any active programs, and all of its methods throw errors.
+Instead of:
+a.current_program('Goto').goto(name)
+We can do:
+a.current_program.goto(name)
+Which raises InvalidCommandException("Goto cannot blah blah")
+This would require making Stop/Return methods for program just so they can fail.
+
+
 Can we Record position of token for exceptions
 
 Better pos tracking for exceptions

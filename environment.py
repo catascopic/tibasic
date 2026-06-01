@@ -1,6 +1,6 @@
 import math
 import random
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from datetime import datetime, date, timedelta
@@ -8,6 +8,7 @@ from datetime import datetime, date, timedelta
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation
 from errors import DataTypeError, DomainError, IllegalNestError, UndefinedError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
+from signals import StopSignal
 
 
 class _VarArray:
@@ -67,19 +68,42 @@ class Environment:
 		self.tm_fmt        = 12
 		self.clock_on      = True
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
-		self.n_tvm = 0   # 𝐍  — number of payments
-		self.i_pct = 0   # I% — interest rate per period (as percentage)
-		self.pv    = 0   # PV — present value
-		self.pmt   = 0   # PMT — payment amount
-		self.fv    = 0   # FV — future value
-		self.py    = 1   # P/Y — payments per year
-		self.cy    = 1   # C/Y — compounding periods per year
+		self.n_tvm = 0   # 𝐍 (number of payments)
+		self.i_pct = 0   # I% (interest rate per period, as percentage)
+		self.pv    = 0   # PV (present value)
+		self.pmt   = 0   # PMT (payment amount)
+		self.fv    = 0   # FV (future value)
+		self.py    = 1   # P/Y (payments per year)
+		self.cy    = 1   # C/Y (compounding periods per year)
 		# Programs
-		self.programs: dict[str, list] = {}  # name → token list for stored programs
+		self.programs: dict[str, list] = {}  # name -> token list for stored programs
 		self.program_stack: deque = deque()  # currently executing programs (innermost last)
 		# Internal data
 		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
 		self._nest_depth: dict[object, int] = defaultdict(lambda: 0)  # tracks nesting depth for ILLEGAL NEST guards
+
+
+	def run(self, tokens):
+		"""
+		Runs a string of tokens as if from the "home screen".
+		"""
+		# TODO: Should there be some kind of flag that makes newline characters raise an error?
+		# On the calculator, it's impossible to get a newline character on the home screen (arguably that's what Enter does)
+		# And actually, maybe if you treat NEWLINE as pressing Enter, everything works as intended
+		from parser import Parser
+		try:
+			Parser(tokens, self).run()
+		except StopSignal:
+			pass
+
+	def run_program(self, prgm_name: str):
+		"""Runs a stored program."""
+		try:
+			prgm_code = self.programs[prgm_name]
+		except KeyError:
+			raise UndefinedError(f"Program not found: {prgm_name!r}")
+		from program import Program
+		Program(prgm_code, self).run()
 
 	def to_rad(self, x):
 		"""Convert x from the current angle mode to radians (for trig input)."""
@@ -222,13 +246,21 @@ class Environment:
 
 class Variable(ABC):
 	"""Base class for typed, storable token variables."""
-	def get(self, env): ...
-	def set(self, env, value): ...
+	
+	@abstractmethod
+	def get(self, env):
+		pass
+		
+	@abstractmethod
+	def set(self, env, value):
+		pass
+
 
 class OffsetVar(Variable):
 	__slots__ = ('index',)
 	def __init__(self, index: int):
 		self.index = index	
+
 
 class NamedVar(Variable):
 	__slots__ = ('name',)

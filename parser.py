@@ -572,22 +572,6 @@ class Parser:
 		# reached EOF with no separator — that's fine
 
 
-# ── Public API ─────────────────────────────────────────────────────────────────
-
-def run_line(tokens: list[Token], env: Environment):
-	"""Tokenize and execute a single input line (may contain multiple statements).
-
-	StopSignal is caught here (the top-level entry point) and silently
-	suppressed, matching the calculator's behaviour of returning to the home
-	screen without displaying an error.
-	"""
-	from signals import StopSignal
-	try:
-		Parser(tokens, env).run()
-	except StopSignal:
-		pass
-
-
 def _parse_method(method):
 	def wrapper(self, optional=False, default=None):
 		return self._arg(lambda: method(self), optional, default)
@@ -737,7 +721,7 @@ if __name__ == '__main__':
 	def test(*line):
 		tokens = toks(*line)
 		print('>>', ''.join(t.text for t in tokens))
-		run_line(tokens, env)
+		env.run(tokens)
 		print('<<', env.ans)
 
 	env.angle_mode = 'DEG'

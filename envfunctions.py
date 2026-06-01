@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from decorators import env_func, env_vectorized, cmd_env_func
+from decorators import env_func, env_vectorized, TiCall
 from environment import Environment
 from errors import DomainError
 from tiobjects import require_real, require_int, require_str
@@ -140,10 +140,19 @@ def expr(env, string):
 
 # ── Clock / date-time ─────────────────────────────────────────────────────────
 
-set_date   = cmd_env_func(Environment.set_date)
-set_time   = cmd_env_func(Environment.set_time)
+
+class set_time_wrapper(TiCall):
+	def call_with_parser(self, a: ArgParser):
+		args = a.parse_args()
+		a.end_paren_cmd()
+		return self(a.env, *args)
+
+
+set_date   = set_time_wrapper(Environment.set_date)
+set_time   = set_time_wrapper(Environment.set_time)
+set_dt_fmt = set_time_wrapper(Environment.set_dt_fmt)
+set_tm_fmt = set_time_wrapper(Environment.set_tm_fmt)
+
 check_tmr  = env_func(Environment.check_tmr)
-set_dt_fmt = cmd_env_func(Environment.set_dt_fmt)
-set_tm_fmt = cmd_env_func(Environment.set_tm_fmt)
 get_dt_str = env_func(Environment.get_dt_str)
 get_tm_str = env_func(Environment.get_tm_str)

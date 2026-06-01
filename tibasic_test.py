@@ -10,9 +10,8 @@ from errors import (
 	TiSyntaxError, IllegalNestError, DomainError, DimMismatchError,
 	StatError, IncrementError, DataTypeError, InvalidDimError, ArgumentError,
 )
-from parser import run_line
 import tokens
-from tokens import ALL_TOKENS, Token, get_token
+from tokens import ALL_TOKENS, Token, get_token, NEWLINE
 from tiobjects import TiList, TiMatrix, TiString
 
 
@@ -32,20 +31,16 @@ for name, value in vars(tokens).items():
 		lookup[name] = value
 
 
-def toks(line) -> list[Token]:
-	"""Build a token list.
-	- Token: used directly
-	- number: tokenised digit-by-digit
-	- str in token table: that token
-	- other str: each character looked up individually
-	"""
+def toks(code) -> list[Token]:
 	tokens = []
-	for seg in line.split():
-		try:
-			tokens.append(lookup[seg])
-		except KeyError:
-			for c in str(seg):
-				tokens.append(lookup[c])
+	for line in code.strip().splitlines():
+		for seg in line.split():
+			try:
+				tokens.append(lookup[seg])
+			except KeyError:
+				for c in str(seg):
+					tokens.append(lookup[c])
+		tokens.append(NEWLINE)
 	return tokens
 
 
@@ -53,7 +48,7 @@ def calc(items, env: Environment | None = None):
 	"""Evaluate a token sequence and return Ans."""
 	if env is None:
 		env = Environment()
-	run_line(toks(items), env)
+	env.run(toks(items))
 	return env.ans
 
 

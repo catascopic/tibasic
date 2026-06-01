@@ -316,6 +316,7 @@ def lbl_cmd(a: ArgParser):
 	"""Lbl name — mark a label; no-op at runtime."""
 	a.label_name()
 	a.end_cmd()
+	a.current_program('Lbl')
 
 
 @forms_func
@@ -330,6 +331,7 @@ def goto_cmd(a: ArgParser):
 def return_cmd(a: ArgParser):
 	"""Return — exit the current sub-program and return to the caller."""
 	a.end_cmd()
+	a.current_program('Return')
 	raise ReturnSignal()
 
 
@@ -337,6 +339,7 @@ def return_cmd(a: ArgParser):
 def stop_cmd(a: ArgParser):
 	"""Stop — terminate all program execution immediately."""
 	a.end_cmd()
+	a.current_program('Stop')
 	raise StopSignal()
 
 
@@ -361,11 +364,13 @@ def ds_lt_cmd(a: ArgParser):
 @forms_func
 def prgm(a: ArgParser):
 	"""prgm NAME — execute the stored sub-program named NAME."""
-	name = a.program_name()
+	prgm_name = a.program_name()
 	a.end_cmd()
-	try:
-		prgm_code = a.env.programs[name]
-	except KeyError:
-		raise UndefinedError(f"Program not found: {name!r}")
-	from program import Program
-	Program(prgm_code, a.env).run()
+	a.env.run_program(prgm_name)
+
+
+@forms_func
+def disp(a: ArgParser):
+	while a.has_next():
+		print(a.expr())
+	a.end_cmd()

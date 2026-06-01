@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod
 from functools import partial, wraps, update_wrapper
 from itertools import repeat
 from typing import TYPE_CHECKING
@@ -33,14 +34,15 @@ def vectorized(func):
 	return apply
 
 
-def _vectorized_env(func):
+def _vectorized_with_env(func):
 	@wraps(func)
 	def apply(env, *args):
 		return _call_vectorized(partial(func, env), args)
 	return apply
 
 
-class _TiBase:
+class TiCall(ABC):
+
 	def __init__(self, func):
 		self._func = func
 		update_wrapper(self, func)
@@ -48,43 +50,38 @@ class _TiBase:
 	def __call__(self, *args):
 		return self._func(*args)
 
+	@abstractmethod
+	def call_with_parser(self, a: ArgParser):
+		pass
 
-class pure_func(_TiBase):
+
+class pure_func(TiCall):
+	"""Decorator for pure math functions that don't need access to the environment."""
 	def call_with_parser(self, a: ArgParser):
 		args = a.parse_args()
 		a.end_func()
 		return self(*args)
 
 
-class env_func(_TiBase):
+class env_func(TiCall):
+	"""Decorator for functions that need access to the environment."""
 	def call_with_parser(self, a: ArgParser):
 		args = a.parse_args()
 		a.end_func()
 		return self(a.env, *args)
 
 
-class cmd_env_func(_TiBase):
-	def call_with_parser(self, a: ArgParser):
-		args = a.parse_args()
-		a.end_paren_cmd()
-		return self(a.env, *args)
-
-
-class forms_func:
-	def __init__(self, func):
-		self._func = func
-		update_wrapper(self, func)
-
-	def __call__(self, *args):
-		return self._func(*args)
-
+class forms_func(TiCall):
+	"""Decorator for functions/commands that do their own parsing."""
 	def call_with_parser(self, a: ArgParser):
 		return self._func(a)
 
 
 def pure_vectorized(func):
+	"""Same as pure_func, but also vectorized."""
 	return pure_func(vectorized(func))
 
 
 def env_vectorized(func):
-	return env_func(_vectorized_env(func))
+	"""Same as env_func, but also vectorized."""
+	return env_func(_vectorized_with_env(func))

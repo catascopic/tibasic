@@ -23,6 +23,7 @@ def xor(a, b):
 
 # ── Postfix operators ────────────────────────────────────────────────────────
 
+# Doesn't need vectorized because it calls __div__
 def inv(x):
 	if isinstance(x, TiMatrix):
 		return x.inv()
