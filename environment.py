@@ -241,6 +241,9 @@ class Variable(ABC):
 	def set(self, env: Environment, value: Any) -> None:
 		pass
 
+	def delete(self, env: Environment) -> None:
+		raise DataTypeError("Cannot delete this variable")
+
 
 class OffsetVar(Variable):
 	"""Variable stored by integer index in one of the environment's flat arrays."""
@@ -264,6 +267,9 @@ class OffsetVar(Variable):
 	def get_unsafe(self, env: Environment) -> Any:
 		"""Return the raw stored value without raising or auto-initialising."""
 		return getattr(env, self._array_attr)[self.index]
+
+	def delete(self, env: Environment) -> None:
+		getattr(env, self._array_attr)[self.index] = None
 
 
 class NamedVar(Variable):
@@ -311,6 +317,12 @@ class UserListVar(NamedVar):
 	def set(self, env: Environment, value: Any) -> None:
 		env.user_lists[self.name] = require_list(value)
 
+	def get_unsafe(self, env: Environment) -> Any:
+		return env.user_lists.get(self.name)
+
+	def delete(self, env: Environment) -> None:
+		env.user_lists.pop(self.name, None)
+
 
 class MatrixVar(OffsetVar):
 	def __init__(self, index: int) -> None:
@@ -337,6 +349,9 @@ class EquationVar(Variable):
 
 	def set(self, env: Environment, value: Any) -> None:
 		getattr(env, self.table)[self.index] = require_equation(value)
+
+	def delete(self, env: Environment) -> None:
+		getattr(env, self.table)[self.index] = None
 
 
 class StatVar(OffsetVar):

@@ -642,6 +642,16 @@ class ArgParser:
 			return t.variable
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
+	def any_var(self) -> Variable:
+		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
+		t = self._parser.peek()
+		if t.variable is not None:
+			return self._parser.advance().variable
+		if t is LIST_PREFIX:
+			self._parser.advance()
+			return UserListVar(self._parser._read_name(5))
+		raise TiSyntaxError(f"Expected a variable, got {t}")
+
 	@_parse_method
 	def label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name (for Lbl / Goto)."""

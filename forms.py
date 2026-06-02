@@ -233,6 +233,41 @@ def fill(a: ArgParser):
 			lst.data[i] = x
 
 
+# ── DelVar and SetUpEditor ────────────────────────────────────────────────────
+
+@forms_func
+def delvar(a):
+	"""DelVar variable — clear one variable without consuming the statement separator.
+
+	Bunches: DelVar ADelVar B and DelVar ADisp X are both valid on the same line.
+	Does not update Ans.
+	"""
+	a.any_var().delete(a.env)
+	# No end() call — bunching: leaves separator in place for next command
+
+
+@forms_func
+def setup_editor(a):
+	"""SetUpEditor [list, ...] — ensure lists exist, creating empty ones as needed.
+
+	With no arguments, ensures L1–L6 all exist (the default list editor columns).
+	With arguments, ensures each named list exists (standard or user-defined).
+	Does not modify lists that already contain data.
+	"""
+	if a.at_eol:
+		for i in range(6):
+			if a.env.lists[i] is None:
+				a.env.lists[i] = TiList([])
+	else:
+		while True:
+			var = a.list_var()
+			if var.get_unsafe(a.env) is None:
+				var.set(a.env, TiList([]))
+			if not a.has_next():
+				break
+	a.end()
+
+
 # ── Equ►String( and String►Equ( ──────────────────────────────────────────────
 
 @forms_func

@@ -37,7 +37,8 @@
       "Bash(python -m pytest -x -q)",
       "Bash(python -m pytest --tb=short -q)",
       "Bash(python -m pytest --tb=no -q)",
-      "Bash(python -c \"import environment\")"
+      "Bash(python -c \"import environment\")",
+      "Bash(python -m pytest -q)"
     ]
   }
 }
