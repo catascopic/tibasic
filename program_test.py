@@ -32,7 +32,7 @@ class TestFor:
 		# 1 + 2 + 3 + 4 + 5 = 15
 		env = run("""
 		For( A,1,5)
-		B+A@B 
+		B+A@B
 		End
 		""")
 		assert var(env, 'B') == 15
@@ -76,7 +76,10 @@ class TestFor:
 
 	def test_step_zero_raises(self):
 		with pytest.raises(IncrementError):
-			run('For( A,1,5,0): End')
+			run("""
+			For( A,1,5,0)
+			End
+			""")
 
 	def test_nested(self):
 		# 3 * 3 = 9 increments
@@ -178,11 +181,18 @@ class TestRepeat:
 class TestIfOneLine:
 
 	def test_true_executes_next(self):
-		env = run('If 1 : 42 @ A')
+		env = run("""
+		If 1
+		42@A
+		""")
 		assert var(env, 'A') == 42
 
 	def test_false_skips_next(self):
-		env = run('If 0 : 42 @ A : 99 @ B')
+		env = run("""
+		If 0
+		42@A
+		99@B
+		""")
 		assert var(env, 'A') is None
 		assert var(env, 'B') == 99
 
@@ -197,7 +207,13 @@ class TestIfOneLine:
 
 	def test_chained_conditions(self):
 		# Two independent one-line Ifs
-		env = run('If 1 : 10 @ A : If 0 : 20 @ B : 30 @ C')
+		env = run("""
+		If 1
+		10@A
+		If 0
+		20@B
+		30@C
+		""")
 		assert var(env, 'A') == 10
 		assert var(env, 'B') is None
 		assert var(env, 'C') == 30
@@ -254,11 +270,28 @@ class TestIfThenElse:
 		assert var(env, 'B') == 99
 
 	def test_nested_then(self):
-		env = run('If 1 : Then : If 1 : Then : 42 @ A : End : End')
+		env = run("""
+		If 1
+		Then
+		If 1
+		Then
+		42@A
+		End
+		End
+		""")
 		assert var(env, 'A') == 42
 
 	def test_nested_then_inner_false(self):
-		env = run('If 1 : Then : If 0 : Then : 99 @ A : End : 42 @ B : End')
+		env = run("""
+		If 1
+		Then
+		If 0
+		Then
+		99@A
+		End
+		42@B
+		End
+		""")
 		assert var(env, 'A') is None
 		assert var(env, 'B') == 42
 
@@ -276,7 +309,14 @@ class TestIfThenElse:
 
 	def test_if_inside_for(self):
 		# Count how many values A takes that are > 3
-		env = run('For( A , 1 , 5 ) : If A > 3 : Then : B + 1 @ B : End : End')
+		env = run("""
+		For( A,1,5)
+		If A>3
+		Then
+		B+1@B
+		End
+		End
+		""")
 		assert var(env, 'B') == 2   # A=4 and A=5
 
 	def test_bare_then_not_counted_as_block_when_skipping(self):
@@ -285,7 +325,16 @@ class TestIfThenElse:
 		# If 0 → skip body; the bare Then inside should be transparent;
 		# the first End closes the outer If/Then; the second End is unmatched.
 		with pytest.raises(TiSyntaxError):
-			run('If 0 : Then : 1 @ A : Then : End : 2 @ B : End : 3 @ C')
+			run("""
+			If 0
+			Then
+			1@A
+			Then
+			End
+			2@B
+			End
+			3@C
+			""")
 
 	def test_end_without_block_raises(self):
 		with pytest.raises(TiSyntaxError):
@@ -293,7 +342,13 @@ class TestIfThenElse:
 
 	def test_end_after_block_closed_raises(self):
 		with pytest.raises(TiSyntaxError):
-			run('If 1 : Then : 1 @ A : End : End')
+			run("""
+			If 1
+			Then
+			1@A
+			End
+			End
+			""")
 
 
 # ── Lbl / Goto ────────────────────────────────────────────────────────────────
@@ -301,18 +356,34 @@ class TestIfThenElse:
 class TestLblGoto:
 
 	def test_basic_forward_goto(self):
-		env = run('Goto A : 99 @ B : Lbl A : 42 @ C')
+		env = run("""
+		Goto A
+		99@B
+		Lbl A
+		42@C
+		""")
 		assert var(env, 'B') is None   # skipped
 		assert var(env, 'C') == 42
 
 	def test_two_char_label(self):
-		env = run('Goto AB : 99 @ C : Lbl AB : 42 @ D')
+		env = run("""
+		Goto AB
+		99@C
+		Lbl AB
+		42@D
+		""")
 		assert var(env, 'C') is None
 		assert var(env, 'D') == 42
 
 	def test_goto_backward_loop(self):
 		# Manually build a counting loop with Goto
-		env = run('Lbl A : A + 1 @ A : If A < 5 : Goto A : 42 @ B')
+		env = run("""
+		Lbl A
+		A+1@A
+		If A<5
+		Goto A
+		42@B
+		""")
 		assert var(env, 'A') == 5
 		assert var(env, 'B') == 42
 
@@ -342,7 +413,10 @@ class TestReturn:
 		Return
 		99@A
 		""")
-		run('prgm P : 2 @ B', env)
+		run("""
+		prgm P
+		2@B
+		""", env)
 		assert var(env, 'A') == 1   # Return fired before 99→A
 		assert var(env, 'B') == 2   # caller continued normally
 
@@ -367,7 +441,7 @@ class TestReturn:
 		assert var(env, 'A') == 1   # INNER's Return fired
 		assert var(env, 'B') == 2   # OUTER continued, then its own Return fired
 		assert var(env, 'C') == 3   # top-level caller continued
-		
+
 	def test_return_doesnt_cancel_other_statements(self):
 		env = Environment()
 		env.programs['P'] = toks('Return')
@@ -377,7 +451,7 @@ class TestReturn:
 		99@B
 		""", env)
 		assert var(env, 'A') == 1    # executed before the sub-program
-		assert var(env, 'B') == 99   # skipped because Stop propagated
+		assert var(env, 'B') == 99   # caller continues after Return
 
 
 # ── Stop ─────────────────────────────────────────────────────────────────────
@@ -407,7 +481,11 @@ class TestStop:
 	def test_stop_does_cancel_other_statements(self):
 		env = Environment()
 		env.programs['P'] = toks('Stop')
-		calc('1@A: prgm P :99@B', env)
+		calc("""
+		1@A
+		prgm P
+		99@B
+		""", env)
 		assert var(env, 'A') == 1    # executed before the sub-program
 		assert var(env, 'B') is None  # skipped because Stop propagated
 
@@ -417,34 +495,43 @@ class TestStop:
 class TestIsGtDsLt:
 
 	def test_is_gt_increments_variable(self):
-		env = Environment()
-		run("""
+		env = run("""
 		3@A
 		IS>( A,5
 		99@B
 		42@C
-		""", env)
+		""")
 		assert var(env, 'A') == 4
 		assert var(env, 'B') == 99
 		assert var(env, 'C') == 42
 
 	def test_is_gt_no_skip_when_not_exceeded(self):
-		env = Environment()
-		run('3@A: IS>( A,5):99@B:42@C', env)
-		assert var(env, 'B') == 99   # not skipped
+		env = run("""
+		3@A
+		IS>( A,5)
+		99@B
+		42@C
+		""")
+		assert var(env, 'B') == 99
 		assert var(env, 'C') == 42
 
 	def test_is_gt_skips_when_exceeded(self):
-		env = Environment()
-		calc('', env)
-		run('5@A: IS>( A,5):99@B:42@C', env)
+		env = run("""
+		5@A
+		IS>( A,5)
+		99@B
+		42@C
+		""")
 		assert var(env, 'B') is None   # skipped
 		assert var(env, 'C') == 42
 
 	def test_ds_lt_decrements_variable(self):
-		env = Environment()
-		calc('', env)
-		run('4@A: DS<( A,3):99@B:42@C', env)
+		env = run("""
+		4@A
+		DS<( A,3)
+		99@B
+		42@C
+		""")
 		assert var(env, 'A') == 3
 
 	def test_ds_lt_no_skip_when_not_below(self):
@@ -461,9 +548,92 @@ class TestIsGtDsLt:
 	def test_ds_lt_skips_when_below(self):
 		env = Environment()
 		env.numerics[0] = 3   # A → 2, 2 < 3
-		run('DS<( A , 3 ) : 99 @ B : 42 @ C', env)
+		run("""
+		DS<( A,3)
+		99@B
+		42@C
+		""", env)
 		assert var(env, 'B') is None   # skipped
 		assert var(env, 'C') == 42
+
+
+# ── Junk after no-arg commands ────────────────────────────────────────────────
+
+class TestJunkAfterCommand:
+	"""No-arg commands must reject stray tokens; junk inside skipped blocks is fine."""
+
+	def test_return_with_junk_raises(self):
+		with pytest.raises(TiSyntaxError):
+			run('Return 5')
+
+	def test_stop_with_junk_raises(self):
+		with pytest.raises(TiSyntaxError):
+			run('Stop 5')
+
+	def test_end_with_junk_raises(self):
+		with pytest.raises(TiSyntaxError):
+			run("""
+			If 1
+			Then
+			End 5
+			End
+			""")
+
+	def test_else_with_junk_raises(self):
+		with pytest.raises(TiSyntaxError):
+			run("""
+			If 1
+			Then
+			Else 5
+			End
+			""")
+
+	def test_junk_in_skipped_repeat(self):
+		# Repeat's argument tokens are consumed by skip_statement — not executed
+		env = run("""
+		If 0
+		Then
+		Repeat +2
+		End
+		End
+		99@A
+		""")
+		assert var(env, 'A') == 99
+
+	def test_junk_in_skipped_while(self):
+		env = run("""
+		If 0
+		Then
+		While +2
+		End
+		End
+		99@A
+		""")
+		assert var(env, 'A') == 99
+
+	def test_junk_in_skipped_for(self):
+		env = run("""
+		If 0
+		Then
+		For( A,+2,+3)
+		End
+		End
+		99@B
+		""")
+		assert var(env, 'B') == 99
+
+	def test_nested_junk_blocks_in_skipped_region(self):
+		env = run("""
+		If 0
+		Then
+		For( A,+1,+2)
+		Repeat +3
+		End
+		End
+		End
+		99@C
+		""")
+		assert var(env, 'C') == 99
 
 
 class TestRecursion:
@@ -484,7 +654,7 @@ class TestRecursion:
 			TN@$A( 1+ dim( $A
 			prgm TEST
 		""", env)
-		
+
 		assert calc('$A( dim( $A', env) == 120
 
 	@pytest.mark.skip('WTF')
@@ -501,26 +671,24 @@ class TestRecursion:
 			Return
 		End
 
-		N@$A(1+ dim( $A))     
+		N@$A(1+ dim( $A))
 		N-1@$A(1+ dim( $A))
 		prgm TEST
-		$A( dim( $A))@R       
+		$A( dim( $A))@R
 		dim( $A)-1@ dim( $A)
 		$A( dim( $A))@N
 
-		R@$A(1+ dim( $A))     
+		R@$A(1+ dim( $A))
 		N@$A(1+ dim( $A))
 		N-2@$A(1+ dim( $A))
 		prgm TEST
 		$A( dim( $A))@S
 		dim( $A)-1@ dim( $A)
 		dim( $A)-1@ dim( $A)
-		$A( dim( $A))@R      
+		$A( dim( $A))@R
 		dim( $A)-1@ dim( $A)
 
-		R+S@$A(1+ dim( $A)) 
+		R+S@$A(1+ dim( $A))
 		""", env)
-		
+
 		assert calc('$A( dim( $A', env) == 34
- 
-		

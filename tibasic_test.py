@@ -57,23 +57,14 @@ def calc(items, env: Environment | None = None):
 def var(env: Environment, name: str):
 	"""Read any variable by its TI-BASIC name (e.g. 'A', '[A]', 'L1', 'Str1').
 
-	For numeric variables, returns the raw stored value (None if never written),
-	bypassing NumericVar's auto-initialise-to-zero side-effect.  For all other
-	variable types, delegates to variable.get(env).  Intended for test assertions
-	only — not for production use.
+	Returns the raw stored value (None if never written), bypassing auto-init
+	side-effects and UndefinedError.  Intended for test assertions only.
 	"""
-	from environment import NumericVar
-	from errors import UndefinedError
 	tok = lookup[name]
 	v = tok.variable
 	if v is None:
 		raise TypeError(f"{name!r} is not a variable")
-	if isinstance(v, NumericVar):
-		return env.numerics[v.index]
-	try:
-		return v.get(env)
-	except UndefinedError:
-		return None
+	return v.get_unsafe(env)
 
 
 @pytest.fixture
