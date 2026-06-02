@@ -3,7 +3,7 @@ import pytest
 from io import BytesIO
 
 from tifile import TiProgram
-from tokens import get_token, DIGITS, LETTERS, ADD, SUB, MUL, DIV, NEWLINE, STORE
+from catalog import get_token, DIGITS, LETTERS, ADD, SUB, MUL, DIV, NEWLINE, STORE
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

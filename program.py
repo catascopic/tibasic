@@ -10,7 +10,7 @@ from environment import Environment, Variable
 from errors import TiSyntaxError, IncrementError, LabelError
 from signals import ReturnSignal
 from tiobjects import require_real
-from tokens import THEN, ELSE, LBL
+from catalog import THEN, ELSE, LBL
 
 
 class Program:

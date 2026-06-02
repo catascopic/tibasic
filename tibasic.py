@@ -1,5 +1,6 @@
 from pyscript import document, when
-from tokens import Token, TOKENS
+from titoken import Token
+from catalog import TOKENS
 
 KEY_MAP: dict[str, Token] = {t.key: t for t in TOKENS if t.key is not None}
 

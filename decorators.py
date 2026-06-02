@@ -1,8 +1,9 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from functools import partial, wraps, update_wrapper
 from itertools import repeat
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from tiobjects import TiList
 from errors import DimMismatchError
@@ -11,7 +12,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 
-def _call_vectorized(func, args):
+def _call_vectorized(func: Callable, args: tuple) -> Any:
 	len_check = set()
 	vec = []
 	for a in args:
@@ -27,31 +28,31 @@ def _call_vectorized(func, args):
 	raise DimMismatchError(f"Dim mismatch: {len_check}")
 
 
-def vectorized(func):
+def vectorized(func: Callable) -> Callable:
 	@wraps(func)
-	def apply(*args):
+	def apply(*args: Any) -> Any:
 		return _call_vectorized(func, args)
 	return apply
 
 
-def _vectorized_with_env(func):
+def _vectorized_with_env(func: Callable) -> Callable:
 	@wraps(func)
-	def apply(env, *args):
+	def apply(env: Any, *args: Any) -> Any:
 		return _call_vectorized(partial(func, env), args)
 	return apply
 
 
 class TiCall(ABC):
 
-	def __init__(self, func):
+	def __init__(self, func: Callable) -> None:
 		self._func = func
 		update_wrapper(self, func)
 
-	def __call__(self, *args):
+	def __call__(self, *args: Any) -> Any:
 		return self._func(*args)
 
 	@abstractmethod
-	def call_with_parser(self, a: ArgParser):
+	def call_with_parser(self, a: ArgParser) -> Any:
 		pass
 
 

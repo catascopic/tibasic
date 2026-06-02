@@ -2,19 +2,16 @@ from dataclasses import dataclass
 from numbers import Number
 
 from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
-from tokens import (
-	Token,
+from titoken import Token, EOF_TOKEN
+from catalog import (
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
 	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
 	SCI_E, DEG, RAD, APOS,
-	LIST_PREFIX, RAND, DIM, 
+	LIST_PREFIX, RAND, DIM,
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
 from environment import Environment, Variable, UserListVar
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError, UndefinedError
-
-
-EOF_TOKEN = Token(b'\x00', None, '<END-OF-INPUT>')
 
 
 @dataclass

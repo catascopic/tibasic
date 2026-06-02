@@ -2,7 +2,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from tokens import Token, ALL_TOKENS, read_token
+from titoken import Token
+from catalog import ALL_TOKENS, read_token
 
 
 @dataclass

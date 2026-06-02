@@ -10,8 +10,9 @@ from errors import (
 	TiSyntaxError, IllegalNestError, DomainError, DimMismatchError,
 	StatError, IncrementError, DataTypeError, InvalidDimError, ArgumentError,
 )
-import tokens
-from tokens import ALL_TOKENS, Token, get_token, NEWLINE
+import catalog
+from titoken import Token
+from catalog import ALL_TOKENS, get_token, NEWLINE
 from tiobjects import TiList, TiMatrix, TiString
 
 
@@ -19,14 +20,14 @@ from tiobjects import TiList, TiMatrix, TiString
 
 
 lookup = {_t.text.strip().replace(' ', '_'): _t for _t in ALL_TOKENS}
-lookup['~'] = tokens.NEG
-lookup['@'] = tokens.STORE
-lookup['e'] = tokens.SCI_E
-lookup['$'] = tokens.LIST_PREFIX
-lookup['i'] = tokens.IMAG_I
-for i, ls in enumerate(tokens.LISTS, start=1):
+lookup['~'] = catalog.NEG
+lookup['@'] = catalog.STORE
+lookup['e'] = catalog.SCI_E
+lookup['$'] = catalog.LIST_PREFIX
+lookup['i'] = catalog.IMAG_I
+for i, ls in enumerate(catalog.LISTS, start=1):
 	lookup[f"L{i}"] = ls
-for name, value in vars(tokens).items():
+for name, value in vars(catalog).items():
 	if isinstance(value, Token):
 		lookup[name] = value
 

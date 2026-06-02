@@ -1,4 +1,4 @@
-from tokens import TOKENS, NEWLINE
+from catalog import TOKENS, NEWLINE
 from tifile import TiProgram, write
 
 tokens = sorted(TOKENS, key=lambda t: t.code)
