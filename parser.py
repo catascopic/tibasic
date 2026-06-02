@@ -209,25 +209,22 @@ class Parser:
 		COLON is a statement separator outside strings but is valid string content.
 		STORE (→) is always an error inside a formula argument."""
 		start = self.pos
-		stack: list[Token] = []   # expected closers, innermost on top
+		stack: list[Token] = []
 		in_string = False
 		while self.has_next:
-			t = self.tokens[self.pos]
+			t = self.peek()
+			if t is STORE:
+				raise TiSyntaxError(f"Unexpected STORE in formula")
+			if t is NEWLINE:
+				break
 			if in_string:
 				if t is QUOTE:
 					in_string = False
-				elif t is NEWLINE:
-					in_string = False  # newline terminates the string
-					break              # …and implicitly closes all delimiters
-			elif t is STORE:
-				# I'm not sure this comes up, but is this right? STORE should maybe break line COLON
-				raise TiSyntaxError(f"Unexpected → inside function arguments")
-			elif t in {COLON, NEWLINE, EOF_TOKEN}:
-				break  # statement boundary: implicitly close all open delimiters
+
+			elif t is COLON or (not stack and t in {COMMA, R_PAREN}):
+				break
 			elif t is QUOTE:
 				in_string = True
-			elif not stack and t in {COMMA, R_PAREN}:
-				break
 			elif stack and t is stack[-1]:
 				stack.pop()
 			elif t.function is not None or t is L_PAREN:
@@ -236,7 +233,7 @@ class Parser:
 				stack.append(R_BRACE)
 			elif t is L_BRACKET:
 				stack.append(R_BRACKET)
-			self.pos += 1
+			self.advance()
 		return Thunk(self.tokens[start:self.pos], self.env)
 
 	def peek_digit_or_dot(self) -> bool:
@@ -437,8 +434,10 @@ class Parser:
 				lst = var.get(self.env)
 			except UndefinedError:
 				lst = TiList()
+				lst[self.parse_expr()] = value
 				var.set(self.env, lst)
-			lst[self.parse_expr()] = value
+			else:
+				lst[self.parse_expr()] = value
 			self.eat_if(R_PAREN)
 		else:
 			var.set(self.env, value)
@@ -486,20 +485,18 @@ class Parser:
 		and also terminates the statement.  If called at a separator (empty
 		statement), that separator is the entire statement and is consumed.
 		"""
-		in_string = False
 		while self.has_next:
-			t = self.tokens[self.pos]
-			self.pos += 1
-			if in_string:
-				if t is QUOTE:
-					in_string = False
-				elif t is NEWLINE:
-					return   # newline closes string and is the separator
-			elif t in {COLON, NEWLINE}:
-				return       # separator consumed
-			elif t is QUOTE:
-				in_string = True
-		# reached EOF with no separator — that's fine
+			t = self.advance()
+			if t in {COLON, NEWLINE}:
+				return
+			if t is QUOTE:
+				while self.has_next:
+					t = self.advance()
+					if t in {QUOTE, STORE}:
+						break
+					if t is NEWLINE:
+						return
+		# statement skipped by reaching EOF
 
 	def skip_block(self, else_mode: bool = False) -> Token:
 		"""Scan forward to the matching End (or Else if *else_mode* is True).
@@ -565,21 +562,20 @@ class Parser:
 				self._exec_statement()
 		except TiError as e:
 			if e.pos is not None:
-				print(f"ERROR: {' '.join(t.text for t in self.tokens[e.pos-5 : e.pos+6])}")
+				loc = [t.text for t in self.tokens]
+				loc[e.pos] = f"[![{loc[e.pos]}]!]"
+				print(''.join(loc))
 			raise
 
 
 def _can_start_atom(t: Token) -> bool:
 	return (
-		t.is_digit()
-		or t.variable is not None
-		or t.nullary is not None
-		or t.function is not None
+		t.is_digit() or t.variable or t.nullary or t.function
 		or t in {L_PAREN, L_BRACE, L_BRACKET, QUOTE, DOT, SCI_E, NEG, LIST_PREFIX}
 	)
 
 
-def _parse_method(method):
+def _parse_arg(method):
 	def wrapper(self, optional=False, default=None):
 		return self._arg(lambda: method(self), optional, default)
 	return wrapper
@@ -612,47 +608,47 @@ class ArgParser:
 		self._next = self._parser.eat_if(COMMA)
 		return val
 
-	@_parse_method
+	@_parse_arg
 	def expr(self):
 		return self._parser.parse_expr()
 
-	@_parse_method
+	@_parse_arg
 	def thunk(self):
 		return self._parser.capture()
 
-	@_parse_method
+	@_parse_arg
 	def numeric_var(self) -> Token:
 		t = self._parser.advance()
 		if not t.is_numeric_var():
 			raise DataTypeError(f"Expected a numeric variable, got {t}")
-		return t
+		return t.variable
 
-	@_parse_method
+	@_parse_arg
 	def list_var(self) -> Variable:
 		return self._parser.parse_list_var()
 
-	@_parse_method
+	@_parse_arg
 	def matrix_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_matrix_var():
 			return t.variable
 		raise DataTypeError(f"Expected a matrix variable, got {t}")
 
-	@_parse_method
+	@_parse_arg
 	def string_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_string_var():
 			return t.variable
 		raise DataTypeError(f"Expected a string variable, got {t}")
 
-	@_parse_method
+	@_parse_arg
 	def equation_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_equation_var():
 			return t.variable
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
-	@_parse_method
+	@_parse_arg
 	def list_var_prefix_optional(self) -> Variable:
 		"""Read a list variable: L1–L6, ᴸNAME, or a bare user-list name without the ᴸ prefix.
 
@@ -671,12 +667,12 @@ class ArgParser:
 			return self._parser._parse_user_list_var()
 		raise TiSyntaxError(f"Expected a variable, got {t}")
 
-	@_parse_method
+	@_parse_arg
 	def label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name (for Lbl / Goto)."""
 		return self._parser.parse_label_name()
 
-	@_parse_method
+	@_parse_arg
 	def program_name(self) -> str:
 		"""Read up to 8 alphanumeric characters as a program name (for prgm)."""
 		return self._parser._read_name(8)
@@ -765,7 +761,7 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('ClockOn : ClockOn')
+	test('seq( 7@A')
 	
 	# test('55@A:99@B')
 	# test('int( log( 2) INV log( max( {A,B')

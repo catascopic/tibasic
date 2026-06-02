@@ -49,10 +49,9 @@ def seq(a: ArgParser) -> TiList:
 			raise IncrementError(f"seq: step is negative but start ({start}) < end ({end})")
 		op = operator.ge
 		end -= 1e-10
-	variable = var.variable
-	with a.env.nest_guard(seq), a.env.scoped_var(variable):
+	with a.env.nest_guard(seq), a.env.scoped_var(var):
 		while op(n, end):
-			variable.set(a.env, n)
+			var.set(a.env, n)
 			result.append(formula.eval())
 			n += step
 	return TiList(result)
@@ -67,10 +66,9 @@ def sigma(a: ArgParser) -> float:
 	a.end_func()
 	total = 0
 	n = start
-	variable = var.variable
-	with a.env.nest_guard(sigma), a.env.scoped_var(variable):
+	with a.env.nest_guard(sigma), a.env.scoped_var(var):
 		while n <= end:
-			variable.set(a.env, n)
+			var.set(a.env, n)
 			total += formula.eval()
 			n += 1
 	return total
@@ -83,11 +81,10 @@ def n_deriv(a: ArgParser) -> float:
 	val = a.expr()
 	h = a.expr(optional=True, default=0.001)
 	a.end_func()
-	variable = var.variable
-	with a.env.nest_guard(n_deriv, max_depth=1), a.env.scoped_var(variable):
-		variable.set(a.env, val + h)
+	with a.env.nest_guard(n_deriv, max_depth=1), a.env.scoped_var(var):
+		var.set(a.env, val + h)
 		fwd = formula.eval()
-		variable.set(a.env, val - h)
+		var.set(a.env, val - h)
 		bwd = formula.eval()
 	return (fwd - bwd) / (2 * h)
 
@@ -141,10 +138,9 @@ def fn_int(a: ArgParser) -> float:
 	hi = a.expr()
 	tol = a.expr(optional=True, default=1e-5)
 	a.end_func()
-	variable = var.variable
-	with a.env.nest_guard('fnInt'), a.env.scoped_var(variable):
+	with a.env.nest_guard('fnInt'), a.env.scoped_var(var):
 		def f(x):
-			variable.set(a.env, x)
+			var.set(a.env, x)
 			return formula.eval()
 		return _adaptive_gk15(f, lo, hi, tol)
 
@@ -344,29 +340,29 @@ def then_cmd(a: ArgParser):
 
 
 @program_command
-def else_cmd(prog):
+def else_cmd(prgm):
 	"""If we encounter Else this way, always skip the block.
 	(Else blocks are only executed when encountered while skipping an If-Then block.)"""
-	prog.begin_else()
+	prgm.begin_else()
 
 
 @forms_func
 def while_cmd(a: ArgParser):
-	thunk = a.thunk()
+	condition = a.thunk()
 	a.end_cmd()
-	a.current_program().begin_while(thunk)
+	a.current_program().begin_while(condition)
 
 
 @forms_func
 def repeat_cmd(a: ArgParser):
-	thunk = a.thunk()
+	condition = a.thunk()
 	a.end_cmd()
-	a.current_program().begin_repeat(thunk)
+	a.current_program().begin_repeat(condition)
 
 
 @forms_func
 def for_cmd(a: ArgParser):
-	var   = a.numeric_var().variable
+	var   = a.numeric_var()
 	start = require_real(a.expr())
 	end   = require_real(a.expr())
 	step  = require_real(a.expr(optional=True, default=1.0))
@@ -375,8 +371,8 @@ def for_cmd(a: ArgParser):
 
 
 @program_command
-def end_cmd(prog):
-	prog.end_block()
+def end_cmd(prgm):
+	prgm.end_block()
 
 
 @forms_func
@@ -395,18 +391,18 @@ def goto_cmd(a: ArgParser):
 
 
 @program_command
-def return_cmd(prog):
+def return_cmd(prgm):
 	raise ReturnSignal()
 
 
 @program_command
-def stop_cmd(prog):
+def stop_cmd(prgm):
 	raise StopSignal()
 
 
 @forms_func
 def is_gt_cmd(a: ArgParser):
-	var = a.numeric_var().variable
+	var = a.numeric_var()
 	threshold = require_real(a.expr())
 	a.end_paren_cmd()
 	a.current_program().is_gt(var, threshold)
@@ -414,7 +410,7 @@ def is_gt_cmd(a: ArgParser):
 
 @forms_func
 def ds_lt_cmd(a: ArgParser):
-	var = a.numeric_var().variable
+	var = a.numeric_var()
 	threshold = require_real(a.expr())
 	a.end_paren_cmd()
 	a.current_program().ds_lt(var, threshold)
@@ -435,5 +431,5 @@ def disp(a: ArgParser):
 			if not a.has_next:
 				break
 	else:
-		pass
+		pass  # a.env.focus_home()
 	a.end_cmd()

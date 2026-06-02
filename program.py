@@ -67,9 +67,11 @@ class Program:
 			self._parser.end_statement()
 			if cond:
 				self.push_block(ThenBlock())
+				# no special handling required for Else here
 			else:
 				found = self._parser.skip_block(else_mode=True)
 				if found is ELSE:
+					# handle Else as if it's an If-Else block that's closed by End
 					self.push_block(ThenBlock())
 		elif not cond:
 			self._parser.skip_statement()
@@ -81,12 +83,12 @@ class Program:
 
 	def begin_while(self, condition: Thunk) -> None:
 		if condition.eval():
-			self.push_block(WhileBlock(pos=self._parser.pos, condition=condition))
+			self.push_block(WhileBlock(self._parser.pos, condition))
 		else:
 			self._parser.skip_block()
 
 	def begin_repeat(self, condition: Thunk) -> None:
-		self.push_block(RepeatBlock(pos=self._parser.pos, condition=condition))
+		self.push_block(RepeatBlock(self._parser.pos, condition))
 
 	def begin_for(self, var: Variable, start: float, end: float, step: float) -> None:
 		var.set(self.env, start)
@@ -120,7 +122,7 @@ class Program:
 		Raises LabelError if the label is not found.
 		"""
 		p = self._parser
-		goto_pos = p.pos - 2 - len(name)
+		current_pos = p.pos
 		p.pos = 0
 		while p.has_next:
 			if p.eat_if(LBL):
@@ -130,7 +132,10 @@ class Program:
 					return
 			else:
 				p.skip_statement()
-		raise LabelError(f"Label not found: {name!r}", pos=goto_pos)
+		raise LabelError(
+			f"Label not found: {name!r}",
+			pos=current_pos - 2 - len(name)  # kind of a hack
+		)
 
 
 # ── For-loop continuation helper ─────────────────────────────────────────────

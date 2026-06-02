@@ -9,7 +9,7 @@ from typing import Any, TypeVar, TYPE_CHECKING
 
 from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
-	SingularMatrixError, DomainError,
+	SingularMatrixError, DomainError
 )
 
 if TYPE_CHECKING:
@@ -51,11 +51,14 @@ def require_real(value: Any) -> float:
 		raise DataTypeError(f"Expected real number, got complex: {value}")
 	return value
 
-def require_int(value: Any) -> int:
+def require_int(value: Any, exc_cls=DomainError) -> int:
 	require_real(value)
 	if not value.is_integer():
-		raise DataTypeError(f"Expected integer, got {value}")
+		raise exc_cls(f"Expected integer, got {value}")
 	return int(value)
+
+def require_int_dim(value: Any) -> int:
+	return require_int(value, InvalidDimError)
 
 def require_list(value: Any) -> TiList:
 	return _require_type(value, TiList)
@@ -75,7 +78,7 @@ class TiList:
 
 	@classmethod
 	def alloc(cls, size: Number) -> TiList:
-		return cls(list(repeat(0, require_int(size))))
+		return cls(list(repeat(0, require_int_dim(size))))
 
 	def __getitem__(self, index: Number) -> Number:
 		if index != int(index) or not (1 <= index <= len(self)):
@@ -101,7 +104,7 @@ class TiList:
 		return TiList([-a for a in self.data])
 
 	def set_dim(self, value: Any) -> None:
-		value = require_int(value)
+		value = require_int_dim(value)
 		dim = len(self)
 		if value < dim:
 			del self.data[value:]
@@ -151,8 +154,8 @@ def _check_valid_dim(value: Any) -> tuple[int, int]:
 	if len(value) != 2:
 		raise InvalidDimError(f"Matrix dimensions must be 2 elements, but got {value}")
 	rows, cols = value
-	rows = require_int(rows)
-	cols = require_int(cols)
+	rows = require_int_dim(rows)
+	cols = require_int_dim(cols)
 	if not (1 <= rows <= 99):
 		raise InvalidDimError(f"Required: 1 <= rows <= 99; got {rows}")
 	if not (1 <= cols <= 99):
@@ -183,8 +186,8 @@ class TiMatrix:
 		if len(index) != 2:
 			raise ArgumentError(f"Matrix index must have 2 elements but got {index}")
 		row_index, col_index = index
-		row_index = require_int(row_index)
-		col_index = require_int(col_index)
+		row_index = require_int_dim(row_index)
+		col_index = require_int_dim(col_index)
 		if not (1 <= row_index <= self.rows):
 			raise InvalidDimError(f"{row_index=}")
 		if not (1 <= col_index <= self.cols):
@@ -208,13 +211,13 @@ class TiMatrix:
 		] for r in range(new_rows)]
 
 	def get_row(self, r: Any) -> list:
-		n = require_int(r)
+		n = require_int_dim(r)
 		if not (1 <= n <= self.rows):
 			raise InvalidDimError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
 		return self.data[n - 1]
 
 	def set_row(self, r: Any, row: list) -> None:
-		n = require_int(r)
+		n = require_int_dim(r)
 		if not (1 <= n <= self.rows):
 			raise InvalidDimError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
 		self.data[n - 1] = row

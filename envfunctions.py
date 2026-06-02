@@ -133,7 +133,7 @@ def sigma_int(env, n1, n2, roundvalue=None):
 def expr(env, string):
 	"""Evaluate a TiString as a TI-BASIC expression."""
 	from parser import Parser
-	string = require_str(string)
+	require_str(string)
 	with env.nest_guard(expr):
 		return Parser(string.tokens, env).parse_expr()
 

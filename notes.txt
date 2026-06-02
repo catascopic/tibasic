@@ -1,6 +1,25 @@
 Does no_args end the command? This is very unclear.
 
-Change var parser to return actual var, not token
+skip_statement tests:
+STORE was not closing strings
+quoted colons
+test the edge cases
+
+Refactor tibasic test to be more like memory test:
+remove fixtures
+use run() where possible, calc only for simple one-line calculations
+skip statements with "a@ Str1
+
+Thunk:
+Hard to tell if commands are straight-up invalid
+On the calculator, I think it's impossible to write a seq( command that produces zero elements
+
+Rename Thunk to Formula
+
+Earlier I was removing all the explicit conversions to float, but that was actually correct.
+The calculator only deals in floating-point numbers, and we should only be using ints internally.
+
+Move stat tests
 
 EquationVar: subdivide
 Variable name formatters as actual functions?

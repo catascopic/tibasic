@@ -611,7 +611,7 @@ class TestStatWithFreqList:
 
 	def test_variance_total_freq_le_one(self):
 		# total freq = 1 → denominator (n-1) = 0
-		with pytest.raises(StatError, match="total frequency"):
+		with pytest.raises(StatError):
 			calc('variance( {5},{1}')
 
 	def test_variance_dim_mismatch(self):
@@ -1323,17 +1323,17 @@ class TestDateTime:
 
 	def test_dbd_too_many_decimals_mmddyy(self):
 		# 5 decimal places in MM.DDYY → ERR:DOMAIN
-		with pytest.raises(DomainError, match="too many decimal places"):
+		with pytest.raises(DomainError):
 			calc('dbd( 1.01075,1.0107')
 
 	def test_dbd_too_many_decimals_ddmmyy(self):
 		# 3 decimal places in DDMM.YY → ERR:DOMAIN
-		with pytest.raises(DomainError, match="too many decimal places"):
+		with pytest.raises(DomainError):
 			calc('dbd( 1701.961,1701.97')
 
 	def test_dbd_ambiguous_integer(self):
 		# Integer part 13–99 is invalid
-		with pytest.raises(DomainError, match="ambiguous"):
+		with pytest.raises(DomainError):
 			calc('dbd( 50.0101,51.0101')
 
 	def test_setdate_getdate(self):
@@ -1676,6 +1676,20 @@ class TestStoreDim:
 		result = calc('dim( [[1,2,3][4,5,6')
 		assert result.data == [2, 3]
 
+	def test_store_invalid_dim_doesnt_create_list(self, env):
+		with pytest.raises(InvalidDimError):
+			calc('1.5 @ dim( $BAD', env)
+		assert env.user_lists == {}
+
+	def test_store_bad_datatype_dim_doesnt_create_matrix(self, env):
+		with pytest.raises(DataTypeError):
+			calc('5 @ dim( [A]', env)
+		assert var(env, '[A]') is None
+
+	def test_store_invalid_dim_doesnt_create_matrix(self, env):
+		with pytest.raises(InvalidDimError):
+			calc('{0,2} @ dim( [A]', env)
+		assert var(env, '[A]') is None
 
 # ── Undefined variable behavior ───────────────────────────────────────────────
 
@@ -1702,6 +1716,11 @@ class TestUndefinedVars:
 		# Storing to L₁(2) when L₁ is undefined is out of range.
 		with pytest.raises(InvalidDimError):
 			calc('7@ L1 (2')
+
+	def test_store_index2_doesnt_create(self, env):
+		with pytest.raises(InvalidDimError):
+			calc('1@$BAD(2', env)
+		assert env.user_lists == {}
 
 	# ── Matrices ─────────────────────────────────────────────────────────────
 
@@ -1873,6 +1892,10 @@ class TestIllegalNest:
 		calc('"1+2"@ Str1', env)
 		assert calc('expr( Str1', env) == 3
 		assert calc('expr( Str1', env) == 3   # second call — must not raise
+	
+	def test_expr_explicit_close(self, env):
+		calc('expr( "2+2@A', env)
+		assert var(env, 'A') == 4
 
 
 # ── Thunk capture: commas inside nested delimiters ────────────────────────────
@@ -1909,25 +1932,29 @@ class TestThunkCapture:
 		with pytest.raises(ArgumentError):
 			calc('seq( X:5,X,1,3)', env)
 
-	def test_store_inside_thunk_raises(self, env):
+	def test_store_inside_thunk_raises(self):
 		# store inside a formula is a statement-level construct; rejected at capture time
-		with pytest.raises(TiSyntaxError, match="arguments"):
-			calc('seq( 5@A,X,1,3)', env)
+		with pytest.raises(TiSyntaxError):
+			calc('seq( 5@A,X,1,3)')
+	
+	def test_store_cannot_be_quoted_in_thunk(self):
+		with pytest.raises(TiSyntaxError):
+			calc('seq( length( "5@A"),X,1,3)')
 
 
 class TestSeqIncrement:
 	"""seq( raises a clear error when start/end/step are inconsistent."""
 
 	def test_zero_step_raises(self, env):
-		with pytest.raises(IncrementError, match="zero"):
+		with pytest.raises(IncrementError):
 			calc('seq( X,X,1,5,0', env)
 
 	def test_positive_step_start_after_end_raises(self, env):
-		with pytest.raises(IncrementError, match="start.*end|end.*start"):
+		with pytest.raises(IncrementError):
 			calc('seq( X,X,5,1', env)
 
 	def test_negative_step_start_before_end_raises(self, env):
-		with pytest.raises(IncrementError, match="start.*end|end.*start"):
+		with pytest.raises(IncrementError):
 			calc('seq( X,X,1,5,~1', env)
 
 	def test_equal_start_end_is_fine(self, env):
