@@ -544,7 +544,7 @@ class Parser:
 
 		try:
 			if self.peek().command is not None:
-				self.advance().command.call_with_parser(CommandArgParser(self))
+				self.advance().command.call_with_parser(ArgParser(self))
 			else:
 				value = self.parse_expr()
 				if self.eat_if(STORE):
@@ -591,7 +591,7 @@ class ArgParser:
 
 	def __init__(self, parser: Parser):
 		self._parser = parser
-		self._next = True  # True = next arg token is already exposed (no leading comma to eat)
+		self._next = parser.peek() not in {COLON, NEWLINE, EOF_TOKEN}
 
 	def _arg(self, parse_fn, optional=False, default=None):
 		if not self._next:
@@ -644,12 +644,11 @@ class ArgParser:
 
 	def any_var(self) -> Variable:
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
-		t = self._parser.peek()
+		t = self._parser.advance()
 		if t.variable is not None:
-			return self._parser.advance().variable
+			return t.variable
 		if t is LIST_PREFIX:
-			self._parser.advance()
-			return UserListVar(self._parser._read_name(5))
+			return self._parser._parse_user_list_var()
 		raise TiSyntaxError(f"Expected a variable, got {t}")
 
 	@_parse_method
@@ -661,6 +660,31 @@ class ArgParser:
 	def program_name(self) -> str:
 		"""Read up to 8 alphanumeric characters as a program name (for prgm)."""
 		return self._parser._read_name(8)
+
+	def current_program(self):
+		"""Return the innermost currently-executing Program.
+
+		Raises InvalidCommandError if called from outside a program (e.g. from
+		the home screen).  The stack trace identifies the calling command.
+		"""
+		prog = self.env.current_program
+		if prog is None:
+			raise InvalidCommandError("This command cannot be used outside a program")
+		return prog
+
+	def no_args(self) -> None:
+		"""Raise TiSyntaxError if any tokens follow on this statement.
+
+		For no-arg commands (Normal, Return, End, etc.) that should reject
+		trailing tokens outright.  Raises TiSyntaxError rather than ArgumentError
+		because stray tokens here are a syntactic mistake, not a wrong argument count.
+		"""
+		if self._next:
+			raise TiSyntaxError(f"Command takes no arguments, but got: {self._parser.peek()}")
+
+	def end_bunch(self) -> None:
+		"""End without consuming the separator, allowing the next command to follow immediately."""
+		pass
 
 	def end_func(self):
 		"""Consume the closing ) and validate no surplus arguments remain.
@@ -692,18 +716,6 @@ class ArgParser:
 		if self._next:
 			raise ArgumentError(f"Too many arguments: unexpected {self.peek()}")
 		self._parser.end_statement()
-	
-
-	def current_program(self):
-		"""Return the innermost currently-executing Program.
-
-		Raises InvalidCommandError if called from outside a program (e.g. from
-		the home screen).  The stack trace identifies the calling command.
-		"""
-		prog = self._parser.env.current_program
-		if prog is None:
-			raise InvalidCommandError("This command cannot be used outside a program")
-		return prog
 
 	@property
 	def env(self):
@@ -721,36 +733,6 @@ class ArgParser:
 	def peek(self):
 		return self._parser.peek()
 
-
-class CommandArgParser(ArgParser):
-	"""ArgParser subclass passed to all command handlers.
-
-	Adds the command-style termination surface:
-	  - at_eol      — True if the next token is a statement boundary
-	  - no_args()   — raise TiSyntaxError if anything follows on this statement
-	  - end()       — consume the trailing statement separator
-	  - end_bunch() — no-op; leave the separator in place so the next command
-	                  can follow immediately (e.g. ClockOnClockOn)
-	"""
-
-	@property
-	def at_eol(self) -> bool:
-		"""True if the next token is a statement boundary (colon, newline, or EOF)."""
-		t = self._parser.peek()
-		return t is COLON or t is NEWLINE or t is EOF_TOKEN
-
-	def no_args(self) -> None:
-		"""Raise TiSyntaxError if any tokens follow on this statement."""
-		if not self.at_eol:
-			raise TiSyntaxError(f"Command takes no arguments, but got: {self._parser.peek()}")
-
-	def end(self) -> None:
-		"""Consume the trailing statement separator."""
-		self._parser.end_statement()
-
-	def end_bunch(self) -> None:
-		"""End without consuming the separator, allowing the next command to follow immediately."""
-		pass
 
 
 if __name__ == '__main__':

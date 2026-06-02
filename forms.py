@@ -4,7 +4,7 @@ from itertools import zip_longest
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-	from parser import ArgParser, CommandArgParser
+	from parser import ArgParser
 
 from decorators import forms_func, TiCall
 from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, UndefinedError, TiSyntaxError
@@ -254,18 +254,19 @@ def setup_editor(a):
 	With arguments, ensures each named list exists (standard or user-defined).
 	Does not modify lists that already contain data.
 	"""
-	if a.at_eol:
-		for i in range(6):
-			if a.env.lists[i] is None:
-				a.env.lists[i] = TiList([])
-	else:
+	if a.has_next:
 		while True:
 			var = a.list_var()
 			if var.get_unsafe(a.env) is None:
 				var.set(a.env, TiList([]))
-			if not a.has_next():
+			if not a.has_next:
 				break
-	a.end()
+	else:
+		for i in range(6):
+			if a.env.lists[i] is None:
+				a.env.lists[i] = TiList([])
+
+	a.end_cmd()
 
 
 # ── Equ►String( and String►Equ( ──────────────────────────────────────────────
@@ -298,9 +299,9 @@ class program_command(TiCall):
 	Raises InvalidCommandError automatically if called outside a program.
 	Use for Return, Stop, Else, End, etc.
 	"""
-	def call_with_parser(self, a: CommandArgParser) -> None:
+	def call_with_parser(self, a: ArgParser) -> None:
 		a.no_args()
-		a.end()
+		a.end_cmd()
 		self.func(a.current_program())
 
 
@@ -414,9 +415,11 @@ def prgm(a: ArgParser):
 
 @forms_func
 def disp(a: ArgParser):
-	if not a.at_eol:
+	if a.has_next:
 		while True:
 			print(a.expr())
 			if not a.has_next():
 				break
-	a.end()
+	else:
+		pass
+	a.end_cmd()

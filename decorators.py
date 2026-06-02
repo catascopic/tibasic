@@ -97,7 +97,7 @@ class nullary_command(TiCall):
 	"""
 	def call_with_parser(self, a: Any) -> None:
 		a.no_args()
-		a.end()
+		a.end_cmd()
 		self.func(a.env)
 
 
