@@ -1,42 +1,23 @@
-How to replace peek (and kill EOF_TOKEN):
-Create these methods:
-next_is(Token): same as peek() is Token
-next_in(set[Token]): same as peek() in {...}
-Weird idea: define __in__ in token to be the same as __eq__
-next_matches(Callable[[Token], bool]): intended to usually be called by doing next_matches(Token.is_numeric_var)
-We'd also need a replacement for peek().function is not None, but that's not hard
-For cases like f"Too many arguments: unexpected {self.peek()}", we could create a method like peek only for throwing messages, which returns repr(token) or "END OF INPUT"
-Maybe EOF_TOKEN is fine! But can we make it a subclass of token that explictly defines its methods to return False?
-Maybe we could even make a common interface that EOF_TOKEN and Token both share, which could even help reduce cyclical imports!
-We could make an ABC called Token (or StreamToken), rename tokens.py to catalog.py, and rename the Token dataclass to... I don't know, something better than TokenImpl. It could be Token(StreamToken)
-
-UserListVars could be None sometimes?
-Should var.get have a "default" param?
-Is catching UndefinedError bad practice?
-Possible solution: OffsetVar defines an abstract method that just returns the right list on env, so that .get can handle the "check None, raise Undefined" logic
+EquationVar: subdivide
+Variable name formatters as actual functions?
 
 The program table in Environment should probably be a dataclass called ProgramData, and have a reference to the name of the program. Then the class Program be given a ProgramData and then it would know its own name, which would be good for debugging if nothing else.
 
-
-Not sure what to do with no-arg commands
-Even more complex are commands that can take 0 or more args, like Disp
-With no args, Disp just shows the home screen
-With args, it prints them
-
-Maybe we do need a CommandArgParser after all!
-Upon creation, it could check if it's at EOL, and have that as a property.
-It would also have the no_args() function that ensures this flag is set.
-
-I'm also wondering if we can redo nullaries using this. Like instead of nullary and function being different fields, they'd be combined somehow?
-
-Another thing: ClockOnClockOn is actually valid! *Some* commands that take no args can be bunched up like that. ClockOn is one of them.
-However, you can't do NormalFloat.
+There's something we need to rethink about commands. It starts with this: ClockOnClockOn is actually valid! *Some* commands that take no args can be bunched up like that. ClockOn is one of them. However, you can't do NormalFloat. I'll probably just have to try them all on my calculator.
+Currently, NormalFloat raises ArgumentError, because it's parsing it as Float being an argument of Normal. It should just raise a TiSyntaxError, though.
 Also, note that DelVar (deletes a variable) can be bunched up, like DelVar ADelVar BDelVar C.
 This actually might not be hard to implement: the command parser could just have an alternate ending method that doesn't consume the separator.
 DelVar takes exactly one argument, so this makes sense.
 
-Also, currently, NormalFloat raises ArgumentError, because it's parsing it as Float being an argument of Normal. It should just raise a TiSyntaxError, though.
+But this is part of a deeper problem: no-arg commands. Even more complex are commands that can take 0 or more args, like Disp. (With no args, Disp just shows the home screen.)
+Maybe we do need a CommandArgParser after all!
+Upon creation, it could check if it's at EOL, and have that as a property.
+It would also have the no_args() function that ensures this flag is set.
+As you can see, I've made a workaround for no-arg commands like End, but it's not perfect.
+What do you think about all this?
 
+
+I'm also wondering if we can redo nullaries using this. Like instead of nullary and function being different fields, they'd be combined somehow?
 
 Rename Environment to Calculator
 
@@ -84,6 +65,23 @@ make them IntEnums for easier testing?
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+How to replace peek (and kill EOF_TOKEN):
+Create these methods:
+next_is(Token): same as peek() is Token
+next_in(set[Token]): same as peek() in {...}
+Weird idea: define __in__ in token to be the same as __eq__
+next_matches(Callable[[Token], bool]): intended to usually be called by doing next_matches(Token.is_numeric_var)
+We'd also need a replacement for peek().function is not None, but that's not hard
+For cases like f"Too many arguments: unexpected {self.peek()}", we could create a method like peek only for throwing messages, which returns repr(token) or "END OF INPUT"
+Maybe EOF_TOKEN is fine! But can we make it a subclass of token that explictly defines its methods to return False?
+Maybe we could even make a common interface that EOF_TOKEN and Token both share, which could even help reduce cyclical imports!
+We could make an ABC called Token (or StreamToken), rename tokens.py to catalog.py, and rename the Token dataclass to... I don't know, something better than TokenImpl. It could be Token(StreamToken)
+
+UserListVars could be None sometimes?
+Should var.get have a "default" param?
+Is catching UndefinedError bad practice?
+Possible solution: OffsetVar defines an abstract method that just returns the right list on env, so that .get can handle the "check None, raise Undefined" logic
 
 New idea: CommandArgParser should be responsible for eating the end-of-statement separator.
 Of course, there's a weird split between functions (always take parentheses) and commands (may or may not). So we might need three total ArgParsers, possibly with a linear heirarchy. Alternatively, CommandArgParser just has two end methods, one of which closes the parentheses; both expect a separator.

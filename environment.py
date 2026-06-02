@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import math
 import random
 from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from datetime import datetime, date, timedelta
+from typing import Any, TYPE_CHECKING
 
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, UndefinedError
@@ -11,41 +14,21 @@ from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, Graph
 from signals import StopSignal
 
 
-class _VarArray:
-	"""Array-backed variable store with integer indexing."""
-	__slots__ = ('_data', '_formatter')
-
-	def __init__(self, size, default, formatter):
-		self._data = [default] * size
-		self._formatter = formatter
-
-	def __getitem__(self, idx: int):
-		return self._data[idx]
-
-	def __setitem__(self, idx: int, value):
-		self._data[idx] = value
-
-	def iter_values(self):
-		for i, x in enumerate(self._data):
-			if x is not None:
-				yield self._formatter(i), x
-
-
 class Environment:
 
 	def __init__(self):
 		# VARIABLES
-		self.numerics   = _VarArray(27, None, lambda n: chr(65+n) if n < 26 else 'θ') # A–Z, θ
-		self.lists      = _VarArray(6,  None, lambda n: f"L{n+1}")         # L1–L6
-		self.matrices   = _VarArray(10, None, lambda n: f"[{chr(65+n)}]")  # [A]–[J]
-		self.strings    = _VarArray(10, None, lambda n: f"Str{n+1}")       # Str0–9
-		self.stat       = _VarArray(0x3D, None, repr)                      # stat vars
-		self.window     = _VarArray(0x37, None, repr)                      # window vars
-		self.user_lists      = {}                                           # ᴸNAME lists
-		self.y_equations     = _VarArray(10, None, lambda n: f'Y{(n + 1) % 10}')        # Y1–Y0
-		self.param_equations = _VarArray(12, None, lambda n: f"{'XY'[n % 2]}{n // 2 + 1}T") # X1T–Y6T
-		self.polar_equations = _VarArray(6,  None, lambda n: f'r{n + 1}')               # r1–r6
-		self.seq_equations   = _VarArray(3,  None, lambda n: 'uvw'[n])                  # u, v, w
+		self.numerics        = [None] * 27   # A–Z, θ
+		self.lists           = [None] * 6    # L1–L6
+		self.user_lists      = {}            # ᴸNAME lists
+		self.matrices        = [None] * 10   # [A]–[J]
+		self.strings         = [None] * 10   # Str1–Str0
+		self.y_equations     = [None] * 10   # Y1–Y0
+		self.param_equations = [None] * 12   # X1T–Y6T
+		self.polar_equations = [None] * 6    # r1–r6
+		self.seq_equations   = [None] * 3    # u, v, w
+		self.stat            = [None] * 0x3D # stat vars
+		self.window          = [None] * 0x37 # window vars
 		self.n = None
 		self.ans = 0
 		self.key_code = 0
@@ -220,16 +203,19 @@ class Environment:
 			self._nest_depth[func] -= 1
 
 	def _iter_values(self):
-		for field in ('numerics', 'lists', 'matrices', 'strings'):
-			yield from getattr(self, field).iter_values()
+		from catalog import LETTERS, VAR_THETA, LISTS, MATRICES, STRINGS
+		for tok in (*LETTERS, VAR_THETA, *LISTS, *MATRICES, *STRINGS):
+			v = tok.variable.get_unsafe(self)
+			if v is not None:
+				yield tok.char if tok.char else tok.text, v
 		for name, lst in self.user_lists.items():
-			yield f"ᴸ{name}", value
+			yield f"ᴸ{name}", lst
 		yield "Ans", self.ans
 
 	def dump(self):
 		for name, value in self._iter_values():
 			print(f"{name:8}= {value!r}")
-	
+
 	def __repr__(self):
 		return f"ENV({';'.join(f"{name}={value!r}" for name, value in self._iter_values())})"
 
@@ -246,115 +232,124 @@ class Environment:
 
 class Variable(ABC):
 	"""Base class for typed, storable token variables."""
-	
+
 	@abstractmethod
-	def get(self, env):
+	def get(self, env: Environment) -> Any:
 		pass
-		
+
 	@abstractmethod
-	def set(self, env, value):
+	def set(self, env: Environment, value: Any) -> None:
 		pass
 
 
 class OffsetVar(Variable):
-	__slots__ = ('index',)
-	def __init__(self, index: int):
-		self.index = index	
+	"""Variable stored by integer index in one of the environment's flat arrays."""
+	__slots__ = ('index', '_array_attr', '_validator', '_formatter')
+
+	def __init__(self, index: int, array_attr: str, validate: Any, name_fn: Any) -> None:
+		self.index      = index
+		self._array_attr  = array_attr
+		self._validator = validate
+		self._formatter = name_fn
+
+	def get(self, env: Environment) -> Any:
+		val = getattr(env, self._array_attr)[self.index]
+		if val is None:
+			raise UndefinedError(self._formatter(self.index))
+		return val
+
+	def set(self, env: Environment, value: Any) -> None:
+		getattr(env, self._array_attr)[self.index] = self._validator(value)
+
+	def get_unsafe(self, env: Environment) -> Any:
+		"""Return the raw stored value without raising or auto-initialising."""
+		return getattr(env, self._array_attr)[self.index]
 
 
 class NamedVar(Variable):
 	__slots__ = ('name',)
-	def __init__(self, name: str):
+	def __init__(self, name: str) -> None:
 		self.name = name
-	
+
 
 class NumericVar(OffsetVar):
-	def get(self, env):
+	def __init__(self, index: int) -> None:
+		super().__init__(index, 'numerics', require_num, lambda i: chr(65 + i) if i < 26 else 'θ')
+
+	def get(self, env: Environment) -> Any:
 		val = env.numerics[self.index]
 		if val is None:
-			val = env.numerics[self.index] = 0
+			env.numerics[self.index] = 0
+			return 0
 		return val
-		
-	def set(self, env, value):
-		env.numerics[self.index] = require_num(value)
+
 
 class RealVar(NamedVar):
-	def get(self, env):
+	def get(self, env: Environment) -> Any:
 		val = getattr(env, self.name)
 		if val is None:
 			setattr(env, self.name, 0)
 			val = 0
 		return val
 
-	def set(self, env, value):
+	def set(self, env: Environment, value: Any) -> None:
 		setattr(env, self.name, require_real(value))
 
+
 class ListVar(OffsetVar):
-	def get(self, env):
-		value = env.lists[self.index]
-		if value is None:
-			raise UndefinedError(f"List {self.index + 1}")
-		return value
-		
-	def set(self, env, value):
-		env.lists[self.index] = require_list(value)
+	def __init__(self, index: int) -> None:
+		super().__init__(index, 'lists', require_list, lambda i: f"L{i + 1}")
+
 
 class UserListVar(NamedVar):
-	def get(self, env):
+	def get(self, env: Environment) -> Any:
 		try:
 			return env.user_lists[self.name]
 		except KeyError:
 			raise UndefinedError(f"User list {self.name}")
-		
-	def set(self, env, value):
+
+	def set(self, env: Environment, value: Any) -> None:
 		env.user_lists[self.name] = require_list(value)
 
-class MatrixVar(OffsetVar):
-	def get(self, env):
-		value = env.matrices[self.index]
-		if value is None:
-			raise UndefinedError(f"Matrix [{chr(65 + self.index)}]")
-		return value
 
-	def set(self, env, value):
-		env.matrices[self.index] = require_matrix(value)
+class MatrixVar(OffsetVar):
+	def __init__(self, index: int) -> None:
+		super().__init__(index, 'matrices', require_matrix, lambda i: f"[{chr(65 + i)}]")
+
 
 class StringVar(OffsetVar):
-	def get(self, env):
-		value = env.strings[self.index]
-		if value is None:
-			raise UndefinedError(f"Str{self.index + 1}")
-		return value
+	def __init__(self, index: int) -> None:
+		super().__init__(index, 'strings', require_str, lambda i: f"Str{(i + 1) % 10}")
 
-	def set(self, env, value):
-		env.strings[self.index] = require_str(value)
 
 class EquationVar(Variable):
 	__slots__ = ('table', 'index')
 
-	def __init__(self, table: str, index: int):
+	def __init__(self, table: str, index: int) -> None:
 		self.table = table
 		self.index = index
 
-	def get(self, env):
+	def get(self, env: Environment) -> Any:
 		val = getattr(env, self.table)[self.index]
 		if val is None:
 			raise UndefinedError("Equation variable is undefined")
 		return val
 
-	def set(self, env, value):
+	def set(self, env: Environment, value: Any) -> None:
 		getattr(env, self.table)[self.index] = require_equation(value)
 
+
 class StatVar(OffsetVar):
-	def get(self, env):
-		return env.stat[self.index]
-		
-	def set(self, env, value):
+	def __init__(self, index: int) -> None:
+		super().__init__(index, 'stat', lambda v: v, lambda i: f"stat[{i:#04x}]")
+
+	def get(self, env: Environment) -> Any:
+		return env.stat[self.index]  # may be None before a stat function has run
+
+	def set(self, env: Environment, value: Any) -> None:
 		raise DataTypeError("Stat variables are read-only")
 
+
 class WindowVar(OffsetVar):
-	def get(self, env):
-		return env.window[self.index]
-		
-	def set(self, env, value):
-		env.window[self.index] = require_real(value)
+	def __init__(self, index: int) -> None:
+		super().__init__(index, 'window', require_real, lambda i: f"window[{i:#04x}]")
