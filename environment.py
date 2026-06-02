@@ -311,15 +311,21 @@ class UserListVar(NamedVar):
 
 class MatrixVar(OffsetVar):
 	def get(self, env):
-		return env.matrices[self.index]
-		
+		value = env.matrices[self.index]
+		if value is None:
+			raise UndefinedError(f"Matrix [{chr(65 + self.index)}]")
+		return value
+
 	def set(self, env, value):
 		env.matrices[self.index] = require_matrix(value)
 
 class StringVar(OffsetVar):
 	def get(self, env):
-		return env.strings[self.index]
-		
+		value = env.strings[self.index]
+		if value is None:
+			raise UndefinedError(f"Str{self.index + 1}")
+		return value
+
 	def set(self, env, value):
 		env.strings[self.index] = require_str(value)
 

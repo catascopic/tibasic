@@ -6,7 +6,6 @@ from collections.abc import Callable, Iterator
 from itertools import repeat
 from numbers import Number
 from typing import Any, TypeVar, TYPE_CHECKING
-from titoken import Token
 
 from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
@@ -14,6 +13,7 @@ from errors import (
 )
 
 if TYPE_CHECKING:
+	from titoken import Token
 	from environment import Environment
 
 

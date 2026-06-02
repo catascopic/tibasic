@@ -327,7 +327,6 @@ class Parser:
 		
 		if t.is_matrix_var():
 			val = t.variable.get(self.env)
-			# TODO: if val is None
 			if self.eat_if(L_PAREN):
 				val = val[self.parse_row_col()]
 				self.eat_if(R_PAREN)
@@ -415,10 +414,7 @@ class Parser:
 
 		elif t.is_matrix_var():
 			if self.eat_if(L_PAREN):
-				mat = t.variable.get(self.env)
-				if mat is None:
-					raise UndefinedError(f"Undefined matrix: {t}")
-				mat[self.parse_row_col()] = value
+				t.variable.get(self.env)[self.parse_row_col()] = value
 				self.eat_if(R_PAREN)
 			else:
 				t.variable.set(self.env, value)
@@ -437,8 +433,9 @@ class Parser:
 
 	def parse_store_list(self, var: Variable, value):
 		if self.eat_if(L_PAREN):
-			lst = var.get(self.env)
-			if lst is None:
+			try:
+				lst = var.get(self.env)
+			except UndefinedError:
 				lst = TiList()
 				var.set(self.env, lst)
 			lst[self.parse_expr()] = value
@@ -458,8 +455,9 @@ class Parser:
 				lst.set_dim(value)
 		elif t.is_matrix_var():
 			self.advance()
-			mat = t.variable.get(self.env)
-			if mat is None:
+			try:
+				mat = t.variable.get(self.env)
+			except UndefinedError:
 				t.variable.set(self.env, TiMatrix.alloc(value))
 			else:
 				mat.set_dim(value)

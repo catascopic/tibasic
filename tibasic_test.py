@@ -9,6 +9,7 @@ from modes import AngleMode
 from errors import (
 	TiSyntaxError, IllegalNestError, DomainError, DimMismatchError,
 	StatError, IncrementError, DataTypeError, InvalidDimError, ArgumentError,
+	UndefinedError,
 )
 import catalog
 from titoken import Token
@@ -1683,6 +1684,64 @@ class TestStoreDim:
 		# dim([[1,2,3][4,5,6]]) = {2,3}
 		result = calc('dim( [[1,2,3][4,5,6')
 		assert result.data == [2, 3]
+
+
+# ── Undefined variable behavior ───────────────────────────────────────────────
+
+class TestUndefinedVars:
+	"""Numeric vars default to 0; all other var types raise UndefinedError."""
+
+	# ── Numeric: always 0 ─────────────────────────────────────────────────────
+
+	def test_numeric_var_defaults_to_zero(self):
+		assert calc('A') == 0
+
+	# ── Lists ─────────────────────────────────────────────────────────────────
+
+	def test_read_undefined_list(self):
+		with pytest.raises(UndefinedError):
+			calc('L1')
+
+	def test_store_index_1_undefined_list(self, env):
+		# Storing to L₁(1) when L₁ is undefined auto-creates it.
+		calc('7@ L1 (1', env)
+		assert var(env, 'L1').data == [7]
+
+	def test_store_index_gt1_undefined_list(self):
+		# Storing to L₁(2) when L₁ is undefined is out of range.
+		with pytest.raises(InvalidDimError):
+			calc('7@ L1 (2')
+
+	# ── Matrices ─────────────────────────────────────────────────────────────
+
+	def test_read_undefined_matrix(self):
+		with pytest.raises(UndefinedError):
+			calc('[A]')
+
+	def test_store_indexed_undefined_matrix(self):
+		# Unlike lists, matrices do not auto-create on indexed store.
+		with pytest.raises(UndefinedError):
+			calc('1@ [A] (1,1')
+
+	# ── Strings ──────────────────────────────────────────────────────────────
+
+	def test_read_undefined_string(self):
+		with pytest.raises(UndefinedError):
+			calc('Str1')
+
+	# ── User-named lists ─────────────────────────────────────────────────────
+
+	def test_read_undefined_user_list(self):
+		with pytest.raises(UndefinedError):
+			calc('$FOO')
+
+	def test_store_index_1_undefined_user_list(self, env):
+		calc('7@ $FOO (1', env)
+		assert env.user_lists['FOO'].data == [7]
+
+	def test_store_index_gt1_undefined_user_list(self):
+		with pytest.raises(InvalidDimError):
+			calc('7@ $FOO (2')
 
 
 # ── Nesting and combinations ──────────────────────────────────────────────────
