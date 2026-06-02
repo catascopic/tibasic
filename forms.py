@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from decorators import forms_func, TiCall
+from decorators import forms_func, nullary_command, TiCall
 from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
@@ -158,7 +158,7 @@ def matr_to_list(a: ArgParser) -> None:
 		raise DataTypeError("Matr►list: first argument must be a matrix")
 	if a.peek().is_list_start():
 		list_refs = [a.list_var()]
-		while a.has_next():
+		while a.has_next:
 			list_refs.append(a.list_var())
 		for ref, col_data in zip(list_refs, zip(*mat.data)):
 			ref.set(a.env, TiList(list(col_data)))
@@ -178,7 +178,7 @@ def list_to_matr(a: ArgParser) -> None:
 	list_vals = []
 	while True:
 		list_vals.append(require_list(a.expr()))
-		if not a.has_next():
+		if not a.has_next:
 			raise ArgumentError("List►matr: expected matrix variable as last argument")
 		if a.peek().is_matrix_var():
 			mat_var = a.matrix_var()
@@ -196,7 +196,7 @@ def _sort(a: ArgParser, reverse: bool):
 	main = a.list_var().get(a.env)
 	# TODO: could be None?
 	deps = []
-	while a.has_next():
+	while a.has_next:
 		deps.append(a.list_var().get(a.env))
 	if not deps:
 		main.data.sort(reverse=reverse)
@@ -233,10 +233,33 @@ def fill(a: ArgParser):
 			lst.data[i] = x
 
 
+# ── ClrList and ClrAllLists ───────────────────────────────────────────────────
+
+@forms_func
+def clr_list(a):
+	"""ClrList list[, list, ...] — clear each named list to empty; silently skip nonexistent lists."""
+	while True:
+		lst = a.list_var().get_unsafe(a.env)
+		if lst is not None:
+			lst.set_dim(0)
+		if not a.has_next:
+			break
+	a.end_cmd()
+
+
+@nullary_command
+def clr_all_lists(env):
+	"""ClrAllLists — set every defined list (L1–L6 and user lists) to empty."""
+	for lst in env.lists:
+		lst.set_dim(0)
+	for lst in env.user_lists.values():
+		lst.set_dim(0)
+
+
 # ── DelVar and SetUpEditor ────────────────────────────────────────────────────
 
 @forms_func
-def delvar(a):
+def del_var(a):
 	"""DelVar variable — clear one variable without consuming the statement separator.
 
 	Bunches: DelVar ADelVar B and DelVar ADisp X are both valid on the same line.
@@ -247,7 +270,7 @@ def delvar(a):
 
 
 @forms_func
-def setup_editor(a):
+def set_up_editor(a):
 	"""SetUpEditor [list, ...] — ensure lists exist, creating empty ones as needed.
 
 	With no arguments, ensures L1–L6 all exist (the default list editor columns).
@@ -256,7 +279,7 @@ def setup_editor(a):
 	"""
 	if a.has_next:
 		while True:
-			var = a.list_var()
+			var = a.list_var_prefix_optional()
 			if var.get_unsafe(a.env) is None:
 				var.set(a.env, TiList([]))
 			if not a.has_next:
@@ -418,7 +441,7 @@ def disp(a: ArgParser):
 	if a.has_next:
 		while True:
 			print(a.expr())
-			if not a.has_next():
+			if not a.has_next:
 				break
 	else:
 		pass

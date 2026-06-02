@@ -642,6 +642,16 @@ class ArgParser:
 			return t.variable
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
+	@_parse_method
+	def list_var_prefix_optional(self) -> Variable:
+		"""Read a list variable: L1–L6, ᴸNAME, or a bare user-list name without the ᴸ prefix.
+
+		SetUpEditor accepts all three forms; ordinary list contexts require the prefix.
+		"""
+		if self.peek().is_numeric_var():
+			return UserListVar(self._parser._read_name(5))
+		return self.parse_list_var()
+
 	def any_var(self) -> Variable:
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
 		t = self._parser.advance()
@@ -680,7 +690,7 @@ class ArgParser:
 		because stray tokens here are a syntactic mistake, not a wrong argument count.
 		"""
 		if self._next:
-			raise TiSyntaxError(f"Command takes no arguments, but got: {self._parser.peek()}")
+			raise TiSyntaxError(f"Command takes no arguments, but got: {self.peek()}")
 
 	def end_bunch(self) -> None:
 		"""End without consuming the separator, allowing the next command to follow immediately."""
@@ -721,6 +731,7 @@ class ArgParser:
 	def env(self):
 		return self._parser.env
 
+	@property
 	def has_next(self) -> bool:
 		return self._next
 
