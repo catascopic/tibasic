@@ -150,8 +150,6 @@ def check_for_condition(value: float, end: float, step: float) -> bool:
 		raise IncrementError("For: step cannot be zero")
 
 
-# ── Block types ───────────────────────────────────────────────────────────────
-
 class Block(ABC):
 	def on_end(self, prgm: 'Program'):
 		"""This method should not be abstract; the default action is to do nothing."""

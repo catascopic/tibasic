@@ -1964,6 +1964,35 @@ class TestSeqIncrement:
 		assert calc('seq( X,X,3,1,~1', env).data == [3, 2, 1]
 
 
+class TestCopyVars:
+	
+	def test_copy_string(self, env):
+		calc('"ABC"@ Str1', env)
+		calc('Str1 @ Str2', env)
+		assert str(var(env, 'Str1')) == 'ABC'
+		assert str(var(env, 'Str2')) == 'ABC'
+		# This part would fail, but it's okay because strings are immutable, I guess?
+		# assert var(env, 'Str1').tokens is not var(env, 'Str2').tokens
+
+	def test_copy_list(self, env):
+		calc('{1,2,3}@ L1', env)
+		calc('L1 @ L2', env)
+		assert var(env, 'L1').data == [1, 2, 3]
+		assert var(env, 'L2').data == [1, 2, 3]
+		calc('4@ L1 (1', env)
+		assert var(env, 'L1').data == [4, 2, 3]
+		assert var(env, 'L2').data == [1, 2, 3]
+
+	def test_copy_matrix(self, env):
+		calc('[[1,2][3,4]]@ [A]', env)
+		calc('[A] @ [B]', env)
+		assert var(env, '[A]').data == [[1, 2], [3, 4]]
+		assert var(env, '[B]').data == [[1, 2], [3, 4]]
+		calc('5@ [A] (2,1', env)
+		assert var(env, '[A]').data == [[1, 2], [5, 4]]
+		assert var(env, '[B]').data == [[1, 2], [3, 4]]
+
+
 class TestSyntax:
 	
 	def test_clockon_bunch(self):

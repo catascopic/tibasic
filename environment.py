@@ -302,9 +302,18 @@ class RealVar(NamedVar):
 		setattr(env, self.name, require_real(value))
 
 
+
+def _copy_list(lst):
+	return require_list(lst).copy()
+	
+	
+def _copy_matrix(mat):
+	return require_matrix(mat).copy()
+
+
 class ListVar(OffsetVar):
 	def __init__(self, index: int) -> None:
-		super().__init__(index, 'lists', require_list, lambda i: f"L{i + 1}")
+		super().__init__(index, 'lists', _copy_list, lambda i: f"L{i + 1}")
 
 
 class UserListVar(NamedVar):
@@ -315,7 +324,7 @@ class UserListVar(NamedVar):
 			raise UndefinedError(f"User list {self.name}")
 
 	def set(self, env: Environment, value: Any) -> None:
-		env.user_lists[self.name] = require_list(value)
+		env.user_lists[self.name] = _copy_list(value)
 
 	def get_unsafe(self, env: Environment) -> Any:
 		return env.user_lists.get(self.name)
@@ -326,7 +335,7 @@ class UserListVar(NamedVar):
 
 class MatrixVar(OffsetVar):
 	def __init__(self, index: int) -> None:
-		super().__init__(index, 'matrices', require_matrix, lambda i: f"[{chr(65 + i)}]")
+		super().__init__(index, 'matrices', _copy_matrix, lambda i: f"[{chr(65 + i)}]")
 
 
 class StringVar(OffsetVar):

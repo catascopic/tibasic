@@ -31,9 +31,9 @@ def ans_index_or_mul(a: ArgParser):
 def seq(a: ArgParser) -> TiList:
 	formula = a.thunk()
 	var = a.numeric_var()
-	start = a.expr()
-	end = a.expr()
-	step = a.expr(optional=True, default=1)
+	start = require_real(a.expr())
+	end = require_real(a.expr())
+	step = require_real(a.expr(optional=True, default=1))
 	a.end_func()
 	n = start
 	result = []

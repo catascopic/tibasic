@@ -1,4 +1,35 @@
-Does no_args end the command? This is very unclear.
+Commands:
+solve( fMin( fMax(
+
+Drawing:
+Line( Vertical Pt-On( Pt-Off( Pt-Change( Shade( Circle( Horizontal Tangent DrawInv DrawF ShadeNorm( Shade_t( Shadeχ²( ShadeF(
+pxl-Test( Pxl-On( Pxl-Off( Pxl-Change(
+Text(  #!!!
+StorePic RecallPic StoreGDB RecallGDB
+
+Modes:
+Horiz Full IndpntAuto IndpntAsk DependAuto DependAsk Time Web
+
+Finance:
+tvm_Pmt tvm_I% tvm_PV tvm_N tvm_FV Pmt_End Pmt_Bgn
+
+I/O:
+Pause Input Prompt Output( ClrHome DispTable Menu(
+
+χ²-Test??? It has a weird display
+
+
+Tests to make sure lists/matrices/strings actually copy the value, not the reference
+
+
+require_real(a.expr()) -> a.expr(require_real) or even a.real_expr()
+
+
+Variables are kind of weird, it feels like they shouldn't always need env as a parameter.
+I like that tokens contain a "Variable" that's just an immutable accessor, but I feel like maybe Token.variable should be a function that takes env and returns an independent object that does get/set. What do you think?
+I also still don't like the token design where it contains an array_name, validator... these things are class variables at best, putting them in the constructor is weird.
+
+
 
 skip_statement tests:
 STORE was not closing strings
@@ -47,6 +78,8 @@ Make sure deg symbol vs D/M/S format is working
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+Does no_args end the command? This is very unclear.
 
 move vectorized to tiobjects
 rename end_val
