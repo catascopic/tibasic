@@ -650,7 +650,7 @@ class ArgParser:
 		"""
 		if self.peek().is_numeric_var():
 			return UserListVar(self._parser._read_name(5))
-		return self.parse_list_var()
+		return self._parser.parse_list_var()
 
 	def any_var(self) -> Variable:
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""

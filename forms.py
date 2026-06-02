@@ -209,14 +209,17 @@ def _sort(a: ArgParser, reverse: bool):
 	a.end_paren_cmd()
 
 
+@forms_func
 def sort_a(a: ArgParser):
 	_sort(a, False)  # ascending
 
 
+@forms_func
 def sort_d(a: ArgParser):
 	_sort(a, True)   # descending
 
 
+@forms_func
 def fill(a: ArgParser):
 	# Fill(value, listname) or Fill(value, matrixname) — value comes first
 	x = require_real(a.expr())
@@ -251,7 +254,8 @@ def clr_list(a):
 def clr_all_lists(env):
 	"""ClrAllLists — set every defined list (L1–L6 and user lists) to empty."""
 	for lst in env.lists:
-		lst.set_dim(0)
+		if lst is not None:
+			lst.set_dim(0)
 	for lst in env.user_lists.values():
 		lst.set_dim(0)
 
