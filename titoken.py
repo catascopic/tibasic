@@ -50,16 +50,6 @@ class Token:
 	def is_name_char(self):
 		return self.is_numeric_var() or self.is_digit()
 
-	def can_start_atom(self) -> bool:
-		return (
-			self.is_digit()
-			or self.variable is not None
-			or self.nullary is not None
-			or self.function is not None
-			or self.code[0] in {0x06, 0x08, 0x10, 0x2A, 0x3A, 0x3B, 0xB0, 0xEB}
-			# 0x06=[  0x08={  0x10=(  0x2A="  0x3A=.  0x3B=ᴇ  0xB0=⁻  0xEB=LIST_PREFIX
-		)
-
 	def __repr__(self):
 		return f'0x{int.from_bytes(self.code):0{2 * len(self.code)}X}:{self.text!r}'
 
@@ -92,7 +82,6 @@ class EofToken:
 	def is_stat_var(self) -> bool:     return False
 	def is_window_var(self) -> bool:   return False
 	def is_name_char(self) -> bool:    return False
-	def can_start_atom(self) -> bool:  return False
 
 	def __repr__(self) -> str:         return '<EOF>'
 

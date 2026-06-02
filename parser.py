@@ -387,7 +387,7 @@ class Parser:
 				continue
 
 			# Implicit multiplication
-			if t.can_start_atom():
+			if _can_start_atom(t):
 				if 60 <= min_bp:
 					break
 				lhs = lhs * self.parse_expr(61)
@@ -567,6 +567,16 @@ class Parser:
 			if e.pos is not None:
 				print(f"ERROR: {' '.join(t.text for t in self.tokens[e.pos-5 : e.pos+6])}")
 			raise
+
+
+def _can_start_atom(t: Token) -> bool:
+	return (
+		t.is_digit()
+		or t.variable is not None
+		or t.nullary is not None
+		or t.function is not None
+		or t in {L_PAREN, L_BRACE, L_BRACKET, QUOTE, DOT, SCI_E, NEG, LIST_PREFIX}
+	)
 
 
 def _parse_method(method):

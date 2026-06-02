@@ -3,6 +3,47 @@ Variable name formatters as actual functions?
 
 The program table in Environment should probably be a dataclass called ProgramData, and have a reference to the name of the program. Then the class Program be given a ProgramData and then it would know its own name, which would be good for debugging if nothing else.
 
+I'm also wondering if we can redo nullaries using this. Like instead of nullary and function being different fields, they'd be combined somehow?
+
+Rename Environment to Calculator
+
+Interface: Input, Prompt, Disp, Menu
+prgm_cmd -> prgm
+
+move signals
+
+vectorized: require_number???
+
+solve( fMin( fMax(
+
+Aho-Corasick parser for testing
+
+Make sure deg symbol vs D/M/S format is working
+
+
+Add aliases to any token that has a character that can't be typed on the keyboard
+
+********
+
+move vectorized to tiobjects
+rename end_val
+ClrAllLists GetCalc( DelVar 	
+test: undefined numerics initalize to 0, lists/matrices error
+Custom numeric classes for formatting?
+Better pos tracking for exceptions
+make them IntEnums for easier testing?
+new function paradigm: decorators for everything
+Can we Record position of token for exceptions
+
+I don't like that current_program is called with a name.
+Maybe we can make a dummy program that's returned if there aren't any active programs, and all of its methods throw errors.
+Instead of:
+a.current_program('Goto').goto(name)
+We can do:
+a.current_program.goto(name)
+Which raises InvalidCommandException("Goto cannot blah blah")
+This would require making Stop/Return methods for program just so they can fail.
+
 There's something we need to rethink about commands. It starts with this: ClockOnClockOn is actually valid! *Some* commands that take no args can be bunched up like that. ClockOn is one of them. However, you can't do NormalFloat. I'll probably just have to try them all on my calculator.
 Currently, NormalFloat raises ArgumentError, because it's parsing it as Float being an argument of Normal. It should just raise a TiSyntaxError, though.
 Also, note that DelVar (deletes a variable) can be bunched up, like DelVar ADelVar BDelVar C.
@@ -16,55 +57,6 @@ It would also have the no_args() function that ensures this flag is set.
 As you can see, I've made a workaround for no-arg commands like End, but it's not perfect.
 What do you think about all this?
 
-
-I'm also wondering if we can redo nullaries using this. Like instead of nullary and function being different fields, they'd be combined somehow?
-
-Rename Environment to Calculator
-
-I don't like that current_program is called with a name.
-Maybe we can make a dummy program that's returned if there aren't any active programs, and all of its methods throw errors.
-Instead of:
-a.current_program('Goto').goto(name)
-We can do:
-a.current_program.goto(name)
-Which raises InvalidCommandException("Goto cannot blah blah")
-This would require making Stop/Return methods for program just so they can fail.
-
-
-Can we Record position of token for exceptions
-
-Better pos tracking for exceptions
-
-Interface: Input, Prompt, Disp, Menu
-prgm_cmd -> prgm
-
-move signals
-
-rename end_val
-
-vectorized: require_number???
-
-solve( fMin( fMax(
-
-ClrAllLists GetCalc( DelVar 	
-
-test: undefined numerics initalize to 0, lists/matrices error
-
-Custom numeric classes for formatting?
-
-Aho-Corasick parser for testing
-
-Make sure deg symbol vs D/M/S format is working
-
-move vectorized to tiobjects
-
-new function paradigm: decorators for everything
-
-make them IntEnums for easier testing?
-
-Add aliases to any token that has a character that can't be typed on the keyboard
-
-********
 
 How to replace peek (and kill EOF_TOKEN):
 Create these methods:
