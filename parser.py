@@ -702,10 +702,6 @@ class ArgParser:
 		if self._next:
 			raise TiSyntaxError(f"Command takes no arguments, but got: {self.peek()}")
 
-	def end_bunch(self) -> None:
-		"""End without consuming the separator, allowing the next command to follow immediately."""
-		pass
-
 	def end_func(self):
 		"""Consume the closing ) and validate no surplus arguments remain.
 

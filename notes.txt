@@ -1,3 +1,7 @@
+Does no_args end the command? This is very unclear.
+
+Change var parser to return actual var, not token
+
 EquationVar: subdivide
 Variable name formatters as actual functions?
 

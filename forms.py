@@ -194,7 +194,6 @@ def list_to_matr(a: ArgParser) -> None:
 
 def _sort(a: ArgParser, reverse: bool):
 	main = a.list_var().get(a.env)
-	# TODO: could be None?
 	deps = []
 	while a.has_next:
 		deps.append(a.list_var().get(a.env))
@@ -211,29 +210,28 @@ def _sort(a: ArgParser, reverse: bool):
 
 @forms_func
 def sort_a(a: ArgParser):
-	_sort(a, False)  # ascending
+	_sort(a, False)
 
 
 @forms_func
 def sort_d(a: ArgParser):
-	_sort(a, True)   # descending
+	_sort(a, True)
 
 
 @forms_func
 def fill(a: ArgParser):
-	# Fill(value, listname) or Fill(value, matrixname) — value comes first
-	x = require_real(a.expr())
+	fill_value = require_real(a.expr())
 	if a.peek().is_matrix_var():
 		lst = a.matrix_var().get(a.env)
 		a.end_paren_cmd()
 		for row in lst.data:
 			for i in range(len(row)):
-				row[i] = x
+				row[i] = fill_value
 	else:
 		lst = a.list_var().get(a.env)
 		a.end_paren_cmd()
 		for i in range(len(lst.data)):
-			lst.data[i] = x
+			lst.data[i] = fill_value
 
 
 # ── ClrList and ClrAllLists ───────────────────────────────────────────────────
@@ -270,7 +268,7 @@ def del_var(a):
 	Does not update Ans.
 	"""
 	a.any_var().delete(a.env)
-	# No end() call — bunching: leaves separator in place for next command
+	# No end_cmd() call; leaves separator in place for next command
 
 
 @forms_func
@@ -334,7 +332,6 @@ class program_command(TiCall):
 
 @forms_func
 def if_cmd(a: ArgParser):
-	"""If condition — execute or skip the next statement (or delegate to Then)."""
 	cond = bool(a.expr())
 	a.end_cmd()
 	a.current_program().begin_if(cond)
@@ -342,20 +339,19 @@ def if_cmd(a: ArgParser):
 
 @forms_func
 def then_cmd(a: ArgParser):
-	"""Then without a preceding If — always a syntax error."""
-	a.no_args()
+	"""Then without a preceding If: always a syntax error."""
 	raise TiSyntaxError("Then without If")
 
 
 @program_command
 def else_cmd(prog):
-	"""Else — skip the else-body (we just finished executing the then-body)."""
+	"""If we encounter Else this way, always skip the block.
+	(Else blocks are only executed when encountered while skipping an If-Then block.)"""
 	prog.begin_else()
 
 
 @forms_func
 def while_cmd(a: ArgParser):
-	"""While condition — loop while condition is True."""
 	thunk = a.thunk()
 	a.end_cmd()
 	a.current_program().begin_while(thunk)
@@ -363,7 +359,6 @@ def while_cmd(a: ArgParser):
 
 @forms_func
 def repeat_cmd(a: ArgParser):
-	"""Repeat condition — loop until condition is True (body executes at least once)."""
 	thunk = a.thunk()
 	a.end_cmd()
 	a.current_program().begin_repeat(thunk)
@@ -371,32 +366,29 @@ def repeat_cmd(a: ArgParser):
 
 @forms_func
 def for_cmd(a: ArgParser):
-	"""For(var, start, end[, step]) — iterate a numeric variable over a range."""
-	var_tok = a.numeric_var()
-	start   = require_real(a.expr())
-	end_val = require_real(a.expr())
-	step    = require_real(a.expr(optional=True, default=1.0))
+	var   = a.numeric_var().variable
+	start = require_real(a.expr())
+	end   = require_real(a.expr())
+	step  = require_real(a.expr(optional=True, default=1.0))
 	a.end_paren_cmd()
-	a.current_program().begin_for(var_tok.variable, start, end_val, step)
+	a.current_program().begin_for(var, start, end, step)
 
 
 @program_command
 def end_cmd(prog):
-	"""End — close the innermost active block (For / While / Repeat / Then)."""
 	prog.end_block()
 
 
 @forms_func
 def lbl_cmd(a: ArgParser):
-	"""Lbl name — mark a label; no-op at runtime."""
+	"""Lbl is a no-op at runtime; just verify the syntax."""
 	a.label_name()
 	a.end_cmd()
-	a.current_program()
+	a.current_program()  # raises if not in a program
 
 
 @forms_func
 def goto_cmd(a: ArgParser):
-	"""Goto name — jump to the named label in the current program."""
 	name = a.label_name()
 	a.end_cmd()
 	a.current_program().goto(name)
@@ -404,37 +396,32 @@ def goto_cmd(a: ArgParser):
 
 @program_command
 def return_cmd(prog):
-	"""Return — exit the current sub-program and return to the caller."""
 	raise ReturnSignal()
 
 
 @program_command
 def stop_cmd(prog):
-	"""Stop — terminate all program execution immediately."""
 	raise StopSignal()
 
 
 @forms_func
 def is_gt_cmd(a: ArgParser):
-	"""IS>(var, value) — increment var; skip the next statement if var > value."""
-	var_tok = a.numeric_var()
+	var = a.numeric_var().variable
 	threshold = require_real(a.expr())
 	a.end_paren_cmd()
-	a.current_program().is_gt(var_tok.variable, threshold)
+	a.current_program().is_gt(var, threshold)
 
 
 @forms_func
 def ds_lt_cmd(a: ArgParser):
-	"""DS<(var, value) — decrement var; skip the next statement if var < value."""
-	var_tok = a.numeric_var()
+	var = a.numeric_var().variable
 	threshold = require_real(a.expr())
 	a.end_paren_cmd()
-	a.current_program().ds_lt(var_tok.variable, threshold)
+	a.current_program().ds_lt(var, threshold)
 
 
 @forms_func
 def prgm(a: ArgParser):
-	"""prgm NAME — execute the stored sub-program named NAME."""
 	prgm_name = a.program_name()
 	a.end_cmd()
 	a.env.run_program(prgm_name)
