@@ -1948,12 +1948,15 @@ class TestSeqIncrement:
 
 class TestSyntax:
 	
-	@mark.skip('no-arg commands broken')
+	def test_clockon_bunch(self):
+		# ClockOn is a weird command that doesn't end the line
+		calc('ClockOn ClockOn')
+
 	def test_consecutive_commands_without_separator_raises(self):
 		# Two commands with no COLON or NEWLINE between them must be a syntax error.
 		with pytest.raises(TiSyntaxError):
-			calc('ClockOn ClockOn')
-
+			calc('Normal Float')
+	
 
 class TestCompleXor:
 	

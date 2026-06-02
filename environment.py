@@ -203,8 +203,8 @@ class Environment:
 			self._nest_depth[func] -= 1
 
 	def _iter_values(self):
-		from catalog import LETTERS, VAR_THETA, LISTS, MATRICES, STRINGS
-		for tok in (*LETTERS, VAR_THETA, *LISTS, *MATRICES, *STRINGS):
+		from catalog import LETTERS, LISTS, MATRICES, STRINGS
+		for tok in (*LETTERS, *LISTS, *MATRICES, *STRINGS):
 			v = tok.variable.get_unsafe(self)
 			if v is not None:
 				yield tok.char if tok.char else tok.text, v

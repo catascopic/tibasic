@@ -4,9 +4,9 @@ from itertools import zip_longest
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-	from parser import ArgParser
+	from parser import ArgParser, CommandArgParser
 
-from decorators import forms_func
+from decorators import forms_func, TiCall
 from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
@@ -256,6 +256,19 @@ def string_to_equ(a: ArgParser) -> None:
 
 # ── Control flow ──────────────────────────────────────────────────────────────
 
+class program_command(TiCall):
+	"""Decorator for no-arg commands that require a running program.
+
+	Calls no_args() + end(), then passes the current Program to the function.
+	Raises InvalidCommandError automatically if called outside a program.
+	Use for Return, Stop, Else, End, etc.
+	"""
+	def call_with_parser(self, a: CommandArgParser) -> None:
+		a.no_args()
+		a.end()
+		self.func(a.current_program())
+
+
 @forms_func
 def if_cmd(a: ArgParser):
 	"""If condition — execute or skip the next statement (or delegate to Then)."""
@@ -271,11 +284,10 @@ def then_cmd(a: ArgParser):
 	raise TiSyntaxError("Then without If")
 
 
-@forms_func
-def else_cmd(a: ArgParser):
+@program_command
+def else_cmd(prog):
 	"""Else — skip the else-body (we just finished executing the then-body)."""
-	a.no_args()
-	a.current_program().begin_else()
+	prog.begin_else()
 
 
 @forms_func
@@ -305,11 +317,10 @@ def for_cmd(a: ArgParser):
 	a.current_program().begin_for(var_tok.variable, start, end_val, step)
 
 
-@forms_func
-def end_cmd(a: ArgParser):
+@program_command
+def end_cmd(prog):
 	"""End — close the innermost active block (For / While / Repeat / Then)."""
-	a.no_args()
-	a.current_program().end_block()
+	prog.end_block()
 
 
 @forms_func
@@ -328,19 +339,15 @@ def goto_cmd(a: ArgParser):
 	a.current_program().goto(name)
 
 
-@forms_func
-def return_cmd(a: ArgParser):
+@program_command
+def return_cmd(prog):
 	"""Return — exit the current sub-program and return to the caller."""
-	a.no_args()
-	a.current_program()
 	raise ReturnSignal()
 
 
-@forms_func
-def stop_cmd(a: ArgParser):
+@program_command
+def stop_cmd(prog):
 	"""Stop — terminate all program execution immediately."""
-	a.no_args()
-	a.current_program()
 	raise StopSignal()
 
 
@@ -372,6 +379,9 @@ def prgm(a: ArgParser):
 
 @forms_func
 def disp(a: ArgParser):
-	while a.has_next():
-		print(a.expr())
-	a.end_cmd()
+	if not a.at_eol:
+		while True:
+			print(a.expr())
+			if not a.has_next():
+				break
+	a.end()

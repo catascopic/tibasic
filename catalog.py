@@ -147,8 +147,7 @@ NEWLINE   = token(0x3F, char='\n')
 
 token(0x40, ' and ',   bp=(30, 31), op=ops.and_)
 
-LETTERS = tuple(token(0x41 + i, char=chr(0x41 + i), var=NumericVar(i)) for i in range(26))
-VAR_THETA = token(0x5B, char='θ', var=NumericVar(26))
+LETTERS = tuple(token(0x41 + i, char=chr(0x41 + i), var=NumericVar(i)) for i in range(26)) + (token(0x5B, char='θ', var=NumericVar(26)),)
 
 # ── 0x5C xx: matrix variables ([A]–[J]) ──────────────────────────────────────
 

@@ -45,11 +45,11 @@ def _vectorized_with_env(func: Callable) -> Callable:
 class TiCall(ABC):
 
 	def __init__(self, func: Callable) -> None:
-		self._func = func
+		self.func = func
 		update_wrapper(self, func)
 
 	def __call__(self, *args: Any) -> Any:
-		return self._func(*args)
+		return self.func(*args)
 
 	@abstractmethod
 	def call_with_parser(self, a: ArgParser) -> Any:
@@ -75,7 +75,7 @@ class env_func(TiCall):
 class forms_func(TiCall):
 	"""Decorator for functions/commands that do their own parsing."""
 	def call_with_parser(self, a: ArgParser):
-		return self._func(a)
+		return self.func(a)
 
 
 def pure_vectorized(func):
@@ -86,3 +86,29 @@ def pure_vectorized(func):
 def env_vectorized(func):
 	"""Same as env_func, but also vectorized."""
 	return env_func(_vectorized_with_env(func))
+
+
+class nullary_command(TiCall):
+	"""Decorator for no-arg commands that consume the statement separator.
+
+	The decorated function receives only the environment.  The decorator itself
+	calls no_args() (raises TiSyntaxError if anything follows) then end().
+	Use for Normal, Float, Radian, etc.
+	"""
+	def call_with_parser(self, a: Any) -> None:
+		a.no_args()
+		a.end()
+		self.func(a.env)
+
+
+class nullary_bunch(TiCall):
+	"""Decorator for no-arg commands that do NOT consume the separator.
+
+	Does not check for surplus tokens — because the next token may be the start
+	of the following command (e.g. ClockOnClockOn).  Simply runs the function
+	and returns, leaving the parser exactly where it is so the main loop
+	picks up the next statement naturally.
+	Use for ClockOn, ClockOff, etc.
+	"""
+	def call_with_parser(self, a: Any) -> None:
+		self.func(a.env)
