@@ -1,8 +1,30 @@
-Can you make some program tests that test the logic of skip_statement and skip_block, as well as capture (thunk parsing)?
+I finally got the Variables into a state that I can tolerate. I now have get/set (these are the "unsafe" methods) and resolve(raise or set default on undefined) and store (validate input). Let me know what you think, but I really just reworked the existing design.
+Somewhat relatedly, I realized xth_root/sqrt need env access because Real/a+bi mode determines whether to return imaginary numbers or raise NONREAL ANS.
+And you know what? All this env stuff is kind of killing me. I probably won't do it, but would it really be that horrible to make Enviroment a global variable? It would still be a class, but it would be a singleton, and all the methods that need it could remove env from their params and just access environment.ENVIRONMENT or something.
+At this point it's not worth it, and I guess I could imagine a situation where you have multiple TI-Basic programs running at the same time, but man. At least it would replicate the frustration of everything being a global variable...
+Anyway, please give me your honest opinion on this idea. I almost certainly won't do it, because it's really not a good design, but I'm wondering if there's actually a case for it.
+
+
+Convert python's math errors to TiErrors
+
+I want to refactor the tests a bit:
+Move stat tests to their own file
+Move memory tests into test_tibasic, and refactor the existing tests to be more like memory_test, which I think is a little more concise. I don't think we need the env fixture.
+
+I'm still wondering if there's some way to unify the logic between variables and nullaries.
+I've been looking into how the stat variables work, and it's a bunch of read-only variables. They're probably better off being nullaries rather than variables, and now I'm wondering if variables should implement the same interface. In the end, I don't think so, in part because there are commands like For( that take a variable... I'm not sure. It seems like there might be something there.
+I've also thought about trying to unify nullaries and regular functions: nullaries could take an ArgParser and check if there's an open parenthesis for the ones like rand that can take optional parameters... but I think they're better off being their own thing. Note that there are still some finance variables we'll have to implement later that are also nullaries that can take parentheses, too.
+
+
+Test storing wrong data types
+
+
+Can you make some program tests that test the logic of skip_statement and skip_block, as well as capture (thunk parsing)?
 I refactored the skipping logic to be more concise, but I want to test the edge cases, such as:
 STORE closing strings
 quoted colons/commas
 Any other edge cases
+
 
 Commands:
 solve( fMin( fMax(
@@ -24,25 +46,8 @@ Pause Input Prompt Output( ClrHome DispTable Menu(
 
 χ²-Test??? It has a weird display
 
-Tests to make sure lists/matrices/strings actually copy the value, not the reference
-
 
 require_real(a.expr()) -> a.expr(require_real) or even a.real_expr()
-
-
-Some thoughts:
-Variables are kind of weird, it feels like they shouldn't always need env as a parameter.
-I like that tokens contain a "Variable" that's just an immutable accessor, but I feel like maybe Token.variable should be a function that takes env and returns an independent object that does get/set. What do you think?
-I also still don't like the token design where it contains an array_name, validator... these things are class variables at best, putting them in the constructor is weird.
-Additionally, I modified list/matrix variable to copy on write, which is fine, but it's not exactly validation anymore.
-
-
-
-
-Refactor tibasic test to be more like memory test:
-remove fixtures
-use run() where possible, calc only for simple one-line calculations
-skip statements with "a@ Str1
 
 Thunk:
 Hard to tell if commands are straight-up invalid
@@ -52,8 +57,6 @@ Rename Thunk to Formula
 
 Earlier I was removing all the explicit conversions to float, but that was actually correct.
 The calculator only deals in floating-point numbers, and we should only be using ints internally.
-
-Move stat tests
 
 EquationVar: subdivide
 Variable name formatters as actual functions?
@@ -81,6 +84,14 @@ Make sure deg symbol vs D/M/S format is working
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+Tests to make sure lists/matrices/strings actually copy the value, not the reference
+
+Some thoughts:
+Variables are kind of weird, it feels like they shouldn't always need env as a parameter.
+I like that tokens contain a "Variable" that's just an immutable accessor, but I feel like maybe Token.variable should be a function that takes env and returns an independent object that does get/set. What do you think?
+I also still don't like the token design where it contains an array_name, validator... these things are class variables at best, putting them in the constructor is weird.
+Additionally, I modified list/matrix variable to copy on write, which is fine, but it's not exactly validation anymore.
 
 Does no_args end the command? This is very unclear.
 

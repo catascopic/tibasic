@@ -64,7 +64,7 @@ def var(env: Environment, name: str):
 	v = tok.variable
 	if v is None:
 		raise TypeError(f"{name!r} is not a variable")
-	return v.get_unsafe(env)
+	return v.get(env)
 
 
 @pytest.fixture

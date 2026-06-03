@@ -189,10 +189,10 @@ def list_to_matr(a: ArgParser) -> None:
 # These are commands (cmd=), not functions — called as cmd(ArgParser) directly.
 
 def _sort(a: ArgParser, reverse: bool):
-	main = a.list_var().get(a.env)
+	main = a.list_var().resolve(a.env)
 	deps = []
 	while a.has_next:
-		deps.append(a.list_var().get(a.env))
+		deps.append(a.list_var().resolve(a.env))
 	if not deps:
 		main.data.sort(reverse=reverse)
 	else:
@@ -218,13 +218,13 @@ def sort_d(a: ArgParser):
 def fill(a: ArgParser):
 	fill_value = require_real(a.expr())
 	if a.peek().is_matrix_var():
-		lst = a.matrix_var().get(a.env)
+		lst = a.matrix_var().resolve(a.env)
 		a.end_paren_cmd()
 		for row in lst.data:
 			for i in range(len(row)):
 				row[i] = fill_value
 	else:
-		lst = a.list_var().get(a.env)
+		lst = a.list_var().resolve(a.env)
 		a.end_paren_cmd()
 		for i in range(len(lst.data)):
 			lst.data[i] = fill_value
@@ -236,7 +236,7 @@ def fill(a: ArgParser):
 def clr_list(a):
 	"""ClrList list[, list, ...] — clear each named list to empty; silently skip nonexistent lists."""
 	while True:
-		lst = a.list_var().get_unsafe(a.env)
+		lst = a.list_var().get(a.env)
 		if lst is not None:
 			lst.set_dim(0)
 		if not a.has_next:
@@ -278,7 +278,7 @@ def set_up_editor(a):
 	if a.has_next:
 		while True:
 			var = a.list_var_prefix_optional()
-			if var.get_unsafe(a.env) is None:
+			if var.get(a.env) is None:
 				var.set(a.env, TiList([]))
 			if not a.has_next:
 				break
@@ -297,8 +297,7 @@ def equ_to_string(a: ArgParser) -> None:
 	"""Equ►String(equvar, strvar) — copy the equation's tokens into a string variable."""
 	equ_var = a.equation_var()
 	str_var = a.string_var()
-	equ = equ_var.get(a.env)
-	str_var.set(a.env, TiString(list(equ.tokens)))
+	str_var.set(a.env, TiString(equ_var.resolve(a.env).tokens))
 	a.end_paren_cmd()
 
 
@@ -307,7 +306,7 @@ def string_to_equ(a: ArgParser) -> None:
 	"""String►Equ(str_expr, equvar) — parse a string value into an equation variable."""
 	string = require_str(a.expr())
 	equ_var = a.equation_var()
-	equ_var.set(a.env, TiEquation(list(string.tokens)))
+	equ_var.set(a.env, TiEquation(string.tokens))
 	a.end_paren_cmd()
 
 

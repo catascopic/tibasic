@@ -101,13 +101,13 @@ class Program:
 		self.pop_block().on_end(self)
 
 	def is_gt(self, var: Variable, threshold: float) -> None:
-		new_val = require_real(var.get(self.env)) + 1
+		new_val = require_real(var.resolve(self.env)) + 1
 		var.set(self.env, new_val)
 		if new_val > threshold:
 			self._parser.skip_statement()
 
 	def ds_lt(self, var: Variable, threshold: float) -> None:
-		new_val = require_real(var.get(self.env)) - 1
+		new_val = require_real(var.resolve(self.env)) - 1
 		var.set(self.env, new_val)
 		if new_val < threshold:
 			self._parser.skip_statement()
@@ -163,7 +163,7 @@ class ForBlock(Block):
 	step: float
 
 	def on_end(self, prgm: Program) -> None:
-		new_val = self.var.get(prgm.env) + self.step
+		new_val = self.var.resolve(prgm.env) + self.step
 		self.var.set(prgm.env, new_val)
 		if check_for_condition(new_val, self.end, self.step):
 			prgm.jump(self.pos)

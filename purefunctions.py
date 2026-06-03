@@ -351,7 +351,10 @@ def exp(x):
 @pure_vectorized
 def log(x):
 	require_num(x)
-	return cmath.log10(x) if isinstance(x, complex) else math.log10(x)
+	try:
+		return cmath.log10(x) if isinstance(x, complex) else math.log10(x)
+	except ValueError:
+		raise DomainError(f"log10({x})")
 
 @pure_vectorized
 def log_base(x, base):

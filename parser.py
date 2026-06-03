@@ -323,19 +323,19 @@ class Parser:
 			return self.parse_list_atom(self._parse_user_list_var())
 		
 		if t.is_matrix_var():
-			val = t.variable.get(self.env)
+			val = t.variable.resolve(self.env)
 			if self.eat_if(L_PAREN):
 				val = val[self.parse_row_col()]
 				self.eat_if(R_PAREN)
 			return val
 
 		if t.variable is not None:
-			return t.variable.get(self.env)
+			return t.variable.resolve(self.env)
 			
 		raise TiSyntaxError(f"Unexpected token in expression: {t}")
 
 	def parse_list_atom(self, var):
-		val = var.get(self.env)
+		val = var.resolve(self.env)
 		if self.eat_if(L_PAREN):
 			val = val[self.parse_expr()]
 			self.eat_if(R_PAREN)
@@ -411,13 +411,13 @@ class Parser:
 
 		elif t.is_matrix_var():
 			if self.eat_if(L_PAREN):
-				t.variable.get(self.env)[self.parse_row_col()] = value
+				t.variable.resolve(self.env)[self.parse_row_col()] = value
 				self.eat_if(R_PAREN)
 			else:
-				t.variable.set(self.env, value)
+				t.variable.store(self.env, value)
 		
 		elif t.variable is not None:
-			t.variable.set(self.env, value)
+			t.variable.store(self.env, value)
 
 		elif t is DIM:
 			self.parse_store_dim(value)
@@ -430,9 +430,8 @@ class Parser:
 
 	def parse_store_list(self, var: Variable, value):
 		if self.eat_if(L_PAREN):
-			try:
-				lst = var.get(self.env)
-			except UndefinedError:
+			lst = var.get(self.env)
+			if lst is None:
 				lst = TiList()
 				lst[self.parse_expr()] = value
 				var.set(self.env, lst)
@@ -440,23 +439,21 @@ class Parser:
 				lst[self.parse_expr()] = value
 			self.eat_if(R_PAREN)
 		else:
-			var.set(self.env, value)
+			var.store(self.env, value)
 
 	def parse_store_dim(self, value):
 		t = self.peek()
 		if t.is_list_var() or t is LIST_PREFIX:
 			var = self.parse_list_var()
-			try:
-				lst = var.get(self.env)
-			except UndefinedError:
+			lst = var.get(self.env)
+			if lst is None:
 				var.set(self.env, TiList.alloc(value))
 			else:
 				lst.set_dim(value)
 		elif t.is_matrix_var():
 			self.advance()
-			try:
-				mat = t.variable.get(self.env)
-			except UndefinedError:
+			mat = t.variable.get(self.env)
+			if mat is None:
 				t.variable.set(self.env, TiMatrix.alloc(value))
 			else:
 				mat.set_dim(value)
@@ -762,11 +759,9 @@ if __name__ == '__main__':
 		print('<<', env.ans)
 
 	env.angle_mode = 'DEG'
-
-	test('seq( 7@A')
 	
-	# test('55@A:99@B')
-	# test('int( log( 2) INV log( max( {A,B')
+	test('55@A:99@B')
+	test('int( log( 2) INV log( max( A,B')
 	# test('2^ cumSum( binomcdf( Ans ,0')
 	# test('sum( Ans .5(1= abs( int( 2 fPart( Ans INV (A+Bi')
 	

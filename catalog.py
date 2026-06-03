@@ -5,7 +5,9 @@ from typing import Any
 import math, itertools
 from titoken import Token
 from environment import (
-	Environment, Variable, NumericVariable, ListVariable, MatrixVariable, StringVariable, EquationVariable, StatVariable, WindowVariable, RealVariable,
+	Environment, Variable, NumericVariable, ListVariable, MatrixVariable, StringVariable, RealVariable,
+	FunctionVariable, ParametricVariable, PolarVariable, SequenceVariable,
+	WindowVariable,
 )
 import purefunctions as pf
 import operators as ops
@@ -159,16 +161,10 @@ LISTS = tuple(token(0x5D00 | i, f'L{chr(0x2081 + i)}', var=ListVariable(i)) for 
 
 # ── 0x5E xx: equation and sequence variables ──────────────────────────────────
 
-Y_EQUATIONS = tuple(token(0x5E10 + i, f'Y{chr(0x2080 + (i + 1) % 10)}', var=EquationVariable('y_equations', i)) for i in range(10))
-PARAM_EQUATIONS = tuple(
-	token(0x5E20 + i, f'{x}{chr(0x2080 + n)}ₜ', var=EquationVariable('param_equations', i))
-	for i, (n, x) in enumerate(itertools.product(range(1, 7), 'XY'))
-)
-POLAR_EQUATIONS = tuple(token(0x5E40 + i, f'r{chr(0x2081 + i)}', var=EquationVariable('polar_equations', i)) for i in range(6))
-
-token(0x5E80, '𝑢', var=EquationVariable('seq_equations', 0))
-token(0x5E81, '𝑣', var=EquationVariable('seq_equations', 1))
-token(0x5E82, '𝑤', var=EquationVariable('seq_equations', 2))
+FUNCTION   = tuple(token(0x5E10 + i, f'Y{chr(0x2080 + (i + 1) % 10)}',			var=FunctionVariable(i))   for i in range(10))
+PARAMETRIC = tuple(token(0x5E20 + i, f'{'XY'[i % 2]}{chr(0x2081 + i // 2)}ₜ',	var=ParametricVariable(i)) for i in range(12))
+POLAR      = tuple(token(0x5E40 + i, f'r{chr(0x2081 + i)}',						var=PolarVariable(i))      for i in range(6))
+SEQUENCE   = tuple(token(0x5E80 + i, chr(0x1D462 + i),							var=SequenceVariable(i))   for i in range(3))
 
 PRGM = token(0x5F, 'prgm', cmd=forms.prgm)
 
@@ -757,4 +753,4 @@ token(0xFF, 'LinReg(ax+b) ')
 
 
 if __name__ == '__main__':
-	print(get_token(0x6221))
+	print([t.variable for t in PARAMETRIC])
