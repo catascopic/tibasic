@@ -4,9 +4,7 @@ from io import BytesIO
 from typing import Any
 import math, itertools
 from titoken import Token
-from environment import (
-	Environment, Variable, NumericVar, ListVar, MatrixVar, StringVar, EquationVar, StatVar, WindowVar, RealVar,
-)
+from environment import Environment, Variable
 import purefunctions as pf
 import operators as ops
 import envfunctions as ef
@@ -70,7 +68,7 @@ def token(
 	cmd:  Callable | None = None,
 	res:  Callable | None = None,
 	cnv:  Callable | None = None,
-	var:  Variable | None = None,
+	var:  Callable | None = None,
 ) -> Token:
 	text = text or char
 	t = Token(code.to_bytes(1 + (code > 0xFF)), char, text, bp, op, post, func, cmd, res, cnv, var)
@@ -147,28 +145,28 @@ NEWLINE   = token(0x3F, char='\n')
 
 token(0x40, ' and ',   bp=(30, 31), op=ops.and_)
 
-LETTERS = tuple(token(0x41 + i, char=chr(0x41 + i), var=NumericVar(i)) for i in range(26)) + (token(0x5B, char='θ', var=NumericVar(26)),)
+LETTERS = tuple(token(0x41 + i, char=chr(0x41 + i), var=lambda env, i=i: env.numerics[i]) for i in range(26)) + (token(0x5B, char='θ', var=lambda env: env.numerics[26]),)
 
 # ── 0x5C xx: matrix variables ([A]–[J]) ──────────────────────────────────────
 
-MATRICES = tuple(token(0x5C00 | i, f'[{chr(0x41 + i)}]', var=MatrixVar(i)) for i in range(10))
+MATRICES = tuple(token(0x5C00 | i, f'[{chr(0x41 + i)}]', var=lambda env, i=i: env.matrices[i]) for i in range(10))
 
 # ── 0x5D xx: list variables (L1–L6) ──────────────────────────────────────────
 
-LISTS = tuple(token(0x5D00 | i, f'L{chr(0x2081 + i)}', var=ListVar(i)) for i in range(6))
+LISTS = tuple(token(0x5D00 | i, f'L{chr(0x2081 + i)}', var=lambda env, i=i: env.lists[i]) for i in range(6))
 
 # ── 0x5E xx: equation and sequence variables ──────────────────────────────────
 
-Y_EQUATIONS = tuple(token(0x5E10 + i, f'Y{chr(0x2080 + (i + 1) % 10)}', var=EquationVar('y_equations', i)) for i in range(10))
+Y_EQUATIONS = tuple(token(0x5E10 + i, f'Y{chr(0x2080 + (i + 1) % 10)}', var=lambda env, i=i: env.y_equations[i]) for i in range(10))
 PARAM_EQUATIONS = tuple(
-	token(0x5E20 + i, f'{x}{chr(0x2080 + n)}ₜ', var=EquationVar('param_equations', i))
+	token(0x5E20 + i, f'{x}{chr(0x2080 + n)}ₜ', var=lambda env, i=i: env.param_equations[i])
 	for i, (n, x) in enumerate(itertools.product(range(1, 7), 'XY'))
 )
-POLAR_EQUATIONS = tuple(token(0x5E40 + i, f'r{chr(0x2081 + i)}', var=EquationVar('polar_equations', i)) for i in range(6))
+POLAR_EQUATIONS = tuple(token(0x5E40 + i, f'r{chr(0x2081 + i)}', var=lambda env, i=i: env.polar_equations[i]) for i in range(6))
 
-token(0x5E80, '𝑢', var=EquationVar('seq_equations', 0))
-token(0x5E81, '𝑣', var=EquationVar('seq_equations', 1))
-token(0x5E82, '𝑤', var=EquationVar('seq_equations', 2))
+token(0x5E80, '𝑢', var=lambda env: env.seq_equations[0])
+token(0x5E81, '𝑣', var=lambda env: env.seq_equations[1])
+token(0x5E82, '𝑤', var=lambda env: env.seq_equations[2])
 
 PRGM = token(0x5F, 'prgm', cmd=forms.prgm)
 
@@ -214,7 +212,7 @@ token(0x621D, 'x₃')
 token(0x621E, 'y₁')
 token(0x621F, 'y₂')
 token(0x6220, 'y₃')
-REC_N = token(0x6221, '𝑛', var=RealVar('n'))
+REC_N = token(0x6221, '𝑛', var=lambda env: env._rv_n)
 token(0x6222, 'p')
 token(0x6223, 'z')
 token(0x6224, 't')
@@ -245,34 +243,34 @@ token(0x623C, 'Error MS')
 
 # ── 0x63 xx: window and finance variables ─────────────────────────────────────
 
-token(0x6302, 'Xscl', var=WindowVar(0))  # TODO: WindowVarAuto
-token(0x6303, 'Yscl', var=WindowVar(1))
-token(0x630A, 'Xmin', var=WindowVar(2))
-token(0x630B, 'Xmax', var=WindowVar(3))
-token(0x630C, 'Ymin', var=WindowVar(4))
-token(0x630D, 'Ymax', var=WindowVar(5))
-token(0x630E, 'Tmin', var=WindowVar(6))
-token(0x630F, 'Tmax', var=WindowVar(7))
-token(0x6310, 'θmin', var=WindowVar(8))
-token(0x6311, 'θmax', var=WindowVar(9))
-token(0x631A, 'TblStart',  var=WindowVar(10))
-token(0x631B, 'PlotStart', var=WindowVar(11))
-token(0x631D, 'nMax', var=WindowVar(12))
-token(0x631F, 'nMin', var=WindowVar(13))
-token(0x6321, 'ΔTbl', var=WindowVar(14))
-token(0x6322, 'Tstep', var=WindowVar(15))
-token(0x6323, 'θstep', var=WindowVar(16))
-token(0x6326, 'ΔX', var=WindowVar(17))
-token(0x6327, 'ΔY', var=WindowVar(18))
-token(0x6328, 'XFact', var=WindowVar(19))
-token(0x6329, 'YFact', var=WindowVar(20))
-token(0x632B, '𝐍',   var=RealVar('n_tvm'))
-token(0x632C, 'I%',  var=RealVar('i_pct'))
-token(0x632D, 'PV',  var=RealVar('pv'))
-token(0x632E, 'PMT', var=RealVar('pmt'))
-token(0x632F, 'FV',  var=RealVar('fv'))
-token(0x6330, 'P/Y', var=RealVar('py'))
-token(0x6331, 'C/Y', var=RealVar('cy'))
+token(0x6302, 'Xscl', var=lambda env: env.window_vars[0])  # TODO: WindowVarAuto
+token(0x6303, 'Yscl', var=lambda env: env.window_vars[1])
+token(0x630A, 'Xmin', var=lambda env: env.window_vars[2])
+token(0x630B, 'Xmax', var=lambda env: env.window_vars[3])
+token(0x630C, 'Ymin', var=lambda env: env.window_vars[4])
+token(0x630D, 'Ymax', var=lambda env: env.window_vars[5])
+token(0x630E, 'Tmin', var=lambda env: env.window_vars[6])
+token(0x630F, 'Tmax', var=lambda env: env.window_vars[7])
+token(0x6310, 'θmin', var=lambda env: env.window_vars[8])
+token(0x6311, 'θmax', var=lambda env: env.window_vars[9])
+token(0x631A, 'TblStart',  var=lambda env: env.window_vars[10])
+token(0x631B, 'PlotStart', var=lambda env: env.window_vars[11])
+token(0x631D, 'nMax', var=lambda env: env.window_vars[12])
+token(0x631F, 'nMin', var=lambda env: env.window_vars[13])
+token(0x6321, 'ΔTbl', var=lambda env: env.window_vars[14])
+token(0x6322, 'Tstep', var=lambda env: env.window_vars[15])
+token(0x6323, 'θstep', var=lambda env: env.window_vars[16])
+token(0x6326, 'ΔX', var=lambda env: env.window_vars[17])
+token(0x6327, 'ΔY', var=lambda env: env.window_vars[18])
+token(0x6328, 'XFact', var=lambda env: env.window_vars[19])
+token(0x6329, 'YFact', var=lambda env: env.window_vars[20])
+token(0x632B, '𝐍',   var=lambda env: env._rv_n_tvm)
+token(0x632C, 'I%',  var=lambda env: env._rv_i_pct)
+token(0x632D, 'PV',  var=lambda env: env._rv_pv)
+token(0x632E, 'PMT', var=lambda env: env._rv_pmt)
+token(0x632F, 'FV',  var=lambda env: env._rv_fv)
+token(0x6330, 'P/Y', var=lambda env: env._rv_py)
+token(0x6331, 'C/Y', var=lambda env: env._rv_cy)
 token(0x6334, 'PlotStep')
 token(0x6336, 'Xres')
 
@@ -378,7 +376,7 @@ token(0xA9, 'DrawF ')
 
 # ── 0xAA xx: string variables (Str1–Str0) ────────────────────────────────────
 
-STRINGS = tuple(token(0xAA00 | i, f'Str{(i + 1) % 10}', var=StringVar(i)) for i in range(10))
+STRINGS = tuple(token(0xAA00 | i, f'Str{(i + 1) % 10}', var=lambda env, i=i: env.strings[i]) for i in range(10))
 
 RAND = token(0xAB, 'rand', res=Environment.rand, func=pf.rand_list)
 token(0xAC, char='π', res=lambda env: math.pi)

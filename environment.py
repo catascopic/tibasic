@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from datetime import datetime, date, timedelta
+from itertools import repeat
 from typing import Any, ClassVar, TYPE_CHECKING
 
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation
@@ -14,28 +15,381 @@ from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, Graph
 from signals import StopSignal
 
 
+# ── Variable hierarchy ────────────────────────────────────────────────────────────
+
+class Variable(ABC):
+	"""Self-contained variable: holds its own value and provides get/set/delete
+	without an env parameter.  Instances live in env's arrays; Token.variable
+	is a callable (env) -> Variable that looks up the right slot.
+	"""
+
+	@abstractmethod
+	def get(self) -> Any:
+		"""Return the current value.  May auto-initialise or raise UndefinedError."""
+		pass
+
+	@abstractmethod
+	def set(self, value: Any) -> None:
+		pass
+
+	def delete(self) -> None:
+		raise DataTypeError("Cannot delete this variable")
+
+	def get_unsafe(self) -> Any:
+		"""Return the raw stored value without auto-init or error; None means absent."""
+		return None
+
+
+class NumericVar(Variable):
+	"""Numeric variable (A–Z, θ).  Auto-initialises to 0 when read while absent."""
+	__slots__ = ('_value', 'name')
+
+	def __init__(self, name: str) -> None:
+		self._value: float | None = None
+		self.name = name
+
+	def __str__(self) -> str:
+		return self.name
+
+	def get(self) -> float:
+		if self._value is None:
+			self._value = 0.0
+		return self._value
+
+	def set(self, value: Any) -> None:
+		self._value = require_num(value)
+
+	def delete(self) -> None:
+		self._value = None
+
+	def get_unsafe(self) -> float | None:
+		return self._value
+
+
+class ListVar(Variable):
+	"""Standard list variable (L1–L6).  Stores a Python list as the backing store;
+	get() returns a TiList sharing that list (in-place mutations propagate back);
+	set() copies on write.  None data means absent/deleted.
+	"""
+	__slots__ = ('data', 'name')
+
+	def __init__(self, name: str) -> None:
+		self.data: list | None = None
+		self.name = name
+
+	def __str__(self) -> str:
+		return self.name
+
+	def __len__(self) -> int:
+		return 0 if self.data is None else len(self.data)
+
+	def get(self) -> TiList:
+		if self.data is None:
+			raise UndefinedError(self.name)
+		return TiList(self.data)
+
+	def set(self, value: Any) -> None:
+		self.data = list(require_list(value).data)
+
+	def delete(self) -> None:
+		self.data = None
+
+	def get_unsafe(self) -> TiList | None:
+		return TiList(self.data) if self.data is not None else None
+
+	def set_dim(self, value: Any) -> None:
+		"""Resize this list in-place (used by dim(→ and ClrList)."""
+		from tiobjects import require_int_dim
+		n = require_int_dim(value)
+		if self.data is None:
+			self.data = []
+		dim = len(self.data)
+		if n < dim:
+			del self.data[n:]
+		elif n > dim:
+			self.data.extend(repeat(0, n - dim))
+
+
+class MatrixVar(Variable):
+	"""Matrix variable ([A]–[J]).  Stores the TiMatrix directly."""
+	__slots__ = ('_value', 'name')
+
+	def __init__(self, name: str) -> None:
+		self._value: TiMatrix | None = None
+		self.name = name
+
+	def __str__(self) -> str:
+		return self.name
+
+	@property
+	def data(self):
+		"""Convenience accessor for tests: env.matrices[i].data."""
+		return self._value.data if self._value is not None else None
+
+	def get(self) -> TiMatrix:
+		if self._value is None:
+			raise UndefinedError(self.name)
+		return self._value
+
+	def set(self, value: Any) -> None:
+		self._value = require_matrix(value).copy()
+
+	def delete(self) -> None:
+		self._value = None
+
+	def get_unsafe(self) -> TiMatrix | None:
+		return self._value
+
+
+class StringVar(Variable):
+	"""String variable (Str1–Str0)."""
+	__slots__ = ('_value', 'name')
+
+	def __init__(self, name: str) -> None:
+		self._value: TiString | None = None
+		self.name = name
+
+	def __str__(self) -> str:
+		return self.name
+
+	def get(self) -> TiString:
+		if self._value is None:
+			raise UndefinedError(self.name)
+		return self._value
+
+	def set(self, value: Any) -> None:
+		self._value = require_str(value)
+
+	def delete(self) -> None:
+		self._value = None
+
+	def get_unsafe(self) -> TiString | None:
+		return self._value
+
+
+class EquationVar(Variable):
+	"""Equation variable (Y1–Y0, X1T–Y6T, r1–r6, u/v/w).
+	Holds a reference to the environment's raw storage list and an index into it.
+	"""
+	__slots__ = ('_storage', 'index', 'name')
+
+	def __init__(self, storage: list, name: str, index: int) -> None:
+		self._storage = storage
+		self.index = index
+		self.name = name
+
+	def __str__(self) -> str:
+		return self.name
+
+	def get(self) -> Any:
+		val = self._storage[self.index]
+		if val is None:
+			raise UndefinedError(self.name)
+		return val
+
+	def set(self, value: Any) -> None:
+		self._storage[self.index] = require_equation(value)
+
+	def delete(self) -> None:
+		self._storage[self.index] = None
+
+	def get_unsafe(self) -> Any:
+		return self._storage[self.index]
+
+
+class StatVar(Variable):
+	"""Stat result variable (read-only; None before a stat function has run)."""
+	__slots__ = ('_storage', 'index')
+
+	def __init__(self, storage: list, index: int) -> None:
+		self._storage = storage
+		self.index = index
+
+	def get(self) -> Any:
+		return self._storage[self.index]  # may be None
+
+	def set(self, value: Any) -> None:
+		raise DataTypeError("Stat variables are read-only")
+
+	def get_unsafe(self) -> Any:
+		return self._storage[self.index]
+
+
+class WindowVar(Variable):
+	"""Window/table variable (Xmin, Xmax, etc.)."""
+	__slots__ = ('_storage', 'index', 'name')
+
+	def __init__(self, storage: list, name: str, index: int) -> None:
+		self._storage = storage
+		self.index = index
+		self.name = name
+
+	def __str__(self) -> str:
+		return self.name
+
+	def get(self) -> float:
+		val = self._storage[self.index]
+		if val is None:
+			raise UndefinedError(self.name)
+		return val
+
+	def set(self, value: Any) -> None:
+		self._storage[self.index] = require_real(value)
+
+	def get_unsafe(self) -> float | None:
+		return self._storage[self.index]
+
+
+class RealVar(Variable):
+	"""Scalar env attribute variable (𝑵, I%, PV, PMT, FV, P/Y, C/Y, 𝑛).
+	Holds a back-reference to env so it can use getattr/setattr.
+	"""
+	__slots__ = ('_env', 'name')
+
+	def __init__(self, env: Environment, name: str) -> None:
+		self._env = env
+		self.name = name
+
+	def __str__(self) -> str:
+		return self.name
+
+	def get(self) -> float:
+		val = getattr(self._env, self.name)
+		if val is None:
+			setattr(self._env, self.name, 0)
+			return 0
+		return val
+
+	def set(self, value: Any) -> None:
+		setattr(self._env, self.name, require_real(value))
+
+	def get_unsafe(self) -> float | None:
+		return getattr(self._env, self.name)
+
+
+class UserListVar(Variable):
+	"""User-named list variable (ᴸNAME).
+	Holds a reference to env.user_lists so it can look up / create entries by name.
+	Created at parse time by _parse_user_list_var(); not pre-allocated in env.
+	"""
+	__slots__ = ('_storage', 'name')
+
+	def __init__(self, storage: dict, name: str) -> None:
+		self._storage = storage
+		self.name = name
+
+	def __str__(self) -> str:
+		return f"ᴸ{self.name}"
+
+	def __len__(self) -> int:
+		lst = self._storage.get(self.name)
+		return 0 if lst is None else len(lst)
+
+	def get(self) -> TiList:
+		lst = self._storage.get(self.name)
+		if lst is None:
+			raise UndefinedError(str(self))
+		return lst
+
+	def set(self, value: Any) -> None:
+		self._storage[self.name] = require_list(value).copy()
+
+	def delete(self) -> None:
+		self._storage.pop(self.name, None)
+
+	def get_unsafe(self) -> TiList | None:
+		return self._storage.get(self.name)
+
+
+# ── Window variable name list (matches catalog WindowVar indices 0–20) ────────────
+
+_WINDOW_VAR_NAMES = [
+	'Xscl', 'Yscl', 'Xmin', 'Xmax', 'Ymin', 'Ymax',
+	'Tmin', 'Tmax', 'θmin', 'θmax',
+	'TblStart', 'PlotStart', 'nMax', 'nMin', 'ΔTbl',
+	'Tstep', 'θstep', 'ΔX', 'ΔY', 'XFact', 'YFact',
+]
+
+
+# ── Environment ───────────────────────────────────────────────────────────────
+
 class Environment:
 
 	def __init__(self):
-		# VARIABLES
-		self.numerics        = [None] * 27   # A–Z, θ
-		self.lists           = [None] * 6    # L1–L6
-		self.user_lists      = {}            # ᴸNAME lists
-		self.matrices        = [None] * 10   # [A]–[J]
-		self.strings         = [None] * 10   # Str1–Str0
-		self.y_equations     = [None] * 10   # Y1–Y0
-		self.param_equations = [None] * 12   # X1T–Y6T
-		self.polar_equations = [None] * 6    # r1–r6
-		self.seq_equations   = [None] * 3    # u, v, w
-		self.stat            = [None] * 0x3D # stat vars
-		self.window          = [None] * 0x37 # window vars
+		# ── Raw storage (for types whose Variable objects hold references) ──────
+		# Equations
+		self._y_eq_storage     = [None] * 10
+		self._param_eq_storage = [None] * 12
+		self._polar_eq_storage = [None] * 6
+		self._seq_eq_storage   = [None] * 3
+		# Window / stat
+		self.window = [None] * 0x37
+		self.stat   = [None] * 0x3D
+
+		# ── Pre-allocated variable objects ────────────────────────────────────
+		_num_names = [chr(65 + i) for i in range(26)] + ['θ']
+		self.numerics = [NumericVar(n) for n in _num_names]
+
+		self.lists    = [ListVar(f'L{i + 1}') for i in range(6)]
+
+		self.matrices = [MatrixVar(f'[{chr(65 + i)}]') for i in range(10)]
+
+		self.strings  = [StringVar(f'Str{(i + 1) % 10}') for i in range(10)]
+
+		_y_names = [f'Y{(i + 1) % 10}' for i in range(10)]
+		self.y_equations = [
+			EquationVar(self._y_eq_storage, _y_names[i], i) for i in range(10)
+		]
+
+		import itertools as _it
+		_param_names = [
+			f'{x}{chr(0x2080 + n)}ₜ'
+			for n, x in _it.product(range(1, 7), 'XY')
+		]
+		self.param_equations = [
+			EquationVar(self._param_eq_storage, _param_names[i], i) for i in range(12)
+		]
+
+		self.polar_equations = [
+			EquationVar(self._polar_eq_storage, f'r{i + 1}', i) for i in range(6)
+		]
+
+		self.seq_equations = [
+			EquationVar(self._seq_eq_storage, name, i)
+			for i, name in enumerate(['𝑢', '𝑣', '𝑤'])
+		]
+
+		self.window_vars = [
+			WindowVar(self.window, name, i) for i, name in enumerate(_WINDOW_VAR_NAMES)
+		]
+
+		# RealVar objects for scalar finance / misc attributes
+		self._rv_n     = RealVar(self, 'n')
+		self._rv_n_tvm = RealVar(self, 'n_tvm')
+		self._rv_i_pct = RealVar(self, 'i_pct')
+		self._rv_pv    = RealVar(self, 'pv')
+		self._rv_pmt   = RealVar(self, 'pmt')
+		self._rv_fv    = RealVar(self, 'fv')
+		self._rv_py    = RealVar(self, 'py')
+		self._rv_cy    = RealVar(self, 'cy')
+
+		# ── Scalar variables ─────────────────────────────────────────────────
+		self.user_lists: dict[str, TiList] = {}
 		self.n = None
 		self.ans = 0
 		self.key_code = 0
+		# Finance
+		self.n_tvm = 0
+		self.i_pct = 0
+		self.pv    = 0
+		self.pmt   = 0
+		self.fv    = 0
+		self.py    = 1
+		self.cy    = 1
 		# MODES
 		self.angle_mode    = AngleMode.RAD
 		self.number_mode   = NumberMode.NORMAL
-		self.fix_digits    = None           # None = Float, 0–9 = Fix N
+		self.fix_digits    = None
 		self.graph_mode    = GraphMode.FUNC
 		self.complex_mode  = ComplexMode.REAL
 		self.draw_mode     = DrawMode.CONNECTED
@@ -50,29 +404,15 @@ class Environment:
 		self.dt_fmt        = 1
 		self.tm_fmt        = 12
 		self.clock_on      = True
-		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
-		self.n_tvm = 0   # 𝐍 (number of payments)
-		self.i_pct = 0   # I% (interest rate per period, as percentage)
-		self.pv    = 0   # PV (present value)
-		self.pmt   = 0   # PMT (payment amount)
-		self.fv    = 0   # FV (future value)
-		self.py    = 1   # P/Y (payments per year)
-		self.cy    = 1   # C/Y (compounding periods per year)
 		# Programs
-		self.programs: dict[str, list] = {}  # name -> token list for stored programs
-		self.program_stack: deque = deque()  # currently executing programs (innermost last)
-		# Internal data
-		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
-		self._nest_depth: dict[object, int] = defaultdict(lambda: 0)  # tracks nesting depth for ILLEGAL NEST guards
+		self.programs: dict[str, list] = {}
+		self.program_stack: deque = deque()
+		# Internal
+		self._datetime_offset = timedelta(0)
+		self._nest_depth: dict[object, int] = defaultdict(lambda: 0)
 
 
 	def run(self, tokens):
-		"""
-		Runs a string of tokens as if from the "home screen".
-		"""
-		# TODO: Should there be some kind of flag that makes newline characters raise an error?
-		# On the calculator, it's impossible to get a newline character on the home screen (arguably that's what Enter does)
-		# And actually, maybe if you treat NEWLINE as pressing Enter, everything works as intended
 		from parser import Parser
 		try:
 			Parser(tokens, self).run()
@@ -80,7 +420,6 @@ class Environment:
 			pass
 
 	def run_program(self, prgm_name: str):
-		"""Runs a stored program. To simulate running a program as you would on a calculator from the home screen, use Environment.run([PRGM, ...])."""
 		try:
 			prgm_code = self.programs[prgm_name]
 		except KeyError:
@@ -89,15 +428,12 @@ class Environment:
 		Program(prgm_code, self).run()
 
 	def to_rad(self, x):
-		"""Convert x from the current angle mode to radians (for trig input)."""
 		return x * (math.pi / 180) if self.angle_mode is AngleMode.DEG else x
 
 	def from_rad(self, r):
-		"""Convert r (radians) to the current angle mode (for inverse trig output)."""
 		return r * (180 / math.pi) if self.angle_mode is AngleMode.DEG else r
 
 	def from_deg(self, x):
-		"""Convert x (in degrees) to the current angle mode (for DMS literals)."""
 		return x * (math.pi / 180) if self.angle_mode is AngleMode.RAD else x
 
 	def set_random_seed(self, value):
@@ -106,7 +442,6 @@ class Environment:
 	# ── Virtual clock ────────────────────────────────────────────────────────────
 
 	def _now(self) -> datetime:
-		"""Current datetime adjusted by any offset set via setDate/setTime."""
 		return datetime.now() + self._datetime_offset
 
 	def set_date(self, year, month, day):
@@ -153,7 +488,7 @@ class Environment:
 			raise DomainError(f"getTmStr: invalid format {fmt}")
 		return TiString.from_str(time_str)
 
-	# ── Nullary helpers (used by nullary= fields in tokens) ──────────────────────
+	# ── Nullary helpers ─────────────────────────────────────────────────────────
 
 	def get_ans(self):
 		return self.ans
@@ -185,12 +520,16 @@ class Environment:
 		return random.random()
 
 	@contextmanager
-	def scoped_var(self, variable):
-		saved = variable.get(self)
+	def scoped_var(self, variable: Variable):
+		"""Save and restore a variable's value around a block."""
+		saved = variable.get_unsafe()
 		try:
 			yield
 		finally:
-			variable.set(self, saved)
+			if saved is None:
+				variable.delete()
+			else:
+				variable.set(saved)
 
 	@contextmanager
 	def nest_guard(self, func: object, max_depth: int = 0):
@@ -205,7 +544,7 @@ class Environment:
 	def _iter_values(self):
 		from catalog import LETTERS, LISTS, MATRICES, STRINGS
 		for tok in (*LETTERS, *LISTS, *MATRICES, *STRINGS):
-			v = tok.variable.get_unsafe(self)
+			v = tok.variable(self).get_unsafe()
 			if v is not None:
 				yield tok.char if tok.char else tok.text, v
 		for name, lst in self.user_lists.items():
@@ -217,224 +556,11 @@ class Environment:
 			print(f"{name:8}= {value!r}")
 
 	def __repr__(self):
-		return f"ENV({';'.join(f"{name}={value!r}" for name, value in self._iter_values())})"
+		return f"ENV({';'.join(f'{name}={value!r}' for name, value in self._iter_values())})"
 
 	@property
 	def current_program(self):
-		"""The innermost currently-executing Program, or None if running interactively."""
 		return self.program_stack[-1] if self.program_stack else None
 
 	def print_screen(self):
 		pass
-
-
-# ── Variable hierarchy ────────────────────────────────────────────────────────────
-
-class Variable(ABC):
-	"""Base class for typed, storable token variables."""
-
-	@abstractmethod
-	def get_unsafe(self, env: Environment) -> Any:
-		"""Return the raw stored value; None means absent/deleted."""
-		pass
-
-	@abstractmethod
-	def set(self, env: Environment, value: Any) -> None:
-		pass
-
-	def get(self, env: Environment) -> Any:
-		val = self.get_unsafe(env)
-		if val is None:
-			return self._missing(env)
-		return val
-
-	def _missing(self, env: Environment) -> Any:
-		"""Called by get() when the slot is None. Default raises; override to auto-initialise."""
-		raise UndefinedError("Undefined variable")
-
-	def delete(self, env: Environment) -> None:
-		raise DataTypeError("Cannot delete this variable")
-
-
-class OffsetVar(Variable):
-	"""Variable stored by integer index in one of the environment's flat arrays."""
-	__slots__ = ('index',)
-	_array_attr: ClassVar[str]
-
-	def __init__(self, index: int) -> None:
-		self.index = index
-
-	def __str__(self) -> str:
-		return f"{self._array_attr}[{self.index}]"
-
-	def _convert(self, value: Any) -> Any:
-		return value
-
-	def _missing(self, env: Environment) -> Any:
-		raise UndefinedError(str(self))
-
-	def get_unsafe(self, env: Environment) -> Any:
-		return getattr(env, self._array_attr)[self.index]
-
-	def set(self, env: Environment, value: Any) -> None:
-		getattr(env, self._array_attr)[self.index] = self._convert(value)
-
-	def delete(self, env: Environment) -> None:
-		getattr(env, self._array_attr)[self.index] = None
-
-
-class NamedVar(Variable):
-	__slots__ = ('name',)
-	def __init__(self, name: str) -> None:
-		self.name = name
-
-
-class NumericVar(OffsetVar):
-	__slots__ = ()
-	_array_attr = 'numerics'
-
-	def __str__(self) -> str:
-		return chr(65 + self.index) if self.index < 26 else 'θ'
-
-	def _convert(self, value: Any) -> Any:
-		return require_num(value)
-
-	def _missing(self, env: Environment) -> Any:
-		env.numerics[self.index] = 0
-		return 0
-
-
-class RealVar(NamedVar):
-	def get_unsafe(self, env: Environment) -> Any:
-		return getattr(env, self.name)
-
-	def _missing(self, env: Environment) -> Any:
-		setattr(env, self.name, 0)
-		return 0
-
-	def set(self, env: Environment, value: Any) -> None:
-		setattr(env, self.name, require_real(value))
-
-
-class ListVar(OffsetVar):
-	__slots__ = ()
-	_array_attr = 'lists'
-
-	def __str__(self) -> str:
-		return f"L{self.index + 1}"
-
-	def _convert(self, value: Any) -> Any:
-		return require_list(value).copy()
-
-
-class UserListVar(NamedVar):
-	def get_unsafe(self, env: Environment) -> Any:
-		return env.user_lists.get(self.name)
-
-	def _missing(self, env: Environment) -> Any:
-		raise UndefinedError(f"User list {self.name}")
-
-	def set(self, env: Environment, value: Any) -> None:
-		env.user_lists[self.name] = _copy_list(value)
-
-	def delete(self, env: Environment) -> None:
-		env.user_lists.pop(self.name, None)
-
-
-class MatrixVar(OffsetVar):
-	__slots__ = ()
-	_array_attr = 'matrices'
-
-	def __str__(self) -> str:
-		return f"[{chr(65 + self.index)}]"
-
-	def _convert(self, value: Any) -> Any:
-		return require_matrix(matrix).copy()
-
-
-class StringVar(OffsetVar):
-	__slots__ = ()
-	_array_attr = 'strings'
-
-	def __str__(self) -> str:
-		return f"Str{(self.index + 1) % 10}"
-
-	def _convert(self, value: Any) -> Any:
-		return require_str(value)
-
-
-class EquationVar(Variable):
-	__slots__ = ('table', 'index')
-
-	def __init__(self, table: str, index: int) -> None:
-		self.table = table
-		self.index = index
-
-	def get_unsafe(self, env: Environment) -> Any:
-		return getattr(env, self.table)[self.index]
-
-	def _missing(self, env: Environment) -> Any:
-		raise UndefinedError("Equation variable is undefined")
-
-	def set(self, env: Environment, value: Any) -> None:
-		getattr(env, self.table)[self.index] = require_equation(value)
-
-	def delete(self, env: Environment) -> None:
-		getattr(env, self.table)[self.index] = None
-
-
-class StatVar(OffsetVar):
-	__slots__ = ()
-	_array_attr = 'stat'
-
-	def __str__(self) -> str:
-		return f"stat[{self.index:#04x}]"
-
-	def _missing(self, env: Environment) -> Any:
-		return None  # stat vars may be None before stat functions have run
-
-	def set(self, env: Environment, value: Any) -> None:
-		raise DataTypeError("Stat variables are read-only")
-
-
-class WindowVar(OffsetVar):
-	__slots__ = ()
-	_array_attr = 'window'
-
-	def __str__(self) -> str:
-		return f"window[{self.index:#04x}]"
-
-	def _convert(self, value: Any) -> Any:
-		return require_real(value)
-
-
-# ── BoundVar ──────────────────────────────────────────────────────────────────
-
-class BoundVar:
-	"""A Variable bound to a specific Environment.
-
-	Returned by ArgParser parse methods so that forms.py never has to pass env
-	explicitly.  The underlying Variable is still accessible via .variable for
-	the few places (scoped_var, begin_for, etc.) that need to work with it directly.
-	"""
-	__slots__ = ('_variable', '_env')
-
-	def __init__(self, variable: Variable, env: Environment) -> None:
-		self._variable = variable
-		self._env = env
-
-	@property
-	def variable(self) -> Variable:
-		return self._variable
-
-	def get(self) -> Any:
-		return self._variable.get(self._env)
-
-	def set(self, value: Any) -> None:
-		self._variable.set(self._env, value)
-
-	def delete(self) -> None:
-		self._variable.delete(self._env)
-
-	def get_unsafe(self) -> Any:
-		return self._variable.get_unsafe(self._env)

@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from environment import Variable
+if TYPE_CHECKING:
+	from environment import Variable, Environment
 
 
 @dataclass(slots=True, frozen=True, eq=False)
@@ -16,7 +20,7 @@ class Token:
 	command:   Callable | None = None  # (ArgParser) -> None for command tokens
 	nullary:   Callable | None = None  # (env) -> value for read-only computed constants
 	converter: Callable | None = None  # (value) -> value for ►DMS, ►Dec, ►Frac and others
-	variable:  Variable | None = None  # Variable instance for storable typed variables
+	variable:  Callable[[Environment], Variable] | None = None  # (env) -> Variable lookup
 
 	# ── Token type predicates ──────────────────────────────────────────────────
 

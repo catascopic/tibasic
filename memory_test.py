@@ -75,7 +75,7 @@ class TestSetUpEditor:
 
 	def test_no_args_creates_all_six_default_lists(self):
 		env = run('SetUpEditor')
-		assert all(env.lists[i] is not None for i in range(6))
+		assert all(env.lists[i].data is not None for i in range(6))
 
 	def test_no_args_default_lists_are_empty(self):
 		env = run('SetUpEditor')

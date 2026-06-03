@@ -38,7 +38,9 @@
       "Bash(python -m pytest --tb=short -q)",
       "Bash(python -m pytest --tb=no -q)",
       "Bash(python -c \"import environment\")",
-      "Bash(python -m pytest -q)"
+      "Bash(python -m pytest -q)",
+      "Bash(python -m pytest memory_test.py -x -q)",
+      "Bash(python -m pytest tibasic_test.py memory_test.py -x -q)"
     ]
   }
 }

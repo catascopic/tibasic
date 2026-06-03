@@ -51,7 +51,7 @@ def seq(a: ArgParser) -> TiList:
 		end -= 1e-10
 	with a.env.nest_guard(seq), a.env.scoped_var(var):
 		while op(n, end):
-			var.set(a.env, n)
+			var.set(n)
 			result.append(formula.eval())
 			n += step
 	return TiList(result)
@@ -68,7 +68,7 @@ def sigma(a: ArgParser) -> float:
 	n = start
 	with a.env.nest_guard(sigma), a.env.scoped_var(var):
 		while n <= end:
-			var.set(a.env, n)
+			var.set(n)
 			total += formula.eval()
 			n += 1
 	return total
@@ -82,9 +82,9 @@ def n_deriv(a: ArgParser) -> float:
 	h = a.expr(optional=True, default=0.001)
 	a.end_func()
 	with a.env.nest_guard(n_deriv, max_depth=1), a.env.scoped_var(var):
-		var.set(a.env, val + h)
+		var.set(val + h)
 		fwd = formula.eval()
-		var.set(a.env, val - h)
+		var.set(val - h)
 		bwd = formula.eval()
 	return (fwd - bwd) / (2 * h)
 
@@ -140,7 +140,7 @@ def fn_int(a: ArgParser) -> float:
 	a.end_func()
 	with a.env.nest_guard('fnInt'), a.env.scoped_var(var):
 		def f(x):
-			var.set(a.env, x)
+			var.set(x)
 			return formula.eval()
 		return _adaptive_gk15(f, lo, hi, tol)
 
@@ -196,11 +196,12 @@ def _sort(a: ArgParser, reverse: bool):
 	if not deps:
 		main.data.sort(reverse=reverse)
 	else:
-		data = main.data
+		data = main.data[:]
 		indices = sorted(range(len(data)), key=lambda i: data[i], reverse=reverse)
-		main.data = [data[i] for i in indices]
+		main.data[:] = [data[i] for i in indices]
 		for d in deps:
-			d.data = [d.data[i] for i in indices]
+			orig = d.data[:]
+			d.data[:] = [orig[i] for i in indices]
 	a.end_paren_cmd()
 
 
@@ -248,7 +249,7 @@ def clr_list(a):
 def clr_all_lists(env):
 	"""ClrAllLists — set every defined list (L1–L6 and user lists) to empty."""
 	for lst in env.lists:
-		if lst is not None:
+		if lst.data is not None:
 			lst.set_dim(0)
 	for lst in env.user_lists.values():
 		lst.set_dim(0)
@@ -284,8 +285,8 @@ def set_up_editor(a):
 				break
 	else:
 		for i in range(6):
-			if a.env.lists[i] is None:
-				a.env.lists[i] = TiList([])
+			if a.env.lists[i].data is None:
+				a.env.lists[i].data = []
 
 	a.end_cmd()
 
