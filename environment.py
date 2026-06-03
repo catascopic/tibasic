@@ -8,7 +8,10 @@ from contextlib import contextmanager
 from datetime import datetime, date, timedelta
 from typing import Any, ClassVar, TYPE_CHECKING
 
-from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation
+from tiobjects import (
+	TiList, TiMatrix, TiString, TiEquation, 
+	require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation,
+)
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, UndefinedError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 from signals import StopSignal
@@ -35,7 +38,7 @@ class Environment:
 		# MODES
 		self.angle_mode    = AngleMode.RAD
 		self.number_mode   = NumberMode.NORMAL
-		self.fix_digits    = None           # None = Float, 0–9 = Fix N
+		self.fix_digits    = None          # None = Float, 0–9 = Fix N
 		self.graph_mode    = GraphMode.FUNC
 		self.complex_mode  = ComplexMode.REAL
 		self.draw_mode     = DrawMode.CONNECTED
@@ -205,19 +208,19 @@ class Environment:
 	def _iter_values(self):
 		from catalog import LETTERS, LISTS, MATRICES, STRINGS
 		for tok in (*LETTERS, *LISTS, *MATRICES, *STRINGS):
-			v = tok.variable.get(self)
-			if v is not None:
-				yield tok.char if tok.char else tok.text, v
+			value = tok.variable.get(self)
+			if value is not None:
+				yield tok.text, value
 		for name, lst in self.user_lists.items():
-			yield f"ᴸ{name}", lst
+			yield f"${name}", lst
 		yield "Ans", self.ans
 
 	def dump(self):
 		for name, value in self._iter_values():
-			print(f"{name:8}= {value!r}")
+			print(f"{name}= {int(value) if isinstance(value, float) and value.is_integer() else value}")
 
 	def __repr__(self):
-		return f"ENV({';'.join(f"{name}={value!r}" for name, value in self._iter_values())})"
+		return f"ENV({','.join(f"{name}={value!r}" for name, value in self._iter_values())})"
 
 	@property
 	def current_program(self):
@@ -263,7 +266,7 @@ class Variable(ABC):
 		raise DataTypeError(f"Cannot delete {self}")
 
 
-class DefaultZeroMixin:
+class _DefaultZeroMixin:
 	def resolve(self, env):
 		val = self.get(env)
 		if val is None:
@@ -272,72 +275,71 @@ class DefaultZeroMixin:
 		return val
 
 
-class OffsetVariable(Variable):
-	"""Variable stored by integer index in one of the environment's flat arrays."""
-	array_attr: ClassVar[str]
+class _Indexed(Variable):
+	_array: ClassVar[str]
 
 	def __init__(self, index: int):
 		self.index = index
 
 	def get(self, env):
-		return getattr(env, self.array_attr)[self.index]
+		return getattr(env, self._array)[self.index]
 
 	def set(self, env, value):
-		getattr(env, self.array_attr)[self.index] = value
+		getattr(env, self._array)[self.index] = value
 
 	def delete(self, env):
 		self.set(env, None)
 
 
-class NumericVariable(DefaultZeroMixin, OffsetVariable):
-	array_attr = 'numerics'
+class NumericVariable(_DefaultZeroMixin, _Indexed):
+	_array = 'numerics'
 	def normalize(self, value): return require_num(value)
 	def __repr__(self):         return f"Var<{chr(65 + self.index) if self.index < 26 else 'θ'}>"
 
-class ListVariable(OffsetVariable):
-	array_attr = 'lists'
+class ListVariable(_Indexed):
+	_array = 'lists'
 	def normalize(self, value): return require_list(value).copy()
 	def __repr__(self):         return f"Var<L{self.index + 1}>"
 
-class MatrixVariable(OffsetVariable):
-	array_attr = 'matrices'
+class MatrixVariable(_Indexed):
+	_array = 'matrices'
 	def normalize(self, value): return require_matrix(value).copy()
 	def __repr__(self):         return f"Var<[{chr(65 + self.index)}]>"
 
-class StringVariable(OffsetVariable):
-	array_attr = 'strings'
+class StringVariable(_Indexed):
+	_array = 'strings'
 	def normalize(self, value): return require_str(value)
 	def __repr__(self):         return f"Var<Str{(self.index + 1) % 10}>"
 
 
-class EquationVariable(OffsetVariable):
+class _EquationVariable(_Indexed):
 
 	def normalize(self, value):
-		if instanceof(value, TiEquation):
+		if isinstance(value, TiEquation):
 			return value
-		if instanceof(value, TiString):
+		if isinstance(value, TiString):
 			return TiEquation(value.tokens)
 		raise DataTypeError(f"Expected equation or string; got {value}")
 
 
-class FunctionVariable(EquationVariable):
-	array_attr = 'function'
+class FunctionVariable(_EquationVariable):
+	_array = 'function'
 	def __repr__(self): return f"FunctionVar<Y{(self.index + 1) % 10}>"
 
-class ParametricVariable(EquationVariable):
-	array_attr = 'parametric'
+class ParametricVariable(_EquationVariable):
+	_array = 'parametric'
 	def __repr__(self): return f"ParametricVar<{'XY'[self.index % 2]}{1 + self.index // 2}T>"
 
-class PolarVariable(EquationVariable):
-	array_attr = 'polar'
+class PolarVariable(_EquationVariable):
+	_array = 'polar'
 	def __repr__(self): return f"PolarVar<r{(self.index + 1)}>"
 
-class SequenceVariable(EquationVariable):
-	array_attr = 'sequence'
+class SequenceVariable(_EquationVariable):
+	_array = 'sequence'
 	def __repr__(self): return f"SequenceVar<{'uvw'[self.index]}>"
 
 
-class RealVariable(DefaultZeroMixin, Variable):
+class RealVariable(_DefaultZeroMixin, Variable):
 
 	def __init__(self, name: str):
 		self.name = name
@@ -358,7 +360,7 @@ class RealVariable(DefaultZeroMixin, Variable):
 		return f"RealVar({self.name})"
 
 
-class UserListVariable(Variable):
+class UserList(Variable):
 
 	def __init__(self, name: str):
 		self.name = name

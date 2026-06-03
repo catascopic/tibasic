@@ -10,7 +10,7 @@ from catalog import (
 	LIST_PREFIX, RAND, DIM,
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
-from environment import Environment, Variable, UserListVariable
+from environment import Environment, Variable, UserList
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError, UndefinedError
 
 
@@ -251,7 +251,7 @@ class Parser:
 
 		return label
 
-	def _read_name(self, limit) -> str:
+	def read_name(self, limit) -> str:
 		"""Read alphanumeric tokens as an identifier (prgm, user list, etc.)."""
 		t = self.advance()
 		if not t.is_numeric_var():
@@ -320,7 +320,7 @@ class Parser:
 			return self.parse_list_atom(t.variable)
 
 		if t is LIST_PREFIX:
-			return self.parse_list_atom(self._parse_user_list_var())
+			return self.parse_list_atom(self.parse_user_list())
 		
 		if t.is_matrix_var():
 			val = t.variable.resolve(self.env)
@@ -398,7 +398,7 @@ class Parser:
 
 	def parse_store(self, value):
 		if self.peek().is_numeric_var() and isinstance(value, TiList):
-			self.env.user_lists[self._read_name(5)] = value
+			self.env.user_lists[self.read_name(5)] = value
 			return
 				
 		t = self.advance()
@@ -407,7 +407,7 @@ class Parser:
 			self.parse_store_list(t.variable, value)
 
 		elif t is LIST_PREFIX:
-			self.parse_store_list(self._parse_user_list_var(), value)
+			self.parse_store_list(self.parse_user_list(), value)
 
 		elif t.is_matrix_var():
 			if self.eat_if(L_PAREN):
@@ -464,13 +464,13 @@ class Parser:
 	def parse_list_var(self):
 		t = self.advance()
 		if t is LIST_PREFIX:
-			return self._parse_user_list_var()
+			return self.parse_user_list()
 		if t.is_list_var():
 			return t.variable
 		raise TiSyntaxError(f"Expected a list variable, got {t}")
 	
-	def _parse_user_list_var(self):
-		return UserListVariable(self._read_name(5))
+	def parse_user_list(self):
+		return UserList(self.read_name(5))
 		
 	# SKIPPING
 
@@ -655,7 +655,7 @@ class ArgParser:
 		SetUpEditor accepts all three forms; ordinary list contexts require the prefix.
 		"""
 		if self.peek().is_numeric_var():
-			return UserListVariable(self._parser._read_name(5))
+			return UserList(self._parser.read_name(5))
 		return self._parser.parse_list_var()
 	def any_var(self) -> Variable:
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
@@ -663,7 +663,7 @@ class ArgParser:
 		if t.variable is not None:
 			return t.variable
 		if t is LIST_PREFIX:
-			return self._parser._parse_user_list_var()
+			return self._parser.parse_user_list()
 		raise TiSyntaxError(f"Expected a variable, got {t}")
 
 	@_parse_arg
@@ -674,7 +674,7 @@ class ArgParser:
 	@_parse_arg
 	def program_name(self) -> str:
 		"""Read up to 8 alphanumeric characters as a program name (for prgm)."""
-		return self._parser._read_name(8)
+		return self._parser.read_name(8)
 
 	def current_program(self):
 		"""Return the innermost currently-executing Program.

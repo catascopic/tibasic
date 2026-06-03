@@ -4,6 +4,7 @@ import math
 import pytest
 from pytest import approx, mark
 
+import purefunctions as pf
 from environment import Environment
 from modes import AngleMode
 from errors import (
@@ -26,8 +27,10 @@ lookup['@'] = catalog.STORE
 lookup['e'] = catalog.SCI_E
 lookup['$'] = catalog.LIST_PREFIX
 lookup['i'] = catalog.IMAG_I
-for i, ls in enumerate(catalog.LISTS, start=1):
-	lookup[f"L{i}"] = ls
+for i, _tok in enumerate(catalog.LISTS, start=1):
+	lookup[f"L{i}"] = _tok
+for i, _tok in enumerate(catalog.FUNCTION, start=1):
+	lookup[f"Y{i}"] = _tok
 for name, value in vars(catalog).items():
 	if isinstance(value, Token):
 		lookup[name] = value
@@ -35,14 +38,21 @@ for name, value in vars(catalog).items():
 
 def toks(code) -> list[Token]:
 	tokens = []
-	for line in code.strip().splitlines():
-		for seg in line.split():
+	
+	def append_line(line):
+		for seg in line.strip().split():
 			try:
 				tokens.append(lookup[seg])
 			except KeyError:
 				for c in str(seg):
 					tokens.append(lookup[c])
+	
+	lines = code.strip().splitlines()
+	append_line(lines[0])
+	for line in lines[1:]:
 		tokens.append(NEWLINE)
+		append_line(line)
+		
 	return tokens
 
 
@@ -361,8 +371,6 @@ class TestListOperations:
 
 
 # ── Stat unit tests (plain-value interface) ───────────────────────────────────
-
-import purefunctions as pf
 
 class TestStatUnit:
 	"""Direct unit tests for statistical functions via TiFunction.__call__.
@@ -1170,7 +1178,7 @@ class TestComplex:
 	def test_real(self):         assert calc('real( 3+4i') == 3
 	def test_imag(self):         assert calc('imag( 3+4i') == 4
 	def test_conj(self):         assert calc('conj( 3+4i') == 3-4j
-	def test_angle(self):        assert calc('angle( 1i') == approx(math.pi / 2)
+	def test_angle(self):        assert calc('angle( i') == approx(math.pi / 2)
 	def test_real_on_real(self): assert calc('real( 5') == 5
 	def test_imag_on_real(self): assert calc('imag( 5') == 0
 
@@ -1962,6 +1970,58 @@ class TestSeqIncrement:
 
 	def test_negative_step_descending_is_fine(self, env):
 		assert calc('seq( X,X,3,1,~1', env).data == [3, 2, 1]
+
+
+class TestStoreDataType:
+
+	def test_store_wrong_data_type(self):
+		with pytest.raises(DataTypeError):
+			calc('"A"@A')
+		with pytest.raises(DataTypeError):
+			calc('[[1]]@A')
+		# {1}@A does work, stores to user list
+		
+		with pytest.raises(DataTypeError):
+			calc('1@ L1')
+		with pytest.raises(DataTypeError):
+			calc('[[1]]@ L1')
+		with pytest.raises(DataTypeError):
+			calc('"A"@ L1')
+			
+		with pytest.raises(DataTypeError):
+			calc('1@ [A]')
+		with pytest.raises(DataTypeError):
+			calc('{1}@ [A]')
+		with pytest.raises(DataTypeError):
+			calc('"A"@ [A]')
+			
+		with pytest.raises(DataTypeError):
+			calc('1@ Str1')
+		with pytest.raises(DataTypeError):
+			calc('{1}@ Str1')
+		with pytest.raises(DataTypeError):
+			calc('[[1]]@ Str1')
+
+		with pytest.raises(DataTypeError):
+			calc('1@ Y1')
+		with pytest.raises(DataTypeError):
+			calc('{1}@ Y1')
+		with pytest.raises(DataTypeError):
+			calc('[[1]]@ Y1')
+
+	def test_str_var_to_equ(self, env):
+		calc('"X" @ Str1', env)
+		calc('Str1 @ Y1', env)
+		assert var(env, 'Str1').tokens == toks('X')
+
+	def test_str_to_equ(self, env):
+		calc('"X"@ Y1', env)
+		assert var(env, 'Y1').tokens == toks('X')
+	
+	def test_equ_to_str(self, env):
+		calc('"X"@ Y1', env)
+		with pytest.raises(DataTypeError):
+			calc('Y1 @ Str1', env)
 
 
 class TestCopyVars:

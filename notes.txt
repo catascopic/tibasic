@@ -1,3 +1,5 @@
+UGGGHHH I KING OF WANT VARIABLES WITH ENV INTERNALLY
+
 I finally got the Variables into a state that I can tolerate. I now have get/set (these are the "unsafe" methods) and resolve(raise or set default on undefined) and store (validate input). Let me know what you think, but I really just reworked the existing design.
 Somewhat relatedly, I realized xth_root/sqrt need env access because Real/a+bi mode determines whether to return imaginary numbers or raise NONREAL ANS.
 And you know what? All this env stuff is kind of killing me. I probably won't do it, but would it really be that horrible to make Enviroment a global variable? It would still be a class, but it would be a singleton, and all the methods that need it could remove env from their params and just access environment.ENVIRONMENT or something.
@@ -15,9 +17,8 @@ I'm still wondering if there's some way to unify the logic between variables and
 I've been looking into how the stat variables work, and it's a bunch of read-only variables. They're probably better off being nullaries rather than variables, and now I'm wondering if variables should implement the same interface. In the end, I don't think so, in part because there are commands like For( that take a variable... I'm not sure. It seems like there might be something there.
 I've also thought about trying to unify nullaries and regular functions: nullaries could take an ArgParser and check if there's an open parenthesis for the ones like rand that can take optional parameters... but I think they're better off being their own thing. Note that there are still some finance variables we'll have to implement later that are also nullaries that can take parentheses, too.
 
-
-Test storing wrong data types
-
+test_store_wrong_data_type: break into sub-tests?
+test_copy_string: okay to share internal data?
 
 Can you make some program tests that test the logic of skip_statement and skip_block, as well as capture (thunk parsing)?
 I refactored the skipping logic to be more concise, but I want to test the edge cases, such as:
