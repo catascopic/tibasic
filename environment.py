@@ -21,7 +21,7 @@ class Environment:
 
 	def __init__(self):
 		# VARIABLES
-		self.numerics      = [None] * 27   # A–Z, θ
+		self.numerics      = [NumericVar] * 27   # A–Z, θ
 		self.lists         = [None] * 6    # L1–L6
 		self.user_lists    = {}            # ᴸNAME lists
 		self.matrices      = [None] * 10   # [A]–[J]
@@ -235,84 +235,55 @@ class Environment:
 
 class Variable(ABC):
 
-	@abstractmethod
-	def get(self, env: Environment) -> Any | None:
-		"""Directly gets the variable. May return None."""
-		pass
+	def __init__(self, name: str, value=None):
+		self.value = None
 
-	@abstractmethod
-	def set(self, env: Environment, value: Any) -> None:
-		"""Directly sets the variable with no type enforcement. Internal use only."""
-		pass
-
-	def resolve(self, env: Environment) -> Any:
+	def resolve(self) -> Any:
 		"""Called when the user references a variable."""
-		val = self.get(env)
+		val = self.get()
 		if val is None:
 			raise UndefinedError(f"Undefined variable: {self}")
 		return val
 
-	def store(self, env, value) -> None:
+	def store(self, new_value) -> None:
 		"""Called when the user stores a variable."""
-		self.set(env, self.normalize(value))
+		self.value = self.normalize(new_value)
 
 	@abstractmethod
 	def normalize(self, value) -> Any:
 		"""Ensures that the stored data is the right type. For structured data, creates a defensive copy."""
 		pass
 
-	def delete(self, env: Environment) -> None:
-		"""Called when the user executes DelVar."""
-		raise DataTypeError(f"Cannot delete {self}")
 
 
-class _DefaultZeroMixin:
-	def resolve(self, env):
-		val = self.get(env)
+class _DefaultZero(Variable):
+	def resolve(self):
+		val = self.get()
 		if val is None:
-			self.set(env, 0)
+			self.set(0)
 			return 0
 		return val
 
 
-class _Indexed(Variable):
-	_array: ClassVar[str]
-
-	def __init__(self, index: int):
-		self.index = index
-
-	def get(self, env):
-		return getattr(env, self._array)[self.index]
-
-	def set(self, env, value):
-		getattr(env, self._array)[self.index] = value
-
-	def delete(self, env):
-		self.set(env, None)
-
-
-class NumericVariable(_DefaultZeroMixin, _Indexed):
-	_array = 'numerics'
+class NumericVariable(_DefaultZero):
 	def normalize(self, value): return require_num(value)
 	def __repr__(self):         return f"Var<{chr(65 + self.index) if self.index < 26 else 'θ'}>"
 
-class ListVariable(_Indexed):
-	_array = 'lists'
+class ListVariable(Variable):
 	def normalize(self, value): return require_list(value).copy()
 	def __repr__(self):         return f"Var<L{self.index + 1}>"
 
-class MatrixVariable(_Indexed):
-	_array = 'matrices'
+class MatrixVariable(Variable):
 	def normalize(self, value): return require_matrix(value).copy()
 	def __repr__(self):         return f"Var<[{chr(65 + self.index)}]>"
 
-class StringVariable(_Indexed):
+class StringVariable(Variable):
 	_array = 'strings'
 	def normalize(self, value): return require_str(value)
 	def __repr__(self):         return f"Var<Str{(self.index + 1) % 10}>"
 
 
-class _EquationVariable(_Indexed):
+class _EquationVariable(Variable):
 
 	def normalize(self, value):
 		if isinstance(value, TiEquation):
@@ -323,35 +294,19 @@ class _EquationVariable(_Indexed):
 
 
 class FunctionVariable(_EquationVariable):
-	_array = 'function'
 	def __repr__(self): return f"FunctionVar<Y{(self.index + 1) % 10}>"
 
 class ParametricVariable(_EquationVariable):
-	_array = 'parametric'
 	def __repr__(self): return f"ParametricVar<{'XY'[self.index % 2]}{1 + self.index // 2}T>"
 
 class PolarVariable(_EquationVariable):
-	_array = 'polar'
 	def __repr__(self): return f"PolarVar<r{(self.index + 1)}>"
 
 class SequenceVariable(_EquationVariable):
-	_array = 'sequence'
 	def __repr__(self): return f"SequenceVar<{'uvw'[self.index]}>"
 
 
-class RealVariable(_DefaultZeroMixin, Variable):
-
-	def __init__(self, name: str):
-		self.name = name
-
-	def get(self, env):
-		return getattr(env, self.name)
-
-	def set(self, env, value):
-		setattr(env, self.name, value)
-
-	def delete(self, env):
-		self.set(env, None)
+class RealVariable(_DefaultZero):
 
 	def normalize(self, value):
 		return require_real(value)
@@ -365,13 +320,13 @@ class UserList(Variable):
 	def __init__(self, name: str):
 		self.name = name
 
-	def get(self, env):
+	def get(self):
 		return env.user_lists.get(self.name)
 
-	def set(self, env, value):
+	def set(self, value):
 		env.user_lists[self.name] = value
 
-	def delete(self, env):
+	def delete(self):
 		env.user_lists.pop(self.name, None)
 		
 	def normalize(self, value):
