@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from datetime import datetime, date, timedelta
-from typing import Any, TYPE_CHECKING
+from typing import Any, ClassVar, TYPE_CHECKING
 
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, UndefinedError
@@ -234,12 +234,23 @@ class Variable(ABC):
 	"""Base class for typed, storable token variables."""
 
 	@abstractmethod
-	def get(self, env: Environment) -> Any:
+	def get_unsafe(self, env: Environment) -> Any:
+		"""Return the raw stored value; None means absent/deleted."""
 		pass
 
 	@abstractmethod
 	def set(self, env: Environment, value: Any) -> None:
 		pass
+
+	def get(self, env: Environment) -> Any:
+		val = self.get_unsafe(env)
+		if val is None:
+			return self._missing(env)
+		return val
+
+	def _missing(self, env: Environment) -> Any:
+		"""Called by get() when the slot is None. Default raises; override to auto-initialise."""
+		raise UndefinedError("Undefined variable")
 
 	def delete(self, env: Environment) -> None:
 		raise DataTypeError("Cannot delete this variable")
@@ -247,26 +258,26 @@ class Variable(ABC):
 
 class OffsetVar(Variable):
 	"""Variable stored by integer index in one of the environment's flat arrays."""
-	__slots__ = ('index', '_array_attr', '_validator', '_formatter')
+	__slots__ = ('index',)
+	_array_attr: ClassVar[str]
 
-	def __init__(self, index: int, array_attr: str, validate: Any, name_fn: Any) -> None:
-		self.index      = index
-		self._array_attr  = array_attr
-		self._validator = validate
-		self._formatter = name_fn
+	def __init__(self, index: int) -> None:
+		self.index = index
 
-	def get(self, env: Environment) -> Any:
-		val = getattr(env, self._array_attr)[self.index]
-		if val is None:
-			raise UndefinedError(self._formatter(self.index))
-		return val
+	def __str__(self) -> str:
+		return f"{self._array_attr}[{self.index}]"
 
-	def set(self, env: Environment, value: Any) -> None:
-		getattr(env, self._array_attr)[self.index] = self._validator(value)
+	def _convert(self, value: Any) -> Any:
+		return value
+
+	def _missing(self, env: Environment) -> Any:
+		raise UndefinedError(str(self))
 
 	def get_unsafe(self, env: Environment) -> Any:
-		"""Return the raw stored value without raising or auto-initialising."""
 		return getattr(env, self._array_attr)[self.index]
+
+	def set(self, env: Environment, value: Any) -> None:
+		getattr(env, self._array_attr)[self.index] = self._convert(value)
 
 	def delete(self, env: Environment) -> None:
 		getattr(env, self._array_attr)[self.index] = None
@@ -279,68 +290,77 @@ class NamedVar(Variable):
 
 
 class NumericVar(OffsetVar):
-	def __init__(self, index: int) -> None:
-		super().__init__(index, 'numerics', require_num, lambda i: chr(65 + i) if i < 26 else 'θ')
+	__slots__ = ()
+	_array_attr = 'numerics'
 
-	def get(self, env: Environment) -> Any:
-		val = env.numerics[self.index]
-		if val is None:
-			env.numerics[self.index] = 0
-			return 0
-		return val
+	def __str__(self) -> str:
+		return chr(65 + self.index) if self.index < 26 else 'θ'
+
+	def _convert(self, value: Any) -> Any:
+		return require_num(value)
+
+	def _missing(self, env: Environment) -> Any:
+		env.numerics[self.index] = 0
+		return 0
 
 
 class RealVar(NamedVar):
-	def get(self, env: Environment) -> Any:
-		val = getattr(env, self.name)
-		if val is None:
-			setattr(env, self.name, 0)
-			val = 0
-		return val
+	def get_unsafe(self, env: Environment) -> Any:
+		return getattr(env, self.name)
+
+	def _missing(self, env: Environment) -> Any:
+		setattr(env, self.name, 0)
+		return 0
 
 	def set(self, env: Environment, value: Any) -> None:
 		setattr(env, self.name, require_real(value))
 
 
-
-def _copy_list(lst):
-	return require_list(lst).copy()
-	
-	
-def _copy_matrix(mat):
-	return require_matrix(mat).copy()
-
-
 class ListVar(OffsetVar):
-	def __init__(self, index: int) -> None:
-		super().__init__(index, 'lists', _copy_list, lambda i: f"L{i + 1}")
+	__slots__ = ()
+	_array_attr = 'lists'
+
+	def __str__(self) -> str:
+		return f"L{self.index + 1}"
+
+	def _convert(self, value: Any) -> Any:
+		return require_list(value).copy()
 
 
 class UserListVar(NamedVar):
-	def get(self, env: Environment) -> Any:
-		try:
-			return env.user_lists[self.name]
-		except KeyError:
-			raise UndefinedError(f"User list {self.name}")
+	def get_unsafe(self, env: Environment) -> Any:
+		return env.user_lists.get(self.name)
+
+	def _missing(self, env: Environment) -> Any:
+		raise UndefinedError(f"User list {self.name}")
 
 	def set(self, env: Environment, value: Any) -> None:
 		env.user_lists[self.name] = _copy_list(value)
-
-	def get_unsafe(self, env: Environment) -> Any:
-		return env.user_lists.get(self.name)
 
 	def delete(self, env: Environment) -> None:
 		env.user_lists.pop(self.name, None)
 
 
 class MatrixVar(OffsetVar):
-	def __init__(self, index: int) -> None:
-		super().__init__(index, 'matrices', _copy_matrix, lambda i: f"[{chr(65 + i)}]")
+	__slots__ = ()
+	_array_attr = 'matrices'
+
+	def __str__(self) -> str:
+		return f"[{chr(65 + self.index)}]"
+
+	def _convert(self, value: Any) -> Any:
+		return require_matrix(matrix).copy()
 
 
 class StringVar(OffsetVar):
-	def __init__(self, index: int) -> None:
-		super().__init__(index, 'strings', require_str, lambda i: f"Str{(i + 1) % 10}")
+	__slots__ = ()
+	_array_attr = 'strings'
+
+	def __str__(self) -> str:
+		return f"Str{(self.index + 1) % 10}"
+
+	def _convert(self, value: Any) -> Any:
+		return require_str(value)
 
 
 class EquationVar(Variable):
@@ -350,11 +370,11 @@ class EquationVar(Variable):
 		self.table = table
 		self.index = index
 
-	def get(self, env: Environment) -> Any:
-		val = getattr(env, self.table)[self.index]
-		if val is None:
-			raise UndefinedError("Equation variable is undefined")
-		return val
+	def get_unsafe(self, env: Environment) -> Any:
+		return getattr(env, self.table)[self.index]
+
+	def _missing(self, env: Environment) -> Any:
+		raise UndefinedError("Equation variable is undefined")
 
 	def set(self, env: Environment, value: Any) -> None:
 		getattr(env, self.table)[self.index] = require_equation(value)
@@ -364,16 +384,57 @@ class EquationVar(Variable):
 
 
 class StatVar(OffsetVar):
-	def __init__(self, index: int) -> None:
-		super().__init__(index, 'stat', lambda v: v, lambda i: f"stat[{i:#04x}]")
+	__slots__ = ()
+	_array_attr = 'stat'
 
-	def get(self, env: Environment) -> Any:
-		return env.stat[self.index]  # may be None before a stat function has run
+	def __str__(self) -> str:
+		return f"stat[{self.index:#04x}]"
+
+	def _missing(self, env: Environment) -> Any:
+		return None  # stat vars may be None before stat functions have run
 
 	def set(self, env: Environment, value: Any) -> None:
 		raise DataTypeError("Stat variables are read-only")
 
 
 class WindowVar(OffsetVar):
-	def __init__(self, index: int) -> None:
-		super().__init__(index, 'window', require_real, lambda i: f"window[{i:#04x}]")
+	__slots__ = ()
+	_array_attr = 'window'
+
+	def __str__(self) -> str:
+		return f"window[{self.index:#04x}]"
+
+	def _convert(self, value: Any) -> Any:
+		return require_real(value)
+
+
+# ── BoundVar ──────────────────────────────────────────────────────────────────
+
+class BoundVar:
+	"""A Variable bound to a specific Environment.
+
+	Returned by ArgParser parse methods so that forms.py never has to pass env
+	explicitly.  The underlying Variable is still accessible via .variable for
+	the few places (scoped_var, begin_for, etc.) that need to work with it directly.
+	"""
+	__slots__ = ('_variable', '_env')
+
+	def __init__(self, variable: Variable, env: Environment) -> None:
+		self._variable = variable
+		self._env = env
+
+	@property
+	def variable(self) -> Variable:
+		return self._variable
+
+	def get(self) -> Any:
+		return self._variable.get(self._env)
+
+	def set(self, value: Any) -> None:
+		self._variable.set(self._env, value)
+
+	def delete(self) -> None:
+		self._variable.delete(self._env)
+
+	def get_unsafe(self) -> Any:
+		return self._variable.get_unsafe(self._env)

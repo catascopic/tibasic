@@ -1,3 +1,9 @@
+Can you make some program tests that test the logic of skip_statement and skip_block, as well as capture (thunk parsing)?
+I refactored the skipping logic to be more concise, but I want to test the edge cases, such as:
+STORE closing strings
+quoted colons/commas
+Any other edge cases
+
 Commands:
 solve( fMin( fMax(
 
@@ -18,23 +24,20 @@ Pause Input Prompt Output( ClrHome DispTable Menu(
 
 χ²-Test??? It has a weird display
 
-
 Tests to make sure lists/matrices/strings actually copy the value, not the reference
 
 
 require_real(a.expr()) -> a.expr(require_real) or even a.real_expr()
 
 
+Some thoughts:
 Variables are kind of weird, it feels like they shouldn't always need env as a parameter.
 I like that tokens contain a "Variable" that's just an immutable accessor, but I feel like maybe Token.variable should be a function that takes env and returns an independent object that does get/set. What do you think?
 I also still don't like the token design where it contains an array_name, validator... these things are class variables at best, putting them in the constructor is weird.
+Additionally, I modified list/matrix variable to copy on write, which is fine, but it's not exactly validation anymore.
 
 
 
-skip_statement tests:
-STORE was not closing strings
-quoted colons
-test the edge cases
 
 Refactor tibasic test to be more like memory test:
 remove fixtures

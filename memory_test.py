@@ -36,14 +36,14 @@ class TestDelVar:
 		run('DelVar A', env)
 		assert env.ans == 42
 
-	def test_clears_standard_self):
+	def test_clears_standard_list(self):
 		env = run("""
 		{1,2,3}@ L1
 		DelVar L1
 		""")
 		assert var(env, 'L1') is None
 
-	def test_clears_user_self):
+	def test_clears_user_list(self):
 		env = run('{9,8}@FOO')
 		assert env.user_lists.get('FOO') is not None
 		run('DelVar $FOO', env)
@@ -86,20 +86,20 @@ class TestSetUpEditor:
 		run('SetUpEditor', env)
 		assert var(env, 'L1').data == [1, 2, 3]
 
-	def test_with_standard_self):
+	def test_with_standard_list(self):
 		env = run('SetUpEditor L3')
 		assert var(env, 'L3') is not None   # L3 created
 		assert var(env, 'L1') is None       # L1 untouched
 
-	def test_with_bare_name_creates_user_self):
+	def test_with_bare_name_creates_user_list(self):
 		env = run('SetUpEditor SAVE')
 		assert env.user_lists.get('SAVE') is not None
 
-	def test_with_prefix_name_creates_user_self):
+	def test_with_prefix_name_creates_user_list(self):
 		env = run('SetUpEditor $DATA')
 		assert env.user_lists.get('DATA') is not None
 
-	def test_does_not_overwrite_existing_user_self):
+	def test_does_not_overwrite_existing_user_list(self):
 		env = run('{7,8,9}@SAVE')
 		run('SetUpEditor SAVE', env)
 		assert env.user_lists['SAVE'].data == [7, 8, 9]
@@ -124,7 +124,7 @@ class TestClrList:
 		assert var(env, 'L1') is not None   # still defined
 		assert len(var(env, 'L1')) == 0     # but empty
 
-	def test_dim_returns_zero_after_clrself):
+	def test_dim_returns_zero_after_clrlist(self):
 		env = run("""
 		{1,2,3}@ L1
 		ClrList L1
@@ -144,7 +144,7 @@ class TestClrList:
 		assert len(var(env, 'L1')) == 0
 		assert len(var(env, 'L2')) == 0
 
-	def test_clears_user_self):
+	def test_clears_user_list(self):
 		env = run('{5,6,7}@FOO')
 		run('ClrList $ FOO', env)
 		assert env.user_lists.get('FOO') is not None
@@ -247,7 +247,7 @@ class TestSortD:
 
 class TestFill:
 
-	def test_fill_self):
+	def test_fill_list(self):
 		env = run("""
 		{1,2,3}@ L1
 		Fill( 7, L1
