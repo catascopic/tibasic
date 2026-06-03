@@ -49,9 +49,9 @@ def seq(a: ArgParser) -> TiList:
 			raise IncrementError(f"seq: step is negative but start ({start}) < end ({end})")
 		op = operator.ge
 		end -= 1e-10
-	with a.env.nest_guard(seq), a.env.scoped_var(var):
+	with a.env.nest_guard(seq), var.scoped():
 		while op(n, end):
-			var.set(a.env, n)
+			var.set(n)
 			result.append(formula.eval())
 			n += step
 	return TiList(result)
@@ -66,9 +66,9 @@ def sigma(a: ArgParser) -> float:
 	a.end_func()
 	total = 0
 	n = start
-	with a.env.nest_guard(sigma), a.env.scoped_var(var):
+	with a.env.nest_guard(sigma), var.scoped():
 		while n <= end:
-			var.set(a.env, n)
+			var.set(n)
 			total += formula.eval()
 			n += 1
 	return total
@@ -81,10 +81,10 @@ def n_deriv(a: ArgParser) -> float:
 	val = a.expr()
 	h = a.expr(optional=True, default=0.001)
 	a.end_func()
-	with a.env.nest_guard(n_deriv, max_depth=1), a.env.scoped_var(var):
-		var.set(a.env, val + h)
+	with a.env.nest_guard(n_deriv, max_depth=1), var.scoped():
+		var.set(val + h)
 		fwd = formula.eval()
-		var.set(a.env, val - h)
+		var.set(val - h)
 		bwd = formula.eval()
 	return (fwd - bwd) / (2 * h)
 
@@ -138,9 +138,9 @@ def fn_int(a: ArgParser) -> float:
 	hi = a.expr()
 	tol = a.expr(optional=True, default=1e-5)
 	a.end_func()
-	with a.env.nest_guard('fnInt'), a.env.scoped_var(var):
+	with a.env.nest_guard('fnInt'), var.scoped():
 		def f(x):
-			var.set(a.env, x)
+			var.set(x)
 			return formula.eval()
 		return _adaptive_gk15(f, lo, hi, tol)
 

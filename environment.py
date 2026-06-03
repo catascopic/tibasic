@@ -185,14 +185,6 @@ class Environment:
 		return random.random()
 
 	@contextmanager
-	def scoped_var(self, variable):
-		saved = variable.get(self)
-		try:
-			yield
-		finally:
-			variable.set(self, saved)
-
-	@contextmanager
 	def nest_guard(self, func: object, max_depth: int = 0):
 		if self._nest_depth[func] > max_depth:
 			raise IllegalNestError(func)
@@ -228,10 +220,15 @@ class Environment:
 		pass
 
 
-# ── Variable hierarchy ────────────────────────────────────────────────────────────
+# ── Accessor hierarchy ────────────────────────────────────────────────────────────
 
-class Variable(ABC):
-	"""Base class for typed, storable token variables."""
+class Accessor(ABC):
+	"""Typed descriptor for a storage slot.
+
+	A single shared, env-independent flyweight (held by Token.variable); its
+	methods take the env to act on.  Call it with an env — ``accessor(env)`` —
+	to obtain an env-free :class:`Variable` handle.
+	"""
 
 	@abstractmethod
 	def get_unsafe(self, env: Environment) -> Any:
@@ -255,9 +252,13 @@ class Variable(ABC):
 	def delete(self, env: Environment) -> None:
 		raise DataTypeError("Cannot delete this variable")
 
+	def bind(self, env: Environment) -> "Variable":
+		"""Bind this accessor to an env, yielding an env-free Variable handle."""
+		return Variable(self, env)
 
-class OffsetVar(Variable):
-	"""Variable stored by integer index in one of the environment's flat arrays."""
+
+class OffsetAccessor(Accessor):
+	"""Accessor stored by integer index in one of the environment's flat arrays."""
 	__slots__ = ('index',)
 	_array_attr: ClassVar[str]
 
@@ -283,13 +284,13 @@ class OffsetVar(Variable):
 		getattr(env, self._array_attr)[self.index] = None
 
 
-class NamedVar(Variable):
+class NamedAccessor(Accessor):
 	__slots__ = ('name',)
 	def __init__(self, name: str) -> None:
 		self.name = name
 
 
-class NumericVar(OffsetVar):
+class NumericAccessor(OffsetAccessor):
 	__slots__ = ()
 	_array_attr = 'numerics'
 
@@ -304,7 +305,7 @@ class NumericVar(OffsetVar):
 		return 0
 
 
-class RealVar(NamedVar):
+class RealAccessor(NamedAccessor):
 	def get_unsafe(self, env: Environment) -> Any:
 		return getattr(env, self.name)
 
@@ -316,7 +317,7 @@ class RealVar(NamedVar):
 		setattr(env, self.name, require_real(value))
 
 
-class ListVar(OffsetVar):
+class ListAccessor(OffsetAccessor):
 	__slots__ = ()
 	_array_attr = 'lists'
 
@@ -327,7 +328,7 @@ class ListVar(OffsetVar):
 		return require_list(value).copy()
 
 
-class UserListVar(NamedVar):
+class UserListAccessor(NamedAccessor):
 	def get_unsafe(self, env: Environment) -> Any:
 		return env.user_lists.get(self.name)
 
@@ -335,13 +336,13 @@ class UserListVar(NamedVar):
 		raise UndefinedError(f"User list {self.name}")
 
 	def set(self, env: Environment, value: Any) -> None:
-		env.user_lists[self.name] = _copy_list(value)
+		env.user_lists[self.name] = require_list(value).copy()
 
 	def delete(self, env: Environment) -> None:
 		env.user_lists.pop(self.name, None)
 
 
-class MatrixVar(OffsetVar):
+class MatrixAccessor(OffsetAccessor):
 	__slots__ = ()
 	_array_attr = 'matrices'
 
@@ -349,10 +350,10 @@ class MatrixVar(OffsetVar):
 		return f"[{chr(65 + self.index)}]"
 
 	def _convert(self, value: Any) -> Any:
-		return require_matrix(matrix).copy()
+		return require_matrix(value).copy()
 
 
-class StringVar(OffsetVar):
+class StringAccessor(OffsetAccessor):
 	__slots__ = ()
 	_array_attr = 'strings'
 
@@ -363,7 +364,7 @@ class StringVar(OffsetVar):
 		return require_str(value)
 
 
-class EquationVar(Variable):
+class EquationAccessor(Accessor):
 	__slots__ = ('table', 'index')
 
 	def __init__(self, table: str, index: int) -> None:
@@ -383,7 +384,7 @@ class EquationVar(Variable):
 		getattr(env, self.table)[self.index] = None
 
 
-class StatVar(OffsetVar):
+class StatAccessor(OffsetAccessor):
 	__slots__ = ()
 	_array_attr = 'stat'
 
@@ -397,7 +398,7 @@ class StatVar(OffsetVar):
 		raise DataTypeError("Stat variables are read-only")
 
 
-class WindowVar(OffsetVar):
+class WindowAccessor(OffsetAccessor):
 	__slots__ = ()
 	_array_attr = 'window'
 
@@ -408,33 +409,42 @@ class WindowVar(OffsetVar):
 		return require_real(value)
 
 
-# ── BoundVar ──────────────────────────────────────────────────────────────────
+# ── Variable ──────────────────────────────────────────────────────────────────
 
-class BoundVar:
-	"""A Variable bound to a specific Environment.
+class Variable:
+	"""An :class:`Accessor` bound to a specific Environment: env-free get/set/delete.
 
-	Returned by ArgParser parse methods so that forms.py never has to pass env
-	explicitly.  The underlying Variable is still accessible via .variable for
-	the few places (scoped_var, begin_for, etc.) that need to work with it directly.
+	Produced by ``accessor(env)`` and returned by every ArgParser parse method, so
+	command implementations (forms.py) and control-flow helpers never pass env
+	around.  All storage polymorphism lives in the wrapped accessor, so a single
+	concrete wrapper serves every variable type, user lists included.
 	"""
-	__slots__ = ('_variable', '_env')
+	__slots__ = ('_accessor', '_env')
 
-	def __init__(self, variable: Variable, env: Environment) -> None:
-		self._variable = variable
+	def __init__(self, accessor: Accessor, env: Environment) -> None:
+		self._accessor = accessor
 		self._env = env
 
-	@property
-	def variable(self) -> Variable:
-		return self._variable
-
 	def get(self) -> Any:
-		return self._variable.get(self._env)
-
-	def set(self, value: Any) -> None:
-		self._variable.set(self._env, value)
-
-	def delete(self) -> None:
-		self._variable.delete(self._env)
+		return self._accessor.get(self._env)
 
 	def get_unsafe(self) -> Any:
-		return self._variable.get_unsafe(self._env)
+		return self._accessor.get_unsafe(self._env)
+
+	def set(self, value: Any) -> None:
+		self._accessor.set(self._env, value)
+
+	def delete(self) -> None:
+		self._accessor.delete(self._env)
+
+	@contextmanager
+	def scoped(self):
+		"""Save this variable's value, run the block, then restore it."""
+		saved = self.get()
+		try:
+			yield
+		finally:
+			self.set(saved)
+
+	def __str__(self) -> str:
+		return str(self._accessor)

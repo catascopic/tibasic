@@ -10,7 +10,7 @@ from catalog import (
 	LIST_PREFIX, RAND, DIM,
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
-from environment import Environment, Variable, BoundVar, UserListVar
+from environment import Environment, Accessor, Variable, UserListAccessor
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError, UndefinedError
 
 
@@ -428,7 +428,7 @@ class Parser:
 		else:
 			raise TiSyntaxError(f"Invalid store target: {t}")
 
-	def parse_store_list(self, var: Variable, value):
+	def parse_store_list(self, var: Accessor, value):
 		if self.eat_if(L_PAREN):
 			try:
 				lst = var.get(self.env)
@@ -473,7 +473,7 @@ class Parser:
 		raise TiSyntaxError(f"Expected a list variable, got {t}")
 	
 	def _parse_user_list_var(self):
-		return UserListVar(self._read_name(5))
+		return UserListAccessor(self._read_name(5))
 		
 	# SKIPPING
 
@@ -621,50 +621,50 @@ class ArgParser:
 		t = self._parser.advance()
 		if not t.is_numeric_var():
 			raise DataTypeError(f"Expected a numeric variable, got {t}")
-		return t.variable
+		return t.variable.bind(self.env)
 
 	@_parse_arg
-	def list_var(self) -> BoundVar:
-		return BoundVar(self._parser.parse_list_var(), self.env)
+	def list_var(self) -> Variable:
+		return self._parser.parse_list_var().bind(self.env)
 
 	@_parse_arg
-	def matrix_var(self) -> BoundVar:
+	def matrix_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_matrix_var():
-			return BoundVar(t.variable, self.env)
+			return t.variable.bind(self.env)
 		raise DataTypeError(f"Expected a matrix variable, got {t}")
 
 	@_parse_arg
-	def string_var(self) -> BoundVar:
+	def string_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_string_var():
-			return BoundVar(t.variable, self.env)
+			return t.variable.bind(self.env)
 		raise DataTypeError(f"Expected a string variable, got {t}")
 
 	@_parse_arg
-	def equation_var(self) -> BoundVar:
+	def equation_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_equation_var():
-			return BoundVar(t.variable, self.env)
+			return t.variable.bind(self.env)
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
 	@_parse_arg
-	def list_var_prefix_optional(self) -> BoundVar:
+	def list_var_prefix_optional(self) -> Variable:
 		"""Read a list variable: L1–L6, ᴸNAME, or a bare user-list name without the ᴸ prefix.
 
 		SetUpEditor accepts all three forms; ordinary list contexts require the prefix.
 		"""
 		if self.peek().is_numeric_var():
-			return BoundVar(UserListVar(self._parser._read_name(5)), self.env)
-		return BoundVar(self._parser.parse_list_var(), self.env)
+			return UserListAccessor(self._parser._read_name(5)).bind(self.env)
+		return self._parser.parse_list_var().bind(self.env)
 
-	def any_var(self) -> BoundVar:
+	def any_var(self) -> Variable:
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
 		t = self._parser.advance()
 		if t.variable is not None:
-			return BoundVar(t.variable, self.env)
+			return t.variable.bind(self.env)
 		if t is LIST_PREFIX:
-			return BoundVar(self._parser._parse_user_list_var(), self.env)
+			return self._parser._parse_user_list_var().bind(self.env)
 		raise TiSyntaxError(f"Expected a variable, got {t}")
 
 	@_parse_arg

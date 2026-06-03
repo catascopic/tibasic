@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from collections.abc import Callable
 
-from environment import Variable
+from environment import Accessor
 
 
 @dataclass(slots=True, frozen=True, eq=False)
@@ -16,7 +16,7 @@ class Token:
 	command:   Callable | None = None  # (ArgParser) -> None for command tokens
 	nullary:   Callable | None = None  # (env) -> value for read-only computed constants
 	converter: Callable | None = None  # (value) -> value for ►DMS, ►Dec, ►Frac and others
-	variable:  Variable | None = None  # Variable instance for storable typed variables
+	variable:  Accessor | None = None  # Accessor flyweight for storable typed variables
 
 	# ── Token type predicates ──────────────────────────────────────────────────
 
