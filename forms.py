@@ -157,15 +157,14 @@ def matr_to_list(a: ArgParser) -> None:
 		while a.has_next:
 			list_vars.append(a.list_var())
 		for var, col_data in zip(list_vars, zip(*mat.data)):
-			var.value = a.env, TiList(list(col_data))
+			var.value = TiList(list(col_data))
 	else:
 		col = require_int(a.expr()) - 1
 		if not (0 <= col < mat.cols):
 			raise InvalidDimError(
 				f"Matr►list: column {col + 1} out of range for {mat.rows}×{mat.cols} matrix"
 			)
-		ref = a.list_var()
-		ref.set(a.env, TiList([mat.data[r][col] for r in range(mat.rows)]))
+		a.list_var().value = TiList([mat.data[r][col] for r in range(mat.rows)])
 	a.end_paren_cmd()
 
 
@@ -245,9 +244,9 @@ def clr_list(a):
 @nullary_command
 def clr_all_lists(env):
 	"""ClrAllLists — set every defined list (L1–L6 and user lists) to empty."""
-	for lst in env.lists:
-		if lst is not None:
-			lst.set_dim(0)
+	for list_var in env.lists:
+		if list_var.value is not None:
+			list_var.value.set_dim(0)
 	for lst in env.user_lists.values():
 		lst.set_dim(0)
 
@@ -261,7 +260,7 @@ def del_var(a):
 	Bunches: DelVar ADelVar B and DelVar ADisp X are both valid on the same line.
 	Does not update Ans.
 	"""
-	a.any_var().delete(a.env)
+	a.any_var().value = None
 	# No end_cmd() call; leaves separator in place for next command
 
 
@@ -281,9 +280,9 @@ def set_up_editor(a):
 			if not a.has_next:
 				break
 	else:
-		for i in range(6):
-			if a.env.lists[i] is None:
-				a.env.lists[i] = TiList([])
+		for list_var in a.env.lists:
+			if list_var.value is None:
+				list_var.value = TiList([])
 
 	a.end_cmd()
 

@@ -335,7 +335,7 @@ class Parser:
 		raise TiSyntaxError(f"Unexpected token in expression: {t}")
 
 	def parse_list_atom(self, var):
-		value = var.value
+		value = var.resolve()
 		if self.eat_if(L_PAREN):
 			value = value[self.parse_expr()]
 			self.eat_if(R_PAREN)
@@ -418,7 +418,7 @@ class Parser:
 				var.store(value)
 
 		elif t.variable is not None:
-			t.variable.store(self.env, value)
+			t.variable(self.env).store(value)
 
 		elif t is DIM:
 			self.parse_store_dim(value)
@@ -436,10 +436,10 @@ class Parser:
 				lst[self.parse_expr()] = value
 				var.value = lst
 			else:
-				lst[self.parse_expr()] = value
+				var.value[self.parse_expr()] = value
 			self.eat_if(R_PAREN)
 		else:
-			var.store(self.env, value)
+			var.store(value)
 
 	def parse_store_dim(self, value):
 		t = self.peek()
@@ -623,7 +623,7 @@ class ArgParser:
 		if not t.is_numeric_var():
 			raise DataTypeError(f"Expected a numeric variable, got {t}")
 		return t.variable(self.env)
-		
+
 	@_parse_arg
 	def list_var(self) -> Variable:
 		return self._parser.parse_list_var()
@@ -656,7 +656,7 @@ class ArgParser:
 		SetUpEditor accepts all three forms; ordinary list contexts require the prefix.
 		"""
 		if self.peek().is_numeric_var():
-			return UserList(self._parser.read_name(5))
+			return UserList(self.env, self._parser.read_name(5))
 		return self._parser.parse_list_var()
 
 	def any_var(self) -> Variable:

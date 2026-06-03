@@ -547,8 +547,8 @@ class TestIsGtDsLt:
 
 	def test_ds_lt_skips_when_below(self):
 		env = Environment()
-		env.numerics[0] = 3   # A → 2, 2 < 3
 		run("""
+		3@A
 		DS<( A,3)
 		99@B
 		42@C

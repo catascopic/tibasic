@@ -91,7 +91,7 @@ class Program:
 		self.push_block(RepeatBlock(self._parser.pos, condition))
 
 	def begin_for(self, var: Variable, start: float, end: float, step: float) -> None:
-		var.set(self.env, start)
+		var.value = start
 		if check_for_condition(start, end, step):
 			self.push_block(ForBlock(self._parser.pos, var, end, step))
 		else:
@@ -132,7 +132,7 @@ class Program:
 				p.skip_statement()
 		raise LabelError(
 			f"Label not found: {name!r}",
-			pos=current_pos - 2 - len(name)  # kind of a hack
+			pos=current_pos - 1 - len(name)  # kind of a hack
 		)
 
 
@@ -149,7 +149,7 @@ def check_for_condition(value: float, end: float, step: float) -> bool:
 
 
 class Block(ABC):
-	def on_end(self, prgm: 'Program'):
+	def on_end(self, prgm: Program):
 		"""This method should not be abstract; the default action is to do nothing."""
 
 
@@ -160,9 +160,9 @@ class ForBlock(Block):
 	end: float
 	step: float
 
-	def on_end(self, prgm: Program) -> None:
-		self.var = self.var.resolve() + self.step
-		if check_for_condition(self.var, self.end, self.step):
+	def on_end(self, prgm) -> None:
+		self.var.value = self.var.resolve() + self.step
+		if check_for_condition(self.var.value, self.end, self.step):
 			prgm.jump(self.pos)
 			prgm.push_block(self)
 
@@ -172,7 +172,7 @@ class WhileBlock(Block):
 	pos: int
 	condition: Thunk
 
-	def on_end(self, prgm: Program) -> None:
+	def on_end(self, prgm) -> None:
 		if self.condition.eval():
 			prgm.jump(self.pos)
 			prgm.push_block(self)
@@ -183,7 +183,7 @@ class RepeatBlock(Block):
 	pos: int
 	condition: Thunk
 
-	def on_end(self, prgm: Program) -> None:
+	def on_end(self, prgm) -> None:
 		if not self.condition.eval():
 			prgm.jump(self.pos)
 			prgm.push_block(self)

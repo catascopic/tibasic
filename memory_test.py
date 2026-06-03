@@ -79,7 +79,8 @@ class TestSetUpEditor:
 
 	def test_no_args_default_lists_are_empty(self):
 		env = run('SetUpEditor')
-		assert all(len(env.lists[i]) == 0 for i in range(6))
+		for i in range(1, 7):
+			assert var(env, f"L{i}").data == []
 
 	def test_no_args_preserves_existing_data(self):
 		env = run('{1,2,3}@ L1')

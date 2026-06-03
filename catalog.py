@@ -59,6 +59,10 @@ def read_token(f: BytesIO) -> Token:
 		raise ValueError(f"Invalid token code: 0x{int.from_bytes(code):0{2 * len(code)}X}")
 
 
+def _make_accessor(table: str, index: int):
+	return lambda env: getattr(env, table)[index]
+
+
 def token(
 	code: int,
 	text: str = None,
@@ -148,22 +152,44 @@ NEWLINE   = token(0x3F, char='\n')
 
 token(0x40, ' and ',   bp=(30, 31), op=ops.and_)
 
-LETTERS = tuple(token(0x41 + i, char=chr(0x41 + i)) for i in range(26)) + (token(0x5B, char='θ'),)
+LETTERS = tuple([
+	*(token(0x41 + i, char=chr(0x41 + i), var=_make_accessor('numerics', i)) for i in range(26)),
+	token(0x5B, char='θ', var=_make_accessor('numerics', 26)),
+])
 
 # ── 0x5C xx: matrix variables ([A]–[J]) ──────────────────────────────────────
 
-MATRICES = tuple(token(0x5C00 | i, f'[{chr(0x41 + i)}]') for i in range(10))
+MATRICES = tuple(token(0x5C00 | i, f'[{chr(0x41 + i)}]', var=_make_accessor('matrices', i)) for i in range(10))
 
 # ── 0x5D xx: list variables (L1–L6) ──────────────────────────────────────────
 
-LISTS = tuple(token(0x5D00 | i, f'L{chr(0x2081 + i)}') for i in range(6))
+LISTS = tuple(token(0x5D00 | i, f'L{chr(0x2081 + i)}', var=_make_accessor('lists', i)) for i in range(6))
 
 # ── 0x5E xx: equation and sequence variables ──────────────────────────────────
 
-FUNCTION   = tuple(token(0x5E10 + i, f'Y{chr(0x2080 + (i + 1) % 10)}',			) for i in range(10))
-PARAMETRIC = tuple(token(0x5E20 + i, f'{'XY'[i % 2]}{chr(0x2081 + i // 2)}ₜ',	) for i in range(12))
-POLAR      = tuple(token(0x5E40 + i, f'r{chr(0x2081 + i)}',						) for i in range(6))
-SEQUENCE   = tuple(token(0x5E80 + i, chr(0x1D462 + i),							) for i in range(3))
+FUNCTION   = tuple(token(
+	0x5E10 + i,
+	f'Y{chr(0x2080 + (i + 1) % 10)}', 
+	var=_make_accessor('function', i)
+) for i in range(10))
+
+PARAMETRIC = tuple(token(
+	0x5E20 + i, 
+	f'{'XY'[i % 2]}{chr(0x2081 + i // 2)}ₜ', 
+	var=_make_accessor('parametric', i)
+) for i in range(12))
+
+POLAR      = tuple(token(
+	0x5E40 + i, 
+	f'r{chr(0x2081 + i)}', 
+	var=_make_accessor('polar', i)
+) for i in range(6))
+
+SEQUENCE   = tuple(token(
+	0x5E80 + i, 
+	chr(0x1D462 + i), 
+	var=_make_accessor('sequence', i)
+) for i in range(3))
 
 PRGM = token(0x5F, 'prgm', cmd=forms.prgm)
 
@@ -373,7 +399,7 @@ token(0xA9, 'DrawF ')
 
 # ── 0xAA xx: string variables (Str1–Str0) ────────────────────────────────────
 
-STRINGS = tuple(token(0xAA00 | i, f'Str{(i + 1) % 10}') for i in range(10))
+STRINGS = tuple(token(0xAA00 | i, f'Str{(i + 1) % 10}', var=_make_accessor('strings', i)) for i in range(10))
 
 RAND = token(0xAB, 'rand', res=Environment.rand, func=pf.rand_list)
 token(0xAC, char='π', res=lambda env: math.pi)

@@ -200,7 +200,7 @@ class Environment:
 	def _iter_values(self):
 		from catalog import LETTERS, LISTS, MATRICES, STRINGS
 		for tok in (*LETTERS, *LISTS, *MATRICES, *STRINGS):
-			value = tok.variable.get(self)
+			value = tok.variable(self).value
 			if value is not None:
 				yield tok.text, value
 		for name, lst in self.user_lists.items():
@@ -227,7 +227,7 @@ class Environment:
 
 class Variable(ABC):
 
-	def __init__(self, value=None):
+	def __init__(self):
 		self.value = None
 
 	def resolve(self) -> Any:
@@ -301,14 +301,22 @@ class UserList:
 		return self.lookup.get(self.name)
 
 	@value.setter
-	def set(self, new_value):
+	def value(self, new_value):
 		if new_value is None:
-			self.lookup.pop(name, None)
+			self.lookup.pop(self.name, None)
 		else:
-			self.lookup[name] = new_value
+			self.lookup[self.name] = new_value
 
-	def normalize(self, value):
-		return require_list(value).copy()
+	def resolve(self) -> Any:
+		"""Called when the user references a variable."""
+		try:
+			return self.lookup[self.name]
+		except KeyError:
+			raise UndefinedError(f"Undefined variable: {self}")
+
+	def store(self, new_value) -> None:
+		"""Called when the user stores a variable."""
+		self.value = require_list(new_value).copy()
 
 
 class WindowVariable:

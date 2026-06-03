@@ -1,5 +1,8 @@
 UGGGHHH I KING OF WANT VARIABLES WITH ENV INTERNALLY
 
+
+Make test that stores to all 27 numeric variables, makes a list out of all of them, then verifies that
+
 I finally got the Variables into a state that I can tolerate. I now have get/set (these are the "unsafe" methods) and resolve(raise or set default on undefined) and store (validate input). Let me know what you think, but I really just reworked the existing design.
 Somewhat relatedly, I realized xth_root/sqrt need env access because Real/a+bi mode determines whether to return imaginary numbers or raise NONREAL ANS.
 And you know what? All this env stuff is kind of killing me. I probably won't do it, but would it really be that horrible to make Enviroment a global variable? It would still be a class, but it would be a singleton, and all the methods that need it could remove env from their params and just access environment.ENVIRONMENT or something.
