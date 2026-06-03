@@ -101,15 +101,13 @@ class Program:
 		self.pop_block().on_end(self)
 
 	def is_gt(self, var: Variable, threshold: float) -> None:
-		new_val = require_real(var.resolve(self.env)) + 1
-		var.set(self.env, new_val)
-		if new_val > threshold:
+		var.value = require_real(var.resolve()) + 1
+		if var.value > threshold:
 			self._parser.skip_statement()
 
 	def ds_lt(self, var: Variable, threshold: float) -> None:
-		new_val = require_real(var.resolve(self.env)) - 1
-		var.set(self.env, new_val)
-		if new_val < threshold:
+		var.value = require_real(var.resolve()) - 1
+		if var.value < threshold:
 			self._parser.skip_statement()
 
 	# ── Label search ──────────────────────────────────────────────────────────
@@ -163,9 +161,8 @@ class ForBlock(Block):
 	step: float
 
 	def on_end(self, prgm: Program) -> None:
-		new_val = self.var.resolve(prgm.env) + self.step
-		self.var.set(prgm.env, new_val)
-		if check_for_condition(new_val, self.end, self.step):
+		self.var = self.var.resolve() + self.step
+		if check_for_condition(self.var, self.end, self.step):
 			prgm.jump(self.pos)
 			prgm.push_block(self)
 

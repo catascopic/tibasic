@@ -188,14 +188,6 @@ class Environment:
 		return random.random()
 
 	@contextmanager
-	def scoped(self, variable):
-		saved = variable.resolve(self)
-		try:
-			yield
-		finally:
-			variable.set(self, saved)
-
-	@contextmanager
 	def nest_guard(self, func: object, max_depth: int = 0):
 		if self._nest_depth[func] > max_depth:
 			raise IllegalNestError(func)
@@ -263,6 +255,14 @@ class NumericVariable(Variable):
 	
 	def normalize(self, value):
 		return require_num(value)
+		
+	@contextmanager
+	def scoped(self):
+		saved = self.resolve()
+		try:
+			yield
+		finally:
+			self.value = saved
 
 
 class RealVariable(NumericVariable):
@@ -293,25 +293,22 @@ class EquationVariable(Variable):
 class UserList:
 
 	def __init__(self, env: Environment, name: str):
-		self.env = env
+		self.lookup = env.user_lists
 		self.name = name
 
 	@property
 	def value(self):
-		return self.env.user_lists.get(self.name)
+		return self.lookup.get(self.name)
 
 	@value.setter
 	def set(self, new_value):
 		if new_value is None:
-			self.env.user_lists.pop(name, None)
+			self.lookup.pop(name, None)
 		else:
-			self.env.user_lists[name] = new_value
+			self.lookup[name] = new_value
 
 	def normalize(self, value):
 		return require_list(value).copy()
-
-	def __repr__(self):
-		return f"UserListVar<{self.name}>"
 
 
 class WindowVariable:

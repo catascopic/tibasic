@@ -49,9 +49,9 @@ def seq(a: ArgParser) -> TiList:
 			raise IncrementError(f"seq: step is negative but start ({start}) < end ({end})")
 		op = operator.ge
 		end -= 1e-10
-	with a.env.nest_guard(seq), a.env.scoped(var):
+	with a.env.nest_guard(seq), var.scoped():
 		while op(n, end):
-			var.set(a.env, n)
+			var.value = n
 			result.append(formula.eval())
 			n += step
 	return TiList(result)
@@ -66,9 +66,9 @@ def sigma(a: ArgParser) -> float:
 	a.end_func()
 	total = 0
 	n = start
-	with a.env.nest_guard(sigma), a.env.scoped(var):
+	with a.env.nest_guard(sigma), var.scoped():
 		while n <= end:
-			var.set(a.env, n)
+			var.value = n
 			total += formula.eval()
 			n += 1
 	return total
@@ -81,10 +81,10 @@ def n_deriv(a: ArgParser) -> float:
 	val = a.expr()
 	h = a.expr(optional=True, default=0.001)
 	a.end_func()
-	with a.env.nest_guard(n_deriv, max_depth=1), a.env.scoped(var):
-		var.set(a.env, val + h)
+	with a.env.nest_guard(n_deriv, max_depth=1), var.scoped():
+		var.value = val + h
 		fwd = formula.eval()
-		var.set(a.env, val - h)
+		var.value = val - h
 		bwd = formula.eval()
 	return (fwd - bwd) / (2 * h)
 
@@ -138,9 +138,9 @@ def fn_int(a: ArgParser) -> float:
 	hi = a.expr()
 	tol = a.expr(optional=True, default=1e-5)
 	a.end_func()
-	with a.env.nest_guard('fnInt'), a.env.scoped(var):
+	with a.env.nest_guard('fnInt'), var.scoped():
 		def f(x):
-			var.set(a.env, x)
+			var.value = x
 			return formula.eval()
 		return _adaptive_gk15(f, lo, hi, tol)
 
@@ -153,11 +153,11 @@ def matr_to_list(a: ArgParser) -> None:
 	if not isinstance(mat, TiMatrix):
 		raise DataTypeError("Matr►list: first argument must be a matrix")
 	if a.peek().is_list_start():
-		list_refs = [a.list_var()]
+		list_vars = [a.list_var()]
 		while a.has_next:
-			list_refs.append(a.list_var())
-		for ref, col_data in zip(list_refs, zip(*mat.data)):
-			ref.set(a.env, TiList(list(col_data)))
+			list_vars.append(a.list_var())
+		for var, col_data in zip(list_vars, zip(*mat.data)):
+			var.value = a.env, TiList(list(col_data))
 	else:
 		col = require_int(a.expr()) - 1
 		if not (0 <= col < mat.cols):
@@ -179,9 +179,7 @@ def list_to_matr(a: ArgParser) -> None:
 		if a.peek().is_matrix_var():
 			mat_var = a.matrix_var()
 			break
-	mat_var.set(a.env, TiMatrix([
-		list(row) for row in zip_longest(*[lst.data for lst in list_vals], fillvalue=0)
-	]))
+	mat_var.value = TiMatrix([list(row) for row in zip_longest(*[lst.data for lst in list_vals], fillvalue=0)])
 	a.end_paren_cmd()
 
 
@@ -189,10 +187,10 @@ def list_to_matr(a: ArgParser) -> None:
 # These are commands (cmd=), not functions — called as cmd(ArgParser) directly.
 
 def _sort(a: ArgParser, reverse: bool):
-	main = a.list_var().resolve(a.env)
+	main = a.list_var().resolve()
 	deps = []
 	while a.has_next:
-		deps.append(a.list_var().resolve(a.env))
+		deps.append(a.list_var().resolve())
 	if not deps:
 		main.data.sort(reverse=reverse)
 	else:
@@ -218,13 +216,13 @@ def sort_d(a: ArgParser):
 def fill(a: ArgParser):
 	fill_value = require_real(a.expr())
 	if a.peek().is_matrix_var():
-		lst = a.matrix_var().resolve(a.env)
+		lst = a.matrix_var().resolve()
 		a.end_paren_cmd()
 		for row in lst.data:
 			for i in range(len(row)):
 				row[i] = fill_value
 	else:
-		lst = a.list_var().resolve(a.env)
+		lst = a.list_var().resolve()
 		a.end_paren_cmd()
 		for i in range(len(lst.data)):
 			lst.data[i] = fill_value
@@ -236,7 +234,7 @@ def fill(a: ArgParser):
 def clr_list(a):
 	"""ClrList list[, list, ...] — clear each named list to empty; silently skip nonexistent lists."""
 	while True:
-		lst = a.list_var().get(a.env)
+		lst = a.list_var().value
 		if lst is not None:
 			lst.set_dim(0)
 		if not a.has_next:
@@ -278,8 +276,8 @@ def set_up_editor(a):
 	if a.has_next:
 		while True:
 			var = a.list_var_prefix_optional()
-			if var.get(a.env) is None:
-				var.set(a.env, TiList([]))
+			if var.value is None:
+				var.value = TiList([])
 			if not a.has_next:
 				break
 	else:
@@ -297,8 +295,8 @@ def equ_to_string(a: ArgParser) -> None:
 	"""Equ►String(equvar, strvar) — copy the equation's tokens into a string variable."""
 	equ_var = a.equation_var()
 	str_var = a.string_var()
-	str_var.set(a.env, TiString(equ_var.resolve(a.env).tokens))
 	a.end_paren_cmd()
+	str_var.value = TiString(equ_var.resolve().tokens)
 
 
 @forms_func
@@ -306,8 +304,8 @@ def string_to_equ(a: ArgParser) -> None:
 	"""String►Equ(str_expr, equvar) — parse a string value into an equation variable."""
 	string = require_str(a.expr())
 	equ_var = a.equation_var()
-	equ_var.set(a.env, TiEquation(string.tokens))
 	a.end_paren_cmd()
+	equ_var.value = TiEquation(string.tokens)
 
 
 # ── Control flow ──────────────────────────────────────────────────────────────

@@ -71,10 +71,9 @@ def var(env: Environment, name: str):
 	side-effects and UndefinedError.  Intended for test assertions only.
 	"""
 	tok = lookup[name]
-	v = tok.variable
-	if v is None:
+	if tok.variable is None:
 		raise TypeError(f"{name!r} is not a variable")
-	return v.get(env)
+	return tok.variable(env).value
 
 
 @pytest.fixture

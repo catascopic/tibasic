@@ -35,7 +35,7 @@ class Parser:
 		self.pos = 0
 		self.env = env
 		self._struct_depth = 0
-	
+
 	def __repr__(self):
 		return f"tokens={self.tokens}, pos={self.pos}"
 
@@ -72,7 +72,7 @@ class Parser:
 		if self.peek() is not tok:
 			raise TiSyntaxError(f"Expected {tok}, got {self.peek()}")
 		self.pos += 1
-	
+
 	def end_statement(self):
 		if self.eat_if({COLON, NEWLINE}):
 			return
@@ -278,20 +278,20 @@ class Parser:
 
 		if t.is_digit() or t is DOT:
 			return self.parse_num_literal(t)
-			
+
 		if t is QUOTE:
 			return self.parse_string_literal()
-			
+
 		if t is L_BRACE:
 			if self._struct_depth > 0:
 				raise TiSyntaxError("List literal not allowed inside a list or matrix")
 			return self.parse_list_literal()
-			
+
 		if t is L_BRACKET:
 			if self._struct_depth > 0:
 				raise TiSyntaxError("Matrix literal not allowed inside a list or matrix")
 			return self.parse_matrix_literal()
-			
+
 		if t is L_PAREN:
 			val = self.parse_expr()
 			self.eat_if(R_PAREN)
@@ -317,29 +317,29 @@ class Parser:
 			return self._call_function(t)
 
 		if t.is_list_var():
-			return self.parse_list_atom(t.variable)
+			return self.parse_list_atom(t.variable(self.env))
 
 		if t is LIST_PREFIX:
 			return self.parse_list_atom(self.parse_user_list())
-		
+
 		if t.is_matrix_var():
-			val = t.variable.resolve(self.env)
+			val = t.variable(self.env).resolve()
 			if self.eat_if(L_PAREN):
 				val = val[self.parse_row_col()]
 				self.eat_if(R_PAREN)
 			return val
 
 		if t.variable is not None:
-			return t.variable.resolve(self.env)
-			
+			return t.variable(self.env).resolve()
+
 		raise TiSyntaxError(f"Unexpected token in expression: {t}")
 
 	def parse_list_atom(self, var):
-		val = var.resolve(self.env)
+		value = var.value
 		if self.eat_if(L_PAREN):
-			val = val[self.parse_expr()]
+			value = value[self.parse_expr()]
 			self.eat_if(R_PAREN)
-		return val
+		return value
 
 	def parse_row_col(self):
 		row = self.parse_expr()
@@ -400,28 +400,29 @@ class Parser:
 		if self.peek().is_numeric_var() and isinstance(value, TiList):
 			self.env.user_lists[self.read_name(5)] = value
 			return
-				
+
 		t = self.advance()
 
 		if t.is_list_var():
-			self.parse_store_list(t.variable, value)
+			self.parse_store_list(t.variable(self.env), value)
 
 		elif t is LIST_PREFIX:
 			self.parse_store_list(self.parse_user_list(), value)
 
 		elif t.is_matrix_var():
+			var = t.variable(self.env)
 			if self.eat_if(L_PAREN):
-				t.variable.resolve(self.env)[self.parse_row_col()] = value
+				var.resolve()[self.parse_row_col()] = value
 				self.eat_if(R_PAREN)
 			else:
-				t.variable.store(self.env, value)
-		
+				var.store(value)
+
 		elif t.variable is not None:
 			t.variable.store(self.env, value)
 
 		elif t is DIM:
 			self.parse_store_dim(value)
-			
+
 		elif t is RAND:
 			self.env.set_random_seed(value)
 
@@ -429,12 +430,11 @@ class Parser:
 			raise TiSyntaxError(f"Invalid store target: {t}")
 
 	def parse_store_list(self, var: Variable, value):
-		if self.eat_if(L_PAREN):
-			lst = var.get(self.env)
-			if lst is None:
+		if self.eat_if(L_PAREN):			
+			if var.value is None:
 				lst = TiList()
 				lst[self.parse_expr()] = value
-				var.set(self.env, lst)
+				var.value = lst
 			else:
 				lst[self.parse_expr()] = value
 			self.eat_if(R_PAREN)
@@ -445,18 +445,17 @@ class Parser:
 		t = self.peek()
 		if t.is_list_var() or t is LIST_PREFIX:
 			var = self.parse_list_var()
-			lst = var.get(self.env)
-			if lst is None:
-				var.set(self.env, TiList.alloc(value))
+			if var.value is None:
+				var.value = TiList.alloc(value)
 			else:
-				lst.set_dim(value)
+				var.value.set_dim(value)
 		elif t.is_matrix_var():
 			self.advance()
-			mat = t.variable.get(self.env)
-			if mat is None:
-				t.variable.set(self.env, TiMatrix.alloc(value))
+			var = t.variable(self.env)
+			if var.value is None:
+				var.value = TiMatrix.alloc(value)
 			else:
-				mat.set_dim(value)
+				var.value.set_dim(value)
 		else:
 			raise TiSyntaxError(f"Invalid store-to-dim target: {t}")
 		self.eat_if(R_PAREN)
@@ -466,12 +465,12 @@ class Parser:
 		if t is LIST_PREFIX:
 			return self.parse_user_list()
 		if t.is_list_var():
-			return t.variable
+			return t.variable(self.env)
 		raise TiSyntaxError(f"Expected a list variable, got {t}")
-	
+
 	def parse_user_list(self):
-		return UserList(self.read_name(5))
-		
+		return UserList(self.env, self.read_name(5))
+
 	# SKIPPING
 
 	def skip_statement(self) -> None:
@@ -623,29 +622,31 @@ class ArgParser:
 		t = self._parser.advance()
 		if not t.is_numeric_var():
 			raise DataTypeError(f"Expected a numeric variable, got {t}")
-		return t.variable
+		return t.variable(self.env)
+		
 	@_parse_arg
 	def list_var(self) -> Variable:
 		return self._parser.parse_list_var()
+
 	@_parse_arg
 	def matrix_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_matrix_var():
-			return t.variable
+			return t.variable(self.env)
 		raise DataTypeError(f"Expected a matrix variable, got {t}")
 
 	@_parse_arg
 	def string_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_string_var():
-			return t.variable
+			return t.variable(self.env)
 		raise DataTypeError(f"Expected a string variable, got {t}")
 
 	@_parse_arg
 	def equation_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_equation_var():
-			return t.variable
+			return t.variable(self.env)
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
 	@_parse_arg
@@ -657,11 +658,12 @@ class ArgParser:
 		if self.peek().is_numeric_var():
 			return UserList(self._parser.read_name(5))
 		return self._parser.parse_list_var()
+
 	def any_var(self) -> Variable:
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
 		t = self._parser.advance()
 		if t.variable is not None:
-			return t.variable
+			return t.variable(self.env)
 		if t is LIST_PREFIX:
 			return self._parser.parse_user_list()
 		raise TiSyntaxError(f"Expected a variable, got {t}")
@@ -759,16 +761,16 @@ if __name__ == '__main__':
 		print('<<', env.ans)
 
 	env.angle_mode = 'DEG'
-	
+
 	test('55@A:99@B')
 	test('int( log( 2) INV log( max( A,B')
 	# test('2^ cumSum( binomcdf( Ans ,0')
 	# test('sum( Ans .5(1= abs( int( 2 fPart( Ans INV (A+Bi')
-	
+
 	# test('55@A:99@B')
 	# test('seq( 2^N,N,8,1,~1@ L1')
 	# test('.5 sum( L1 *(1= abs( int( 2 fPart( (A+Bi)/ L1')
-	
+
 	# test("1E2°1E2'")
 	# test("1E2+(1E2/60)")
 	# test('1@A')
