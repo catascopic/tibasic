@@ -5,8 +5,7 @@ from typing import Any
 import math, itertools
 from titoken import Token
 from environment import (
-	Environment, Variable, NumericVariable, ListVariable, MatrixVariable, StringVariable, RealVariable,
-	FunctionVariable, ParametricVariable, PolarVariable, SequenceVariable,
+	Environment,
 	WindowVariable,
 )
 import purefunctions as pf
@@ -72,7 +71,7 @@ def token(
 	cmd:  Callable | None = None,
 	res:  Callable | None = None,
 	cnv:  Callable | None = None,
-	var:  Variable | None = None,
+	var:  Callable | None = None,
 ) -> Token:
 	text = text or char
 	t = Token(code.to_bytes(1 + (code > 0xFF)), char, text, bp, op, post, func, cmd, res, cnv, var)
@@ -149,22 +148,22 @@ NEWLINE   = token(0x3F, char='\n')
 
 token(0x40, ' and ',   bp=(30, 31), op=ops.and_)
 
-LETTERS = tuple(token(0x41 + i, char=chr(0x41 + i), var=NumericVariable(i)) for i in range(26)) + (token(0x5B, char='θ', var=NumericVariable(26)),)
+LETTERS = tuple(token(0x41 + i, char=chr(0x41 + i)) for i in range(26)) + (token(0x5B, char='θ'),)
 
 # ── 0x5C xx: matrix variables ([A]–[J]) ──────────────────────────────────────
 
-MATRICES = tuple(token(0x5C00 | i, f'[{chr(0x41 + i)}]', var=MatrixVariable(i)) for i in range(10))
+MATRICES = tuple(token(0x5C00 | i, f'[{chr(0x41 + i)}]') for i in range(10))
 
 # ── 0x5D xx: list variables (L1–L6) ──────────────────────────────────────────
 
-LISTS = tuple(token(0x5D00 | i, f'L{chr(0x2081 + i)}', var=ListVariable(i)) for i in range(6))
+LISTS = tuple(token(0x5D00 | i, f'L{chr(0x2081 + i)}') for i in range(6))
 
 # ── 0x5E xx: equation and sequence variables ──────────────────────────────────
 
-FUNCTION   = tuple(token(0x5E10 + i, f'Y{chr(0x2080 + (i + 1) % 10)}',			var=FunctionVariable(i))   for i in range(10))
-PARAMETRIC = tuple(token(0x5E20 + i, f'{'XY'[i % 2]}{chr(0x2081 + i // 2)}ₜ',	var=ParametricVariable(i)) for i in range(12))
-POLAR      = tuple(token(0x5E40 + i, f'r{chr(0x2081 + i)}',						var=PolarVariable(i))      for i in range(6))
-SEQUENCE   = tuple(token(0x5E80 + i, chr(0x1D462 + i),							var=SequenceVariable(i))   for i in range(3))
+FUNCTION   = tuple(token(0x5E10 + i, f'Y{chr(0x2080 + (i + 1) % 10)}',			) for i in range(10))
+PARAMETRIC = tuple(token(0x5E20 + i, f'{'XY'[i % 2]}{chr(0x2081 + i // 2)}ₜ',	) for i in range(12))
+POLAR      = tuple(token(0x5E40 + i, f'r{chr(0x2081 + i)}',						) for i in range(6))
+SEQUENCE   = tuple(token(0x5E80 + i, chr(0x1D462 + i),							) for i in range(3))
 
 PRGM = token(0x5F, 'prgm', cmd=forms.prgm)
 
@@ -210,7 +209,7 @@ token(0x621D, 'x₃')
 token(0x621E, 'y₁')
 token(0x621F, 'y₂')
 token(0x6220, 'y₃')
-REC_N = token(0x6221, '𝑛', var=RealVariable('n'))
+REC_N = token(0x6221, '𝑛', var=lambda env: env.n)
 token(0x6222, 'p')
 token(0x6223, 'z')
 token(0x6224, 't')
@@ -262,13 +261,13 @@ token(0x6326, 'ΔX', var=WindowVariable(17))
 token(0x6327, 'ΔY', var=WindowVariable(18))
 token(0x6328, 'XFact', var=WindowVariable(19))
 token(0x6329, 'YFact', var=WindowVariable(20))
-token(0x632B, '𝐍',   var=RealVariable('n_tvm'))
-token(0x632C, 'I%',  var=RealVariable('i_pct'))
-token(0x632D, 'PV',  var=RealVariable('pv'))
-token(0x632E, 'PMT', var=RealVariable('pmt'))
-token(0x632F, 'FV',  var=RealVariable('fv'))
-token(0x6330, 'P/Y', var=RealVariable('py'))
-token(0x6331, 'C/Y', var=RealVariable('cy'))
+token(0x632B, '𝐍')
+token(0x632C, 'I%')
+token(0x632D, 'PV')
+token(0x632E, 'PMT')
+token(0x632F, 'FV')
+token(0x6330, 'P/Y')
+token(0x6331, 'C/Y')
 token(0x6334, 'PlotStep')
 token(0x6336, 'Xres')
 
@@ -374,7 +373,7 @@ token(0xA9, 'DrawF ')
 
 # ── 0xAA xx: string variables (Str1–Str0) ────────────────────────────────────
 
-STRINGS = tuple(token(0xAA00 | i, f'Str{(i + 1) % 10}', var=StringVariable(i)) for i in range(10))
+STRINGS = tuple(token(0xAA00 | i, f'Str{(i + 1) % 10}') for i in range(10))
 
 RAND = token(0xAB, 'rand', res=Environment.rand, func=pf.rand_list)
 token(0xAC, char='π', res=lambda env: math.pi)
@@ -753,4 +752,4 @@ token(0xFF, 'LinReg(ax+b) ')
 
 
 if __name__ == '__main__':
-	print([t.variable for t in PARAMETRIC])
+	print(len(ALL_TOKENS))

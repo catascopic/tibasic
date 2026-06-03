@@ -21,15 +21,15 @@ class Environment:
 
 	def __init__(self):
 		# VARIABLES
-		self.numerics      = [NumericVar] * 27   # A–Z, θ
-		self.lists         = [None] * 6    # L1–L6
-		self.user_lists    = {}            # ᴸNAME lists
-		self.matrices      = [None] * 10   # [A]–[J]
-		self.strings       = [None] * 10   # Str1–Str0
-		self.function      = [None] * 10   # Y1–Y0
-		self.parametric    = [None] * 12   # X1T–Y6T
-		self.polar         = [None] * 6    # r1–r6
-		self.sequence      = [None] * 3    # u, v, w
+		self.numerics   = [NumericVariable()  for _ in range(27)]  # A–Z, θ
+		self.lists      = [ListVariable()     for _ in range(6)]   # L1–L6
+		self.matrices   = [MatrixVariable()   for _ in range(10)]  # [A]–[J]
+		self.strings    = [StringVariable()   for _ in range(10)]  # Str1–Str0
+		self.function   = [EquationVariable() for _ in range(10)]  # Y1–Y0
+		self.parametric = [EquationVariable() for _ in range(12)]  # X1T–Y6T
+		self.polar      = [EquationVariable() for _ in range(6)]   # r1–r6
+		self.sequence   = [EquationVariable() for _ in range(3)]   # u, v, w
+		self.user_lists = {}
 		# self.stat        = [None] * 0x3D # stat vars
 		# self.window      = [None] * 0x37 # window vars
 		self.n = None
@@ -235,15 +235,14 @@ class Environment:
 
 class Variable(ABC):
 
-	def __init__(self, name: str, value=None):
+	def __init__(self, value=None):
 		self.value = None
 
 	def resolve(self) -> Any:
 		"""Called when the user references a variable."""
-		val = self.get()
-		if val is None:
+		if self.value is None:
 			raise UndefinedError(f"Undefined variable: {self}")
-		return val
+		return self.value
 
 	def store(self, new_value) -> None:
 		"""Called when the user stores a variable."""
@@ -255,36 +254,34 @@ class Variable(ABC):
 		pass
 
 
+class NumericVariable(Variable):
 
-class _DefaultZero(Variable):
 	def resolve(self):
-		val = self.get()
-		if val is None:
-			self.set(0)
-			return 0
-		return val
+		if self.value is None:
+			self.value = 0
+		return self.value
+	
+	def normalize(self, value):
+		return require_num(value)
 
 
-class NumericVariable(_DefaultZero):
-	def normalize(self, value): return require_num(value)
-	def __repr__(self):         return f"Var<{chr(65 + self.index) if self.index < 26 else 'θ'}>"
-
+class RealVariable(NumericVariable):
+	def normalize(self, value):
+		return require_real(value)
+	
 class ListVariable(Variable):
-	def normalize(self, value): return require_list(value).copy()
-	def __repr__(self):         return f"Var<L{self.index + 1}>"
+	def normalize(self, value):
+		return require_list(value).copy()
 
 class MatrixVariable(Variable):
-	def normalize(self, value): return require_matrix(value).copy()
-	def __repr__(self):         return f"Var<[{chr(65 + self.index)}]>"
+	def normalize(self, value):
+		return require_matrix(value).copy()
 
 class StringVariable(Variable):
-	_array = 'strings'
-	def normalize(self, value): return require_str(value)
-	def __repr__(self):         return f"Var<Str{(self.index + 1) % 10}>"
+	def normalize(self, value):
+		return require_str(value)
 
-
-class _EquationVariable(Variable):
-
+class EquationVariable(Variable):
 	def normalize(self, value):
 		if isinstance(value, TiEquation):
 			return value
@@ -293,42 +290,23 @@ class _EquationVariable(Variable):
 		raise DataTypeError(f"Expected equation or string; got {value}")
 
 
-class FunctionVariable(_EquationVariable):
-	def __repr__(self): return f"FunctionVar<Y{(self.index + 1) % 10}>"
+class UserList:
 
-class ParametricVariable(_EquationVariable):
-	def __repr__(self): return f"ParametricVar<{'XY'[self.index % 2]}{1 + self.index // 2}T>"
-
-class PolarVariable(_EquationVariable):
-	def __repr__(self): return f"PolarVar<r{(self.index + 1)}>"
-
-class SequenceVariable(_EquationVariable):
-	def __repr__(self): return f"SequenceVar<{'uvw'[self.index]}>"
-
-
-class RealVariable(_DefaultZero):
-
-	def normalize(self, value):
-		return require_real(value)
-
-	def __repr__(self):
-		return f"RealVar({self.name})"
-
-
-class UserList(Variable):
-
-	def __init__(self, name: str):
+	def __init__(self, env: Environment, name: str):
+		self.env = env
 		self.name = name
 
-	def get(self):
-		return env.user_lists.get(self.name)
+	@property
+	def value(self):
+		return self.env.user_lists.get(self.name)
 
-	def set(self, value):
-		env.user_lists[self.name] = value
+	@value.setter
+	def set(self, new_value):
+		if new_value is None:
+			self.env.user_lists.pop(name, None)
+		else:
+			self.env.user_lists[name] = new_value
 
-	def delete(self):
-		env.user_lists.pop(self.name, None)
-		
 	def normalize(self, value):
 		return require_list(value).copy()
 
