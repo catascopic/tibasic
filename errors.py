@@ -13,6 +13,7 @@ class TiError(Exception):
 	def __init__(self, message: str = '', *, pos: int | None = None):
 		super().__init__(message)
 		self.pos = pos  # token-stream index where the error occurred, if known
+		self.located = False  # True once a parser has displayed the error location
 
 
 class TiSyntaxError(TiError):

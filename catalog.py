@@ -5,7 +5,7 @@ from typing import Any
 import math, itertools
 from titoken import Token
 from environment import (
-	Environment, Accessor, NumericAccessor, ListAccessor, MatrixAccessor, StringAccessor, EquationAccessor, StatAccessor, WindowAccessor, RealAccessor,
+	Environment, Variable, NumericVariable, ListVariable, MatrixVariable, StringVariable, EquationVariable, StatVariable, WindowVariable, RealVariable,
 )
 import purefunctions as pf
 import operators as ops
@@ -70,7 +70,7 @@ def token(
 	cmd:  Callable | None = None,
 	res:  Callable | None = None,
 	cnv:  Callable | None = None,
-	var:  Accessor | None = None,
+	var:  Variable | None = None,
 ) -> Token:
 	text = text or char
 	t = Token(code.to_bytes(1 + (code > 0xFF)), char, text, bp, op, post, func, cmd, res, cnv, var)
@@ -147,28 +147,28 @@ NEWLINE   = token(0x3F, char='\n')
 
 token(0x40, ' and ',   bp=(30, 31), op=ops.and_)
 
-LETTERS = tuple(token(0x41 + i, char=chr(0x41 + i), var=NumericAccessor(i)) for i in range(26)) + (token(0x5B, char='θ', var=NumericAccessor(26)),)
+LETTERS = tuple(token(0x41 + i, char=chr(0x41 + i), var=NumericVariable(i)) for i in range(26)) + (token(0x5B, char='θ', var=NumericVariable(26)),)
 
 # ── 0x5C xx: matrix variables ([A]–[J]) ──────────────────────────────────────
 
-MATRICES = tuple(token(0x5C00 | i, f'[{chr(0x41 + i)}]', var=MatrixAccessor(i)) for i in range(10))
+MATRICES = tuple(token(0x5C00 | i, f'[{chr(0x41 + i)}]', var=MatrixVariable(i)) for i in range(10))
 
 # ── 0x5D xx: list variables (L1–L6) ──────────────────────────────────────────
 
-LISTS = tuple(token(0x5D00 | i, f'L{chr(0x2081 + i)}', var=ListAccessor(i)) for i in range(6))
+LISTS = tuple(token(0x5D00 | i, f'L{chr(0x2081 + i)}', var=ListVariable(i)) for i in range(6))
 
 # ── 0x5E xx: equation and sequence variables ──────────────────────────────────
 
-Y_EQUATIONS = tuple(token(0x5E10 + i, f'Y{chr(0x2080 + (i + 1) % 10)}', var=EquationAccessor('y_equations', i)) for i in range(10))
+Y_EQUATIONS = tuple(token(0x5E10 + i, f'Y{chr(0x2080 + (i + 1) % 10)}', var=EquationVariable('y_equations', i)) for i in range(10))
 PARAM_EQUATIONS = tuple(
-	token(0x5E20 + i, f'{x}{chr(0x2080 + n)}ₜ', var=EquationAccessor('param_equations', i))
+	token(0x5E20 + i, f'{x}{chr(0x2080 + n)}ₜ', var=EquationVariable('param_equations', i))
 	for i, (n, x) in enumerate(itertools.product(range(1, 7), 'XY'))
 )
-POLAR_EQUATIONS = tuple(token(0x5E40 + i, f'r{chr(0x2081 + i)}', var=EquationAccessor('polar_equations', i)) for i in range(6))
+POLAR_EQUATIONS = tuple(token(0x5E40 + i, f'r{chr(0x2081 + i)}', var=EquationVariable('polar_equations', i)) for i in range(6))
 
-token(0x5E80, '𝑢', var=EquationAccessor('seq_equations', 0))
-token(0x5E81, '𝑣', var=EquationAccessor('seq_equations', 1))
-token(0x5E82, '𝑤', var=EquationAccessor('seq_equations', 2))
+token(0x5E80, '𝑢', var=EquationVariable('seq_equations', 0))
+token(0x5E81, '𝑣', var=EquationVariable('seq_equations', 1))
+token(0x5E82, '𝑤', var=EquationVariable('seq_equations', 2))
 
 PRGM = token(0x5F, 'prgm', cmd=forms.prgm)
 
@@ -214,7 +214,7 @@ token(0x621D, 'x₃')
 token(0x621E, 'y₁')
 token(0x621F, 'y₂')
 token(0x6220, 'y₃')
-REC_N = token(0x6221, '𝑛', var=RealAccessor('n'))
+REC_N = token(0x6221, '𝑛', var=RealVariable('n'))
 token(0x6222, 'p')
 token(0x6223, 'z')
 token(0x6224, 't')
@@ -245,34 +245,34 @@ token(0x623C, 'Error MS')
 
 # ── 0x63 xx: window and finance variables ─────────────────────────────────────
 
-token(0x6302, 'Xscl', var=WindowAccessor(0))  # TODO: WindowAccessorAuto
-token(0x6303, 'Yscl', var=WindowAccessor(1))
-token(0x630A, 'Xmin', var=WindowAccessor(2))
-token(0x630B, 'Xmax', var=WindowAccessor(3))
-token(0x630C, 'Ymin', var=WindowAccessor(4))
-token(0x630D, 'Ymax', var=WindowAccessor(5))
-token(0x630E, 'Tmin', var=WindowAccessor(6))
-token(0x630F, 'Tmax', var=WindowAccessor(7))
-token(0x6310, 'θmin', var=WindowAccessor(8))
-token(0x6311, 'θmax', var=WindowAccessor(9))
-token(0x631A, 'TblStart',  var=WindowAccessor(10))
-token(0x631B, 'PlotStart', var=WindowAccessor(11))
-token(0x631D, 'nMax', var=WindowAccessor(12))
-token(0x631F, 'nMin', var=WindowAccessor(13))
-token(0x6321, 'ΔTbl', var=WindowAccessor(14))
-token(0x6322, 'Tstep', var=WindowAccessor(15))
-token(0x6323, 'θstep', var=WindowAccessor(16))
-token(0x6326, 'ΔX', var=WindowAccessor(17))
-token(0x6327, 'ΔY', var=WindowAccessor(18))
-token(0x6328, 'XFact', var=WindowAccessor(19))
-token(0x6329, 'YFact', var=WindowAccessor(20))
-token(0x632B, '𝐍',   var=RealAccessor('n_tvm'))
-token(0x632C, 'I%',  var=RealAccessor('i_pct'))
-token(0x632D, 'PV',  var=RealAccessor('pv'))
-token(0x632E, 'PMT', var=RealAccessor('pmt'))
-token(0x632F, 'FV',  var=RealAccessor('fv'))
-token(0x6330, 'P/Y', var=RealAccessor('py'))
-token(0x6331, 'C/Y', var=RealAccessor('cy'))
+token(0x6302, 'Xscl', var=WindowVariable(0))  # TODO: WindowVariableAuto
+token(0x6303, 'Yscl', var=WindowVariable(1))
+token(0x630A, 'Xmin', var=WindowVariable(2))
+token(0x630B, 'Xmax', var=WindowVariable(3))
+token(0x630C, 'Ymin', var=WindowVariable(4))
+token(0x630D, 'Ymax', var=WindowVariable(5))
+token(0x630E, 'Tmin', var=WindowVariable(6))
+token(0x630F, 'Tmax', var=WindowVariable(7))
+token(0x6310, 'θmin', var=WindowVariable(8))
+token(0x6311, 'θmax', var=WindowVariable(9))
+token(0x631A, 'TblStart',  var=WindowVariable(10))
+token(0x631B, 'PlotStart', var=WindowVariable(11))
+token(0x631D, 'nMax', var=WindowVariable(12))
+token(0x631F, 'nMin', var=WindowVariable(13))
+token(0x6321, 'ΔTbl', var=WindowVariable(14))
+token(0x6322, 'Tstep', var=WindowVariable(15))
+token(0x6323, 'θstep', var=WindowVariable(16))
+token(0x6326, 'ΔX', var=WindowVariable(17))
+token(0x6327, 'ΔY', var=WindowVariable(18))
+token(0x6328, 'XFact', var=WindowVariable(19))
+token(0x6329, 'YFact', var=WindowVariable(20))
+token(0x632B, '𝐍',   var=RealVariable('n_tvm'))
+token(0x632C, 'I%',  var=RealVariable('i_pct'))
+token(0x632D, 'PV',  var=RealVariable('pv'))
+token(0x632E, 'PMT', var=RealVariable('pmt'))
+token(0x632F, 'FV',  var=RealVariable('fv'))
+token(0x6330, 'P/Y', var=RealVariable('py'))
+token(0x6331, 'C/Y', var=RealVariable('cy'))
 token(0x6334, 'PlotStep')
 token(0x6336, 'Xres')
 
@@ -378,7 +378,7 @@ token(0xA9, 'DrawF ')
 
 # ── 0xAA xx: string variables (Str1–Str0) ────────────────────────────────────
 
-STRINGS = tuple(token(0xAA00 | i, f'Str{(i + 1) % 10}', var=StringAccessor(i)) for i in range(10))
+STRINGS = tuple(token(0xAA00 | i, f'Str{(i + 1) % 10}', var=StringVariable(i)) for i in range(10))
 
 RAND = token(0xAB, 'rand', res=Environment.rand, func=pf.rand_list)
 token(0xAC, char='π', res=lambda env: math.pi)

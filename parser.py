@@ -10,7 +10,7 @@ from catalog import (
 	LIST_PREFIX, RAND, DIM,
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
-from environment import Environment, Accessor, Variable, UserListAccessor
+from environment import Environment, Variable, UserListVariable
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError, UndefinedError
 
 
@@ -428,7 +428,7 @@ class Parser:
 		else:
 			raise TiSyntaxError(f"Invalid store target: {t}")
 
-	def parse_store_list(self, var: Accessor, value):
+	def parse_store_list(self, var: Variable, value):
 		if self.eat_if(L_PAREN):
 			try:
 				lst = var.get(self.env)
@@ -473,7 +473,7 @@ class Parser:
 		raise TiSyntaxError(f"Expected a list variable, got {t}")
 	
 	def _parse_user_list_var(self):
-		return UserListAccessor(self._read_name(5))
+		return UserListVariable(self._read_name(5))
 		
 	# SKIPPING
 
@@ -561,10 +561,15 @@ class Parser:
 			while self.has_next:
 				self._exec_statement()
 		except TiError as e:
-			if e.pos is not None:
+			# Only the parser that owns the token stream for e.pos displays the
+			# location; once shown, mark the error so enclosing parsers (e.g. the
+			# caller of a `prgm` invocation, whose tokens are unrelated) neither
+			# re-display nor index out of range.
+			if e.pos is not None and not e.located and 0 <= e.pos < len(self.tokens):
 				loc = [t.text for t in self.tokens]
 				loc[e.pos] = f"[![{loc[e.pos]}]!]"
 				print(''.join(loc))
+				e.located = True
 			raise
 
 
@@ -621,31 +626,29 @@ class ArgParser:
 		t = self._parser.advance()
 		if not t.is_numeric_var():
 			raise DataTypeError(f"Expected a numeric variable, got {t}")
-		return t.variable.bind(self.env)
-
+		return t.variable
 	@_parse_arg
 	def list_var(self) -> Variable:
-		return self._parser.parse_list_var().bind(self.env)
-
+		return self._parser.parse_list_var()
 	@_parse_arg
 	def matrix_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_matrix_var():
-			return t.variable.bind(self.env)
+			return t.variable
 		raise DataTypeError(f"Expected a matrix variable, got {t}")
 
 	@_parse_arg
 	def string_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_string_var():
-			return t.variable.bind(self.env)
+			return t.variable
 		raise DataTypeError(f"Expected a string variable, got {t}")
 
 	@_parse_arg
 	def equation_var(self) -> Variable:
 		t = self._parser.advance()
 		if t.is_equation_var():
-			return t.variable.bind(self.env)
+			return t.variable
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
 	@_parse_arg
@@ -655,16 +658,15 @@ class ArgParser:
 		SetUpEditor accepts all three forms; ordinary list contexts require the prefix.
 		"""
 		if self.peek().is_numeric_var():
-			return UserListAccessor(self._parser._read_name(5)).bind(self.env)
-		return self._parser.parse_list_var().bind(self.env)
-
+			return UserListVariable(self._parser._read_name(5))
+		return self._parser.parse_list_var()
 	def any_var(self) -> Variable:
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
 		t = self._parser.advance()
 		if t.variable is not None:
-			return t.variable.bind(self.env)
+			return t.variable
 		if t is LIST_PREFIX:
-			return self._parser._parse_user_list_var().bind(self.env)
+			return self._parser._parse_user_list_var()
 		raise TiSyntaxError(f"Expected a variable, got {t}")
 
 	@_parse_arg

@@ -185,6 +185,14 @@ class Environment:
 		return random.random()
 
 	@contextmanager
+	def scoped(self, variable):
+		saved = variable.get(self)
+		try:
+			yield
+		finally:
+			variable.set(self, saved)
+
+	@contextmanager
 	def nest_guard(self, func: object, max_depth: int = 0):
 		if self._nest_depth[func] > max_depth:
 			raise IllegalNestError(func)
@@ -197,7 +205,7 @@ class Environment:
 	def _iter_values(self):
 		from catalog import LETTERS, LISTS, MATRICES, STRINGS
 		for tok in (*LETTERS, *LISTS, *MATRICES, *STRINGS):
-			v = tok.variable.get_unsafe(self)
+			v = tok.accessor.get_unsafe(self)
 			if v is not None:
 				yield tok.char if tok.char else tok.text, v
 		for name, lst in self.user_lists.items():
@@ -220,14 +228,13 @@ class Environment:
 		pass
 
 
-# ── Accessor hierarchy ────────────────────────────────────────────────────────────
+# ── Variable hierarchy ────────────────────────────────────────────────────────────
 
-class Accessor(ABC):
+class Variable(ABC):
 	"""Typed descriptor for a storage slot.
 
 	A single shared, env-independent flyweight (held by Token.variable); its
-	methods take the env to act on.  Call it with an env — ``accessor(env)`` —
-	to obtain an env-free :class:`Variable` handle.
+	methods take the env to act on.
 	"""
 
 	@abstractmethod
@@ -252,13 +259,10 @@ class Accessor(ABC):
 	def delete(self, env: Environment) -> None:
 		raise DataTypeError("Cannot delete this variable")
 
-	def bind(self, env: Environment) -> "Variable":
-		"""Bind this accessor to an env, yielding an env-free Variable handle."""
-		return Variable(self, env)
 
 
-class OffsetAccessor(Accessor):
-	"""Accessor stored by integer index in one of the environment's flat arrays."""
+class OffsetVariable(Variable):
+	"""Variable stored by integer index in one of the environment's flat arrays."""
 	__slots__ = ('index',)
 	_array_attr: ClassVar[str]
 
@@ -284,13 +288,13 @@ class OffsetAccessor(Accessor):
 		getattr(env, self._array_attr)[self.index] = None
 
 
-class NamedAccessor(Accessor):
+class NamedVariable(Variable):
 	__slots__ = ('name',)
 	def __init__(self, name: str) -> None:
 		self.name = name
 
 
-class NumericAccessor(OffsetAccessor):
+class NumericVariable(OffsetVariable):
 	__slots__ = ()
 	_array_attr = 'numerics'
 
@@ -305,7 +309,7 @@ class NumericAccessor(OffsetAccessor):
 		return 0
 
 
-class RealAccessor(NamedAccessor):
+class RealVariable(NamedVariable):
 	def get_unsafe(self, env: Environment) -> Any:
 		return getattr(env, self.name)
 
@@ -317,7 +321,7 @@ class RealAccessor(NamedAccessor):
 		setattr(env, self.name, require_real(value))
 
 
-class ListAccessor(OffsetAccessor):
+class ListVariable(OffsetVariable):
 	__slots__ = ()
 	_array_attr = 'lists'
 
@@ -328,7 +332,7 @@ class ListAccessor(OffsetAccessor):
 		return require_list(value).copy()
 
 
-class UserListAccessor(NamedAccessor):
+class UserListVariable(NamedVariable):
 	def get_unsafe(self, env: Environment) -> Any:
 		return env.user_lists.get(self.name)
 
@@ -342,7 +346,7 @@ class UserListAccessor(NamedAccessor):
 		env.user_lists.pop(self.name, None)
 
 
-class MatrixAccessor(OffsetAccessor):
+class MatrixVariable(OffsetVariable):
 	__slots__ = ()
 	_array_attr = 'matrices'
 
@@ -353,7 +357,7 @@ class MatrixAccessor(OffsetAccessor):
 		return require_matrix(value).copy()
 
 
-class StringAccessor(OffsetAccessor):
+class StringVariable(OffsetVariable):
 	__slots__ = ()
 	_array_attr = 'strings'
 
@@ -364,7 +368,7 @@ class StringAccessor(OffsetAccessor):
 		return require_str(value)
 
 
-class EquationAccessor(Accessor):
+class EquationVariable(Variable):
 	__slots__ = ('table', 'index')
 
 	def __init__(self, table: str, index: int) -> None:
@@ -384,7 +388,7 @@ class EquationAccessor(Accessor):
 		getattr(env, self.table)[self.index] = None
 
 
-class StatAccessor(OffsetAccessor):
+class StatVariable(OffsetVariable):
 	__slots__ = ()
 	_array_attr = 'stat'
 
@@ -398,7 +402,7 @@ class StatAccessor(OffsetAccessor):
 		raise DataTypeError("Stat variables are read-only")
 
 
-class WindowAccessor(OffsetAccessor):
+class WindowVariable(OffsetVariable):
 	__slots__ = ()
 	_array_attr = 'window'
 
@@ -409,42 +413,3 @@ class WindowAccessor(OffsetAccessor):
 		return require_real(value)
 
 
-# ── Variable ──────────────────────────────────────────────────────────────────
-
-class Variable:
-	"""An :class:`Accessor` bound to a specific Environment: env-free get/set/delete.
-
-	Produced by ``accessor(env)`` and returned by every ArgParser parse method, so
-	command implementations (forms.py) and control-flow helpers never pass env
-	around.  All storage polymorphism lives in the wrapped accessor, so a single
-	concrete wrapper serves every variable type, user lists included.
-	"""
-	__slots__ = ('_accessor', '_env')
-
-	def __init__(self, accessor: Accessor, env: Environment) -> None:
-		self._accessor = accessor
-		self._env = env
-
-	def get(self) -> Any:
-		return self._accessor.get(self._env)
-
-	def get_unsafe(self) -> Any:
-		return self._accessor.get_unsafe(self._env)
-
-	def set(self, value: Any) -> None:
-		self._accessor.set(self._env, value)
-
-	def delete(self) -> None:
-		self._accessor.delete(self._env)
-
-	@contextmanager
-	def scoped(self):
-		"""Save this variable's value, run the block, then restore it."""
-		saved = self.get()
-		try:
-			yield
-		finally:
-			self.set(saved)
-
-	def __str__(self) -> str:
-		return str(self._accessor)
