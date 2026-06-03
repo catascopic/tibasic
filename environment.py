@@ -32,7 +32,7 @@ class Environment:
 		self.user_lists = {}
 		# self.stat        = [None] * 0x3D # stat vars
 		# self.window      = [None] * 0x37 # window vars
-		self.n = None
+		self.n = NumericVariable()
 		self.ans = 0
 		self.key_code = 0
 		# MODES
