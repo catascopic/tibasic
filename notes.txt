@@ -1,3 +1,7 @@
+Restructured end_block: what do you think?
+
+Test: DelVar the for-loop index
+
 fill: Error message is wrong, it says it expected a list when a matrix would have worked.
 Fail on empty list helper?
 sort: fail on empty list, what about dim mismatch?

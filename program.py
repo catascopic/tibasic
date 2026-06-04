@@ -1,5 +1,5 @@
 from __future__ import annotations
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -29,43 +29,28 @@ class Program:
 	def __init__(self, tokens: list, env: Environment):
 		from parser import Parser  # lazy: program → parser → tokens → forms → program
 		self._parser = Parser(tokens, env)
-		self.env = env
-		self.block_stack: list[Block] = []
+		self._env = env
+		self._block_stack: list[Block] = []
 
-	# ── Execution loop ────────────────────────────────────────────────────────
-
-	def run(self) -> None:
+	def run(self):
 		"""Execute all statements in the token stream until EOF."""
-		self.env.program_stack.append(self)
+		self._env.program_stack.append(self)
 		try:
 			self._parser.run()
 		except ReturnSignal:
 			pass
 		finally:
-			finished = self.env.program_stack.pop()
+			finished = self._env.program_stack.pop()
 			if finished is not self:
 				raise ValueError(f"Program stack out of order: expected {self}; got {finished}")
 
-	# ── Block stack ───────────────────────────────────────────────────────────
+	def push_block(self, block: Block):
+		self._block_stack.append(block)
 
-	def push_block(self, block: Block) -> None:
-		self.block_stack.append(block)
-
-	def pop_block(self) -> Block:
-		if not self.block_stack:
-			raise TiSyntaxError("End/Else without matching block")
-		return self.block_stack.pop()
-
-	def jump(self, pos: int) -> None:
-		"""Set the parser's execution position (used by loop blocks on_end)."""
-		self._parser.pos = pos
-
-	# ── Control-flow commands ─────────────────────────────────────────────────
-
-	def begin_if(self, cond: bool) -> None:
+	def begin_if(self, condition: bool):
 		if self._parser.eat_if(THEN):
 			self._parser.end_statement()
-			if cond:
+			if condition:
 				self.push_block(ThenBlock())
 				# no special handling required for Else here
 			else:
@@ -73,46 +58,53 @@ class Program:
 				if found is ELSE:
 					# handle Else as if it's an If-Else block that's closed by End
 					self.push_block(ThenBlock())
-		elif not cond:
+		elif not condition:
 			self._parser.skip_statement()
 
-	def begin_else(self) -> None:
-		if not isinstance(self.pop_block(), ThenBlock):
-			raise TiSyntaxError("Else without matching Then")
+	def begin_else(self):
+		if not self._block_stack:
+			raise TiSyntaxError("Else without matching block")
+		block = self._block_stack.pop()
+		if not isinstance(block, ThenBlock):
+			raise TiSyntaxError(f"Expected Then block to match Else; got {block}")
 		self._parser.skip_block()
 
-	def begin_while(self, condition: Thunk) -> None:
+	def begin_while(self, condition: Thunk):
 		if condition.eval():
 			self.push_block(WhileBlock(self._parser.pos, condition))
 		else:
 			self._parser.skip_block()
 
-	def begin_repeat(self, condition: Thunk) -> None:
+	def begin_repeat(self, condition: Thunk):
 		self.push_block(RepeatBlock(self._parser.pos, condition))
 
-	def begin_for(self, var: Variable, start: float, end: float, step: float) -> None:
+	def begin_for(self, var: Variable, start: float, end: float, step: float):
 		var.value = start
 		if check_for_condition(start, end, step):
 			self.push_block(ForBlock(self._parser.pos, var, end, step))
 		else:
 			self._parser.skip_block()
 
-	def end_block(self) -> None:
-		self.pop_block().on_end(self)
+	def end_block(self):
+		if not self._block_stack:
+			raise TiSyntaxError("End without matching block")
+		block = self._block_stack[-1]		
+		if block.on_end(self):
+			self._parser.pos = block.pos
+		else:
+			self._block_stack.pop()
 
-	def is_gt(self, var: Variable, threshold: float) -> None:
+	def is_gt(self, var: Variable, threshold: float):
 		var.value = require_real(var.resolve()) + 1
 		if var.value > threshold:
 			self._parser.skip_statement()
 
-	def ds_lt(self, var: Variable, threshold: float) -> None:
+	def ds_lt(self, var: Variable, threshold: float):
 		var.value = require_real(var.resolve()) - 1
 		if var.value < threshold:
 			self._parser.skip_statement()
 
-	# ── Label search ──────────────────────────────────────────────────────────
-
-	def goto(self, name: str) -> None:
+	def goto(self, name: str):
 		"""Jump to the first Lbl <name> in the token stream.
 
 		Scans from the beginning, skipping statements with skip_statement()
@@ -130,13 +122,12 @@ class Program:
 					return
 			else:
 				p.skip_statement()
-		raise LabelError(f"Label not found: {name!r}", pos=lbl_pos)
+		# Missing label: return to the invalid Goto
+		p.pos = lbl_pos
+		raise LabelError(f"Label not found: {name!r}")
 
-
-# ── For-loop continuation helper ─────────────────────────────────────────────
 
 def check_for_condition(value: float, end: float, step: float) -> bool:
-	"""Return True if the For loop should continue (value has not exceeded end)."""
 	if step > 0:
 		return value <= end + 1e-10
 	elif step < 0:
@@ -146,8 +137,9 @@ def check_for_condition(value: float, end: float, step: float) -> bool:
 
 
 class Block(ABC):
-	def on_end(self, prgm: Program):
-		"""This method should not be abstract; the default action is to do nothing."""
+	@abstractmethod
+	def on_end(self, prgm: Program) -> bool:
+		"""Returns whether the program should re-run the block."""
 
 
 @dataclass
@@ -157,11 +149,9 @@ class ForBlock(Block):
 	end: float
 	step: float
 
-	def on_end(self, prgm) -> None:
+	def on_end(self, prgm):
 		self.var.value = self.var.resolve() + self.step
-		if check_for_condition(self.var.value, self.end, self.step):
-			prgm.jump(self.pos)
-			prgm.push_block(self)
+		return check_for_condition(self.var.value, self.end, self.step)
 
 
 @dataclass
@@ -169,10 +159,8 @@ class WhileBlock(Block):
 	pos: int
 	condition: Thunk
 
-	def on_end(self, prgm) -> None:
-		if self.condition.eval():
-			prgm.jump(self.pos)
-			prgm.push_block(self)
+	def on_end(self, prgm):
+		return self.condition.eval()
 
 
 @dataclass
@@ -180,13 +168,11 @@ class RepeatBlock(Block):
 	pos: int
 	condition: Thunk
 
-	def on_end(self, prgm) -> None:
-		if not self.condition.eval():
-			prgm.jump(self.pos)
-			prgm.push_block(self)
+	def on_end(self, prgm):
+		return not self.condition.eval()
 
 
 @dataclass
 class ThenBlock(Block):
-	"""Marker for an active If/Then or Else block.  End simply pops it (no-op on_end)."""
-	pass
+	def on_end(self, prgm):
+		return False
