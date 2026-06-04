@@ -1,4 +1,6 @@
 fill: Error message is wrong, it says it expected a list when a matrix would have worked.
+Fail on empty list helper?
+sort: fail on empty list, what about dim mismatch?
 
 I'm still wondering if there's some way to unify the logic between variables and nullaries.
 I've been looking into how the stat variables work, and it's a bunch of read-only variables. They're probably better off being nullaries rather than variables, and now I'm wondering if variables should implement the same interface. In the end, I don't think so, in part because there are commands like For( that take a variable... I'm not sure. It seems like there might be something there.

@@ -120,7 +120,7 @@ class Program:
 		Raises LabelError if the label is not found.
 		"""
 		p = self._parser
-		current_pos = p.pos
+		lbl_pos = p.pos
 		p.pos = 0
 		while p.has_next:
 			if p.eat_if(LBL):
@@ -130,10 +130,7 @@ class Program:
 					return
 			else:
 				p.skip_statement()
-		raise LabelError(
-			f"Label not found: {name!r}",
-			pos=current_pos - 1 - len(name)  # kind of a hack
-		)
+		raise LabelError(f"Label not found: {name!r}", pos=lbl_pos)
 
 
 # ── For-loop continuation helper ─────────────────────────────────────────────

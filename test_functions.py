@@ -1233,3 +1233,9 @@ class TestFill:
 		Fill( 9, [A]
 		""")
 		assert var(env, '[A]').data == [[9, 9], [9, 9]]
+
+	def test_fill_empty_fails(self):
+		env = run('SetUpEditor L1')
+		with pytest.raises(InvalidDimError):
+			run('Fill( 7, L1', env)
+		

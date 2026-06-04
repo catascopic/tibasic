@@ -223,6 +223,8 @@ def fill(a: ArgParser):
 	else:
 		lst = a.list_var().resolve()
 		a.end_paren_cmd()
+		if not lst.data:
+			raise InvalidDimError("fill: list is empty")
 		for i in range(len(lst.data)):
 			lst.data[i] = fill_value
 

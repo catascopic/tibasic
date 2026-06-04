@@ -399,7 +399,7 @@ class TestLblGoto:
 		""")
 		with pytest.raises(LabelError) as exc_info:
 			Program(tokens, Environment()).run()
-		assert exc_info.value.pos == 4
+		assert exc_info.value.pos == len(tokens)
 
 
 # ── Return ────────────────────────────────────────────────────────────────────
