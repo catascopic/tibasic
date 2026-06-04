@@ -183,14 +183,14 @@ class TestIfOneLine:
 	def test_true_executes_next(self):
 		env = run("""
 		If 1
-		42@A
+			42@A
 		""")
 		assert var(env, 'A') == 42
 
 	def test_false_skips_next(self):
 		env = run("""
 		If 0
-		42@A
+			42@A
 		99@B
 		""")
 		assert var(env, 'A') is None
@@ -209,9 +209,9 @@ class TestIfOneLine:
 		# Two independent one-line Ifs
 		env = run("""
 		If 1
-		10@A
+			10@A
 		If 0
-		20@B
+			20@B
 		30@C
 		""")
 		assert var(env, 'A') == 10
@@ -273,10 +273,10 @@ class TestIfThenElse:
 		env = run("""
 		If 1
 		Then
-		If 1
-		Then
-		42@A
-		End
+			If 1
+			Then
+				42@A
+			End
 		End
 		""")
 		assert var(env, 'A') == 42
@@ -285,11 +285,11 @@ class TestIfThenElse:
 		env = run("""
 		If 1
 		Then
-		If 0
-		Then
-		99@A
-		End
-		42@B
+			If 0
+			Then
+				99@A
+			End
+			42@B
 		End
 		""")
 		assert var(env, 'A') is None
@@ -311,10 +311,10 @@ class TestIfThenElse:
 		# Count how many values A takes that are > 3
 		env = run("""
 		For( A,1,5)
-		If A>3
-		Then
-		B+1@B
-		End
+			If A>3
+			Then
+				B+1@B
+			End
 		End
 		""")
 		assert var(env, 'B') == 2   # A=4 and A=5
@@ -328,10 +328,10 @@ class TestIfThenElse:
 			run("""
 			If 0
 			Then
-			1@A
-			Then
-			End
-			2@B
+				1@A
+				Then
+				End
+				2@B
 			End
 			3@C
 			""")
@@ -345,7 +345,7 @@ class TestIfThenElse:
 			run("""
 			If 1
 			Then
-			1@A
+				1@A
 			End
 			End
 			""")
@@ -399,7 +399,7 @@ class TestLblGoto:
 		""")
 		with pytest.raises(LabelError) as exc_info:
 			Program(tokens, Environment()).run()
-		assert exc_info.value.pos == len(tokens)
+		assert exc_info.value.pos == len(tokens) - 1
 
 
 # ── Return ────────────────────────────────────────────────────────────────────

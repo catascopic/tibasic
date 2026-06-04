@@ -101,7 +101,7 @@ def power(base, exp, env):
 	try:
 		result = base ** exp
 	except ValueError:
-		if env.complex_mode is ComplexMode.REAL:
+		if env.real_only:
 			raise NonRealAnsError("Non-real result")
 		return cmath.exp(cmath.log(complex(base)) * exp)
 	return result
@@ -114,7 +114,7 @@ def xth_root(n, x, env):
 	try:
 		return x ** (1 / n)
 	except ValueError:
-		if env.complex_mode is ComplexMode.REAL:
+		if env.real_only:
 			raise NonRealAnsError("Non-real result")
 		return cmath.exp(cmath.log(x) / n)
 

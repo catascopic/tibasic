@@ -159,12 +159,12 @@ class Parser:
 	def parse_string_literal(self) -> TiString:
 		"""Opening \" already consumed. Reads until closing \", STORE, NEWLINE, or EOF.
 		Colons are valid string content; newlines implicitly terminate the string."""
-		tokens = []
-		while not self.peek() in {STORE, NEWLINE, EOF_TOKEN}:
-			if self.eat_if(QUOTE):
-				break
-			tokens.append(self.advance())
-		return TiString(tokens)
+		start = self.pos
+		while self.peek() not in {QUOTE, STORE, NEWLINE, EOF_TOKEN}:
+			self.advance()
+		string = TiString(self.tokens[start:self.pos])
+		self.eat_if(QUOTE)
+		return string
 
 	def parse_list_literal(self) -> TiList:
 		"""{ already consumed."""
@@ -248,7 +248,6 @@ class Parser:
 		label = t.char
 		if self.peek().is_name_char():
 			label += self.advance().char
-
 		return label
 
 	def read_name(self, limit) -> str:
@@ -563,7 +562,7 @@ class Parser:
 			# re-display nor index out of range.
 			if e.pos is not None and not e.located and 0 <= e.pos < len(self.tokens):
 				loc = [t.text for t in self.tokens]
-				loc[e.pos] = f"[![{loc[e.pos]}]!]"
+				loc[e.pos] = f" <<< {loc[e.pos]} >>> "
 				print(''.join(loc))
 				e.located = True
 			raise
@@ -762,8 +761,10 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('55@A:99@B')
-	test('int( log( 2) INV log( max( A,B')
+	test('[[1]]={1}')
+	# test('""1@ Str1')
+	# test('55@A:99@B')
+	# test('int( log( 2) INV log( max( A,B')
 	# test('2^ cumSum( binomcdf( Ans ,0')
 	# test('sum( Ans .5(1= abs( int( 2 fPart( Ans INV (A+Bi')
 
@@ -802,3 +803,4 @@ if __name__ == '__main__':
 	# test(3,STORE,(0x5C,0),'(2,1')
 	# print(env.numerics)
 	env.dump()
+	print(env.strings)

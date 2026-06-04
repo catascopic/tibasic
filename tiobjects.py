@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import functools
 import operator
 from collections.abc import Callable, Iterator
 from itertools import repeat
@@ -117,16 +118,21 @@ class TiList:
 		return TiList(self.data.copy())
 
 	def __repr__(self) -> str:
+		if not all(isinstance(i, Number) for i in self):
+			raise ValueError(self.data)
 		return f"{{{','.join(repr_num(i) for i in self)}}}"
 
 
 def _vectorize_op(op: Callable) -> Callable:
+	@functools.wraps(op)
 	def list_op(self: TiList, other: Any) -> TiList:
 		if isinstance(other, TiList):
 			if len(self) != len(other):
 				raise DimMismatchError(f"Dim mismatch: {len(self)} vs {len(other)}")
 			return TiList([op(a, b) for a, b in zip(self, other)])
-		return TiList([op(a, other) for a in self.data])
+		if isinstance(other, Number):
+			return TiList([op(a, other) for a in self.data])
+		return NotImplemented
 	return list_op
 
 
@@ -233,16 +239,26 @@ class TiMatrix:
 		])
 
 	def __add__(self, other: Any) -> TiMatrix:
-		return self.transform_zip(other, operator.add) if isinstance(other, TiMatrix) else self.transform(lambda x: x + other)
+		if isinstance(other, TiMatrix):
+			return self.transform_zip(other, operator.add)
+		if isinstance(other, Number):
+			return self.transform(lambda x: x + other)
+		return NotImplemented
 
 	def __radd__(self, other: Any) -> TiMatrix:
 		return self + other
 
 	def __sub__(self, other: Any) -> TiMatrix:
-		return self.transform_zip(other, operator.sub) if isinstance(other, TiMatrix) else self.transform(lambda x: x - other)
+		if isinstance(other, TiMatrix):
+			return self.transform_zip(other, operator.sub)
+		if isinstance(other, Number):
+			return self.transform(lambda x: x - other)
+		return NotImplemented
 
 	def __rsub__(self, other: Any) -> TiMatrix:
-		return self.transform(lambda x: other - x)
+		if isinstance(other, Number):
+			return self.transform(lambda x: other - x)
+		return NotImplemented
 
 	def __matmul__(self, other: TiMatrix) -> TiMatrix:
 		if self.cols != other.rows:
@@ -319,6 +335,10 @@ class TiMatrix:
 		return TiMatrix([row.copy() for row in self.data])
 
 	def __repr__(self) -> str:
+		for row in self.data:
+			for i in row:
+				if not isinstance(i, Number):
+					raise ValueError(self.data)
 		return '[' + ''.join('[' + ' '.join(repr_num(x) for x in row) + ']' for row in self.data) + ']'
 		# widths = [max(len(repr_num(row[c])) for row in self.data) for c in range(len(self.data[0]))]
 		# return f"[{'\n'.join([f"[{' '.join(f'{repr_num(x):{widths[c]}}' for c, x in enumerate(row))}]" for row in self.data])}]"

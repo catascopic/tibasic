@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 from decorators import env_func, env_vectorized, TiCall
 from environment import Environment
-from errors import DomainError, NonRealAnsError
+from errors import TiSyntaxError, DomainError, NonRealAnsError
 from modes import ComplexMode
 from tiobjects import require_num, require_real, require_int, require_str
 
@@ -71,7 +71,7 @@ def sqrt(env, x):
 		return cmath.sqrt(x)
 	if x >= 0:
 		return math.sqrt(x)
-	if env.complex_mode is ComplexMode.REAL:
+	if env.real_only:
 		raise NonRealAnsError(f"√({x}): non-real result")
 	return cmath.sqrt(x)
 
@@ -84,7 +84,7 @@ def ln(env, x):
 		return math.log(x)
 	if x == 0:
 		raise DomainError("ln: undefined for 0")
-	if env.complex_mode is ComplexMode.REAL:
+	if env.real_only:
 		raise NonRealAnsError(f"ln({x}): non-real result")
 	return cmath.log(x)
 
@@ -97,7 +97,7 @@ def log(env, x):
 		return math.log10(x)
 	if x == 0:
 		raise DomainError("log: undefined for 0")
-	if env.complex_mode is ComplexMode.REAL:
+	if env.real_only:
 		raise NonRealAnsError(f"log({x}): non-real result")
 	return cmath.log10(x)
 
@@ -113,7 +113,7 @@ def log_base(env, x, base):
 		raise DomainError("logBASE: undefined for x=0")
 	if x > 0:
 		return math.log(x, base)
-	if env.complex_mode is ComplexMode.REAL:
+	if env.real_only:
 		raise NonRealAnsError(f"logBASE({x}, {base}): non-real result")
 	return cmath.log(x, base)
 
@@ -122,8 +122,8 @@ def acosh(env, x):
 	require_real(x)
 	if x >= 1:
 		return math.acosh(x)
-	if env.complex_mode is ComplexMode.REAL:
-		raise NonRealAnsError(f"cosh⁻¹({x}): non-real result")
+	if env.real_only:
+		raise NonRealAnsError(f"acosh({x}): non-real result")
 	return cmath.acosh(x)
 
 @env_vectorized
@@ -132,8 +132,8 @@ def atanh(env, x):
 	if abs(x) < 1:
 		return math.atanh(x)
 	if abs(x) == 1:
-		raise DomainError(f"tanh⁻¹: undefined for ±1")
-	if env.complex_mode is ComplexMode.REAL:
+		raise DomainError(f"atanh: undefined for ±1")
+	if env.real_only:
 		raise NonRealAnsError(f"tanh⁻¹({x}): non-real result")
 	return cmath.atanh(x)
 
@@ -218,7 +218,11 @@ def expr(env, string):
 	from parser import Parser
 	require_str(string)
 	with env.nest_guard(expr):
-		return Parser(string.tokens, env).parse_expr()
+		p = Parser(string.tokens, env)
+		result = p.parse_expr()
+		if p.has_next:
+			raise TiSyntaxError(f"expr: evaluated string must contain a single expression; got: {string!r}")
+		return result
 
 
 # ── Clock / date-time ─────────────────────────────────────────────────────────

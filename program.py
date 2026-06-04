@@ -130,10 +130,9 @@ class Program:
 def check_for_condition(value: float, end: float, step: float) -> bool:
 	if step > 0:
 		return value <= end + 1e-10
-	elif step < 0:
+	if step < 0:
 		return value >= end - 1e-10
-	else:
-		raise IncrementError("For: step cannot be zero")
+	raise IncrementError("For: step cannot be zero")
 
 
 class Block(ABC):

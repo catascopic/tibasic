@@ -1,6 +1,15 @@
+NotImplemented:
+Make tests for all combination of types for all operators
+Make sure we get DataTypeError for bad ones
+How to do this? Either throw in methods (annoying to implement for vectorized TiList ops) or try/catch around actual use of operators. Can we catch TypeError and actually see which types were involved, or can we only see that indirectly in the string message?
+
+
+Refactor window: inner object
+
 Restructured end_block: what do you think?
 
 Test: DelVar the for-loop index
+Test: Weird programs that jump into blocks, jump out of blocks, use If to skip End
 
 fill: Error message is wrong, it says it expected a list when a matrix would have worked.
 Fail on empty list helper?

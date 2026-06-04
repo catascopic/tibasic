@@ -126,6 +126,10 @@ class Environment:
 	def from_deg(self, x):
 		"""Convert x (in degrees) to the current angle mode (for DMS literals)."""
 		return x * (math.pi / 180) if self.angle_mode is AngleMode.RAD else x
+	
+	@property
+	def real_only(self):
+		return self.complex_mode is ComplexMode.REAL
 
 	def set_random_seed(self, value):
 		random.seed(require_int(value))
@@ -233,7 +237,7 @@ class Environment:
 
 	def dump(self):
 		for name, value in self._iter_values():
-			print(f"{name}= {int(value) if isinstance(value, float) and value.is_integer() else value}")
+			print(f"{name}= {int(value) if isinstance(value, float) and value.is_integer() else value!r}")
 
 	def __repr__(self):
 		return f"ENV({','.join(f"{name}={value!r}" for name, value in self._iter_values())})"
@@ -279,6 +283,9 @@ class Variable(ABC):
 	def normalize(self, value) -> Any:
 		"""Validates and coerces a value before storage. For structured types, returns a defensive copy."""
 		pass
+	
+	def __repr__(self):
+		return f"{type(self).__name__}({self.value})"
 
 
 class NumericVariable(Variable):
