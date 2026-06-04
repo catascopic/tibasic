@@ -380,7 +380,7 @@ class Parser:
 				if left_bp <= min_bp:
 					break
 				self.advance()
-				lhs = t.operator(lhs, self.parse_expr(right_bp))
+				lhs = t.operator(lhs, self.parse_expr(right_bp), self.env)
 				continue
 
 			# Implicit multiplication

@@ -86,6 +86,11 @@ class LabelError(TiError):
 	code = 'LABEL'
 
 
+class NonRealAnsError(TiError):
+	"""ERR:NONREAL ANS — a computation produced a complex result while in Real mode."""
+	code = 'NONREAL ANS'
+
+
 class InvalidCommandError(TiError):
 	"""ERR:INVALID — a command was executed in a context where it is not allowed
 	(e.g. a block-level command run from the home screen instead of a program)."""

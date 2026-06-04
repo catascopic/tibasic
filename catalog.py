@@ -1,4 +1,3 @@
-import operator as op
 from collections.abc import Callable, Sequence
 from io import BytesIO
 from typing import Any
@@ -264,7 +263,7 @@ token(0x623C, 'Error MS')
 # ── 0x63 xx: window and finance variables ─────────────────────────────────────
 
 def _window_accessor(index: int):
-	return _window_accessor(index)
+	return _make_accessor('window', index)
 
 token(0x6302, 'Xscl', var=_window_accessor(0))
 token(0x6303, 'Yscl', var=_window_accessor(1))
@@ -305,14 +304,14 @@ token(0x67, 'Sci',    cmd=modes.sci)
 token(0x68, 'Eng',    cmd=modes.eng)
 token(0x69, 'Float',  cmd=modes.float_)
 
-EQ  = token(0x6A, char='=', bp=(40, 41), op=op.eq)
-LT  = token(0x6B, char='<', bp=(40, 41), op=op.lt)
-GT  = token(0x6C, char='>', bp=(40, 41), op=op.gt)
-LE  = token(0x6D, char='≤', bp=(40, 41), op=op.le)
-GE  = token(0x6E, char='≥', bp=(40, 41), op=op.ge)
-NE  = token(0x6F, char='≠', bp=(40, 41), op=op.ne)
-ADD = token(0x70, char='+', bp=(50, 51), op=op.add)
-SUB = token(0x71, char='-', bp=(50, 51), op=op.sub)
+EQ  = token(0x6A, char='=', bp=(40, 41), op=ops.eq)
+LT  = token(0x6B, char='<', bp=(40, 41), op=ops.lt)
+GT  = token(0x6C, char='>', bp=(40, 41), op=ops.gt)
+LE  = token(0x6D, char='≤', bp=(40, 41), op=ops.le)
+GE  = token(0x6E, char='≥', bp=(40, 41), op=ops.ge)
+NE  = token(0x6F, char='≠', bp=(40, 41), op=ops.ne)
+ADD = token(0x70, char='+', bp=(50, 51), op=ops.add)
+SUB = token(0x71, char='-', bp=(50, 51), op=ops.sub)
 ANS = token(0x72, 'Ans',  res=Environment.get_ans, func=forms.ans_index_or_mul)
 
 token(0x73, 'Fix',   cmd=modes.fix)
@@ -353,8 +352,8 @@ token(0x7F, '▫')
 token(0x80, '﹢')
 token(0x81, '·')
 
-MUL = token(0x82, char='*', bp=(60, 61), op=op.mul)
-DIV = token(0x83, char='/', bp=(60, 61), op=op.truediv)
+MUL = token(0x82, char='*', bp=(60, 61), op=ops.mul)
+DIV = token(0x83, char='/', bp=(60, 61), op=ops.div)
 
 token(0x84, 'Trace')
 token(0x85, 'ClrDraw')
@@ -758,7 +757,7 @@ token(0xEF3D, 'FRAC-APPROX')
 
 # ── 0xF0–0xFF: power operators and regression commands ───────────────────────
 
-POW      = token(0xF0, char='^', bp=(70, 69), op=op.pow)
+POW      = token(0xF0, char='^', bp=(70, 69), op=ops.power)
 XTH_ROOT = token(0xF1, 'ˣ√',     bp=(60, 61), op=ops.xth_root)
 
 token(0xF2, '1-Var Stats ')

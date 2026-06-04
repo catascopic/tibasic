@@ -78,6 +78,31 @@ class forms_func(TiCall):
 		return self.func(a)
 
 
+def pure_op(func: Callable) -> Callable:
+	"""Wraps a pure (lhs, rhs) binary operator to accept but ignore env.
+
+	Use as the outer decorator so the inner (vectorized) function sees only
+	the two operands while the parser can always call op(lhs, rhs, env).
+	"""
+	@wraps(func)
+	def wrapper(lhs: Any, rhs: Any, env: Any) -> Any:
+		return func(lhs, rhs)
+	return wrapper
+
+
+def op_vectorized(func: Callable) -> Callable:
+	"""Vectorized binary operator whose third argument is env (never iterated).
+
+	Use for operators that need env (e.g. to check ComplexMode).  The operator
+	is called as op(lhs, rhs, env); env is threaded through without being
+	broadcast over list elements.
+	"""
+	@wraps(func)
+	def apply(lhs: Any, rhs: Any, env: Any) -> Any:
+		return _call_vectorized(lambda l, r: func(l, r, env), (lhs, rhs))
+	return apply
+
+
 def pure_vectorized(func):
 	"""Same as pure_func, but also vectorized."""
 	return pure_func(vectorized(func))

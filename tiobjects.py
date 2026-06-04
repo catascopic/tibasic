@@ -139,12 +139,12 @@ for name, op in [
 	('__rtruediv__', lambda a, b: b / a),
 	('__pow__', pow),
 	('__rpow__', lambda a, b: b ** a),
-	('__eq__', operator.eq),
-	('__ne__', operator.ne),
-	('__lt__', operator.lt),
-	('__gt__', operator.gt),
-	('__le__', operator.le),
-	('__ge__', operator.ge),
+	('__eq__', lambda a, b: float(operator.eq(a, b))),
+	('__ne__', lambda a, b: float(operator.ne(a, b))),
+	('__lt__', lambda a, b: float(operator.lt(a, b))),
+	('__gt__', lambda a, b: float(operator.gt(a, b))),
+	('__le__', lambda a, b: float(operator.le(a, b))),
+	('__ge__', lambda a, b: float(operator.ge(a, b))),
 ]:
 	setattr(TiList, name, _vectorize_op(op))
 
