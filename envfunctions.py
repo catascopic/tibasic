@@ -1,4 +1,5 @@
 from __future__ import annotations
+import cmath
 import math
 from functools import wraps
 from typing import TYPE_CHECKING
@@ -8,8 +9,9 @@ if TYPE_CHECKING:
 
 from decorators import env_func, env_vectorized, TiCall
 from environment import Environment
-from errors import DomainError
-from tiobjects import require_real, require_int, require_str
+from errors import DomainError, NonRealAnsError
+from modes import ComplexMode
+from tiobjects import require_num, require_real, require_int, require_str
 
 
 # ── Trig / coordinate helpers ─────────────────────────────────────────────────
@@ -53,6 +55,82 @@ def acos(x):
 @inv_trig
 def atan(x):
 	return math.atan(x)
+
+
+# ── Logarithms / roots (env-aware for ComplexMode) ───────────────────────────
+
+@env_vectorized
+def sqrt(env, x):
+	require_num(x)
+	if isinstance(x, complex):
+		return cmath.sqrt(x)
+	if x >= 0:
+		return math.sqrt(x)
+	if env.complex_mode is ComplexMode.REAL:
+		raise NonRealAnsError(f"√({x}): non-real result")
+	return cmath.sqrt(x)
+
+@env_vectorized
+def ln(env, x):
+	require_num(x)
+	if isinstance(x, complex):
+		return cmath.log(x)
+	if x > 0:
+		return math.log(x)
+	if x == 0:
+		raise DomainError("ln: undefined for 0")
+	if env.complex_mode is ComplexMode.REAL:
+		raise NonRealAnsError(f"ln({x}): non-real result")
+	return cmath.log(x)
+
+@env_vectorized
+def log(env, x):
+	require_num(x)
+	if isinstance(x, complex):
+		return cmath.log10(x)
+	if x > 0:
+		return math.log10(x)
+	if x == 0:
+		raise DomainError("log: undefined for 0")
+	if env.complex_mode is ComplexMode.REAL:
+		raise NonRealAnsError(f"log({x}): non-real result")
+	return cmath.log10(x)
+
+@env_vectorized
+def log_base(env, x, base):
+	require_num(x)
+	require_num(base)
+	if isinstance(x, complex) or isinstance(base, complex):
+		return cmath.log(x, base)
+	if base <= 0 or base == 1:
+		raise DomainError(f"logBASE: base must be positive and ≠ 1, got {base}")
+	if x == 0:
+		raise DomainError("logBASE: undefined for x=0")
+	if x > 0:
+		return math.log(x, base)
+	if env.complex_mode is ComplexMode.REAL:
+		raise NonRealAnsError(f"logBASE({x}, {base}): non-real result")
+	return cmath.log(x, base)
+
+@env_vectorized
+def acosh(env, x):
+	require_real(x)
+	if x >= 1:
+		return math.acosh(x)
+	if env.complex_mode is ComplexMode.REAL:
+		raise NonRealAnsError(f"cosh⁻¹({x}): non-real result")
+	return cmath.acosh(x)
+
+@env_vectorized
+def atanh(env, x):
+	require_real(x)
+	if abs(x) < 1:
+		return math.atanh(x)
+	if abs(x) == 1:
+		raise DomainError(f"tanh⁻¹: undefined for ±1")
+	if env.complex_mode is ComplexMode.REAL:
+		raise NonRealAnsError(f"tanh⁻¹({x}): non-real result")
+	return cmath.atanh(x)
 
 
 # ── Coordinate conversions ────────────────────────────────────────────────────

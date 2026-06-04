@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 from decorators import forms_func, nullary_command, TiCall
-from errors import DomainError, DataTypeError, ArgumentError, IncrementError, InvalidDimError, UndefinedError, TiSyntaxError
+from errors import DataTypeError, ArgumentError, IncrementError, InvalidDimError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
 

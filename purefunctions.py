@@ -77,14 +77,13 @@ def f_part(x):
 	return x - math.trunc(require_num(x))
 
 @pure_vectorized
-def sqrt(x):
-	require_num(x)
-	return cmath.sqrt(x) if isinstance(x, complex) or x < 0 else math.sqrt(x)
-
-@pure_vectorized
 def cbrt(x):
 	require_num(x)
-	return cmath.exp(cmath.log(x) / 3) if isinstance(x, complex) else math.cbrt(x)
+	if isinstance(x, complex):
+		if x == 0:
+			return 0
+		return cmath.exp(cmath.log(x) / 3)
+	return math.cbrt(x)
 
 @pure_func
 def cum_sum(lst):
@@ -339,28 +338,9 @@ def pow10(x):
 	return 10 ** require_num(x)
 
 @pure_vectorized
-def ln(x):
-	require_num(x)
-	return cmath.log(x) if isinstance(x, complex) else math.log(x)
-
-@pure_vectorized
 def exp(x):
 	require_num(x)
 	return cmath.exp(x) if isinstance(x, complex) else math.exp(x)
-
-@pure_vectorized
-def log(x):
-	require_num(x)
-	try:
-		return cmath.log10(x) if isinstance(x, complex) else math.log10(x)
-	except ValueError:
-		raise DomainError(f"log10({x})")
-
-@pure_vectorized
-def log_base(x, base):
-	require_num(x)
-	require_num(base)
-	return cmath.log(x, base) if isinstance(x, complex) else math.log(x, base)
 
 @pure_vectorized
 def sinh(x):
@@ -378,13 +358,6 @@ def tanh(x):
 def asinh(x):
 	return math.asinh(require_real(x))
 
-@pure_vectorized
-def acosh(x):
-	return math.acosh(require_real(x))
-
-@pure_vectorized
-def atanh(x):
-	return math.atanh(require_real(x))
 
 # ── Integer / combinatorics ─────────────────────────────────────────────────────
 
@@ -414,7 +387,10 @@ def rand_list(n):
 
 @vectorized
 def _rand_int_single(low, high):
-	return random.randint(require_int(low), require_int(high))
+	low, high = require_int(low), require_int(high)
+	if low > high:
+		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
+	return random.randint(low, high)
 
 @pure_func
 def rand_int(low, high, n=None):
@@ -422,6 +398,8 @@ def rand_int(low, high, n=None):
 		return _rand_int_single(low, high)
 	low = require_int(low)
 	high = require_int(high)
+	if low > high:
+		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
 	return TiList([random.randint(low, high) for _ in range(require_int(n))])
 
 @pure_func
@@ -549,7 +527,10 @@ def timecnv(seconds):
 @pure_func
 def dayofwk(year, month, day):
 	"""Day of week: 1=Sunday, 2=Monday, …, 7=Saturday."""
-	d = date(require_int(year), require_int(month), require_int(day))
+	try:
+		d = date(require_int(year), require_int(month), require_int(day))
+	except ValueError as e:
+		raise DomainError(f"dayOfWk: invalid date ({year}/{month}/{day})") from e
 	return d.isoweekday() % 7 + 1
 
 def _parse_dbd_date(d):
@@ -584,7 +565,10 @@ def _parse_dbd_date(d):
 		raise DomainError(f"dbd: invalid date {d!r} (integer part {int_part} is ambiguous: must be ≤12 or ≥100)")
 
 	year = (2000 if yy < 50 else 1900) + yy
-	return date(year, month, day)
+	try:
+		return date(year, month, day)
+	except ValueError as e:
+		raise DomainError(f"dbd: invalid date ({year}/{month}/{day})") from e
 
 
 @pure_vectorized
@@ -775,6 +759,8 @@ def normalpdf(x, mu=0, sigma=1):
 	require_real(x)
 	require_real(mu)
 	require_real(sigma)
+	if sigma == 0:
+		raise DomainError("normalpdf: sigma must be non-zero")
 	z = (x - mu) / sigma
 	return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2 * math.pi))
 
@@ -784,6 +770,8 @@ def normalcdf(lower, upper, mu=0, sigma=1):
 	require_real(upper)
 	require_real(mu)
 	require_real(sigma)
+	if sigma == 0:
+		raise DomainError("normalcdf: sigma must be non-zero")
 	def _cdf(z):
 		return 0.5 * (1 + math.erf(z / math.sqrt(2)))
 	return _cdf((upper - mu) / sigma) - _cdf((lower - mu) / sigma)

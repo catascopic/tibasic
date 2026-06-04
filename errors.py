@@ -4,11 +4,12 @@ TI-BASIC runtime and parse errors.
 Each class carries a `code` attribute matching the calculator's ERR: screen
 (e.g. ERR:DIM MISMATCH), plus a human-readable message as the exception value.
 """
+from typing import ClassVar
 
 
 class TiError(Exception):
 	"""Base class for all TI-BASIC errors."""
-	code = 'ERROR'
+	code: ClassVar[str]
 
 	def __init__(self, message: str = '', *, pos: int | None = None):
 		super().__init__(message)

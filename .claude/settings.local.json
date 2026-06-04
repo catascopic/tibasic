@@ -41,7 +41,8 @@
       "Bash(python -m pytest -q)",
       "Bash(python -m pytest tibasic_test.py --collect-only -q)",
       "Bash(python -m pytest tibasic_test.py::TestCompleXor::test_xor -q -s)",
-      "Bash(python -m pytest tibasic_test.py test_functions.py stat_test.py -q)"
+      "Bash(python -m pytest tibasic_test.py test_functions.py stat_test.py -q)",
+      "Bash(python -m pytest test_tibasic.py test_functions.py test_stat.py -q)"
     ]
   }
 }

@@ -2,7 +2,7 @@ import cmath
 import math
 
 from decorators import vectorized, pure_op, op_vectorized
-from errors import DomainError, NonRealAnsError
+from errors import DomainError, DivideByZeroError, NonRealAnsError
 from modes import ComplexMode
 from tiobjects import TiMatrix, require_real, require_int, require_num, require_matrix
 
@@ -48,22 +48,29 @@ def sub(a, b): return a - b
 def mul(a, b): return a * b
 
 @pure_op
-def div(a, b): return a / b
+def div(a, b):
+	try:
+		return a / b
+	except ZeroDivisionError:
+		raise DivideByZeroError("Division by zero")
 
 
 # ── Pure logical operators ────────────────────────────────────────────────────
 
 @pure_op
 @vectorized
-def and_(a, b): return int(bool(require_real(a)) and bool(require_real(b)))
+def and_(a, b):
+	return float(bool(require_real(a)) and bool(require_real(b)))
 
 @pure_op
 @vectorized
-def or_(a, b): return int(bool(require_real(a)) or bool(require_real(b)))
+def or_(a, b):
+	return float(bool(require_real(a)) or bool(require_real(b)))
 
 @pure_op
 @vectorized
-def xor(a, b): return int(bool(require_real(a)) ^ bool(require_real(b)))
+def xor(a, b):
+	return float(bool(require_real(a)) ^ bool(require_real(b)))
 
 
 # ── Pure combinatorics operators ─────────────────────────────────────────────
@@ -91,15 +98,12 @@ def npr(n, r):
 @op_vectorized
 def power(base, exp, env):
 	"""^ operator — checks ComplexMode before returning a non-real result."""
-	if isinstance(base, TiMatrix):
-		return base ** exp
 	try:
 		result = base ** exp
 	except ValueError:
-		# Negative base with fractional exponent → complex result.
-		result = cmath.exp(cmath.log(complex(base)) * exp)
-	if isinstance(result, complex) and env.complex_mode is ComplexMode.REAL:
-		raise NonRealAnsError("Non-real result")
+		if env.complex_mode is ComplexMode.REAL:
+			raise NonRealAnsError("Non-real result")
+		return cmath.exp(cmath.log(complex(base)) * exp)
 	return result
 
 
@@ -107,11 +111,12 @@ def power(base, exp, env):
 def xth_root(n, x, env):
 	"""ˣ√ operator — checks ComplexMode before returning a non-real result."""
 	require_num(x)
-	if isinstance(x, complex) or x < 0:
+	try:
+		return x ** (1 / n)
+	except ValueError:
 		if env.complex_mode is ComplexMode.REAL:
 			raise NonRealAnsError("Non-real result")
 		return cmath.exp(cmath.log(x) / n)
-	return x ** (1 / n)
 
 
 # ── Postfix operators ────────────────────────────────────────────────────────
@@ -120,7 +125,10 @@ def inv(x):
 	"""¹ — multiplicative inverse or matrix inverse."""
 	if isinstance(x, TiMatrix):
 		return x.inv()
-	return 1 / x
+	try:
+		return 1 / x
+	except ZeroDivisionError:
+		raise DivideByZeroError("Division by zero")
 
 def transpose(mat):
 	"""ᵀ — matrix transpose."""

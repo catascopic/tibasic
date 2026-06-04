@@ -5,10 +5,10 @@ import pytest
 from pytest import approx
 
 from environment import Environment
-from modes import AngleMode
+from modes import AngleMode, ComplexMode
 from errors import (
 	TiSyntaxError, DomainError, DimMismatchError,
-	DataTypeError, InvalidDimError, ArgumentError,
+	DataTypeError, InvalidDimError, ArgumentError, NonRealAnsError,
 )
 import catalog
 from tiobjects import TiList, TiMatrix, TiString
@@ -36,11 +36,21 @@ class TestNumericFunctions:
 	def test_f_part_neg(self):    assert calc('fPart( ~3.7') == approx(-0.7)
 	def test_int_floor_pos(self): assert calc('int( 3.9') == 3
 	def test_int_floor_neg(self): assert calc('int( ~3.1') == -4     # floor, not truncate
-	def test_sqrt(self):          assert calc('SQRT 9') == approx(3)
-	def test_sqrt_negative(self): assert calc('SQRT ~1') == approx(1j)
-	def test_cbrt(self):          assert calc('CBRT 8') == approx(2)
-	def test_ln(self):            assert calc(f'ln( {math.e}') == approx(1)
-	def test_log(self):           assert calc('log( 100') == approx(2)
+	def test_sqrt(self):                  assert calc('SQRT 9') == approx(3)
+	def test_sqrt_negative_complex(self):
+		env = Environment(); env.complex_mode = ComplexMode.A_PLUS_BI
+		assert calc('SQRT ~1', env) == approx(1j)
+	def test_sqrt_negative_real(self):    pytest.raises(NonRealAnsError, calc, 'SQRT ~1')
+	def test_cbrt(self):                  assert calc('CBRT 8') == approx(2)
+	def test_ln(self):                    assert calc(f'ln( {math.e}') == approx(1)
+	def test_ln_negative_complex(self):
+		env = Environment(); env.complex_mode = ComplexMode.A_PLUS_BI
+		assert calc('ln( ~1', env) == approx(1j * math.pi)
+	def test_ln_negative_real(self):      pytest.raises(NonRealAnsError, calc, 'ln( ~1')
+	def test_ln_zero(self):               pytest.raises(DomainError, calc, 'ln( 0')
+	def test_log(self):                   assert calc('log( 100') == approx(2)
+	def test_log_negative_real(self):     pytest.raises(NonRealAnsError, calc, 'log( ~1')
+	def test_log_zero(self):              pytest.raises(DomainError, calc, 'log( 0')
 	def test_exp(self):           assert calc('𝑒^( 0') == approx(1)
 	def test_pow10(self):         assert calc('⑽^( 3') == approx(1000)
 	def test_not_false(self):     assert calc('not( 0') == 1
