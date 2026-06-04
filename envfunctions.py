@@ -24,11 +24,16 @@ def trig(func):
 	return env_vectorized(apply)
 
 def inv_trig(func):
-	"""Decorator for inverse trig functions: vectorize and convert output to current angle mode."""
+	"""Decorator for inverse trig functions: vectorize, convert output to current angle mode,
+	and raise DomainError for out-of-domain inputs."""
 	@wraps(func)
 	def apply(env, x):
-		return env.from_rad(func(require_real(x)))
+		try:
+			return env.from_rad(func(require_real(x)))
+		except ValueError:
+			raise DomainError(f"{func.__name__}: argument out of domain: {x}")
 	return env_vectorized(apply)
+
 
 # ── Trig functions ────────────────────────────────────────────────────────────
 
