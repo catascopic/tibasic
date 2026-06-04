@@ -692,3 +692,27 @@ class TestRecursion:
 		""", env)
 
 		assert calc('$A( dim( $A', env) == 34
+
+
+class TestEngima:
+
+	def test_dynamic_rotors(self):
+		env = run("""
+		{1,2,3@RTR1
+		{4,5,6@RTR2
+		{7,8,9@RTR3
+		For( N,1,3
+		expr( "$RTR" + sub( "123",N,1) + "(N"@$RES(N
+		End
+		""")
+		assert var(env, '$RES').data == [1, 5, 9]
+	
+	def test_index_of(self):
+		env = run("""
+		seq( X,X,1,26@ L1
+		{1,9,22,21,18,15,4,6,23,16,26,3,10,14,7,8,13,25,17,5,2,19,24,20,11,12}@RTR
+		max( L1 *($RTR=12@I
+		max( L1 *($RTR=13@J
+		""")
+		assert var(env, 'I') == 26
+		assert var(env, 'J') == 17

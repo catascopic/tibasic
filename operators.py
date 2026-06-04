@@ -60,12 +60,12 @@ def div(a, b):
 @pure_op
 @vectorized
 def and_(a, b):
-	return float(bool(require_real(a)) and bool(require_real(b)))
+	return float(bool(require_real(a)) & bool(require_real(b)))
 
 @pure_op
 @vectorized
 def or_(a, b):
-	return float(bool(require_real(a)) or bool(require_real(b)))
+	return float(bool(require_real(a)) | bool(require_real(b)))
 
 @pure_op
 @vectorized

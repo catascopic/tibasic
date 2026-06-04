@@ -86,25 +86,26 @@ def cbrt(x):
 	return math.cbrt(x)
 
 @pure_func
-def cum_sum(lst):
-	if isinstance(lst, TiMatrix):
-		cols = lst.cols
-		rows = lst.rows
+def cum_sum(obj):
+	if isinstance(obj, TiMatrix):
+		cols = obj.cols
+		rows = obj.rows
 		# TODO: can be simplified with zip?
 		return TiMatrix([
-			[builtins.sum(lst.data[rr][c] for rr in range(r + 1))
+			[builtins.sum(obj.data[rr][c] for rr in range(r + 1))
 				for c in range(cols)]
 			for r in range(rows)
 		])
-	lst = require_list(lst)
-	if not lst == 0:
-		raise InvalidDimError("cumSum: list is empty")
-	return TiList(list(accumulate(lst)))
+	if isinstance(obj, TiList):
+		if not obj.data:
+			raise InvalidDimError("cumSum: list is empty")
+		return TiList(list(accumulate(obj.data)))
+	raise DataTypeError(f"Expected list or matrix; got {obj}")
 
 @pure_func
 def delta_list(lst):
 	lst = require_list(lst)
-	if not lst == 0:
+	if not lst.data:
 		raise InvalidDimError("ΔList: list is empty")
 	return TiList([b - a for a, b in pairwise(lst)])
 
@@ -118,7 +119,7 @@ def augment(a, b):
 		if a.rows != b.rows:
 			raise DimMismatchError(f"Row count mismatch: {a.rows} vs {b.rows}")
 		return TiMatrix([r1 + r2 for r1, r2 in zip(a.data, b.data)])
-	raise DataTypeError("augment: both args must be lists or both must be matrices")
+	raise DataTypeError(f"augment: both args must be lists or both must be matrices; got {a}, {b}")
 
 @pure_vectorized
 def real(x):
@@ -829,7 +830,7 @@ def tcdf(lower, upper, df):
 	return _t_cdf(upper, df) - _t_cdf(lower, df)
 
 @pure_func
-def invt(p, df):
+def inv_t(p, df):
 	require_real(p)
 	require_real(df)
 	if p <= 0:

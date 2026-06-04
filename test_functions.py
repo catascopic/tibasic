@@ -15,11 +15,15 @@ from tiobjects import TiList, TiMatrix, TiString
 from test_tibasic import toks, calc, run, var, approx_mat
 
 
-@pytest.fixture
 def deg():
-	e = Environment()
-	e.angle_mode = AngleMode.DEG
-	return e
+	env = Environment()
+	env.angle_mode = AngleMode.DEG
+	return env
+
+def cpx():
+	env = Environment()
+	env.complex_mode = ComplexMode.A_PLUS_BI
+	return env
 
 
 # ── Numeric functions ─────────────────────────────────────────────────────────
@@ -37,15 +41,11 @@ class TestNumericFunctions:
 	def test_int_floor_pos(self): assert calc('int( 3.9') == 3
 	def test_int_floor_neg(self): assert calc('int( ~3.1') == -4     # floor, not truncate
 	def test_sqrt(self):                  assert calc('SQRT 9') == approx(3)
-	def test_sqrt_negative_complex(self):
-		env = Environment(); env.complex_mode = ComplexMode.A_PLUS_BI
-		assert calc('SQRT ~1', env) == approx(1j)
+	def test_sqrt_negative_complex(self): assert calc('SQRT ~1', cpx()) == approx(1j)
 	def test_sqrt_negative_real(self):    pytest.raises(NonRealAnsError, calc, 'SQRT ~1')
 	def test_cbrt(self):                  assert calc('CBRT 8') == approx(2)
 	def test_ln(self):                    assert calc(f'ln( {math.e}') == approx(1)
-	def test_ln_negative_complex(self):
-		env = Environment(); env.complex_mode = ComplexMode.A_PLUS_BI
-		assert calc('ln( ~1', env) == approx(1j * math.pi)
+	def test_ln_negative_complex(self):   assert calc('ln( ~1', cpx()) == approx(1j * math.pi)
 	def test_ln_negative_real(self):      pytest.raises(NonRealAnsError, calc, 'ln( ~1')
 	def test_ln_zero(self):               pytest.raises(DomainError, calc, 'ln( 0')
 	def test_log(self):                   assert calc('log( 100') == approx(2)
@@ -67,13 +67,13 @@ class TestTrig:
 	def test_asin(self):  assert calc(f'sin¹( 0.5') == approx(math.pi / 6)
 	def test_acos(self):  assert calc(f'cos¹( 1') == approx(0)
 	def test_atan(self):  assert calc(f'tan¹( 1') == approx(math.pi / 4)
-	# DEG mode
-	def test_sin_deg(self, deg):  assert calc('sin( 30',   deg) == approx(0.5)
-	def test_cos_deg(self, deg):  assert calc('cos( 0',    deg) == approx(1)
-	def test_tan_deg(self, deg):  assert calc('tan( 45',   deg) == approx(1)
-	def test_asin_deg(self, deg): assert calc('sin¹( 0.5', deg) == approx(30)
-	def test_acos_deg(self, deg): assert calc('cos¹( 1',   deg) == approx(0)
-	def test_atan_deg(self, deg): assert calc('tan¹( 1',   deg) == approx(45)
+	# deg() mode
+	def test_sin_deg(self):  assert calc('sin( 30',   deg()) == approx(0.5)
+	def test_cos_deg(self):  assert calc('cos( 0',    deg()) == approx(1)
+	def test_tan_deg(self):  assert calc('tan( 45',   deg()) == approx(1)
+	def test_asin_deg(self): assert calc('sin¹( 0.5', deg()) == approx(30)
+	def test_acos_deg(self): assert calc('cos¹( 1',   deg()) == approx(0)
+	def test_atan_deg(self): assert calc('tan¹( 1',   deg()) == approx(45)
 	# Hyperbolics stay in purefunctions, no angle mode
 	def test_sinh(self):  assert calc('sinh( 0') == approx(0)
 	def test_cosh(self):  assert calc('cosh( 0') == approx(1)
@@ -713,9 +713,9 @@ class TestCoordinates:
 		assert calc(f'R►Pr( {x},{y}') == approx(r)
 		assert calc(f'R►Pθ( {x},{y}') == approx(theta)
 
-	def test_r_ptheta_deg(self, deg): assert calc('R►Pθ( 1,0',  deg) == approx(0)
-	def test_p_rx_deg(self, deg):    assert calc('P►Rx( 5,0',  deg) == approx(5)
-	def test_p_ry_deg(self, deg):    assert calc('P►Ry( 5,90', deg) == approx(5)
+	def test_r_ptheta_deg(self): assert calc('R►Pθ( 1,0',  deg()) == approx(0)
+	def test_p_rx_deg(self):    assert calc('P►Rx( 5,0',  deg()) == approx(5)
+	def test_p_ry_deg(self):    assert calc('P►Ry( 5,90', deg()) == approx(5)
 
 
 # ── Probability distributions ─────────────────────────────────────────────────
@@ -986,3 +986,250 @@ class TestMatrixVectorized:
 
 	def test_abs_matrix_2x2(self):
 		assert calc('abs( [[~1,2][3,~4]]').data == [[1, 2], [3, 4]]
+
+
+# ── Memory management ─────────────────────────────────────────────────────────
+
+class TestDelVar:
+
+	def test_clears_numeric(self):
+		env = run("""
+		42@A
+		DelVar A
+		""")
+		assert var(env, 'A') is None
+
+	def test_numeric_autoinits_to_zero_after_delvar(self):
+		env = run('42@A')
+		run('DelVar A', env)
+		assert calc('A', env) == 0
+
+	def test_does_not_update_ans(self):
+		env = run('42@A')
+		run('DelVar A', env)
+		assert env.ans == 42
+
+	def test_clears_standard_list(self):
+		env = run("""
+		{1,2,3}@ L1
+		DelVar L1
+		""")
+		assert var(env, 'L1') is None
+
+	def test_clears_user_list(self):
+		env = run('{9,8}@FOO')
+		assert env.user_lists.get('FOO') is not None
+		run('DelVar $FOO', env)
+		assert env.user_lists.get('FOO') is None
+
+	def test_clears_matrix(self):
+		env = run('[[1,2][3,4]]@ [A]')
+		run('DelVar [A]', env)
+		assert var(env, '[A]') is None
+
+	def test_bunching_chain(self):
+		env = run("""
+		1@A
+		2@B
+		DelVar A DelVar B
+		""")
+		assert var(env, 'A') is None
+		assert var(env, 'B') is None
+
+	def test_bunching_with_subsequent_statement(self):
+		# DelVar A then 99@B on the same line — B must still be set
+		env = run('1@A')
+		run('DelVar A 99@B', env)
+		assert var(env, 'A') is None
+		assert var(env, 'B') == 99
+
+
+class TestSetUpEditor:
+
+	def test_no_args_default_lists_are_empty(self):
+		env = run('SetUpEditor')
+		for i in range(1, 7):
+			assert var(env, f"L{i}").data == []
+
+	def test_no_args_preserves_existing_data(self):
+		env = run('{1,2,3}@ L1')
+		run('SetUpEditor', env)
+		assert var(env, 'L1').data == [1, 2, 3]
+
+	def test_with_standard_list(self):
+		env = run('SetUpEditor L3')
+		assert var(env, 'L3') is not None   # L3 created
+		assert var(env, 'L1') is None       # L1 untouched
+
+	def test_with_bare_name_creates_user_list(self):
+		env = run('SetUpEditor SAVE')
+		assert env.user_lists.get('SAVE') is not None
+
+	def test_with_prefix_name_creates_user_list(self):
+		env = run('SetUpEditor $DATA')
+		assert env.user_lists.get('DATA') is not None
+
+	def test_does_not_overwrite_existing_user_list(self):
+		env = run('{7,8,9}@SAVE')
+		run('SetUpEditor SAVE', env)
+		assert env.user_lists['SAVE'].data == [7, 8, 9]
+
+	def test_multiple_args(self):
+		env = run('SetUpEditor L1 , L3 , SAVE')
+		assert var(env, 'L1') is not None
+		assert var(env, 'L2') is None       # L2 not requested
+		assert var(env, 'L3') is not None
+		assert env.user_lists.get('SAVE') is not None
+
+
+class TestClrList:
+
+	def test_clears_existing_list_to_empty(self):
+		env = run("""
+		{1,2,3}@ L1
+		ClrList L1
+		""")
+		assert var(env, 'L1') is not None   # still defined
+		assert len(var(env, 'L1')) == 0     # but empty
+
+	def test_dim_returns_zero_after_clrlist(self):
+		env = run("""
+		{1,2,3}@ L1
+		ClrList L1
+		""")
+		assert calc('dim( L1', env) == 0
+
+	def test_nonexistent_list_is_silent_noop(self):
+		env = run('ClrList L2')           # L2 was never set
+		assert var(env, 'L2') is None       # still None, not created
+
+	def test_multiple_lists(self):
+		env = run("""
+		{1,2}@ L1
+		{3,4}@ L2
+		ClrList L1 , L2
+		""")
+		assert len(var(env, 'L1')) == 0
+		assert len(var(env, 'L2')) == 0
+
+	def test_clears_user_list(self):
+		env = run('{5,6,7}@FOO')
+		run('ClrList $ FOO', env)
+		assert env.user_lists.get('FOO') is not None
+		assert len(env.user_lists['FOO']) == 0
+
+	def test_nonexistent_mixed_with_existing(self):
+		# L1 exists, L3 does not — L3 must remain None, L1 must be cleared
+		env = run('{9,9,9}@ L1')
+		run('ClrList L1 , L3', env)
+		assert len(var(env, 'L1')) == 0
+		assert var(env, 'L3') is None
+
+
+class TestClrAllLists:
+
+	def test_clears_all_defined_standard_lists(self):
+		env = run("""
+		{1,2}@ L1
+		{3,4}@ L2
+		ClrAllLists
+		""")
+		assert len(var(env, 'L1')) == 0
+		assert len(var(env, 'L2')) == 0
+
+	def test_leaves_undefined_slots_as_none(self):
+		env = run("""
+		{1,2}@ L1
+		ClrAllLists
+		""")
+		assert var(env, 'L1') is not None   # was defined, now empty
+		assert var(env, 'L2') is None       # was never defined
+
+	def test_clears_user_lists(self):
+		env = run('{5,6}@FOO')
+		run('ClrAllLists', env)
+		assert len(env.user_lists['FOO']) == 0
+
+	def test_no_args(self):
+		with pytest.raises(TiSyntaxError):
+			run('ClrAllLists 5')
+
+
+class TestSortA:
+
+	def test_sorts_ascending(self):
+		env = run("""
+		{3,1,4,1,5}@ L1
+		SortA( L1
+		""")
+		assert var(env, 'L1').data == [1, 1, 3, 4, 5]
+
+	def test_already_sorted_unchanged(self):
+		env = run("""
+		{1,2,3}@ L1
+		SortA( L1
+		""")
+		assert var(env, 'L1').data == [1, 2, 3]
+
+	def test_dependent_list_reordered_consistently(self):
+		env = run("""
+		{3,1,2}@ L1
+		{1,2,3}@ L2
+		SortA( L1 , L2
+		""")
+		assert var(env, 'L1').data == [1, 2, 3]
+		assert var(env, 'L2').data == [2, 3, 1]
+
+	def test_two_dependent_lists(self):
+		env = run("""
+		{3,1,2}@ L1
+		{1,2,3}@ L2
+		{20,30,10}@ L3
+		SortA( L1 , L2 , L3
+		""")
+		assert var(env, 'L1').data == [1, 2, 3]
+		assert var(env, 'L2').data == [2, 3, 1]
+		assert var(env, 'L3').data == [30, 10, 20]
+
+
+class TestSortD:
+
+	def test_sorts_descending(self):
+		env = run("""
+		{3,1,4,1,5}@ L1
+		SortD( L1
+		""")
+		assert var(env, 'L1').data == [5, 4, 3, 1, 1]
+
+	def test_dependent_list_reordered_consistently(self):
+		env = run("""
+		{1,3,2}@ L1
+		{4,5,6}@ L2
+		SortD( L1 , L2
+		""")
+		assert var(env, 'L1').data == [3, 2, 1]
+		assert var(env, 'L2').data == [5, 6, 4]
+
+
+class TestFill:
+
+	def test_fill_list(self):
+		env = run("""
+		{1,2,3}@ L1
+		Fill( 7, L1
+		""")
+		assert var(env, 'L1').data == [7, 7, 7]
+
+	def test_fill_list_with_zero(self):
+		env = run("""
+		{5,6,7}@ L1
+		Fill( 0, L1
+		""")
+		assert var(env, 'L1').data == [0, 0, 0]
+
+	def test_fill_matrix(self):
+		env = run("""
+		[[1,2][3,4]]@ [A]
+		Fill( 9, [A]
+		""")
+		assert var(env, '[A]').data == [[9, 9], [9, 9]]

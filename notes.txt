@@ -1,4 +1,4 @@
-Convert python's math errors to TiErrors
+fill: Error message is wrong, it says it expected a list when a matrix would have worked.
 
 I'm still wondering if there's some way to unify the logic between variables and nullaries.
 I've been looking into how the stat variables work, and it's a bunch of read-only variables. They're probably better off being nullaries rather than variables, and now I'm wondering if variables should implement the same interface. In the end, I don't think so, in part because there are commands like For( that take a variable... I'm not sure. It seems like there might be something there.
@@ -12,6 +12,34 @@ I refactored the skipping logic to be more concise, but I want to test the edge 
 STORE closing strings
 quoted colons/commas
 Any other edge cases
+
+Thunk:
+Hard to tell if commands are straight-up invalid
+On the calculator, I think it's impossible to write a seq( command that produces zero elements
+
+Rename Thunk to Formula
+
+Earlier I was removing all the explicit conversions to float, but that was actually correct.
+The calculator only deals in floating-point numbers, and we should only be using ints internally.
+
+The program table in Environment should probably be a dataclass called ProgramData, and have a reference to the name of the program. Then the class Program be given a ProgramData and then it would know its own name, which would be good for debugging if nothing else.
+
+I'm also wondering if we can redo nullaries using this. Like instead of nullary and function being different fields, they'd be combined somehow?
+
+Rename Environment to Calculator
+
+Interface: Input, Prompt, Disp, Menu
+
+move signals
+
+vectorized: require_number???
+
+Aho-Corasick parser for testing
+
+Make sure deg symbol vs D/M/S format is working
+
+Add aliases to any token that has a character that can't be typed on the keyboard
+
 
 
 Commands:
@@ -34,44 +62,9 @@ Pause Input Prompt Output( ClrHome DispTable Menu(
 
 χ²-Test??? It has a weird display
 
-
-require_real(a.expr()) -> a.expr(require_real) or even a.real_expr()
-
-Thunk:
-Hard to tell if commands are straight-up invalid
-On the calculator, I think it's impossible to write a seq( command that produces zero elements
-
-Rename Thunk to Formula
-
-Earlier I was removing all the explicit conversions to float, but that was actually correct.
-The calculator only deals in floating-point numbers, and we should only be using ints internally.
-
-EquationVar: subdivide
-Variable name formatters as actual functions?
-
-The program table in Environment should probably be a dataclass called ProgramData, and have a reference to the name of the program. Then the class Program be given a ProgramData and then it would know its own name, which would be good for debugging if nothing else.
-
-I'm also wondering if we can redo nullaries using this. Like instead of nullary and function being different fields, they'd be combined somehow?
-
-Rename Environment to Calculator
-
-Interface: Input, Prompt, Disp, Menu
-prgm_cmd -> prgm
-
-move signals
-
-vectorized: require_number???
-
-solve( fMin( fMax(
-
-Aho-Corasick parser for testing
-
-Make sure deg symbol vs D/M/S format is working
-
-
-Add aliases to any token that has a character that can't be typed on the keyboard
-
 ********
+
+Convert python's math errors to TiErrors
 
 I want to refactor the tests a bit:
 Move stat tests to their own file

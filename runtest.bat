@@ -1,1 +1,1 @@
-python -m pytest
+python -m pytest %*

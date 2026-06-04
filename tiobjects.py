@@ -37,22 +37,22 @@ class DMS(float):
 
 _T = TypeVar('_T')
 
-def _require_type(value: Any, tp: type[_T]) -> _T:
+def _require_type(value: Any, tp: type[_T], exc_cls=DataTypeError) -> _T:
 	if not isinstance(value, tp):
-		raise DataTypeError(f"Invalid value: {value!r}; required: {tp.__name__}")
+		raise exc_cls(f"Invalid value: {value!r}; required: {tp.__name__}")
 	return value
 
-def require_num(value: Any) -> Number:
-	return _require_type(value, Number)
+def require_num(value: Any, exc_cls=DataTypeError) -> Number:
+	return _require_type(value, Number, exc_cls)
 
-def require_real(value: Any) -> float:
-	require_num(value)
+def require_real(value: Any, exc_cls=DataTypeError) -> float:
+	require_num(value, exc_cls)
 	if isinstance(value, complex):
-		raise DataTypeError(f"Expected real number, got complex: {value}")
+		raise exc_cls(f"Expected real number, got complex: {value}")
 	return value
 
 def require_int(value: Any, exc_cls=DomainError) -> int:
-	require_real(value)
+	require_real(value, exc_cls)
 	if not value.is_integer():
 		raise exc_cls(f"Expected integer, got {value}")
 	return int(value)
@@ -80,19 +80,21 @@ class TiList:
 	def alloc(cls, size: Number) -> TiList:
 		return cls(list(repeat(0, require_int_dim(size))))
 
+	def _check_index(self, index):
+		# Hold off on require_int_dim because __setitem__ has these decoupled
+		if not (1 <= index <= len(self)):
+			raise InvalidDimError(f"out of bounds: {index}; dim: {len(self)}")
+		return index
+
 	def __getitem__(self, index: Number) -> Number:
-		if index != int(index) or not (1 <= index <= len(self)):
-			raise InvalidDimError(f"{index=}")
-		return self.data[int(index) - 1]
+		return self.data[self._check_index(require_int_dim(index)) - 1]
 
 	def __setitem__(self, index: Number, value: Number) -> None:
-		require_num(value)
+		index = require_int_dim(index)
 		if index == len(self) + 1:
 			self.data.append(value)
-		elif index != int(index) or not (1 <= index <= len(self)):
-			raise InvalidDimError(f"out of bounds: {index}; dim: {len(self)}")
 		else:
-			self.data[int(index) - 1] = value
+			self.data[self._check_index(index) - 1] = value
 
 	def __len__(self) -> int:
 		return len(self.data)
@@ -139,12 +141,6 @@ for name, op in [
 	('__rtruediv__', lambda a, b: b / a),
 	('__pow__', pow),
 	('__rpow__', lambda a, b: b ** a),
-	('__eq__', operator.eq),
-	('__ne__', operator.ne),
-	('__lt__', operator.lt),
-	('__gt__', operator.gt),
-	('__le__', operator.le),
-	('__ge__', operator.ge),
 ]:
 	setattr(TiList, name, _vectorize_op(op))
 
