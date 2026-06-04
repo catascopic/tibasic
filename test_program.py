@@ -10,7 +10,7 @@ from environment import Environment
 from errors import IncrementError, TiSyntaxError, LabelError
 from signals import ReturnSignal, StopSignal
 from program import Program
-from tibasic_test import toks, var, calc
+from test_tibasic import toks, var, calc
 
 
 # ── Helper ────────────────────────────────────────────────────────────────────

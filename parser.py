@@ -750,7 +750,7 @@ class ArgParser:
 
 
 if __name__ == '__main__':
-	from tibasic_test import toks, calc
+	from test_tibasic import toks, calc
 
 	env = Environment()
 
