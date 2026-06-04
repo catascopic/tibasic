@@ -1077,16 +1077,16 @@ class TestBal:
 	@pytest.fixture
 	def mortgage(self):
 		env = Environment()
-		env.pv    = 100_000
-		env.i_pct = 8 / 12           # monthly rate as percentage
-		env.n_tvm = 360
+		env.pv.value    = 100_000
+		env.i_pct.value = 8 / 12           # monthly rate as percentage
+		env.n_tvm.value = 360
 		# Exact PMT for zero FV
-		r = env.i_pct / 100
-		env.pmt = -env.pv * r / (1 - (1 + r) ** -env.n_tvm)
+		r = env.i_pct.value / 100
+		env.pmt.value = -env.pv.value * r / (1 - (1 + r) ** -env.n_tvm.value)
 		return env
 
 	def test_bal_zero_is_pv(self, mortgage):
-		assert calc('bal( 0', mortgage) == approx(mortgage.pv)
+		assert calc('bal( 0', mortgage) == approx(mortgage.pv.value)
 
 	def test_bal_180(self, mortgage):
 		# After 15 years (180 payments) — docs quote ~$76781.55
@@ -1102,9 +1102,9 @@ class TestBal:
 
 	def test_bal_zero_interest(self):
 		env = Environment()
-		env.pv = 1200
-		env.i_pct = 0
-		env.pmt = -100
+		env.pv.value    = 1200
+		env.i_pct.value = 0
+		env.pmt.value   = -100
 		assert calc('bal( 6', env) == approx(600)
 
 	def test_bal_with_rounding(self, mortgage):
@@ -1117,11 +1117,11 @@ class TestSigmaPrn:
 	@pytest.fixture
 	def mortgage(self):
 		env = Environment()
-		env.pv    = 100_000
-		env.i_pct = 8 / 12
-		env.n_tvm = 360
-		r = env.i_pct / 100
-		env.pmt = -env.pv * r / (1 - (1 + r) ** -env.n_tvm)
+		env.pv.value    = 100_000
+		env.i_pct.value = 8 / 12
+		env.n_tvm.value = 360
+		r = env.i_pct.value / 100
+		env.pmt.value = -env.pv.value * r / (1 - (1 + r) ** -env.n_tvm.value)
 		return env
 
 	def test_sigma_prn_first_60(self, mortgage):
@@ -1138,18 +1138,18 @@ class TestSigmaPrn:
 	def test_sigma_prn_full_term(self, mortgage):
 		# Principal paid over all 360 payments should equal -PV
 		sprn = calc('Σprn( 1,360', mortgage)
-		assert sprn == approx(-mortgage.pv, rel=1e-6)
+		assert sprn == approx(-mortgage.pv.value, rel=1e-6)
 
 
 class TestSigmaInt:
 	@pytest.fixture
 	def mortgage(self):
 		env = Environment()
-		env.pv    = 100_000
-		env.i_pct = 8 / 12
-		env.n_tvm = 360
-		r = env.i_pct / 100
-		env.pmt = -env.pv * r / (1 - (1 + r) ** -env.n_tvm)
+		env.pv.value    = 100_000
+		env.i_pct.value = 8 / 12
+		env.n_tvm.value = 360
+		r = env.i_pct.value / 100
+		env.pmt.value = -env.pv.value * r / (1 - (1 + r) ** -env.n_tvm.value)
 		return env
 
 	def test_sigma_int_first_60(self, mortgage):
@@ -1161,13 +1161,13 @@ class TestSigmaInt:
 		n1, n2 = 1, 60
 		sprn = calc('Σprn( 1,60', mortgage)
 		sint = calc('ΣInt( 1,60', mortgage)
-		total_pmt = n2 * mortgage.pmt  # 60 payments
+		total_pmt = n2 * mortgage.pmt.value  # 60 payments
 		assert sprn + sint == approx(total_pmt, rel=1e-8)
 
 	def test_sigma_int_full_term(self, mortgage):
 		# Total interest = total paid - principal = 360*PMT - (-PV) = 360*PMT + PV
 		sint = calc('ΣInt( 1,360', mortgage)
-		expected = 360 * mortgage.pmt + mortgage.pv  # negative (outflow)
+		expected = 360 * mortgage.pmt.value + mortgage.pv.value  # negative (outflow)
 		assert sint == approx(expected, rel=1e-6)
 
 

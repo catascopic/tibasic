@@ -78,9 +78,9 @@ def polar_to_rect_y(env, r, theta):
 
 def _bal(env, m: int, roundvalue=None):
 	"""Balance after m payments, using TVM variables from env."""
-	r = env.i_pct / 100
-	pv = env.pv
-	pmt = env.pmt
+	r = env.i_pct.resolve() / 100
+	pv = env.pv.resolve()
+	pmt = env.pmt.resolve()
 	if roundvalue is not None:
 		b = pv
 		for _ in range(m):
@@ -124,7 +124,7 @@ def sigma_int(env, n1, n2, roundvalue=None):
 	if n1 < 1 or n2 < 0:
 		raise DomainError("ΣInt: payment numbers must be positive")
 	sprn = _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
-	return (n2 - n1 + 1) * env.pmt - sprn
+	return (n2 - n1 + 1) * env.pmt.resolve() - sprn
 
 
 # ── expr( ─────────────────────────────────────────────────────────────────────

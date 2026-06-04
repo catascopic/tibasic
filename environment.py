@@ -53,14 +53,38 @@ class Environment:
 		self.dt_fmt        = 1
 		self.tm_fmt        = 12
 		self.clock_on      = True
+		# Window / graphing variables (Xscl, Xmin, Xmax, …)
+		self.window = [
+			RealVariable(1),    # [0]  Xscl
+			RealVariable(1),    # [1]  Yscl
+			RealVariable(-10),  # [2]  Xmin
+			RealVariable(10),   # [3]  Xmax
+			RealVariable(-10),  # [4]  Ymin
+			RealVariable(10),   # [5]  Ymax
+			RealVariable(),     # [6]  Tmin
+			RealVariable(),     # [7]  Tmax
+			RealVariable(),     # [8]  θmin
+			RealVariable(),     # [9]  θmax
+			RealVariable(),     # [10] TblStart
+			RealVariable(1),    # [11] PlotStart
+			RealVariable(10),   # [12] nMax
+			RealVariable(1),    # [13] nMin
+			RealVariable(1),    # [14] ΔTbl
+			RealVariable(),     # [15] Tstep
+			RealVariable(),     # [16] θstep
+			RealVariable(),     # [17] ΔX
+			RealVariable(),     # [18] ΔY
+			RealVariable(4),    # [19] XFact
+			RealVariable(4),    # [20] YFact
+		]
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
-		self.n_tvm = 0   # 𝐍 (number of payments)
-		self.i_pct = 0   # I% (interest rate per period, as percentage)
-		self.pv    = 0   # PV (present value)
-		self.pmt   = 0   # PMT (payment amount)
-		self.fv    = 0   # FV (future value)
-		self.py    = 1   # P/Y (payments per year)
-		self.cy    = 1   # C/Y (compounding periods per year)
+		self.n_tvm = RealVariable()   # 𝐍 (number of payments)
+		self.i_pct = RealVariable()   # I% (interest rate per period, as percentage)
+		self.pv    = RealVariable()   # PV (present value)
+		self.pmt   = RealVariable()   # PMT (payment amount)
+		self.fv    = RealVariable()   # FV (future value)
+		self.py    = RealVariable(1)  # P/Y (payments per year)
+		self.cy    = RealVariable(1)  # C/Y (compounding periods per year)
 		# Programs
 		self.programs: dict[str, list] = {}  # name -> token list for stored programs
 		self.program_stack: deque = deque()  # currently executing programs (innermost last)
@@ -226,9 +250,20 @@ class Environment:
 # ── Variable hierarchy ────────────────────────────────────────────────────────────
 
 class Variable(ABC):
+	"""Abstract base for all TI-BASIC variable types.
 
-	def __init__(self):
-		self.value = None
+	Concrete subclasses fall into two storage models:
+	  - Instance-stored (NumericVariable and its descendants, ListVariable, etc.):
+	    value lives in self.value; NumericVariable provides __init__(default=None)
+	    which subclasses inherit.  Other instance-stored classes have no __init__
+	    and therefore never accept a constructor default — intentional, since lists,
+	    matrices, strings and equations are always initialised to undefined (None).
+	  - Proxy-stored (UserList): value lives in env.user_lists[name]; the class
+	    manages its own __init__ and exposes value as a property.  It inherits from
+	    Variable without calling super().__init__() because there is no super
+	    __init__ to call.
+	"""
+	value = None  # class-level sentinel; instance writes shadow it
 
 	def resolve(self) -> Any:
 		"""Called when the user references a variable."""
@@ -242,17 +277,23 @@ class Variable(ABC):
 
 	@abstractmethod
 	def normalize(self, value) -> Any:
-		"""Ensures that the stored data is the right type. For structured data, creates a defensive copy."""
+		"""Validates and coerces a value before storage. For structured types, returns a defensive copy."""
 		pass
 
 
 class NumericVariable(Variable):
+	"""Numeric (real or complex) variable.  Accepts an optional constructor default
+	which RealVariable and other subclasses inherit — the only Variable subclasses
+	that are ever constructed with a non-None starting value."""
+
+	def __init__(self, default=None):
+		self.value = default
 
 	def resolve(self):
 		if self.value is None:
 			self.value = 0
 		return self.value
-	
+
 	def normalize(self, value):
 		return require_num(value)
 		
@@ -290,11 +331,12 @@ class EquationVariable(Variable):
 		raise DataTypeError(f"Expected equation or string; got {value}")
 
 
-class UserList:
+class UserList(Variable):
 
 	def __init__(self, env: Environment, name: str):
 		self.lookup = env.user_lists
 		self.name = name
+		# Don't call super().__init__() — value is managed via the property below.
 
 	@property
 	def value(self):
@@ -307,18 +349,11 @@ class UserList:
 		else:
 			self.lookup[self.name] = new_value
 
+	def normalize(self, value) -> Any:
+		return require_list(value).copy()
+
 	def resolve(self) -> Any:
-		"""Called when the user references a variable."""
 		try:
 			return self.lookup[self.name]
 		except KeyError:
-			raise UndefinedError(f"Undefined variable: {self}")
-
-	def store(self, new_value) -> None:
-		"""Called when the user stores a variable."""
-		self.value = require_list(new_value).copy()
-
-
-class WindowVariable:
-	def __init__(self, index):
-		pass  # TODO
+			raise UndefinedError(f"User list {self.name!r} is not defined")

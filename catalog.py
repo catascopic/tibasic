@@ -4,10 +4,7 @@ from io import BytesIO
 from typing import Any
 import math, itertools
 from titoken import Token
-from environment import (
-	Environment,
-	WindowVariable,
-)
+from environment import Environment
 import purefunctions as pf
 import operators as ops
 import envfunctions as ef
@@ -266,34 +263,37 @@ token(0x623C, 'Error MS')
 
 # ── 0x63 xx: window and finance variables ─────────────────────────────────────
 
-token(0x6302, 'Xscl', var=WindowVariable(0))  # TODO: WindowVariableAuto
-token(0x6303, 'Yscl', var=WindowVariable(1))
-token(0x630A, 'Xmin', var=WindowVariable(2))
-token(0x630B, 'Xmax', var=WindowVariable(3))
-token(0x630C, 'Ymin', var=WindowVariable(4))
-token(0x630D, 'Ymax', var=WindowVariable(5))
-token(0x630E, 'Tmin', var=WindowVariable(6))
-token(0x630F, 'Tmax', var=WindowVariable(7))
-token(0x6310, 'θmin', var=WindowVariable(8))
-token(0x6311, 'θmax', var=WindowVariable(9))
-token(0x631A, 'TblStart',  var=WindowVariable(10))
-token(0x631B, 'PlotStart', var=WindowVariable(11))
-token(0x631D, 'nMax', var=WindowVariable(12))
-token(0x631F, 'nMin', var=WindowVariable(13))
-token(0x6321, 'ΔTbl', var=WindowVariable(14))
-token(0x6322, 'Tstep', var=WindowVariable(15))
-token(0x6323, 'θstep', var=WindowVariable(16))
-token(0x6326, 'ΔX', var=WindowVariable(17))
-token(0x6327, 'ΔY', var=WindowVariable(18))
-token(0x6328, 'XFact', var=WindowVariable(19))
-token(0x6329, 'YFact', var=WindowVariable(20))
-token(0x632B, '𝐍')
-token(0x632C, 'I%')
-token(0x632D, 'PV')
-token(0x632E, 'PMT')
-token(0x632F, 'FV')
-token(0x6330, 'P/Y')
-token(0x6331, 'C/Y')
+def _window_accessor(index: int):
+	return _window_accessor(index)
+
+token(0x6302, 'Xscl', var=_window_accessor(0))
+token(0x6303, 'Yscl', var=_window_accessor(1))
+token(0x630A, 'Xmin', var=_window_accessor(2))
+token(0x630B, 'Xmax', var=_window_accessor(3))
+token(0x630C, 'Ymin', var=_window_accessor(4))
+token(0x630D, 'Ymax', var=_window_accessor(5))
+token(0x630E, 'Tmin', var=_window_accessor(6))
+token(0x630F, 'Tmax', var=_window_accessor(7))
+token(0x6310, 'θmin', var=_window_accessor(8))
+token(0x6311, 'θmax', var=_window_accessor(9))
+token(0x631A, 'TblStart',  var=_window_accessor(10))
+token(0x631B, 'PlotStart', var=_window_accessor(11))
+token(0x631D, 'nMax', var=_window_accessor(12))
+token(0x631F, 'nMin', var=_window_accessor(13))
+token(0x6321, 'ΔTbl', var=_window_accessor(14))
+token(0x6322, 'Tstep', var=_window_accessor(15))
+token(0x6323, 'θstep', var=_window_accessor(16))
+token(0x6326, 'ΔX', var=_window_accessor(17))
+token(0x6327, 'ΔY', var=_window_accessor(18))
+token(0x6328, 'XFact', var=_window_accessor(19))
+token(0x6329, 'YFact', var=_window_accessor(20))
+token(0x632B, '𝐍',   var=lambda env: env.n_tvm)
+token(0x632C, 'I%',  var=lambda env: env.i_pct)
+token(0x632D, 'PV',  var=lambda env: env.pv)
+token(0x632E, 'PMT', var=lambda env: env.pmt)
+token(0x632F, 'FV',  var=lambda env: env.fv)
+token(0x6330, 'P/Y', var=lambda env: env.py)
+token(0x6331, 'C/Y', var=lambda env: env.cy)
 token(0x6334, 'PlotStep')
 token(0x6336, 'Xres')
 

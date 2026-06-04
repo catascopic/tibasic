@@ -1,14 +1,7 @@
-UGGGHHH I KING OF WANT VARIABLES WITH ENV INTERNALLY
-
-
-Make test that stores to all 27 numeric variables, makes a list out of all of them, then verifies that
-
-I finally got the Variables into a state that I can tolerate. I now have get/set (these are the "unsafe" methods) and resolve(raise or set default on undefined) and store (validate input). Let me know what you think, but I really just reworked the existing design.
-Somewhat relatedly, I realized xth_root/sqrt need env access because Real/a+bi mode determines whether to return imaginary numbers or raise NONREAL ANS.
+I realized xth_root/sqrt need env access because Real/a+bi mode determines whether to return imaginary numbers or raise NONREAL ANS.
 And you know what? All this env stuff is kind of killing me. I probably won't do it, but would it really be that horrible to make Enviroment a global variable? It would still be a class, but it would be a singleton, and all the methods that need it could remove env from their params and just access environment.ENVIRONMENT or something.
 At this point it's not worth it, and I guess I could imagine a situation where you have multiple TI-Basic programs running at the same time, but man. At least it would replicate the frustration of everything being a global variable...
 Anyway, please give me your honest opinion on this idea. I almost certainly won't do it, because it's really not a good design, but I'm wondering if there's actually a case for it.
-
 
 Convert python's math errors to TiErrors
 
@@ -88,6 +81,10 @@ Make sure deg symbol vs D/M/S format is working
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 ********
+
+I finally got the Variables into a state that I can tolerate. I now have get/set (these are the "unsafe" methods) and resolve(raise or set default on undefined) and store (validate input). Let me know what you think, but I really just reworked the existing design.
+
+UGGGHHH I KING OF WANT VARIABLES WITH ENV INTERNALLY
 
 Tests to make sure lists/matrices/strings actually copy the value, not the reference
 
