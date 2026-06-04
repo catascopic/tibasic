@@ -4,34 +4,35 @@ import math
 from decorators import vectorized, pure_op, op_vectorized
 from errors import DomainError, NonRealAnsError
 from modes import ComplexMode
-from tiobjects import TiList, TiMatrix, require_real, require_int, require_num, require_matrix
+from tiobjects import TiMatrix, require_real, require_int, require_num, require_matrix
 
 
 # ── Pure comparison operators ────────────────────────────────────────────────
-# TiList broadcasting is handled by TiList's magic methods (__eq__, __lt__, etc.),
-# which already produce float elements.  _as_float converts scalar bool → float.
-
-def _as_float(x):
-	"""Convert a scalar comparison result (bool) to float; pass TiList through."""
-	return x if isinstance(x, TiList) else float(x)
+# Return 1.0/0.0; @vectorized handles TiList element-wise iteration.
 
 @pure_op
-def eq(a, b): return _as_float(a == b)
+@vectorized
+def eq(a, b): return float(a == b)
 
 @pure_op
-def ne(a, b): return _as_float(a != b)
+@vectorized
+def ne(a, b): return float(a != b)
 
 @pure_op
-def lt(a, b): return _as_float(a < b)
+@vectorized
+def lt(a, b): return float(a < b)
 
 @pure_op
-def le(a, b): return _as_float(a <= b)
+@vectorized
+def le(a, b): return float(a <= b)
 
 @pure_op
-def gt(a, b): return _as_float(a > b)
+@vectorized
+def gt(a, b): return float(a > b)
 
 @pure_op
-def ge(a, b): return _as_float(a >= b)
+@vectorized
+def ge(a, b): return float(a >= b)
 
 
 # ── Pure arithmetic operators ────────────────────────────────────────────────

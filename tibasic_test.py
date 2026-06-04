@@ -2111,3 +2111,220 @@ class TestCompleXor:
 		calc('seq( 2^N,N,8,1,~1@ L1', env).data == [256, 128, 64, 32, 16, 8, 4, 2]
 		calc('.5 sum( L1 *(1= abs( int( 2 fPart( (A+Bi)/ L1 @F', env)
 		assert calc('F', env) == 84
+
+
+# ── Vectorized operators ───────────────────────────────────────────────────────
+
+class TestComparisonOps:
+	"""Comparison operators: scalar float return type and list vectorization."""
+
+	# Return type must be float (not bool or int)
+	def test_true_is_float(self):   assert type(calc('1=1')) is float
+	def test_false_is_float(self):  assert type(calc('1=2')) is float
+
+	# Scalar results
+	def test_eq_true(self):   assert calc('2=2')  == 1.0
+	def test_eq_false(self):  assert calc('1=2')  == 0.0
+	def test_ne_true(self):   assert calc('1≠2')  == 1.0
+	def test_ne_false(self):  assert calc('2≠2')  == 0.0
+	def test_lt_true(self):   assert calc('1<2')  == 1.0
+	def test_lt_false(self):  assert calc('2<1')  == 0.0
+	def test_le_equal(self):  assert calc('2≤2')  == 1.0
+	def test_le_less(self):   assert calc('1≤2')  == 1.0
+	def test_le_false(self):  assert calc('3≤2')  == 0.0
+	def test_gt_true(self):   assert calc('3>2')  == 1.0
+	def test_gt_false(self):  assert calc('1>2')  == 0.0
+	def test_ge_equal(self):  assert calc('2≥2')  == 1.0
+	def test_ge_greater(self): assert calc('3≥2') == 1.0
+	def test_ge_false(self):  assert calc('1≥2')  == 0.0
+
+	# List vectorization
+	def test_eq_list_scalar(self):
+		assert calc('{1,2,3}=2').data == [0.0, 1.0, 0.0]
+
+	def test_ne_list_scalar(self):
+		assert calc('{1,2,3}≠2').data == [1.0, 0.0, 1.0]
+
+	def test_lt_list_scalar(self):
+		assert calc('{1,2,3}<2').data == [1.0, 0.0, 0.0]
+
+	def test_le_list_scalar(self):
+		assert calc('{1,2,3}≤2').data == [1.0, 1.0, 0.0]
+
+	def test_gt_list_scalar(self):
+		assert calc('{1,2,3}>2').data == [0.0, 0.0, 1.0]
+
+	def test_ge_list_scalar(self):
+		assert calc('{1,2,3}≥2').data == [0.0, 1.0, 1.0]
+
+	def test_eq_list_list(self):
+		assert calc('{1,2}={1,3}').data == [1.0, 0.0]
+
+	def test_eq_scalar_list(self):
+		assert calc('2={2,1}').data == [1.0, 0.0]
+
+	def test_eq_dim_mismatch(self):
+		with pytest.raises(DimMismatchError):
+			calc('{1,2}={1,2,3}')
+
+
+class TestLogicVectorized:
+	"""Logical operators (and/or/xor) vectorized over lists."""
+
+	def test_and_list_scalar(self):
+		assert list(calc('{1,0,1} and 1')) == [1, 0, 1]
+
+	def test_and_list_list(self):
+		assert list(calc('{1,0} and {1,1}')) == [1, 0]
+
+	def test_or_list_scalar(self):
+		assert list(calc('{1,0} or 0')) == [1, 0]
+
+	def test_or_list_list(self):
+		assert list(calc('{1,0} or {0,1}')) == [1, 1]
+
+	def test_xor_list_list(self):
+		assert list(calc('{1,0} xor {0,1}')) == [1, 1]
+
+	def test_xor_list_scalar(self):
+		assert list(calc('{1,0,1} xor 1')) == [0, 1, 0]
+
+
+class TestCombinatoricsVectorized:
+	"""nCr and nPr vectorized over lists."""
+
+	def test_ncr_list_scalar(self):
+		assert list(calc('{5,6} nCr 2')) == [10, 15]
+
+	def test_npr_list_scalar(self):
+		assert list(calc('{4,5} nPr 2')) == [12, 20]
+
+	def test_ncr_scalar_list(self):
+		assert list(calc('6 nCr {1,2,3}')) == [6, 15, 20]
+
+
+class TestOpVectorized:
+	"""op_vectorized operators (^ and ˣ√) with list operands."""
+
+	def test_power_list_exponent(self):
+		assert calc('{4,9}^0.5').data == approx([2.0, 3.0])
+
+	def test_power_list_base(self):
+		assert calc('2^{2,3,4}').data == approx([4.0, 8.0, 16.0])
+
+	def test_power_list_list(self):
+		assert calc('{2,3}^{3,2}').data == approx([8.0, 9.0])
+
+	def test_xth_root_list_radicand(self):
+		# 2 ˣ√ {4, 9} = {√4, √9} = {2, 3}
+		assert calc('2 XTH_ROOT {4,9}').data == approx([2.0, 3.0])
+
+	def test_xth_root_list_degree(self):
+		# {2,3} ˣ√ 8 = {√8, ∛8} = {2√2, 2}
+		assert calc('{2,3} XTH_ROOT 8').data == approx([8 ** 0.5, 2.0])
+
+
+# ── matrix_vectorized functions ────────────────────────────────────────────────
+
+class TestMatrixVectorized:
+	"""Functions decorated with @matrix_vectorized applied to a TiMatrix."""
+
+	def test_ipart_matrix(self):
+		assert calc('iPart( [[1.7,~1.7]]').data == [[1, -1]]
+
+	def test_int_matrix(self):
+		# int( uses floor: floor(-1.7) = -2
+		assert calc('int( [[1.7,~1.7]]').data == [[1, -2]]
+
+	def test_fpart_matrix(self):
+		assert calc('fPart( [[1.7,2.3]]').data == approx_mat([[0.7, 0.3]])
+
+	def test_round_matrix(self):
+		assert calc('round( [[1.567,2.345]],2').data == approx_mat([[1.57, 2.35]])
+
+	def test_abs_matrix(self):
+		assert calc('abs( [[~3,4]]').data == [[3, 4]]
+
+	def test_abs_matrix_2x2(self):
+		assert calc('abs( [[~1,2][3,~4]]').data == [[1, 2], [3, 4]]
+
+
+# ── List and matrix arithmetic with both operands non-scalar ──────────────────
+
+class TestListArithmetic:
+	"""Arithmetic operators with two list operands (via TiList magic methods)."""
+
+	def test_add_list_list(self):
+		assert calc('{1,2,3}+{4,5,6}').data == [5, 7, 9]
+
+	def test_sub_list_list(self):
+		assert calc('{5,3,1}-{1,1,1}').data == [4, 2, 0]
+
+	def test_mul_list_list(self):
+		assert calc('{2,3,4}*{5,6,7}').data == [10, 18, 28]
+
+	def test_div_list_list(self):
+		assert calc('{6,9,12}/{2,3,4}').data == approx([3.0, 3.0, 3.0])
+
+	def test_add_dim_mismatch(self):
+		with pytest.raises(DimMismatchError):
+			calc('{1,2}+{1,2,3}')
+
+	def test_mul_list_scalar(self):
+		assert calc('{1,2,3}*2').data == [2, 4, 6]
+
+	def test_add_scalar_list(self):
+		# scalar on left — exercises __radd__
+		assert calc('10+{1,2,3}').data == [11, 12, 13]
+
+	def test_sub_scalar_list(self):
+		# scalar on left — exercises __rsub__
+		assert calc('10-{1,2,3}').data == [9, 8, 7]
+
+
+class TestMatrixArithmetic:
+	"""Arithmetic operators with two matrix operands."""
+
+	def test_add_matrix_matrix(self):
+		assert calc('[[1,2][3,4]]+[[5,6][7,8]]').data == [[6, 8], [10, 12]]
+
+	def test_sub_matrix_matrix(self):
+		assert calc('[[5,6][7,8]]-[[1,2][3,4]]').data == [[4, 4], [4, 4]]
+
+	def test_mul_matrix_scalar(self):
+		assert calc('[[1,2][3,4]]*2').data == [[2, 4], [6, 8]]
+
+	def test_mul_scalar_matrix(self):
+		# scalar * matrix — exercises __rmul__
+		assert calc('3*[[1,2][3,4]]').data == [[3, 6], [9, 12]]
+
+	def test_mul_matrix_matrix(self):
+		# matrix * matrix is matrix multiplication (not element-wise)
+		# [[1,2][3,4]] * [[1,0][0,1]] = [[1,2][3,4]]
+		assert calc('[[1,2][3,4]]*[[1,0][0,1]]').data == [[1, 2], [3, 4]]
+
+	def test_add_dim_mismatch(self):
+		with pytest.raises(DimMismatchError):
+			calc('[[1,2]]+[[1,2][3,4]]')
+
+
+# ── String concatenation ───────────────────────────────────────────────────────
+
+class TestStringConcat:
+	"""String + String via TiString.__add__."""
+
+	def test_concat_result(self):
+		assert str(calc('"HELLO"+"WORLD"')) == 'HELLOWORLD'
+
+	def test_concat_empty_left_raises(self):
+		# TI-84 raises ERR:INVALID DIM when either operand is an empty string
+		with pytest.raises(InvalidDimError):
+			calc('""+\"ABC"')
+
+	def test_concat_empty_right_raises(self):
+		with pytest.raises(InvalidDimError):
+			calc('"ABC"+""')
+
+	def test_concat_stored_and_retrieved(self, env):
+		calc('"FOO"+"BAR"@ Str1', env)
+		assert str(var(env, 'Str1')) == 'FOOBAR'
