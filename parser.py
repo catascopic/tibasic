@@ -11,7 +11,7 @@ from catalog import (
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
 from environment import Environment, Variable, UserList
-from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError, UndefinedError
+from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError, InvalidDimError, UndefinedError
 
 
 @dataclass
@@ -217,10 +217,10 @@ class Parser:
 				raise TiSyntaxError(f"Unexpected STORE in formula")
 			if t is NEWLINE:
 				break
+
 			if in_string:
 				if t is QUOTE:
 					in_string = False
-
 			elif t is COLON or (not stack and t in {COMMA, R_PAREN}):
 				break
 			elif t is QUOTE:
@@ -391,6 +391,8 @@ class Parser:
 
 			break
 
+		if isinstance(lhs, TiList) and not lhs.data:
+			raise InvalidDimError("list is empty")
 		return lhs
 
 	# ── Store target parser ────────────────────────────────────────────────────
@@ -761,7 +763,8 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('[[1,0][0,1]]^{1,2}')
+	test('SetUpEditor')
+	test('L1')
 	# test('""1@ Str1')
 	# test('55@A:99@B')
 	# test('int( log( 2) INV log( max( A,B')
@@ -803,4 +806,3 @@ if __name__ == '__main__':
 	# test(3,STORE,(0x5C,0),'(2,1')
 	# print(env.numerics)
 	env.dump()
-	print(env.strings)

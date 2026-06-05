@@ -1,8 +1,16 @@
+string __add__
+
 Refactor window: inner object
 
-fill: Error message is wrong, it says it expected a list when a matrix would have worked.
 Fail on empty list helper?
-sort: fail on empty list, what about dim mismatch?
+
+A few bugs:
+sort: should fail on empty list and dim mismatch
+fill: Error message is subtly wrong, it says "expected a list" when a matrix would have worked.
+Actually, an expression that's just an empty list should result in dim mismatch. For example:
+'0@ dim( L1'  # this is okay
+'L1' # DIM MISMATCH
+So I guess any time you get an empty list while evaluating an expression, it should raise dim mismatch. This might simplify a lof of guard statements in the functions
 
 I'm still wondering if there's some way to unify the logic between variables and nullaries.
 I've been looking into how the stat variables work, and it's a bunch of read-only variables. They're probably better off being nullaries rather than variables, and now I'm wondering if variables should implement the same interface. In the end, I don't think so, in part because there are commands like For( that take a variable... I'm not sure. It seems like there might be something there.

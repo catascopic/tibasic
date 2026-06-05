@@ -44,15 +44,11 @@ def matrix_vectorized(func):
 	return pure_func(apply)
 
 
-# ── dim ───────────────────────────────────────────────────────────────────────────
+# ── length( ───────────────────────────────────────────────────────────────────────
 
 @pure_func
-def dim(value):
-	if isinstance(value, TiList):
-		return len(value)
-	if isinstance(value, TiMatrix):
-		return TiList([value.rows, value.cols])
-	raise DataTypeError(f"Invalid type: {type(value).__name__}; required: list or matrix")
+def length(string):
+	return len(require_str(string))
 
 
 # ── Numeric functions ────────────────────────────────────────────────────────────
@@ -97,23 +93,16 @@ def cum_sum(obj):
 			for r in range(rows)
 		])
 	if isinstance(obj, TiList):
-		if not obj.data:
-			raise InvalidDimError("cumSum: list is empty")
 		return TiList(list(accumulate(obj.data)))
 	raise DataTypeError(f"Expected list or matrix; got {obj}")
 
 @pure_func
 def delta_list(lst):
-	lst = require_list(lst)
-	if not lst.data:
-		raise InvalidDimError("ΔList: list is empty")
-	return TiList([b - a for a, b in pairwise(lst)])
+	return TiList([b - a for a, b in pairwise(require_list(lst))])
 
 @pure_func
 def augment(a, b):
 	if isinstance(a, TiList) and isinstance(b, TiList):
-		if not a or not b:
-			raise InvalidDimError("augment: cannot augment an empty list")
 		return TiList(a.data + b.data)
 	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix):
 		if a.rows != b.rows:
@@ -157,9 +146,6 @@ def in_string(string, substring, start=1):
 			return i + 1
 	return 0
 
-@pure_func
-def length(string):
-	return len(require_str(string))
 
 @pure_func
 def sub(*args):
@@ -185,8 +171,6 @@ def sub(*args):
 @pure_func
 def mean(lst, freqlist=None):
 	require_list(lst)
-	if len(lst) == 0:
-		raise InvalidDimError("mean: list is empty")
 	if freqlist is None:
 		return builtins.sum(lst) / len(lst)
 	require_list(freqlist)
@@ -195,8 +179,6 @@ def mean(lst, freqlist=None):
 @pure_func
 def variance(lst, freqlist=None):
 	require_list(lst)
-	if len(lst) == 0:
-		raise InvalidDimError("variance: list is empty")
 	if freqlist is None:
 		n = len(lst)
 		if n < 2:
@@ -223,10 +205,7 @@ def round(x, decimals=9):
 
 def _minmax(fn, a, b):
 	if b is None:
-		lst = require_list(a)
-		if len(lst) == 0:
-			raise InvalidDimError(f"{fn.__name__}: list is empty")
-		return fn(lst)
+		return fn(require_list(a))
 	if isinstance(a, TiList) and isinstance(b, TiList):
 		if len(a) != len(b):
 			raise DimMismatchError(f"{fn.__name__}: dim mismatch ({len(a)} vs {len(b)})")
@@ -246,8 +225,6 @@ def min(a, b=None):
 @pure_func
 def median(lst, freqlist=None):
 	require_list(lst)
-	if len(lst) == 0:
-		raise InvalidDimError("median: list is empty")
 	if freqlist is None:
 		sorted_data = sorted(lst)
 		n = len(sorted_data)
@@ -308,8 +285,6 @@ def identity(n):
 @pure_func
 def sum(lst, start=None, end=None):
 	data = require_list(lst).data
-	if not data:
-		raise InvalidDimError("sum: list is empty")
 	if start is None:
 		return builtins.sum(data)
 	start = require_int(start)
@@ -321,8 +296,6 @@ def sum(lst, start=None, end=None):
 @pure_func
 def prod(lst, start=None, end=None):
 	data = require_list(lst).data
-	if not data:
-		raise InvalidDimError("prod: list is empty")
 	if start is None:
 		return math.prod(data)
 	start = require_int(start)

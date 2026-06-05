@@ -12,7 +12,7 @@ from tiobjects import (
 	TiList, TiMatrix, TiString, TiEquation, 
 	require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation,
 )
-from errors import TiError, DataTypeError, DomainError, IllegalNestError, UndefinedError
+from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidDimError, UndefinedError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 from signals import StopSignal
 
@@ -318,6 +318,12 @@ class RealVariable(NumericVariable):
 		return require_real(value)
 	
 class ListVariable(Variable):
+	def resolve(self):
+		lst = super().resolve()
+		if not lst.data:
+			raise InvalidDimError("list is empty")
+		return lst
+
 	def normalize(self, value):
 		return require_list(value).copy()
 
@@ -361,6 +367,9 @@ class UserList(Variable):
 
 	def resolve(self) -> Any:
 		try:
-			return self.lookup[self.name]
+			lst = self.lookup[self.name]
 		except KeyError:
 			raise UndefinedError(f"User list {self.name!r} is not defined")
+		if not lst.data:
+			raise InvalidDimError("list is empty")
+		return lst

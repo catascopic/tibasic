@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 from decorators import forms_func, nullary_command, TiCall
-from errors import DataTypeError, ArgumentError, IncrementError, InvalidDimError, UndefinedError, TiSyntaxError
+from errors import DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
 
@@ -145,6 +145,30 @@ def fn_int(a: ArgParser) -> float:
 		return _adaptive_gk15(f, lo, hi, tol)
 
 
+# ── dim( ─────────────────────────────────────────────────────────────────────
+# dim( reads a variable's stored dimension rather than its value: it accesses
+# .value (raw storage) instead of .resolve(), so dim(L1) returns 0 for an empty
+# list where a bare reference to L1 would raise InvalidDimError.  This mirrors
+# the calculator, where dim( works on both sides of → for the same reason.
+
+@forms_func
+def dim(a: ArgParser):
+	if a.peek().is_list_start():
+		var = a.list_var()
+		val = var.value
+		if val is None:
+			raise UndefinedError(f"Undefined variable: {var}")
+		a.end_func()
+		return len(val)
+	value = a.expr()
+	a.end_func()
+	if isinstance(value, TiList):
+		return len(value)
+	if isinstance(value, TiMatrix):
+		return TiList([value.rows, value.cols])
+	raise DataTypeError("dim(: expected list or matrix")
+
+
 # ── Matr►list( and List►matr( ────────────────────────────────────────────────
 
 @forms_func
@@ -190,6 +214,9 @@ def _sort(a: ArgParser, reverse: bool):
 	deps = []
 	while a.has_next:
 		deps.append(a.list_var().resolve())
+	for d in deps:
+		if len(d) != len(main):
+			raise DimMismatchError(f"SortA/SortD: dependent list length {len(d)} doesn't match {len(main)}")
 	if not deps:
 		main.data.sort(reverse=reverse)
 	else:
@@ -220,13 +247,13 @@ def fill(a: ArgParser):
 		for row in lst.data:
 			for i in range(len(row)):
 				row[i] = fill_value
-	else:
+	elif a.peek().is_list_start():
 		lst = a.list_var().resolve()
 		a.end_paren_cmd()
-		if not lst.data:
-			raise InvalidDimError("fill: list is empty")
 		for i in range(len(lst.data)):
 			lst.data[i] = fill_value
+	else:
+		raise DataTypeError("Fill(: expected a list or matrix variable")
 
 
 # ── ClrList and ClrAllLists ───────────────────────────────────────────────────

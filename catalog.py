@@ -412,7 +412,7 @@ token(0xB2, 'abs(', func=pf.abs)
 token(0xB3, 'det(', func=pf.det)
 token(0xB4, 'identity(', func=pf.identity)
 
-DIM = token(0xB5, 'dim(', func=pf.dim)
+DIM = token(0xB5, 'dim(', func=forms.dim)
 
 token(0xB6, 'sum(', func=pf.sum)
 token(0xB7, 'prod(', func=pf.prod)
