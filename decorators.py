@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 
-def _call_vectorized(func: Callable, args: tuple) -> Any:
+def call_vectorized(func: Callable, args: tuple) -> Any:
 	len_check = set()
 	vec = []
 	for a in args:
@@ -34,14 +34,14 @@ def _call_vectorized(func: Callable, args: tuple) -> Any:
 def vectorized(func: Callable) -> Callable:
 	@wraps(func)
 	def apply(*args: Any) -> Any:
-		return _call_vectorized(func, args)
+		return call_vectorized(func, args)
 	return apply
 
 
 def _vectorized_with_env(func: Callable) -> Callable:
 	@wraps(func)
 	def apply(env: Any, *args: Any) -> Any:
-		return _call_vectorized(partial(func, env), args)
+		return call_vectorized(partial(func, env), args)
 	return apply
 
 
@@ -79,31 +79,6 @@ class forms_func(TiCall):
 	"""Decorator for functions/commands that do their own parsing."""
 	def call_with_parser(self, a: ArgParser):
 		return self.func(a)
-
-
-def pure_op(func: Callable) -> Callable:
-	"""Wraps a pure (lhs, rhs) binary operator to accept but ignore env.
-
-	Use as the outer decorator so the inner (vectorized) function sees only
-	the two operands while the parser can always call op(lhs, rhs, env).
-	"""
-	@wraps(func)
-	def wrapper(env, lhs: Any, rhs: Any) -> Any:
-		return func(lhs, rhs)
-	return wrapper
-
-
-def op_vectorized(func: Callable) -> Callable:
-	"""Vectorized binary operator whose third argument is env (never iterated).
-
-	Use for operators that need env (e.g. to check ComplexMode).  The operator
-	is called as op(lhs, rhs, env); env is threaded through without being
-	broadcast over list elements.
-	"""
-	@wraps(func)
-	def apply(env, lhs: Any, rhs: Any) -> Any:
-		return _call_vectorized(partial(func, env), (lhs, rhs))
-	return apply
 
 
 def pure_vectorized(func):

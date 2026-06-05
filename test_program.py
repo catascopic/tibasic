@@ -593,7 +593,7 @@ class TestJunkAfterCommand:
 		env = run("""
 		If 0
 		Then
-		Repeat +2
+		Repeat 1/0
 		End
 		End
 		99@A
@@ -604,7 +604,7 @@ class TestJunkAfterCommand:
 		env = run("""
 		If 0
 		Then
-		While +2
+		While $BAD
 		End
 		End
 		99@A
@@ -615,7 +615,7 @@ class TestJunkAfterCommand:
 		env = run("""
 		If 0
 		Then
-		For( A,+2,+3)
+		For( real( )
 		End
 		End
 		99@B
@@ -627,7 +627,7 @@ class TestJunkAfterCommand:
 		If 0
 		Then
 		For( A,+1,+2)
-		Repeat +3
+		Repeat +-*/
 		End
 		End
 		End
@@ -647,7 +647,7 @@ class TestForDelVar:
 		# from 0 to 1, and the loop continues from there — 6 iterations total.
 		env = run("""
 		For( X,3,5)
-		A+1→A
+		A+1@A
 		If A=2
 		DelVar X
 		End
@@ -668,7 +668,7 @@ class TestGotoBlocks:
 			Goto IN
 			For( X,1,3)
 			Lbl IN
-			99→A
+			99@A
 			End
 			""")
 
@@ -678,12 +678,12 @@ class TestGotoBlocks:
 		# encountered to accidentally pop it.
 		env = run("""
 		For( X,1,5)
-		A+1→A
+		A+1@A
 		If A=3
 		Goto D
 		End
 		Lbl D
-		99→B
+		99@B
 		""")
 		assert var(env, 'A') == 3
 		assert var(env, 'B') == 99
@@ -696,16 +696,16 @@ class TestGotoBlocks:
 		# X=2: normal End exits → Goto D → B=99
 		env = run("""
 		For( X,1,2)
-		A+1→A
+		A+1@A
 		If X=1
 		Goto S
 		End
 		Goto D
 		Lbl S
-		C+1→C
+		C+1@C
 		End
 		Lbl D
-		99→B
+		99@B
 		""")
 		assert var(env, 'A') == 2
 		assert var(env, 'B') == 99
@@ -726,10 +726,10 @@ class TestIfSkipsEnd:
 		# X=4: If false → skip End → B+=4 → normal End exits
 		env = run("""
 		For( X,1,4)
-		A+X→A
+		A+X@A
 		If X=2
 		End
-		B+X→B
+		B+X@B
 		End
 		""")
 		assert var(env, 'A') == 10   # 1+2+3+4

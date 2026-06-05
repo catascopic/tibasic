@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import builtins
-import functools
 import operator
 from collections.abc import Callable, Iterator
+from functools import wraps
 from itertools import repeat
 from numbers import Number
 from typing import Any, TypeVar, TYPE_CHECKING
@@ -20,18 +20,6 @@ if TYPE_CHECKING:
 
 def repr_num(value: Number) -> str:
 	return repr(int(value) if not isinstance(value, complex) and value.is_integer() else value)
-
-
-class DMS(float):
-	"""A float in decimal degrees that displays as degrees°minutes'seconds\"."""
-	def __repr__(self) -> str:
-		total = abs(self)
-		sign = '-' if self < 0 else ''
-		d = int(total)
-		m_total = (total - d) * 60
-		m = int(m_total)
-		s = (m_total - m) * 60
-		return f"{sign}{d}°{m}'{repr_num(s)}\""
 
 
 # ── Guard functions ───────────────────────────────────────────────────────────────
@@ -80,14 +68,14 @@ def require_str(value: Any) -> TiString:
 class TiList:
 	__slots__ = ('data',)
 
-	def __init__(self, data: list[float] | None = None) -> None:
+	def __init__(self, data: list[Number] | None = None) -> None:
 		self.data = [] if data is None else data
 		if not all(isinstance(i, Number) for i in self.data):
 			raise ValueError(self.data)
 
 	@classmethod
 	def alloc(cls, size: Number) -> TiList:
-		return cls(list(repeat(0, require_int_dim(size))))
+		return cls(list(repeat(0.0, require_int_dim(size))))
 
 	def _check_index(self, index):
 		# Hold off on require_int_dim because __setitem__ has these decoupled
@@ -130,7 +118,7 @@ class TiList:
 
 
 def _vectorize_op(op: Callable) -> Callable:
-	@functools.wraps(op)
+	@wraps(op)
 	def list_op(self: TiList, other: Any) -> TiList:
 		if isinstance(other, TiList):
 			if len(self) != len(other):
@@ -174,16 +162,16 @@ def _check_valid_dim(value: Any) -> tuple[int, int]:
 class TiMatrix:
 	__slots__ = ('data',)
 
-	def __init__(self, data: list[list[Number]] | None = None) -> None:
+	def __init__(self, data: list[list[float]] | None = None) -> None:
 		self.data = [] if data is None else data
 		for row in self.data:
-			if not all(isinstance(i, Number) for i in row):
+			if not all(isinstance(i, float) for i in row):
 				raise ValueError(self.data)
 
 	@classmethod
 	def alloc(cls, dim_list: TiList) -> TiMatrix:
 		rows, cols = _check_valid_dim(dim_list)
-		return cls([list(repeat(0, cols)) for r in range(rows)])
+		return cls([list(repeat(0.0, cols)) for r in range(rows)])
 
 	@property
 	def rows(self) -> int:
@@ -207,12 +195,12 @@ class TiMatrix:
 
 	def __getitem__(self, index: Any) -> float:
 		row_index, col_index = self._check_index(index)
-		return self.data[int(row_index) - 1][int(col_index) - 1]
+		return self.data[row_index - 1][col_index - 1]
 
 	def __setitem__(self, index: Any, value: Any) -> None:
 		require_real(value)
 		row_index, col_index = self._check_index(index)
-		self.data[int(row_index) - 1][int(col_index) - 1] = value
+		self.data[row_index - 1][col_index - 1] = value
 
 	def set_dim(self, dim_list: TiList) -> None:
 		new_rows, new_cols = _check_valid_dim(dim_list)
@@ -250,23 +238,11 @@ class TiMatrix:
 	def __add__(self, other: Any) -> TiMatrix:
 		if isinstance(other, TiMatrix):
 			return self.transform_zip(other, operator.add)
-		if isinstance(other, Number):
-			return self.transform(lambda x: x + other)
 		return NotImplemented
-
-	def __radd__(self, other: Any) -> TiMatrix:
-		return self + other
 
 	def __sub__(self, other: Any) -> TiMatrix:
 		if isinstance(other, TiMatrix):
 			return self.transform_zip(other, operator.sub)
-		if isinstance(other, Number):
-			return self.transform(lambda x: x - other)
-		return NotImplemented
-
-	def __rsub__(self, other: Any) -> TiMatrix:
-		if isinstance(other, Number):
-			return self.transform(lambda x: other - x)
 		return NotImplemented
 
 	def __matmul__(self, other: TiMatrix) -> TiMatrix:
@@ -279,19 +255,19 @@ class TiMatrix:
 		])
 
 	def __mul__(self, other: Any) -> TiMatrix:
-		if isinstance(other, Number):
+		if isinstance(other, float):
 			return self.transform(lambda x: x * other)
 		if isinstance(other, TiMatrix):
 			return self @ other
 		return NotImplemented
 
 	def __rmul__(self, other: Any) -> TiMatrix:
-		if isinstance(other, Number):
+		if isinstance(other, float):
 			return self.transform(lambda x: other * x)
 		return NotImplemented
 
 	def __pow__(self, n: Any) -> TiMatrix:
-		if not isinstance(n, Number):
+		if not isinstance(n, float):
 			return NotImplemented
 		n = require_int(n)
 		if self.rows != self.cols:
@@ -299,7 +275,7 @@ class TiMatrix:
 		if n < 0:
 			raise DomainError("Negative matrix power not supported")
 		size = self.rows
-		result = TiMatrix([[int(r == c) for c in range(size)] for r in range(size)])
+		result = TiMatrix([[float(r == c) for c in range(size)] for r in range(size)])
 		base = self
 		while n > 0:
 			if n & 1:

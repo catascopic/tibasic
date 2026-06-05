@@ -1,0 +1,28 @@
+For functions only (not operators):
+Can you clean up purefunctions/envfunctions/forms and put the functions in order within their files?
+Function order goes like this: on the calculator functions are grouped by menus. The full menu layout is given here: 'webref/Command Menu Map (Black & White) - TI-Basic Developer.htm'.
+Please reorder the functions by row and then by column, so for Math, it goes MATH,NUM,CPX,PRB. The four together consist of a category (collectively called Math). to_frac should be first and rand_int_no_rep should be last.
+Between categories, please put a separator that looks like this:
+
+##################
+# MATH FUNCTIONS #
+##################
+
+Categories:
+
+Functions that have a designated key: sin, cos, tan, asin, acos, atan, sqrt, log10, 10^(, ln, e^(
+Math Functions (MATH)
+Lists (2nd LIST)
+Matrices (2nd MATRIX)
+Strings (2nd CATALOG)
+Control Flow (PRGM)
+Graph Screen (2nd DRAW)
+Statistics (STAT)
+Angle (2nd ANGLE)
+Finance (Not in the table)
+Zoom Menu (ZOOM)
+Graph Format (2nd FORMAT)
+Function On/Off Variables (VARS Y-VARS 4)
+Stat Plots (2nd PLOT)
+Distributions (2nd DISTR)
+Everything else!

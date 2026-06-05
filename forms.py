@@ -12,6 +12,32 @@ from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
 
 
+# You'd think dim could be a pure function, right? For a while, it was.
+# But then I realized empty lists are illegal everywhere, with a single exception.
+# dim( reads a variable's stored dimension rather than its value: it accesses
+# .value (raw storage) instead of .resolve(), so dim(L1) returns 0 for an empty
+# list where a bare reference to L1 would raise InvalidDimError.  This mirrors
+# the calculator, where dim( works on both sides of → for the same reason.
+
+@forms_func
+def dim(a: ArgParser):
+	if a.peek().is_list_start():
+		var = a.list_var()
+		val = var.value
+		if val is None:
+			raise UndefinedError(f"Undefined list variable")
+		a.end_func()
+		return len(val)
+
+	value = a.expr()
+	a.end_func()
+	if isinstance(value, TiList):
+		return len(value)
+	# Don't need direct matrix variable access because empty matrices aren't possible
+	if isinstance(value, TiMatrix):
+		return TiList([value.rows, value.cols])
+	raise DataTypeError(f"dim: expected list or matrix; got {value}")
+
 @forms_func
 def ans_index_or_mul(a: ArgParser):
 	ans = a.env.ans
@@ -26,7 +52,6 @@ def ans_index_or_mul(a: ArgParser):
 		return ans[arg]
 	return ans * arg
 
-
 @forms_func
 def seq(a: ArgParser) -> TiList:
 	formula = a.thunk()
@@ -39,6 +64,7 @@ def seq(a: ArgParser) -> TiList:
 	result = []
 	if step == 0:
 		raise IncrementError("seq: step cannot be zero")
+
 	if step > 0:
 		if start > end + 1e-10:
 			raise IncrementError(f"seq: step is positive but start ({start}) > end ({end})")
@@ -49,13 +75,14 @@ def seq(a: ArgParser) -> TiList:
 			raise IncrementError(f"seq: step is negative but start ({start}) < end ({end})")
 		op = operator.ge
 		end -= 1e-10
+
 	with a.env.nest_guard(seq), var.scoped():
 		while op(n, end):
 			var.value = n
 			result.append(formula.eval())
 			n += step
-	return TiList(result)
 
+	return TiList(result)
 
 @forms_func
 def sigma(a: ArgParser) -> float:
@@ -72,7 +99,6 @@ def sigma(a: ArgParser) -> float:
 			total += formula.eval()
 			n += 1
 	return total
-
 
 @forms_func
 def n_deriv(a: ArgParser) -> float:
@@ -129,7 +155,6 @@ def _adaptive_gk15(f, lo, hi, tol, depth=0):
 		_adaptive_gk15(f, mid, hi, tol / 2, depth + 1)
 	)
 
-
 @forms_func
 def fn_int(a: ArgParser) -> float:
 	formula = a.thunk()
@@ -143,33 +168,6 @@ def fn_int(a: ArgParser) -> float:
 			var.value = x
 			return formula.eval()
 		return _adaptive_gk15(f, lo, hi, tol)
-
-
-# ── dim( ─────────────────────────────────────────────────────────────────────
-# dim( reads a variable's stored dimension rather than its value: it accesses
-# .value (raw storage) instead of .resolve(), so dim(L1) returns 0 for an empty
-# list where a bare reference to L1 would raise InvalidDimError.  This mirrors
-# the calculator, where dim( works on both sides of → for the same reason.
-
-@forms_func
-def dim(a: ArgParser):
-	if a.peek().is_list_start():
-		var = a.list_var()
-		val = var.value
-		if val is None:
-			raise UndefinedError(f"Undefined variable: {var}")
-		a.end_func()
-		return len(val)
-	value = a.expr()
-	a.end_func()
-	if isinstance(value, TiList):
-		return len(value)
-	if isinstance(value, TiMatrix):
-		return TiList([value.rows, value.cols])
-	raise DataTypeError("dim(: expected list or matrix")
-
-
-# ── Matr►list( and List►matr( ────────────────────────────────────────────────
 
 @forms_func
 def matr_to_list(a: ArgParser) -> None:
@@ -191,7 +189,6 @@ def matr_to_list(a: ArgParser) -> None:
 		a.list_var().value = TiList([mat.data[r][col] for r in range(mat.rows)])
 	a.end_paren_cmd()
 
-
 @forms_func
 def list_to_matr(a: ArgParser) -> None:
 	list_vals = []
@@ -202,21 +199,20 @@ def list_to_matr(a: ArgParser) -> None:
 		if a.peek().is_matrix_var():
 			mat_var = a.matrix_var()
 			break
-	mat_var.value = TiMatrix([list(row) for row in zip_longest(*[lst.data for lst in list_vals], fillvalue=0)])
+	mat_var.value = TiMatrix([list(row) for row in zip_longest(*(lst.data for lst in list_vals), fillvalue=0.0)])
 	a.end_paren_cmd()
-
-
-# ── SortA(, SortD(, Fill( ─────────────────────────────────────────────────────
-# These are commands (cmd=), not functions — called as cmd(ArgParser) directly.
 
 def _sort(a: ArgParser, reverse: bool):
 	main = a.list_var().resolve()
 	deps = []
 	while a.has_next:
 		deps.append(a.list_var().resolve())
+	a.end_paren_cmd()
+	
 	for d in deps:
 		if len(d) != len(main):
 			raise DimMismatchError(f"SortA/SortD: dependent list length {len(d)} doesn't match {len(main)}")
+
 	if not deps:
 		main.data.sort(reverse=reverse)
 	else:
@@ -225,18 +221,14 @@ def _sort(a: ArgParser, reverse: bool):
 		main.data = [data[i] for i in indices]
 		for d in deps:
 			d.data = [d.data[i] for i in indices]
-	a.end_paren_cmd()
-
 
 @forms_func
 def sort_a(a: ArgParser):
 	_sort(a, False)
 
-
 @forms_func
 def sort_d(a: ArgParser):
 	_sort(a, True)
-
 
 @forms_func
 def fill(a: ArgParser):
@@ -255,9 +247,6 @@ def fill(a: ArgParser):
 	else:
 		raise DataTypeError("Fill(: expected a list or matrix variable")
 
-
-# ── ClrList and ClrAllLists ───────────────────────────────────────────────────
-
 @forms_func
 def clr_list(a):
 	"""ClrList list[, list, ...] — clear each named list to empty; silently skip nonexistent lists."""
@@ -269,7 +258,6 @@ def clr_list(a):
 			break
 	a.end_cmd()
 
-
 @nullary_command
 def clr_all_lists(env):
 	"""ClrAllLists — set every defined list (L1–L6 and user lists) to empty."""
@@ -278,9 +266,6 @@ def clr_all_lists(env):
 			list_var.value.set_dim(0)
 	for lst in env.user_lists.values():
 		lst.set_dim(0)
-
-
-# ── DelVar and SetUpEditor ────────────────────────────────────────────────────
 
 @forms_func
 def del_var(a):
@@ -291,7 +276,6 @@ def del_var(a):
 	"""
 	a.any_var().value = None
 	# No end_cmd() call; leaves separator in place for next command
-
 
 @forms_func
 def set_up_editor(a):
@@ -315,9 +299,6 @@ def set_up_editor(a):
 
 	a.end_cmd()
 
-
-# ── Equ►String( and String►Equ( ──────────────────────────────────────────────
-
 @forms_func
 def equ_to_string(a: ArgParser) -> None:
 	"""Equ►String(equvar, strvar) — copy the equation's tokens into a string variable."""
@@ -325,7 +306,6 @@ def equ_to_string(a: ArgParser) -> None:
 	str_var = a.string_var()
 	a.end_paren_cmd()
 	str_var.value = TiString(equ_var.resolve().tokens)
-
 
 @forms_func
 def string_to_equ(a: ArgParser) -> None:
@@ -335,8 +315,9 @@ def string_to_equ(a: ArgParser) -> None:
 	a.end_paren_cmd()
 	equ_var.value = TiEquation(string.tokens)
 
-
-# ── Control flow ──────────────────────────────────────────────────────────────
+####################
+# PROGRAM COMMANDS #
+####################
 
 class program_command(TiCall):
 	"""Decorator for no-arg commands that require a running program.
@@ -350,19 +331,16 @@ class program_command(TiCall):
 		a.end_cmd()
 		self.func(a.current_program())
 
-
 @forms_func
 def if_cmd(a: ArgParser):
 	cond = bool(a.expr())
 	a.end_cmd()
 	a.current_program().begin_if(cond)
 
-
 @forms_func
 def then_cmd(a: ArgParser):
 	"""Then without a preceding If: always a syntax error."""
 	raise TiSyntaxError("Then without If")
-
 
 @program_command
 def else_cmd(prgm):
@@ -370,20 +348,17 @@ def else_cmd(prgm):
 	(Else blocks are only executed when encountered while skipping an If-Then block.)"""
 	prgm.begin_else()
 
-
 @forms_func
 def while_cmd(a: ArgParser):
 	condition = a.thunk()
 	a.end_cmd()
 	a.current_program().begin_while(condition)
 
-
 @forms_func
 def repeat_cmd(a: ArgParser):
 	condition = a.thunk()
 	a.end_cmd()
 	a.current_program().begin_repeat(condition)
-
 
 @forms_func
 def for_cmd(a: ArgParser):
@@ -394,11 +369,9 @@ def for_cmd(a: ArgParser):
 	a.end_paren_cmd()
 	a.current_program().begin_for(var, start, end, step)
 
-
 @program_command
 def end_cmd(prgm):
 	prgm.end_block()
-
 
 @forms_func
 def lbl_cmd(a: ArgParser):
@@ -407,23 +380,19 @@ def lbl_cmd(a: ArgParser):
 	a.end_cmd()
 	a.current_program()  # raises if not in a program
 
-
 @forms_func
 def goto_cmd(a: ArgParser):
 	name = a.label_name()
 	a.end_cmd()
 	a.current_program().goto(name)
 
-
 @program_command
 def return_cmd(prgm):
 	raise ReturnSignal()
 
-
 @program_command
 def stop_cmd(prgm):
 	raise StopSignal()
-
 
 @forms_func
 def is_gt_cmd(a: ArgParser):
@@ -432,7 +401,6 @@ def is_gt_cmd(a: ArgParser):
 	a.end_paren_cmd()
 	a.current_program().is_gt(var, threshold)
 
-
 @forms_func
 def ds_lt_cmd(a: ArgParser):
 	var = a.numeric_var()
@@ -440,13 +408,11 @@ def ds_lt_cmd(a: ArgParser):
 	a.end_paren_cmd()
 	a.current_program().ds_lt(var, threshold)
 
-
 @forms_func
 def prgm(a: ArgParser):
 	prgm_name = a.program_name()
 	a.end_cmd()
 	a.env.run_program(prgm_name)
-
 
 @forms_func
 def disp(a: ArgParser):

@@ -11,7 +11,7 @@ from itertools import accumulate, pairwise, chain, repeat, batched
 from math import prod
 from numbers import Number
 from tiobjects import (
-	TiList, TiMatrix, TiString, DMS,
+	TiList, TiMatrix, TiString,
 	require_num, require_real, require_int,
 	require_list, require_matrix, require_str,
 )
@@ -55,17 +55,17 @@ def length(string):
 
 @pure_vectorized
 def not_(x):
-	return int(not require_real(x))
+	return float(not require_real(x))
 
 @matrix_vectorized
 @handle_complex
 def i_part(x):
-	return math.trunc(require_num(x))
+	return float(math.trunc(require_num(x)))
 
 @matrix_vectorized
 @handle_complex
 def int_(x):
-	return math.floor(require_num(x))
+	return float(math.floor(require_num(x)))
 
 @matrix_vectorized
 @handle_complex
@@ -145,7 +145,6 @@ def in_string(string, substring, start=1):
 		if v[i:i + len(s)] == s:
 			return i + 1
 	return 0
-
 
 @pure_func
 def sub(*args):
@@ -280,7 +279,7 @@ def det(mat):
 @pure_func
 def identity(n):
 	n = require_int(n)
-	return TiMatrix([[1 if r == c else 0 for c in range(n)] for r in range(n)])
+	return TiMatrix([[float(r == c) for c in range(n)] for r in range(n)])
 
 @pure_func
 def sum(lst, start=None, end=None):

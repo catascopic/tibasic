@@ -934,29 +934,37 @@ class TestOperatorTypes:
 
 	def test_add(self):
 		assert calc('1+2') == 3
+		assert calc('1+i') == 1+1j
 		assert calc('1+{1,2}').data == [2, 3]
-		assert calc('1+[[1,0][0,1]]').data == [[2, 1], [1, 2]]
+		assert calc('1+{1,2i}').data == [2, 1+2j]
+		with pytest.raises(DataTypeError): calc('1+[[1,0][0,1]]')
 		with pytest.raises(DataTypeError): calc('1+"A"')
 
 		assert calc('{1,2}+1').data == [2, 3]
+		assert calc('{1,2}+3+4i').data == [4+4j, 5+4j]
 		assert calc('{1,2}+{3,4}').data == [4, 6]
+		assert calc('{1,2}+{i,1-i}').data == [1+1j, 3-1j]
 		with pytest.raises(DataTypeError): calc('{1,2}+[[1,0][0,1]]')
 		with pytest.raises(DataTypeError): calc('{1,2}+"A"')
 
-		assert calc('[[1,0][0,1]]+2').data == [[3, 2], [2, 3]]
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]+2')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]+i')
 		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]+{1,2}')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]+{i,~2+3i}')
 		assert calc('[[1,0][0,1]]+[[1,0][0,1]]').data == [[2, 0], [0, 2]]
 		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]+"A"')
 
 		with pytest.raises(DataTypeError): calc('"A"+1')
+		with pytest.raises(DataTypeError): calc('"A"+i')
 		with pytest.raises(DataTypeError): calc('"A"+{1,2}')
+		with pytest.raises(DataTypeError): calc('"A"+{i,2}')
 		with pytest.raises(DataTypeError): calc('"A"+[[1,0][0,1]]')
 		assert str(calc('"A"+"B"')) == 'AB'
 
 	def test_sub(self):
 		assert calc('3-1') == 2
 		assert calc('3-{1,2}').data == [2, 1]
-		assert calc('3-[[1,0][0,1]]').data == [[2, 3], [3, 2]]
+		with pytest.raises(DataTypeError): calc('3-[[1,0][0,1]]')
 		with pytest.raises(DataTypeError): calc('1-"A"')
 
 		assert calc('{3,4}-1').data == [2, 3]
@@ -964,7 +972,7 @@ class TestOperatorTypes:
 		with pytest.raises(DataTypeError): calc('{1,2}-[[1,0][0,1]]')
 		with pytest.raises(DataTypeError): calc('{1,2}-"A"')
 
-		assert calc('[[3,0][0,3]]-1').data == [[2, -1], [-1, 2]]
+		with pytest.raises(DataTypeError): calc('[[3,0][0,3]]-1')
 		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]-{1,2}')
 		assert calc('[[3,0][0,3]]-[[1,0][0,1]]').data == [[2, 0], [0, 2]]
 		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]-"A"')
@@ -1036,6 +1044,27 @@ class TestOperatorTypes:
 		with pytest.raises(DataTypeError): calc('"A"^{1,2}')
 		with pytest.raises(DataTypeError): calc('"A"^[[1,0][0,1]]')
 		with pytest.raises(DataTypeError): calc('"A"^"B"')
+
+	def test_xth_root(self):
+		assert calc('4 ˣ√ 256') == approx(4)
+		assert calc('2 ˣ√ {1,4,9}').data == approx([1, 2, 3])
+		with pytest.raises(DataTypeError): calc('2 ˣ√ [[1,2][3,4]]')
+		with pytest.raises(DataTypeError): calc('2 ˣ√ "A"')
+
+		assert calc('{1,2,3} ˣ√ 64').data == approx([64, 8, 4])
+		assert calc('{2,3} ˣ√ {4,27}').data == approx([2, 3])
+		with pytest.raises(DataTypeError): calc('{1,2} ˣ√ [[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2} ˣ√ "A"')
+
+		with pytest.raises(DataTypeError): calc('[[1,2][3,4]] ˣ√ {1,2}')
+		with pytest.raises(DataTypeError): calc('[[1,2][3,4]] ˣ√ 2')
+		with pytest.raises(DataTypeError): calc('[[1,2][3,4]] ˣ√ [[5,6][7,8]]')
+		with pytest.raises(DataTypeError): calc('[[1,2][3,4]] ˣ√ "A"')
+
+		with pytest.raises(DataTypeError): calc('"A" ˣ√ 1')
+		with pytest.raises(DataTypeError): calc('"A" ˣ√ {1,2}')
+		with pytest.raises(DataTypeError): calc('"A" ˣ√ [[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('"A" ˣ√ "B"')
 
 	def test_eq(self):
 		assert calc('1=1') == 1.0
@@ -1167,6 +1196,12 @@ class TestOperatorTypes:
 		with pytest.raises(DataTypeError): calc('"A"≥[[1,0][0,1]]')
 		with pytest.raises(DataTypeError): calc('"A"≥"B"')
 
+	def test_sqrt(self):
+		assert calc('SQRT 16') == approx(4)
+		assert calc('SQRT {1,4,9}').data == approx([1, 2, 3])
+		with pytest.raises(DataTypeError): calc('SQRT [[1,2][3,4]]')
+		with pytest.raises(DataTypeError): calc('SQRT "A"')
+
 
 # ── Indexing errors ───────────────────────────────────────────────────────────
 
@@ -1175,63 +1210,29 @@ class TestIndexing:
 
 	# ── List: wrong index type ────────────────────────────────────────────────
 
-	def test_list_index_list(self):
+	def test_bad_list_index(self):
 		env = run('{1,2,3@ L1')
 		with pytest.raises(InvalidDimError): calc('L1 ({1,2}', env)
-
-	def test_list_index_matrix(self):
-		env = run('{1,2,3@ L1')
 		with pytest.raises(InvalidDimError): calc('L1 ([[1]]', env)
-
-	def test_list_index_float(self):
-		env = run('{1,2,3@ L1')
 		with pytest.raises(InvalidDimError): calc('L1 (1.5', env)
-
-	# ── List: wrong arg count ─────────────────────────────────────────────────
-
-	def test_list_index_two_args(self):
-		env = run('{1,2,3@ L1')
-		with pytest.raises(TiSyntaxError): calc('L1 (1,2', env)
-
-	# ── List: out of bounds ───────────────────────────────────────────────────
-
-	def test_list_index_zero(self):
-		env = run('{1,2,3@ L1')
+		with pytest.raises(InvalidDimError): calc('L1 (i', env)
+		with pytest.raises(InvalidDimError): calc('L1 ("A"', env)
+		with pytest.raises(ArgumentError):   calc('L1 (1,2', env)
 		with pytest.raises(InvalidDimError): calc('L1 (0', env)
-
-	def test_list_index_too_large(self):
-		env = run('{1,2,3@ L1')
 		with pytest.raises(InvalidDimError): calc('L1 (5', env)
-
-	# ── Matrix: wrong arg count ───────────────────────────────────────────────
 
 	def test_matrix_index_one_arg(self):
 		env = run('[[1,2][3,4]]@ [A]')
-		with pytest.raises(TiSyntaxError): calc('[A] (1', env)
-
-	def test_matrix_index_three_args(self):
-		env = run('[[1,2][3,4]]@ [A]')
-		with pytest.raises(TiSyntaxError): calc('[A] (1,2,3', env)
-
-	# ── Matrix: wrong index type ──────────────────────────────────────────────
-
-	def test_matrix_index_list_row(self):
-		env = run('[[1,2][3,4]]@ [A]')
+		with pytest.raises(ArgumentError):   calc('[A] (1', env)
+		with pytest.raises(ArgumentError):   calc('[A] (1,2,3', env)
 		with pytest.raises(InvalidDimError): calc('[A] ({1},1', env)
-
-	def test_matrix_index_list_col(self):
-		env = run('[[1,2][3,4]]@ [A]')
 		with pytest.raises(InvalidDimError): calc('[A] (1,{1}', env)
-
-	# ── Matrix: out of bounds ─────────────────────────────────────────────────
-
-	def test_matrix_index_row_out_of_bounds(self):
-		env = run('[[1,2][3,4]]@ [A]')
 		with pytest.raises(InvalidDimError): calc('[A] (5,1', env)
-
-	def test_matrix_index_col_out_of_bounds(self):
-		env = run('[[1,2][3,4]]@ [A]')
 		with pytest.raises(InvalidDimError): calc('[A] (1,5', env)
+		with pytest.raises(InvalidDimError): calc('[A] (i', env)
+		with pytest.raises(InvalidDimError): calc('[A] (1.5,1', env)
+		with pytest.raises(InvalidDimError): calc('[A] ("A"', env)
+		with pytest.raises(InvalidDimError): calc('[A] ([[1]]', env)
 
 
 # ── Nesting and combinations ──────────────────────────────────────────────────

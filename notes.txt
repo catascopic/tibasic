@@ -1,22 +1,25 @@
-string __add__
+test fractional powers
+
+op/data type tests:
+first, I made a mistake: Matrix + number is a DataTypeError
+Also, there are actually sort of two more data types: complex numbers, and lists containing complex numbers
+Matrices cannot contain complex numbers, and this is also currently not enforced!
+eq/ne is defined for comparing 2 complex numbers, but the other 4 raise DataTypeError
+Comparing complex and real with any 6 comparison operators raises DataTypeError
+Parameterize these tests?
+This might be a problem because complex == real is defined at the python level
+I'm wondering if I might have to make a custom complex class
+Actually, just making everything a custom type might make things easier!
+
+For index tests:
+Wrong number of arguments should produce ArgumentError.
+Indices should be parsed in a similar way to ArgParser.
+
+Move decorators to where they're used?
+utils.py: decorators, signals, other low-level things? Token?
 
 Refactor window: inner object
 
-Fail on empty list helper?
-
-A few bugs:
-sort: should fail on empty list and dim mismatch
-fill: Error message is subtly wrong, it says "expected a list" when a matrix would have worked.
-Actually, an expression that's just an empty list should result in dim mismatch. For example:
-'0@ dim( L1'  # this is okay
-'L1' # DIM MISMATCH
-So I guess any time you get an empty list while evaluating an expression, it should raise dim mismatch. This might simplify a lof of guard statements in the functions
-
-I'm still wondering if there's some way to unify the logic between variables and nullaries.
-I've been looking into how the stat variables work, and it's a bunch of read-only variables. They're probably better off being nullaries rather than variables, and now I'm wondering if variables should implement the same interface. In the end, I don't think so, in part because there are commands like For( that take a variable... I'm not sure. It seems like there might be something there.
-I've also thought about trying to unify nullaries and regular functions: nullaries could take an ArgParser and check if there's an open parenthesis for the ones like rand that can take optional parameters... but I think they're better off being their own thing. Note that there are still some finance variables we'll have to implement later that are also nullaries that can take parentheses, too.
-
-test_store_wrong_data_type: break into sub-tests?
 test_copy_string: okay to share internal data?
 
 Can you make some program tests that test the logic of skip_statement and skip_block, as well as capture (thunk parsing)?
@@ -29,52 +32,47 @@ Thunk:
 Hard to tell if commands are straight-up invalid
 On the calculator, I think it's impossible to write a seq( command that produces zero elements
 
-Rename Thunk to Formula
-
 Earlier I was removing all the explicit conversions to float, but that was actually correct.
 The calculator only deals in floating-point numbers, and we should only be using ints internally.
 
 The program table in Environment should probably be a dataclass called ProgramData, and have a reference to the name of the program. Then the class Program be given a ProgramData and then it would know its own name, which would be good for debugging if nothing else.
 
-I'm also wondering if we can redo nullaries using this. Like instead of nullary and function being different fields, they'd be combined somehow?
-
-Rename Environment to Calculator
-
-Interface: Input, Prompt, Disp, Menu
-
-move signals
-
-vectorized: require_number???
-
+Rename Thunk to Formula
 Aho-Corasick parser for testing
-
 Make sure deg symbol vs D/M/S format is working
-
 Add aliases to any token that has a character that can't be typed on the keyboard
 
 
+TODO:
 
-Commands:
-solve( fMin( fMax(
-
-Drawing:
-Line( Vertical Pt-On( Pt-Off( Pt-Change( Shade( Circle( Horizontal Tangent DrawInv DrawF ShadeNorm( Shade_t( Shadeχ²( ShadeF(
-pxl-Test( Pxl-On( Pxl-Off( Pxl-Change(
+Commands: solve( fMin( fMax(
+Drawing: Line( Vertical Pt-On( Pt-Off( Pt-Change( Shade( Circle( Horizontal Tangent DrawInv DrawF ShadeNorm( Shade_t( Shadeχ²( ShadeF(
+Pixel: pxl-Test( Pxl-On( Pxl-Off( Pxl-Change(
 Text(  #!!!
 StorePic RecallPic StoreGDB RecallGDB
-
-Modes:
-Horiz Full IndpntAuto IndpntAsk DependAuto DependAsk Time Web
-
-Finance:
-tvm_Pmt tvm_I% tvm_PV tvm_N tvm_FV Pmt_End Pmt_Bgn
-
-I/O:
-Pause Input Prompt Output( ClrHome DispTable Menu(
-
+Modes: Horiz Full IndpntAuto IndpntAsk DependAuto DependAsk Time Web
+Finance: tvm_Pmt tvm_I% tvm_PV tvm_N tvm_FV Pmt_End Pmt_Bgn
+I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
 
 ********
+
+I'm still wondering if there's some way to unify the logic between variables and nullaries.
+I've been looking into how the stat variables work, and it's a bunch of read-only variables. They're probably better off being nullaries rather than variables, and now I'm wondering if variables should implement the same interface. In the end, I don't think so, in part because there are commands like For( that take a variable... I'm not sure. It seems like there might be something there.
+I've also thought about trying to unify nullaries and regular functions: nullaries could take an ArgParser and check if there's an open parenthesis for the ones like rand that can take optional parameters... but I think they're better off being their own thing. Note that there are still some finance variables we'll have to implement later that are also nullaries that can take parentheses, too.
+
+vectorized: require_number???
+
+test_store_wrong_data_type: break into sub-tests?
+
+A few bugs:
+sort: should fail on empty list and dim mismatch
+fill: Error message is subtly wrong, it says "expected a list" when a matrix would have worked.
+Actually, an expression that's just an empty list should result in dim mismatch. For example:
+'0@ dim( L1'  # this is okay
+'L1' # DIM MISMATCH
+So I guess any time you get an empty list while evaluating an expression, it should raise dim mismatch. This might simplify a lof of guard statements in the functions
+Fail on empty list helper?
 
 Test: DelVar the for-loop index
 Test: Weird programs that jump into blocks, jump out of blocks, use If to skip End

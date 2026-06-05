@@ -386,7 +386,11 @@ class Parser:
 			if _can_start_atom(t):
 				if 60 <= min_bp:
 					break
-				lhs = lhs * self.parse_expr(61)
+				rhs = self.parse_expr(61)
+				try:
+					lhs = lhs * rhs
+				except TypeError: 
+					raise DataTypeError(f"Cannot implicitly multiply {lhs} by {rhs}")
 				continue
 
 			break
@@ -763,46 +767,8 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('SetUpEditor')
-	test('L1')
-	# test('""1@ Str1')
-	# test('55@A:99@B')
-	# test('int( log( 2) INV log( max( A,B')
-	# test('2^ cumSum( binomcdf( Ans ,0')
-	# test('sum( Ans .5(1= abs( int( 2 fPart( Ans INV (A+Bi')
+	test('[[1]]@ [A]')
+	test('i [A]')
 
-	# test('55@A:99@B')
-	# test('seq( 2^N,N,8,1,~1@ L1')
-	# test('.5 sum( L1 *(1= abs( int( 2 fPart( (A+Bi)/ L1')
-
-	# test("1E2°1E2'")
-	# test("1E2+(1E2/60)")
-	# test('1@A')
-	# test('1E~1°2\'3"')
-	# test("1°~30'")
-	# test('List►matr( {1,2},{3,4}, [A]')
-	# test('⑽^( {1,10')
-	# test('5°')
-	# test('5°5\'5"')
-	# test('2^3',SCI_E,2)
-	# test('"a',STORE,'Str1')
-	# test('1°ʳ')
-	# test('([[1,2][3,4@ [A]')
-	# test('[A]','+[[5,6],[7,8]]')
-	# test('[A]','^4')
-	# test('[A]')
-	# test('length( "  or ')
-	# test('{1,2,3}',SCI_E,'{1,2,3}')
-	# test('[[2','dim(','{1,2,3]')
-	# test('rand (5')
-	# test('[[1:[[','Ans','(1,1')
-	# test('{5,5',STORE,'dim(',(0x5C,0))
-	# test('{5',STORE,LIST_PREFIX,'AB')
-	# test(0,STORE,'dim(',(0x5D,0))
-	# test(1,STORE,'A:3',STORE,'B')
-	# test('[[1,2.5],[π,4]]')
-	# test('randM(','3,4')
-	# test('Ans',STORE,(0x5C,0))
 	# test(3,STORE,(0x5C,0),'(2,1')
-	# print(env.numerics)
 	env.dump()

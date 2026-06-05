@@ -941,7 +941,7 @@ class TestRand:
 	def test_rand_int(self):
 		# randInt(1,6) returns an integer value in [1, 6]
 		result = calc('randInt( 1,6)')
-		assert result == int(result)
+		assert result.is_integer()
 		assert 1 <= result <= 6
 
 	def test_rand_int_list(self):

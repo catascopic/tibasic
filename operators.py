@@ -1,8 +1,8 @@
 import cmath
-import functools
 import math
 
-from decorators import vectorized, pure_op, op_vectorized
+from decorators import vectorized, call_vectorized
+from functools import partial, wraps
 from numbers import Number
 from errors import DataTypeError, DomainError, DivideByZeroError, NonRealAnsError
 from modes import ComplexMode
@@ -16,81 +16,81 @@ from tiobjects import TiMatrix, require_real, require_int, require_num, require_
 #   - lt/gt/le/ge: TypeError from missing __lt__ etc. is converted to DataTypeError
 
 
-def _type_err(op, a, b):
-	raise DataTypeError(f"'{op}' not supported between {type(a).__name__} and {type(b).__name__}")
+def pure_op(func):
+	"""Wraps a pure (lhs, rhs) binary operator to accept but ignore env.
+
+	Use as the outer decorator so the inner (vectorized) function sees only
+	the two operands while the parser can always call op(lhs, rhs, env).
+	"""
+	@wraps(func)
+	def wrapper(env, lhs, rhs):
+		return func(lhs, rhs)
+	return wrapper
 
 
-@pure_op
-@vectorized
-def eq(a, b): return float(a == b)
+def comparison(func):
+	@wraps(func)
+	def apply(a, b):
+		try:
+			return float(func(a, b))
+		except TypeError: 
+			raise DataTypeError(f"'{func.__name__}' not supported between {type(a).__name__} and {type(b).__name__}")
+	return pure_op(vectorized(apply))
 
-@pure_op
-@vectorized
-def ne(a, b): return float(a != b)
 
-@pure_op
-@vectorized
-def lt(a, b):
-	try: return float(a < b)
-	except TypeError: _type_err('<', a, b)
+@comparison
+def eq(a, b): return a == b
 
-@pure_op
-@vectorized
-def le(a, b):
-	try: return float(a <= b)
-	except TypeError: _type_err('≤', a, b)
+@comparison
+def ne(a, b): return a != b
 
-@pure_op
-@vectorized
-def gt(a, b):
-	try: return float(a > b)
-	except TypeError: _type_err('>', a, b)
+@comparison
+def lt(a, b): return a < b
 
-@pure_op
-@vectorized
-def ge(a, b):
-	try: return float(a >= b)
-	except TypeError: _type_err('≥', a, b)
+@comparison
+def le(a, b): return a <= b
+
+@comparison
+def gt(a, b): return a > b
+
+@comparison
+def ge(a, b): return a >= b
 
 
 # ── Pure arithmetic operators ────────────────────────────────────────────────
 # TiList broadcasting is handled by TiList's magic methods (__add__, etc.).
 
-@pure_op
-def add(a, b):
-	try:
-		return a + b
-	except TypeError:
-		_type_err('+', a, b)
+def arithmetic(func):
+	@wraps(func)
+	def apply(a, b):
+		try:
+			return func(a, b)
+		except TypeError: 
+			raise DataTypeError(f"'{func.__name__}' not supported between {type(a).__name__} and {type(b).__name__}")
+	return pure_op(apply)
 
-@pure_op
-def sub(a, b):
-	try:
-		return a - b
-	except TypeError:
-		_type_err('-', a, b)
 
-@pure_op
-def mul(a, b):
-	try:
-		return a * b
-	except TypeError:
-		_type_err('*', a, b)
+@arithmetic
+def add(a, b): return a + b
 
-@pure_op
+@arithmetic
+def sub(a, b): return a - b
+
+@arithmetic
+def mul(a, b): return a * b
+
+@arithmetic
 def div(a, b):
 	try:
 		return a / b
 	except ZeroDivisionError:
-		raise DivideByZeroError("Division by zero")
-	except TypeError:
-		_type_err('/', a, b)
+		raise DivideByZeroError
 
 
 # ── Pure logical operators ────────────────────────────────────────────────────
 
 def logical(func):
-	functools.wraps(func)
+	@wraps(func)
 	def apply(a, b):
 		return float(func(bool(require_real(a)), bool(require_real(b))))
 	return pure_op(vectorized(apply))
@@ -128,36 +128,37 @@ def npr(n, r):
 # ── Env-aware binary operators ────────────────────────────────────────────────
 # These need env to check ComplexMode; they are NOT wrapped with @pure_op.
 
-@op_vectorized
+
 def power(env, base, exp):
 	"""^ operator — checks ComplexMode before returning a non-real result."""
 	try:
 		result = base ** exp
 	except ValueError:
 		if env.real_only:
-			raise NonRealAnsError("Non-real result")
+			raise NonRealAnsError(f"{base}^{power}")
 		return cmath.exp(cmath.log(complex(base)) * exp)
 	except TypeError:
-		_type_err('^', base, exp)
+		raise DataTypeError(f"{base}^{exp} not supported")
 	return result
 
 
-@op_vectorized
-def xth_root(env, n, x):
+def xth_root(env, x, n):
 	"""ˣ√ operator — checks ComplexMode before returning a non-real result."""
-	require_num(x)
+	if isinstance(n, TiMatrix):
+		raise DataTypeError(f"xth root not supported for matrix")
 	try:
-		return x ** (1 / n)
+		return n ** (1 / x)
 	except ValueError:
 		if env.real_only:
-			raise NonRealAnsError("Non-real result")
-		return cmath.exp(cmath.log(x) / n)
+			raise NonRealAnsError(f"{x}th root {n}")
+		return cmath.exp(cmath.log(n) / x)
+	except TypeError:
+		raise DataTypeError(f"{x}th root of {n} not supported")
 
 
 # ── Postfix operators ────────────────────────────────────────────────────────
 
 def inv(x):
-	"""¹ — multiplicative inverse or matrix inverse."""
 	if isinstance(x, TiMatrix):
 		return x.inv()
 	try:
@@ -166,7 +167,6 @@ def inv(x):
 		raise DivideByZeroError("Division by zero")
 
 def transpose(mat):
-	"""ᵀ — matrix transpose."""
 	require_matrix(mat)
 	return TiMatrix([[mat.data[r][c] for r in range(mat.rows)] for c in range(mat.cols)])
 

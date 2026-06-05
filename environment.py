@@ -132,7 +132,7 @@ class Environment:
 		return self.complex_mode is ComplexMode.REAL
 
 	def set_random_seed(self, value):
-		random.seed(require_int(value))
+		random.seed(require_real(value))
 
 	# ── Virtual clock ────────────────────────────────────────────────────────────
 
@@ -153,7 +153,7 @@ class Environment:
 		self._datetime_offset = new_v - now
 
 	def check_tmr(self, start):
-		return int(self._now().timestamp()) - int(require_real(start))
+		return float(int(self._now().timestamp()) - int(require_real(start)))
 
 	def set_dt_fmt(self, fmt):
 		fmt = require_int(fmt)
@@ -198,7 +198,7 @@ class Environment:
 		return TiList([t.hour, t.minute, t.second])
 
 	def start_tmr(self):
-		return int(self._now().timestamp())
+		return float(int(self._now().timestamp()))
 
 	def get_dt_fmt(self):
 		return self.dt_fmt
@@ -272,7 +272,7 @@ class Variable(ABC):
 	def resolve(self) -> Any:
 		"""Called when the user references a variable."""
 		if self.value is None:
-			raise UndefinedError(f"Undefined variable: {self}")
+			raise UndefinedError(f"Undefined {type(self).__name__}")
 		return self.value
 
 	def store(self, new_value) -> None:
@@ -321,7 +321,7 @@ class ListVariable(Variable):
 	def resolve(self):
 		lst = super().resolve()
 		if not lst.data:
-			raise InvalidDimError("list is empty")
+			raise InvalidDimError("empty list")
 		return lst
 
 	def normalize(self, value):
@@ -344,7 +344,7 @@ class EquationVariable(Variable):
 		raise DataTypeError(f"Expected equation or string; got {value}")
 
 
-class UserList(Variable):
+class UserList(ListVariable):
 
 	def __init__(self, env: Environment, name: str):
 		self.lookup = env.user_lists
@@ -362,14 +362,11 @@ class UserList(Variable):
 		else:
 			self.lookup[self.name] = new_value
 
-	def normalize(self, value) -> Any:
-		return require_list(value).copy()
-
 	def resolve(self) -> Any:
 		try:
 			lst = self.lookup[self.name]
 		except KeyError:
 			raise UndefinedError(f"User list {self.name!r} is not defined")
 		if not lst.data:
-			raise InvalidDimError("list is empty")
+			raise InvalidDimError("empty list")
 		return lst
