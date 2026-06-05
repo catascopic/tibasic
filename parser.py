@@ -761,7 +761,7 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('[[1]]={1}')
+	test('[[1,0][0,1]]^{1,2}')
 	# test('""1@ Str1')
 	# test('55@A:99@B')
 	# test('int( log( 2) INV log( max( A,B')

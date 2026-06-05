@@ -3,13 +3,22 @@ import functools
 import math
 
 from decorators import vectorized, pure_op, op_vectorized
-from errors import DomainError, DivideByZeroError, NonRealAnsError
+from numbers import Number
+from errors import DataTypeError, DomainError, DivideByZeroError, NonRealAnsError
 from modes import ComplexMode
 from tiobjects import TiMatrix, require_real, require_int, require_num, require_matrix
 
 
 # ── Pure comparison operators ────────────────────────────────────────────────
 # Return 1.0/0.0; @vectorized handles TiList element-wise iteration.
+# Type checking is delegated to the operands' magic methods:
+#   - eq/ne: TiMatrix.__eq__ handles mat==mat (returns bool) and mat==other (raises DataTypeError)
+#   - lt/gt/le/ge: TypeError from missing __lt__ etc. is converted to DataTypeError
+
+
+def _type_err(op, a, b):
+	raise DataTypeError(f"'{op}' not supported between {type(a).__name__} and {type(b).__name__}")
+
 
 @pure_op
 @vectorized
@@ -21,32 +30,52 @@ def ne(a, b): return float(a != b)
 
 @pure_op
 @vectorized
-def lt(a, b): return float(a < b)
+def lt(a, b):
+	try: return float(a < b)
+	except TypeError: _type_err('<', a, b)
 
 @pure_op
 @vectorized
-def le(a, b): return float(a <= b)
+def le(a, b):
+	try: return float(a <= b)
+	except TypeError: _type_err('≤', a, b)
 
 @pure_op
 @vectorized
-def gt(a, b): return float(a > b)
+def gt(a, b):
+	try: return float(a > b)
+	except TypeError: _type_err('>', a, b)
 
 @pure_op
 @vectorized
-def ge(a, b): return float(a >= b)
+def ge(a, b):
+	try: return float(a >= b)
+	except TypeError: _type_err('≥', a, b)
 
 
 # ── Pure arithmetic operators ────────────────────────────────────────────────
 # TiList broadcasting is handled by TiList's magic methods (__add__, etc.).
 
 @pure_op
-def add(a, b): return a + b
+def add(a, b):
+	try:
+		return a + b
+	except TypeError:
+		_type_err('+', a, b)
 
 @pure_op
-def sub(a, b): return a - b
+def sub(a, b):
+	try:
+		return a - b
+	except TypeError:
+		_type_err('-', a, b)
 
 @pure_op
-def mul(a, b): return a * b
+def mul(a, b):
+	try:
+		return a * b
+	except TypeError:
+		_type_err('*', a, b)
 
 @pure_op
 def div(a, b):
@@ -54,6 +83,8 @@ def div(a, b):
 		return a / b
 	except ZeroDivisionError:
 		raise DivideByZeroError("Division by zero")
+	except TypeError:
+		_type_err('/', a, b)
 
 
 # ── Pure logical operators ────────────────────────────────────────────────────
@@ -98,15 +129,22 @@ def npr(n, r):
 # These need env to check ComplexMode; they are NOT wrapped with @pure_op.
 
 @op_vectorized
-def power(base, exp, env):
-	"""^ operator — checks ComplexMode before returning a non-real result."""
+def _power(base, exp, env):
 	try:
 		result = base ** exp
 	except ValueError:
 		if env.real_only:
 			raise NonRealAnsError("Non-real result")
 		return cmath.exp(cmath.log(complex(base)) * exp)
+	except TypeError:
+		_type_err('^', base, exp)
 	return result
+
+def power(base, exp, env):
+	"""^ operator — checks ComplexMode before returning a non-real result."""
+	if isinstance(base, TiMatrix) and not isinstance(exp, Number):
+		_type_err('^', base, exp)
+	return _power(base, exp, env)
 
 
 @op_vectorized

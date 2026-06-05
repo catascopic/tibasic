@@ -922,34 +922,316 @@ class TestDataType:
 		with pytest.raises(DataTypeError):
 			calc('Y1 @ Str1', env)
 	
-	def test_plus(self):
-		assert calc('1+1') == 2
+
+
+
+# ── Operator type compatibility ───────────────────────────────────────────────
+# Each test covers all 16 ordered (lhs, rhs) combinations of the 4 data types.
+# num=scalar, lst={1,2}, mat=[[1,0][0,1]], str="A"/"B"
+# Valid combos use assert; invalid ones expect DataTypeError.
+
+class TestOperatorTypes:
+
+	def test_add(self):
+		assert calc('1+2') == 3
 		assert calc('1+{1,2}').data == [2, 3]
-		assert calc('1+[[1][2]]').data == [[2], [3]]
-		with pytest.raises(DataTypeError):
-			calc('1+"A"')
-		
+		assert calc('1+[[1,0][0,1]]').data == [[2, 1], [1, 2]]
+		with pytest.raises(DataTypeError): calc('1+"A"')
+
 		assert calc('{1,2}+1').data == [2, 3]
 		assert calc('{1,2}+{3,4}').data == [4, 6]
-		with pytest.raises(DataTypeError):
-			calc('{1,2}+[[1][2]]')
-		with pytest.raises(DataTypeError):
-			calc('{1,2}+"A"')
-		
-		assert calc('[[1][2]]+3').data == [[4], [5]]
-		with pytest.raises(DataTypeError):
-			assert calc('[[1][2]]+{3,4}')
-		assert calc('[[1][2]]+[[3][4]]').data == [[4], [6]]
-		with pytest.raises(DataTypeError):
-			calc('[[1][2]]+"A"')
-		
-		with pytest.raises(DataTypeError):
-			assert calc('"A"+1')
-		with pytest.raises(DataTypeError):
-			assert calc('"A"+{1,2}')
-		with pytest.raises(DataTypeError):
-			assert calc('"A"+[[1][2]]')
+		with pytest.raises(DataTypeError): calc('{1,2}+[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2}+"A"')
+
+		assert calc('[[1,0][0,1]]+2').data == [[3, 2], [2, 3]]
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]+{1,2}')
+		assert calc('[[1,0][0,1]]+[[1,0][0,1]]').data == [[2, 0], [0, 2]]
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]+"A"')
+
+		with pytest.raises(DataTypeError): calc('"A"+1')
+		with pytest.raises(DataTypeError): calc('"A"+{1,2}')
+		with pytest.raises(DataTypeError): calc('"A"+[[1,0][0,1]]')
 		assert str(calc('"A"+"B"')) == 'AB'
+
+	def test_sub(self):
+		assert calc('3-1') == 2
+		assert calc('3-{1,2}').data == [2, 1]
+		assert calc('3-[[1,0][0,1]]').data == [[2, 3], [3, 2]]
+		with pytest.raises(DataTypeError): calc('1-"A"')
+
+		assert calc('{3,4}-1').data == [2, 3]
+		assert calc('{3,4}-{1,2}').data == [2, 2]
+		with pytest.raises(DataTypeError): calc('{1,2}-[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2}-"A"')
+
+		assert calc('[[3,0][0,3]]-1').data == [[2, -1], [-1, 2]]
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]-{1,2}')
+		assert calc('[[3,0][0,3]]-[[1,0][0,1]]').data == [[2, 0], [0, 2]]
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]-"A"')
+
+		with pytest.raises(DataTypeError): calc('"A"-1')
+		with pytest.raises(DataTypeError): calc('"A"-{1,2}')
+		with pytest.raises(DataTypeError): calc('"A"-[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('"A"-"B"')
+
+	def test_mul(self):
+		assert calc('2*3') == 6
+		assert calc('2*{1,2}').data == [2, 4]
+		assert calc('2*[[1,0][0,1]]').data == [[2, 0], [0, 2]]
+		with pytest.raises(DataTypeError): calc('2*"A"')
+
+		assert calc('{1,2}*3').data == [3, 6]
+		assert calc('{2,3}*{3,2}').data == [6, 6]
+		with pytest.raises(DataTypeError): calc('{1,2}*[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2}*"A"')
+
+		assert calc('[[1,0][0,1]]*3').data == [[3, 0], [0, 3]]
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]*{1,2}')
+		assert calc('[[1,2][3,4]]*[[1,0][0,1]]').data == [[1, 2], [3, 4]]
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]*"A"')
+
+		with pytest.raises(DataTypeError): calc('"A"*1')
+		with pytest.raises(DataTypeError): calc('"A"*{1,2}')
+		with pytest.raises(DataTypeError): calc('"A"*[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('"A"*"B"')
+
+	def test_div(self):
+		assert calc('6/2') == 3
+		assert calc('6/{2,3}').data == [3, 2]
+		with pytest.raises(DataTypeError): calc('1/[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('1/"A"')
+
+		assert calc('{6,4}/2').data == [3, 2]
+		assert calc('{6,4}/{2,4}').data == [3, 1]
+		with pytest.raises(DataTypeError): calc('{1,2}/[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2}/"A"')
+
+		with pytest.raises(DataTypeError): calc('[[6,4][2,8]]/2')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]/{1,2}')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]/[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]/"A"')
+
+		with pytest.raises(DataTypeError): calc('"A"/1')
+		with pytest.raises(DataTypeError): calc('"A"/{1,2}')
+		with pytest.raises(DataTypeError): calc('"A"/[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('"A"/"B"')
+
+	def test_pow(self):
+		assert calc('2^3') == 8
+		assert calc('2^{1,2,3}').data == [2, 4, 8]
+		with pytest.raises(DataTypeError): calc('2^[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('2^"A"')
+
+		assert calc('{1,2,3}^2').data == [1, 4, 9]
+		assert calc('{2,3}^{3,2}').data == [8, 9]
+		with pytest.raises(DataTypeError): calc('{1,2}^[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2}^"A"')
+
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]^{1,2}')
+		assert calc('[[1,2][3,4]]^2').data == [[7, 10], [15, 22]]
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]^[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]^"A"')
+
+		with pytest.raises(DataTypeError): calc('"A"^1')
+		with pytest.raises(DataTypeError): calc('"A"^{1,2}')
+		with pytest.raises(DataTypeError): calc('"A"^[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('"A"^"B"')
+
+	def test_eq(self):
+		assert calc('1=1') == 1.0
+		assert calc('1={1,2}').data == [1.0, 0.0]
+		with pytest.raises(DataTypeError): calc('1=[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('1="A"')
+
+		assert calc('{1,2}=1').data == [1.0, 0.0]
+		assert calc('{1,2}={1,3}').data == [1.0, 0.0]
+		with pytest.raises(DataTypeError): calc('{1,2}=[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2}="A"')
+
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]=1')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]={1,2}')
+		assert calc('[[1,0][0,1]]=[[1,0][0,1]]') == 1.0
+		assert calc('[[1,0][0,1]]=[[2,0][0,2]]') == 0.0
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]="A"')
+
+		with pytest.raises(DataTypeError): calc('"A"=1')
+		with pytest.raises(DataTypeError): calc('"A"={1,2}')
+		with pytest.raises(DataTypeError): calc('"A"=[[1,0][0,1]]')
+		assert calc('"A"="A"') == 1.0
+		assert calc('"A"="B"') == 0.0
+
+	def test_ne(self):
+		assert calc('1≠2') == 1.0
+		assert calc('1≠{1,2}').data == [0.0, 1.0]
+		with pytest.raises(DataTypeError): calc('1≠[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('1≠"A"')
+
+		assert calc('{1,2}≠1').data == [0.0, 1.0]
+		assert calc('{1,2}≠{1,3}').data == [0.0, 1.0]
+		with pytest.raises(DataTypeError): calc('{1,2}≠[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2}≠"A"')
+
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]≠1')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]≠{1,2}')
+		assert calc('[[1,0][0,1]]≠[[1,0][0,1]]') == 0.0
+		assert calc('[[1,0][0,1]]≠[[2,0][0,2]]') == 1.0
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]≠"A"')
+
+		with pytest.raises(DataTypeError): calc('"A"≠1')
+		with pytest.raises(DataTypeError): calc('"A"≠{1,2}')
+		with pytest.raises(DataTypeError): calc('"A"≠[[1,0][0,1]]')
+		assert calc('"A"≠"B"') == 1.0
+		assert calc('"A"≠"A"') == 0.0
+
+	def test_lt(self):
+		assert calc('1<2') == 1.0
+		assert calc('1<{1,2}').data == [0.0, 1.0]
+		with pytest.raises(DataTypeError): calc('1<[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('1<"A"')
+
+		assert calc('{1,2}<2').data == [1.0, 0.0]
+		assert calc('{1,2}<{2,1}').data == [1.0, 0.0]
+		with pytest.raises(DataTypeError): calc('{1,2}<[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2}<"A"')
+
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]<1')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]<{1,2}')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]<[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]<"A"')
+
+		with pytest.raises(DataTypeError): calc('"A"<1')
+		with pytest.raises(DataTypeError): calc('"A"<{1,2}')
+		with pytest.raises(DataTypeError): calc('"A"<[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('"A"<"B"')
+
+	def test_gt(self):
+		assert calc('2>1') == 1.0
+		assert calc('2>{1,2}').data == [1.0, 0.0]
+		with pytest.raises(DataTypeError): calc('1>[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('1>"A"')
+
+		assert calc('{2,1}>1').data == [1.0, 0.0]
+		assert calc('{2,1}>{1,2}').data == [1.0, 0.0]
+		with pytest.raises(DataTypeError): calc('{1,2}>[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2}>"A"')
+
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]>1')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]>{1,2}')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]>[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]>"A"')
+
+		with pytest.raises(DataTypeError): calc('"A">1')
+		with pytest.raises(DataTypeError): calc('"A">{1,2}')
+		with pytest.raises(DataTypeError): calc('"A">[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('"A">"B"')
+
+	def test_le(self):
+		assert calc('1≤2') == 1.0
+		assert calc('1≤{1,2}').data == [1.0, 1.0]
+		with pytest.raises(DataTypeError): calc('1≤[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('1≤"A"')
+
+		assert calc('{1,2}≤2').data == [1.0, 1.0]
+		assert calc('{1,2}≤{2,1}').data == [1.0, 0.0]
+		with pytest.raises(DataTypeError): calc('{1,2}≤[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2}≤"A"')
+
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]≤1')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]≤{1,2}')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]≤[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]≤"A"')
+
+		with pytest.raises(DataTypeError): calc('"A"≤1')
+		with pytest.raises(DataTypeError): calc('"A"≤{1,2}')
+		with pytest.raises(DataTypeError): calc('"A"≤[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('"A"≤"B"')
+
+	def test_ge(self):
+		assert calc('2≥1') == 1.0
+		assert calc('2≥{1,2}').data == [1.0, 1.0]
+		with pytest.raises(DataTypeError): calc('1≥[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('1≥"A"')
+
+		assert calc('{2,1}≥1').data == [1.0, 1.0]
+		assert calc('{2,1}≥{1,2}').data == [1.0, 0.0]
+		with pytest.raises(DataTypeError): calc('{1,2}≥[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('{1,2}≥"A"')
+
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]≥1')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]≥{1,2}')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]≥[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('[[1,0][0,1]]≥"A"')
+
+		with pytest.raises(DataTypeError): calc('"A"≥1')
+		with pytest.raises(DataTypeError): calc('"A"≥{1,2}')
+		with pytest.raises(DataTypeError): calc('"A"≥[[1,0][0,1]]')
+		with pytest.raises(DataTypeError): calc('"A"≥"B"')
+
+
+# ── Indexing errors ───────────────────────────────────────────────────────────
+
+class TestIndexing:
+	"""Invalid list/matrix indexing raises appropriate errors."""
+
+	# ── List: wrong index type ────────────────────────────────────────────────
+
+	def test_list_index_list(self):
+		env = run('{1,2,3@ L1')
+		with pytest.raises(InvalidDimError): calc('L1 ({1,2}', env)
+
+	def test_list_index_matrix(self):
+		env = run('{1,2,3@ L1')
+		with pytest.raises(InvalidDimError): calc('L1 ([[1]]', env)
+
+	def test_list_index_float(self):
+		env = run('{1,2,3@ L1')
+		with pytest.raises(InvalidDimError): calc('L1 (1.5', env)
+
+	# ── List: wrong arg count ─────────────────────────────────────────────────
+
+	def test_list_index_two_args(self):
+		env = run('{1,2,3@ L1')
+		with pytest.raises(TiSyntaxError): calc('L1 (1,2', env)
+
+	# ── List: out of bounds ───────────────────────────────────────────────────
+
+	def test_list_index_zero(self):
+		env = run('{1,2,3@ L1')
+		with pytest.raises(InvalidDimError): calc('L1 (0', env)
+
+	def test_list_index_too_large(self):
+		env = run('{1,2,3@ L1')
+		with pytest.raises(InvalidDimError): calc('L1 (5', env)
+
+	# ── Matrix: wrong arg count ───────────────────────────────────────────────
+
+	def test_matrix_index_one_arg(self):
+		env = run('[[1,2][3,4]]@ [A]')
+		with pytest.raises(TiSyntaxError): calc('[A] (1', env)
+
+	def test_matrix_index_three_args(self):
+		env = run('[[1,2][3,4]]@ [A]')
+		with pytest.raises(TiSyntaxError): calc('[A] (1,2,3', env)
+
+	# ── Matrix: wrong index type ──────────────────────────────────────────────
+
+	def test_matrix_index_list_row(self):
+		env = run('[[1,2][3,4]]@ [A]')
+		with pytest.raises(InvalidDimError): calc('[A] ({1},1', env)
+
+	def test_matrix_index_list_col(self):
+		env = run('[[1,2][3,4]]@ [A]')
+		with pytest.raises(InvalidDimError): calc('[A] (1,{1}', env)
+
+	# ── Matrix: out of bounds ─────────────────────────────────────────────────
+
+	def test_matrix_index_row_out_of_bounds(self):
+		env = run('[[1,2][3,4]]@ [A]')
+		with pytest.raises(InvalidDimError): calc('[A] (5,1', env)
+
+	def test_matrix_index_col_out_of_bounds(self):
+		env = run('[[1,2][3,4]]@ [A]')
+		with pytest.raises(InvalidDimError): calc('[A] (1,5', env)
 
 
 # ── Nesting and combinations ──────────────────────────────────────────────────

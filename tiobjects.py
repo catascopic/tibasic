@@ -76,6 +76,8 @@ class TiList:
 
 	def __init__(self, data: list[float] | None = None) -> None:
 		self.data = [] if data is None else data
+		if not all(isinstance(i, Number) for i in self.data):
+			raise ValueError(self.data)
 
 	@classmethod
 	def alloc(cls, size: Number) -> TiList:
@@ -118,8 +120,6 @@ class TiList:
 		return TiList(self.data.copy())
 
 	def __repr__(self) -> str:
-		if not all(isinstance(i, Number) for i in self):
-			raise ValueError(self.data)
 		return f"{{{','.join(repr_num(i) for i in self)}}}"
 
 
@@ -170,6 +170,9 @@ class TiMatrix:
 
 	def __init__(self, data: list[list[Number]] | None = None) -> None:
 		self.data = [] if data is None else data
+		for row in self.data:
+			if not all(isinstance(i, Number) for i in row):
+				raise ValueError(self.data)
 
 	@classmethod
 	def alloc(cls, dim_list: TiList) -> TiMatrix:
@@ -282,6 +285,8 @@ class TiMatrix:
 		return NotImplemented
 
 	def __pow__(self, n: Any) -> TiMatrix:
+		if not isinstance(n, Number):
+			return NotImplemented
 		n = require_int(n)
 		if self.rows != self.cols:
 			raise DomainError(f"Matrix power requires a square matrix, got {self.rows}×{self.cols}")
@@ -335,10 +340,6 @@ class TiMatrix:
 		return TiMatrix([row.copy() for row in self.data])
 
 	def __repr__(self) -> str:
-		for row in self.data:
-			for i in row:
-				if not isinstance(i, Number):
-					raise ValueError(self.data)
 		return '[' + ''.join('[' + ' '.join(repr_num(x) for x in row) + ']' for row in self.data) + ']'
 		# widths = [max(len(repr_num(row[c])) for row in self.data) for c in range(len(self.data[0]))]
 		# return f"[{'\n'.join([f"[{' '.join(f'{repr_num(x):{widths[c]}}' for c, x in enumerate(row))}]" for row in self.data])}]"

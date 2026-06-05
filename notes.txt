@@ -1,16 +1,4 @@
-NotImplemented:
-Make tests for all combination of types for all operators
-Make sure we get DataTypeError for bad ones
-How to do this? Either throw in methods (annoying to implement for vectorized TiList ops) or try/catch around actual use of operators. Can we catch TypeError and actually see which types were involved, or can we only see that indirectly in the string message?
 
-TestDataType:
-add sub mul div pow (on both sides)!
-eq ne lt gt le ge
-Try indexing lists and matrices with a bunch of invalid things: other lists/matrices, strings, wrong number of arguments (i.e. L1(2,3) for a list or [A](5) for a matrix)
-
-logical operators: extract to decorator
-Are the decorators getting out of control?
-How hard would this be for someone else to understand? Would the decorators make it easier or harder?
 
 Refactor window: inner object
 
@@ -86,6 +74,12 @@ Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
 
 ********
+
+Are the decorators getting out of control? I just added the "logical" decorator and I'm thinking it might make sense to add more for all the operatos that catch TypeError. How hard would this be for someone else to understand? Would the decorators make it easier or harder?
+
+I'm trying to figure out how to handle operator implemtations. I realized that multiplying a list by a matrix led to a matrix that contained a list (or vice versa). Not good! I need to make sure operators are strictly defined. I created test_plus in test_tibasic, and I'd like you to create equivalent tests for all operators: add sub mul div pow eq ne lt gt le ge (make sure both sides are tested)!
+The other question is, how do I fix this? I could either have the methods return NotImplemented and then catch the TypeError that eventually gets thrown (note this doesn't work for eq/ne, and I have coded that to throw an error, though maybe there's a better way)
+So we either throw in methods (annoying to implement for vectorized TiList ops) or try/catch around actual use of operators. Can we catch TypeError and actually see which types were involved, or can we only see that indirectly in the string message?
 
 Convert python's math errors to TiErrors
 

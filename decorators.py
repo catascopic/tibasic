@@ -3,10 +3,11 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from functools import partial, wraps, update_wrapper
 from itertools import repeat
+from numbers import Number
 from typing import Any, TYPE_CHECKING
 
 from tiobjects import TiList
-from errors import DimMismatchError
+from errors import DimMismatchError, DataTypeError
 
 if TYPE_CHECKING:
 	from parser import ArgParser
@@ -15,13 +16,16 @@ if TYPE_CHECKING:
 def _call_vectorized(func: Callable, args: tuple) -> Any:
 	len_check = set()
 	vec = []
+	alt = False
 	for a in args:
 		if isinstance(a, TiList):
 			len_check.add(len(a))
 			vec.append(a)
-		else:
+		elif isinstance(a, Number):
 			vec.append(repeat(a))
-	if not len_check:
+		else:
+			alt = True
+	if not len_check or alt:
 		return func(*args)
 	if len(len_check) == 1:
 		return TiList([func(*v) for v in zip(*vec)])
