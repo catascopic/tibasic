@@ -129,7 +129,8 @@ def npr(n, r):
 # These need env to check ComplexMode; they are NOT wrapped with @pure_op.
 
 @op_vectorized
-def _power(base, exp, env):
+def power(base, exp, env):
+	"""^ operator — checks ComplexMode before returning a non-real result."""
 	try:
 		result = base ** exp
 	except ValueError:
@@ -139,12 +140,6 @@ def _power(base, exp, env):
 	except TypeError:
 		_type_err('^', base, exp)
 	return result
-
-def power(base, exp, env):
-	"""^ operator — checks ComplexMode before returning a non-real result."""
-	if isinstance(base, TiMatrix) and not isinstance(exp, Number):
-		_type_err('^', base, exp)
-	return _power(base, exp, env)
 
 
 @op_vectorized

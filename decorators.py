@@ -7,7 +7,7 @@ from numbers import Number
 from typing import Any, TYPE_CHECKING
 
 from tiobjects import TiList
-from errors import DimMismatchError, DataTypeError
+from errors import DimMismatchError
 
 if TYPE_CHECKING:
 	from parser import ArgParser
@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 def _call_vectorized(func: Callable, args: tuple) -> Any:
 	len_check = set()
 	vec = []
-	alt = False
 	for a in args:
 		if isinstance(a, TiList):
 			len_check.add(len(a))
@@ -24,8 +23,8 @@ def _call_vectorized(func: Callable, args: tuple) -> Any:
 		elif isinstance(a, Number):
 			vec.append(repeat(a))
 		else:
-			alt = True
-	if not len_check or alt:
+			return func(*args)
+	if not len_check:
 		return func(*args)
 	if len(len_check) == 1:
 		return TiList([func(*v) for v in zip(*vec)])
