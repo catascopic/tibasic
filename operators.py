@@ -1,4 +1,5 @@
 import cmath
+import functools
 import math
 
 from decorators import vectorized, pure_op, op_vectorized
@@ -57,20 +58,21 @@ def div(a, b):
 
 # ── Pure logical operators ────────────────────────────────────────────────────
 
-@pure_op
-@vectorized
-def and_(a, b):
-	return float(bool(require_real(a)) & bool(require_real(b)))
+def logical(func):
+	functools.wraps(func)
+	def apply(a, b):
+		return float(func(bool(require_real(a)), bool(require_real(b))))
+	return pure_op(vectorized(apply))
 
-@pure_op
-@vectorized
-def or_(a, b):
-	return float(bool(require_real(a)) | bool(require_real(b)))
 
-@pure_op
-@vectorized
-def xor(a, b):
-	return float(bool(require_real(a)) ^ bool(require_real(b)))
+@logical
+def and_(a, b): return a & b
+
+@logical
+def or_(a, b):  return a | b
+
+@logical
+def xor(a, b):  return a ^ b
 
 
 # ── Pure combinatorics operators ─────────────────────────────────────────────

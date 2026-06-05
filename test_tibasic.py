@@ -871,7 +871,7 @@ class TestCopyVars:
 
 # ── Store data type ───────────────────────────────────────────────────────────
 
-class TestStoreDataType:
+class TestDataType:
 
 	def test_store_wrong_data_type(self):
 		with pytest.raises(DataTypeError):
@@ -921,6 +921,35 @@ class TestStoreDataType:
 		env = run('"X"@ Y1')
 		with pytest.raises(DataTypeError):
 			calc('Y1 @ Str1', env)
+	
+	def test_plus(self):
+		assert calc('1+1') == 2
+		assert calc('1+{1,2}').data == [2, 3]
+		assert calc('1+[[1][2]]').data == [[2], [3]]
+		with pytest.raises(DataTypeError):
+			calc('1+"A"')
+		
+		assert calc('{1,2}+1').data == [2, 3]
+		assert calc('{1,2}+{3,4}').data == [4, 6]
+		with pytest.raises(DataTypeError):
+			calc('{1,2}+[[1][2]]')
+		with pytest.raises(DataTypeError):
+			calc('{1,2}+"A"')
+		
+		assert calc('[[1][2]]+3').data == [[4], [5]]
+		with pytest.raises(DataTypeError):
+			assert calc('[[1][2]]+{3,4}')
+		assert calc('[[1][2]]+[[3][4]]').data == [[4], [6]]
+		with pytest.raises(DataTypeError):
+			calc('[[1][2]]+"A"')
+		
+		with pytest.raises(DataTypeError):
+			assert calc('"A"+1')
+		with pytest.raises(DataTypeError):
+			assert calc('"A"+{1,2}')
+		with pytest.raises(DataTypeError):
+			assert calc('"A"+[[1][2]]')
+		assert str(calc('"A"+"B"')) == 'AB'
 
 
 # ── Nesting and combinations ──────────────────────────────────────────────────

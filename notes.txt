@@ -3,6 +3,14 @@ Make tests for all combination of types for all operators
 Make sure we get DataTypeError for bad ones
 How to do this? Either throw in methods (annoying to implement for vectorized TiList ops) or try/catch around actual use of operators. Can we catch TypeError and actually see which types were involved, or can we only see that indirectly in the string message?
 
+TestDataType:
+add sub mul div pow (on both sides)!
+eq ne lt gt le ge
+Try indexing lists and matrices with a bunch of invalid things: other lists/matrices, strings, wrong number of arguments (i.e. L1(2,3) for a list or [A](5) for a matrix)
+
+logical operators: extract to decorator
+Are the decorators getting out of control?
+How hard would this be for someone else to understand? Would the decorators make it easier or harder?
 
 Refactor window: inner object
 
