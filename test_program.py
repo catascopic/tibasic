@@ -636,6 +636,106 @@ class TestJunkAfterCommand:
 		assert var(env, 'C') == 99
 
 
+# ── DelVar the loop index ─────────────────────────────────────────────────────
+
+class TestForDelVar:
+
+	def test_delvar_resets_counter_causing_extra_iterations(self):
+		# DelVar on a numeric variable resets it to its default (0).
+		# For(X,3,5) normally runs 3 times (X=3,4,5).
+		# Deleting X on the first pass makes it 0; the next End increments
+		# from 0 to 1, and the loop continues from there — 6 iterations total.
+		env = run("""
+		For( X,3,5)
+		A+1→A
+		If A=2
+		DelVar X
+		End
+		""")
+		assert var(env, 'A') == 7
+
+
+# ── Goto into / out of loop blocks ────────────────────────────────────────────
+
+class TestGotoBlocks:
+
+	def test_goto_into_loop_raises_at_end(self):
+		# Jumping into a For loop body bypasses begin_for, so no ForBlock is
+		# pushed onto the block stack.  When End is reached the stack is empty
+		# — ERR:SYNTAX on hardware, TiSyntaxError here.
+		with pytest.raises(TiSyntaxError):
+			run("""
+			Goto IN
+			For( X,1,3)
+			Lbl IN
+			99→A
+			End
+			""")
+
+	def test_goto_out_of_loop_stale_block_harmless(self):
+		# Goto out of a For loop leaves a stale ForBlock on the block stack,
+		# but code after the label runs normally because no further End is
+		# encountered to accidentally pop it.
+		env = run("""
+		For( X,1,5)
+		A+1→A
+		If A=3
+		Goto D
+		End
+		Lbl D
+		99→B
+		""")
+		assert var(env, 'A') == 3
+		assert var(env, 'B') == 99
+
+	def test_goto_out_stale_block_consumed_by_later_end(self):
+		# After jumping out of a For loop the stale ForBlock stays on the
+		# stack.  A later End (after a Lbl) pops it and jumps back into the
+		# loop body — the loop effectively resumes from where it left off.
+		# X=1: Goto S → C+1, End loops back (stale block, X→2)
+		# X=2: normal End exits → Goto D → B=99
+		env = run("""
+		For( X,1,2)
+		A+1→A
+		If X=1
+		Goto S
+		End
+		Goto D
+		Lbl S
+		C+1→C
+		End
+		Lbl D
+		99→B
+		""")
+		assert var(env, 'A') == 2
+		assert var(env, 'B') == 99
+		assert var(env, 'C') == 1
+
+
+# ── Using one-line If to skip End ─────────────────────────────────────────────
+
+class TestIfSkipsEnd:
+
+	def test_if_skips_end_acts_as_continue(self):
+		# A one-line If whose body is End acts like a "continue": when the
+		# condition is true, End executes immediately (looping back or exiting),
+		# skipping the rest of the loop body for that iteration.
+		# X=1: If false → skip End → B+=1 → normal End loops
+		# X=2: If true  → End loops back immediately, B not updated
+		# X=3: If false → skip End → B+=3 → normal End loops
+		# X=4: If false → skip End → B+=4 → normal End exits
+		env = run("""
+		For( X,1,4)
+		A+X→A
+		If X=2
+		End
+		B+X→B
+		End
+		""")
+		assert var(env, 'A') == 10   # 1+2+3+4
+		assert var(env, 'B') == 8    # 1+3+4  (X=2 skipped)
+
+
 class TestRecursion:
 
 	def test_factorial(self):

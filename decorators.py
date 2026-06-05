@@ -88,7 +88,7 @@ def pure_op(func: Callable) -> Callable:
 	the two operands while the parser can always call op(lhs, rhs, env).
 	"""
 	@wraps(func)
-	def wrapper(lhs: Any, rhs: Any, env: Any) -> Any:
+	def wrapper(env, lhs: Any, rhs: Any) -> Any:
 		return func(lhs, rhs)
 	return wrapper
 
@@ -101,8 +101,8 @@ def op_vectorized(func: Callable) -> Callable:
 	broadcast over list elements.
 	"""
 	@wraps(func)
-	def apply(lhs: Any, rhs: Any, env: Any) -> Any:
-		return _call_vectorized(lambda l, r: func(l, r, env), (lhs, rhs))
+	def apply(env, lhs: Any, rhs: Any) -> Any:
+		return _call_vectorized(partial(func, env), (lhs, rhs))
 	return apply
 
 

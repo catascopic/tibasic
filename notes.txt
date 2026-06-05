@@ -1,11 +1,4 @@
-
-
 Refactor window: inner object
-
-Restructured end_block: what do you think?
-
-Test: DelVar the for-loop index
-Test: Weird programs that jump into blocks, jump out of blocks, use If to skip End
 
 fill: Error message is wrong, it says it expected a list when a matrix would have worked.
 Fail on empty list helper?
@@ -74,6 +67,11 @@ Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
 
 ********
+
+Test: DelVar the for-loop index
+Test: Weird programs that jump into blocks, jump out of blocks, use If to skip End
+
+Restructured end_block: what do you think?
 
 Are the decorators getting out of control? I just added the "logical" decorator and I'm thinking it might make sense to add more for all the operatos that catch TypeError. How hard would this be for someone else to understand? Would the decorators make it easier or harder?
 

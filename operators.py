@@ -129,7 +129,7 @@ def npr(n, r):
 # These need env to check ComplexMode; they are NOT wrapped with @pure_op.
 
 @op_vectorized
-def power(base, exp, env):
+def power(env, base, exp):
 	"""^ operator — checks ComplexMode before returning a non-real result."""
 	try:
 		result = base ** exp
@@ -143,7 +143,7 @@ def power(base, exp, env):
 
 
 @op_vectorized
-def xth_root(n, x, env):
+def xth_root(env, n, x):
 	"""ˣ√ operator — checks ComplexMode before returning a non-real result."""
 	require_num(x)
 	try:

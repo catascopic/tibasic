@@ -89,7 +89,7 @@ class Program:
 		if not self._block_stack:
 			raise TiSyntaxError("End without matching block")
 		block = self._block_stack[-1]		
-		if block.on_end(self):
+		if block.on_end():
 			self._parser.pos = block.pos
 		else:
 			self._block_stack.pop()
@@ -137,41 +137,42 @@ def check_for_condition(value: float, end: float, step: float) -> bool:
 
 class Block(ABC):
 	@abstractmethod
-	def on_end(self, prgm: Program) -> bool:
+	def on_end(self) -> bool:
 		"""Returns whether the program should re-run the block."""
 
 
 @dataclass
-class ForBlock(Block):
+class LoopBlock(Block, ABC):
 	pos: int
+
+
+@dataclass
+class ForBlock(LoopBlock):
 	var: Variable
 	end: float
 	step: float
 
-	def on_end(self, prgm):
+	def on_end(self):
 		self.var.value = self.var.resolve() + self.step
 		return check_for_condition(self.var.value, self.end, self.step)
 
 
 @dataclass
-class WhileBlock(Block):
-	pos: int
+class WhileBlock(LoopBlock):
 	condition: Thunk
 
-	def on_end(self, prgm):
+	def on_end(self):
 		return self.condition.eval()
 
 
 @dataclass
-class RepeatBlock(Block):
-	pos: int
+class RepeatBlock(LoopBlock):
 	condition: Thunk
 
-	def on_end(self, prgm):
+	def on_end(self):
 		return not self.condition.eval()
 
 
-@dataclass
 class ThenBlock(Block):
-	def on_end(self, prgm):
+	def on_end(self):
 		return False
