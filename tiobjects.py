@@ -40,11 +40,17 @@ def require_real(value: Any, exc_cls=DataTypeError) -> float:
 		raise exc_cls(f"Expected real number, got complex: {value}")
 	return value
 
-def require_int(value: Any, exc_cls=DomainError) -> int:
+def require_int(value: Any, exc_cls=DomainError) -> float:
 	require_real(value, exc_cls)
 	if not value.is_integer():
 		raise exc_cls(f"Expected integer, got {value}")
 	return value
+
+def py_int(value: Any, exc_cls=DomainError) -> int:
+	"""Validate that value is a whole number, then return it as a Python int.
+	Use when passing a TI value to a Python API that requires int (range, math.comb, etc.).
+	For TI-level validation only, use require_int."""
+	return int(require_int(value, exc_cls))
 
 def require_list(value: Any) -> TiList:
 	return _require_type(value, TiList)
@@ -63,8 +69,7 @@ def require_str(value: Any) -> TiString:
 
 
 def _get_dim(value: Any) -> int:
-	require_int(value, InvalidDimError)
-	return int(value)
+	return py_int(value, InvalidDimError)
 
 
 class TiList:

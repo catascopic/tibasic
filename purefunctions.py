@@ -13,7 +13,7 @@ from numbers import Number
 from tiobjects import (
 	TiList, TiMatrix, TiString,
 	require_num, require_real, require_int,
-	require_list, require_matrix, require_str,
+	require_list, require_matrix, require_str, py_int,
 )
 from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
@@ -140,8 +140,8 @@ def angle(x):
 def in_string(string, substring, start=1):
 	v = require_str(string).tokens
 	s = require_str(substring).tokens
-	require_int(start)
-	for i in range(int(start) - 1, len(v) - len(s) + 1):
+	start = py_int(start)
+	for i in range(start - 1, len(v) - len(s) + 1):
 		if v[i:i + len(s)] == s:
 			return i + 1
 	return 0
@@ -156,13 +156,13 @@ def sub(*args):
 	if len(args) == 3:
 		string, start, length = args
 		require_str(string)
-		require_int(start)
-		require_int(length)
+		start = py_int(start)
+		length = py_int(length)
 		if length < 1:
 			raise DomainError(f"sub: length must be ≥ 1, got {length}")
 		if not (1 <= start <= len(string) - length + 1):
 			raise InvalidDimError(f"sub: index out of range")
-		return TiString(string.tokens[int(start) - 1 : int(start + length) - 1])
+		return TiString(string.tokens[start - 1 : start + length - 1])
 	raise ArgumentError(f"Invalid arguments: {args}")
 
 # ── Aggregate / statistics ───────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ def stddev(lst, freqlist=None):
 
 @matrix_vectorized
 def round(x, decimals=9):
-	return builtins.round(require_num(x), int(require_int(decimals)))
+	return builtins.round(require_num(x), py_int(decimals))
 
 def _minmax(fn, a, b):
 	if b is None:
@@ -277,7 +277,7 @@ def det(mat):
 
 @pure_func
 def identity(n):
-	size = int(require_int(n))
+	size = py_int(n)
 	return TiMatrix([[float(r == c) for c in range(size)] for r in range(size)])
 
 @pure_func
@@ -286,16 +286,16 @@ def sum(lst, start=None, end=None):
 	if start is None:
 		return builtins.sum(data)
 
-	require_int(start)
+	start = py_int(start)
 	if end is None:
 		end = len(data)
 	else:
-		require_int(end)
+		end = py_int(end)
 
 	if not (1 <= start <= end <= len(data)):
 		raise InvalidDimError(f"sum: index out of range (start={start}, end={end}, dim={len(data)})")
 
-	return builtins.sum(data[int(start) - 1 : int(end)])
+	return builtins.sum(data[start - 1 : end])
 
 @pure_func
 def prod(lst, start=None, end=None):
@@ -303,16 +303,16 @@ def prod(lst, start=None, end=None):
 	if start is None:
 		return math.prod(data)
 
-	require_int(start)
+	start = py_int(start)
 	if end is None:
 		end = len(data)
 	else:
-		require_int(end)
+		end = py_int(end)
 
 	if not (1 <= start <= end <= len(data)):
 		raise InvalidDimError(f"prod: index out of range (start={start}, end={end}, dim={len(data)})")
 
-	return math.prod(data[int(start) - 1 : int(end)])
+	return math.prod(data[start - 1 : end])
 
 
 # ── Transcendental functions ────────────────────────────────────────────────────
@@ -347,15 +347,11 @@ def asinh(x):
 
 @pure_vectorized
 def lcm(a, b):
-	require_int(a)
-	require_int(b)
-	return float(math.lcm(int(a), int(b)))
+	return float(math.lcm(py_int(a), py_int(b)))
 
 @pure_vectorized
 def gcd(a, b):
-	require_int(a)
-	require_int(b)
-	return float(math.gcd(int(a), int(b)))
+	return float(math.gcd(py_int(a), py_int(b)))
 
 @pure_vectorized
 def remainder(a, b):
@@ -371,28 +367,24 @@ def remainder(a, b):
 
 @pure_func
 def rand_list(n):
-	return TiList([random.random() for _ in range(int(require_int(n)))])
+	return TiList([random.random() for _ in range(py_int(n))])
 
 @vectorized
 def _rand_int_single(low, high):
-	require_int(low)
-	require_int(high)
 	if low > high:
 		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
-	return float(random.randint(int(low), int(high)))
+	return float(random.randint(py_int(low), py_int(high)))
 
 @pure_func
 def rand_int(low, high, n=None):
 	if n is None:
 		return _rand_int_single(low, high)
-	low = require_int(low)
-	high = require_int(high)
+	low = py_int(low)
+	high = py_int(high)
 	if low > high:
 		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
-	require_int(n)
-	low = int(low)
-	high = int(high)
-	return TiList([float(random.randint(low, high)) for _ in range(int(n))])
+	n = py_int(n)
+	return TiList([float(random.randint(low, high)) for _ in range(n)])
 
 @pure_func
 def rand_norm(mu, sigma, n=None):
@@ -400,14 +392,11 @@ def rand_norm(mu, sigma, n=None):
 	require_real(sigma)
 	if n is None:
 		return random.gauss(mu, sigma)
-	require_int(n)
-	return TiList([random.gauss(mu, sigma) for _ in range(int(n))])
+	return TiList([random.gauss(mu, sigma) for _ in range(py_int(n))])
 
 @pure_func
 def rand_int_no_rep(low, high):
-	require_int(low)
-	require_int(high)
-	lst = list(range(int(low), int(high) + 1))
+	lst = list(range(py_int(low), py_int(high) + 1))
 	random.shuffle(lst)
 	return TiList(lst)
 
@@ -487,25 +476,25 @@ def rref(mat):
 
 @pure_func
 def rand_m(rows, cols):
-	require_int(rows)
-	require_int(cols)
+	rows = py_int(rows)
+	cols = py_int(cols)
 	if not (1 <= rows <= 99) or not (1 <= cols <= 99):
 		raise InvalidDimError("randM: dimensions must be 1-99")
 	# Per spec: entries are successive randInt(-9,9) calls filled bottom-right to top-left
-	data = [random.randint(-9, 9) for _ in range(int(rows * cols))]
-	return TiMatrix([list(row) for row in batched(reversed(data), int(cols))])
+	data = [random.randint(-9, 9) for _ in range(rows * cols)]
+	return TiMatrix([list(row) for row in batched(reversed(data), cols)])
 
 @pure_func
 def rand_bin(n, p, simulations=None):
-	require_int(n)
+	n = py_int(n)
 	if not (0 <= p <= 1):
 		raise DomainError("randBin: p must be in [0, 1]")
 	if n <= 0:
 		raise DomainError("randBin: n must be positive")
 	if simulations is None:
-		return builtins.sum(1 for _ in range(int(n)) if random.random() < p)
-	require_int(simulations)
-	return TiList([builtins.sum(1 for _ in range(int(n)) if random.random() < p) for _ in range(int(simulations))])
+		return builtins.sum(1 for _ in range(n) if random.random() < p)
+	simulations = py_int(simulations)
+	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(simulations)])
 
 
 # ── Date / time utilities ────────────────────────────────────────────────────
@@ -523,11 +512,8 @@ def time_cnv(seconds):
 @pure_func
 def dayofwk(year, month, day):
 	"""Day of week: 1=Sunday, 2=Monday, …, 7=Saturday."""
-	require_int(year)
-	require_int(month)
-	require_int(day)
 	try:
-		d = date(int(year), int(month), int(day))
+		d = date(py_int(year), py_int(month), py_int(day))
 	except ValueError as e:
 		raise DomainError(f"dayOfWk: invalid date ({year}/{month}/{day})") from e
 	return float(d.isoweekday() % 7 + 1)
@@ -895,38 +881,37 @@ def fcdf(lower, upper, df1, df2):
 
 @pure_func
 def binompdf(n, p, k=None):
-	require_int(n)
+	n = py_int(n)
 	require_real(p)
 	if k is None:
-		return TiList([math.comb(int(n), i) * p ** i * (1 - p) ** (n - i) for i in range(int(n) + 1)])
-	return math.comb(int(n), int(k)) * p ** k * (1 - p) ** (n - k)
+		return TiList([math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(n + 1)])
+	return math.comb(n, py_int(k)) * p ** k * (1 - p) ** (n - k)
 
 @pure_func
 def binomcdf(n, p, k=None):
-	require_int(n)
+	n = py_int(n)
 	require_real(p)
 	if k is None:
 		acc = 0
 		result = []
-		for i in range(int(n) + 1):
-			acc += math.comb(int(n), i) * p ** i * (1 - p) ** (n - i)
+		for i in range(n + 1):
+			acc += math.comb(n, i) * p ** i * (1 - p) ** (n - i)
 			result.append(acc)
 		return TiList(result)
 
-	n = int(n)
-	return float(builtins.sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(int(k) + 1)))
+	return float(builtins.sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(py_int(k) + 1)))
 
 @pure_func
 def poissonpdf(lam, k):
 	require_real(lam)
-	require_int(k)
-	return math.exp(-lam) * lam ** k / math.factorial(int(k))
+	k = py_int(k)
+	return math.exp(-lam) * lam ** k / math.factorial(k)
 
 @pure_func
 def poissoncdf(lam, k):
 	require_real(lam)
-	require_int(k)
-	return builtins.sum(math.exp(-lam) * lam ** i / math.factorial(i) for i in range(int(k) + 1))
+	k = py_int(k)
+	return builtins.sum(math.exp(-lam) * lam ** i / math.factorial(i) for i in range(k + 1))
 
 @pure_func
 def geometpdf(p, n):

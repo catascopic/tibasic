@@ -11,7 +11,7 @@ from decorators import env_func, env_vectorized, TiCall
 from environment import Environment
 from errors import TiSyntaxError, DomainError, NonRealAnsError
 from modes import ComplexMode
-from tiobjects import require_num, require_real, require_int, require_str
+from tiobjects import require_num, require_real, require_int, require_str, py_int
 
 
 # ── Trig / coordinate helpers ─────────────────────────────────────────────────
@@ -165,9 +165,8 @@ def _bal(env, n, roundvalue=None):
 	pv = env.pv.resolve()
 	pmt = env.pmt.resolve()
 	if roundvalue is not None:
-		roundvalue = int(roundvalue)
 		b = pv
-		for _ in range(int(n)):
+		for _ in range(n):
 			b = round(b * (1 + r) + pmt, roundvalue)
 		return b
 	if r == 0:
@@ -178,21 +177,21 @@ def _bal(env, n, roundvalue=None):
 @env_func
 def bal(env, n, roundvalue=None):
 	"""bal(n[,roundvalue]) — remaining balance after n payments."""
-	require_int(n)
+	n = py_int(n)
 	if n < 0:
 		raise DomainError("bal: n must be non-negative")
 	if roundvalue is not None:
-		roundvalue = require_int(roundvalue)
+		roundvalue = py_int(roundvalue)
 	return _bal(env, n, roundvalue)
 
 
 @env_func
 def sigma_prn(env, n1, n2, roundvalue=None):
 	"""ΣPrn(n1,n2[,roundvalue]) — principal paid from payment n1 through n2."""
-	require_int(n1)
-	require_int(n2)
+	n1 = py_int(n1)
+	n2 = py_int(n2)
 	if roundvalue is not None:
-		roundvalue = require_int(roundvalue)
+		roundvalue = py_int(roundvalue)
 	if n1 < 1 or n2 < 0:
 		raise DomainError("ΣPrn: payment numbers must be positive")
 	return _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
@@ -201,10 +200,10 @@ def sigma_prn(env, n1, n2, roundvalue=None):
 @env_func
 def sigma_int(env, n1, n2, roundvalue=None):
 	"""ΣInt(n1,n2[,roundvalue]) — interest paid from payment n1 through n2."""
-	require_int(n1)
-	require_int(n2)
+	n1 = py_int(n1)
+	n2 = py_int(n2)
 	if roundvalue is not None:
-		roundvalue = require_int(roundvalue)
+		roundvalue = py_int(roundvalue)
 	if n1 < 1 or n2 < 0:
 		raise DomainError("ΣInt: payment numbers must be positive")
 	sprn = _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)

@@ -6,7 +6,7 @@ from functools import partial, wraps
 from numbers import Number
 from errors import DataTypeError, DomainError, DivideByZeroError, NonRealAnsError
 from modes import ComplexMode
-from tiobjects import TiMatrix, require_real, require_int, require_num, require_matrix
+from tiobjects import TiMatrix, require_real, require_int, require_num, require_matrix, py_int
 
 
 # ── Pure comparison operators ────────────────────────────────────────────────
@@ -111,20 +111,16 @@ def xor(a, b):  return a ^ b
 @pure_op
 @vectorized
 def ncr(n, r):
-	require_int(n)
-	require_int(r)
 	try:
-		return math.comb(int(n), int(r))
+		return math.comb(py_int(n), py_int(r))
 	except ValueError:
 		raise DomainError(f"nCr: invalid arguments ({n}, {r})")
 
 @pure_op
 @vectorized
 def npr(n, r):
-	require_int(n)
-	require_int(r)
 	try:
-		return math.perm(int(n), int(r))
+		return math.perm(py_int(n), py_int(r))
 	except ValueError:
 		raise DomainError(f"nPr: invalid arguments ({n}, {r})")
 

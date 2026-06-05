@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 from decorators import forms_func, nullary_command, TiCall
 from errors import DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
-from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str
+from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str, py_int
 
 
 # You'd think dim could be a pure function, right? For a while, it was.
@@ -181,7 +181,7 @@ def matr_to_list(a: ArgParser) -> None:
 		for var, col_data in zip(list_vars, zip(*mat.data)):
 			var.value = TiList(list(col_data))
 	else:
-		col = int(require_int(a.expr())) - 1
+		col = py_int(a.expr()) - 1
 		if not (0 <= col < mat.cols):
 			raise InvalidDimError(
 				f"Matr►list: column {col + 1} out of range for {mat.rows}×{mat.cols} matrix"

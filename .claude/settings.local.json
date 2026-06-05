@@ -47,7 +47,8 @@
       "Bash(python -m pytest test_tibasic.py::TestOperatorTypes::test_pow -v)",
       "Bash(python -m pytest test_tibasic.py::TestOperatorTypes::test_add test_tibasic.py::TestIndexing -v)",
       "Bash(python -m pytest test_tibasic.py -q)",
-      "Bash(python -m pytest test_tibasic.py test_program.py -x -q)"
+      "Bash(python -m pytest test_tibasic.py test_program.py -x -q)",
+      "Bash(python -m pytest test_tibasic.py test_program.py -q)"
     ]
   }
 }

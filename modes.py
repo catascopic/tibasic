@@ -2,7 +2,7 @@ from __future__ import annotations
 from enum import Enum, auto
 from decorators import forms_func, nullary_command, nullary_bunch
 from errors import DomainError
-from tiobjects import require_int
+from tiobjects import py_int
 
 
 class AngleMode(Enum):
@@ -55,10 +55,10 @@ float_ = _mode('fix_digits', None)
 
 @forms_func
 def fix(a):
-	n = require_int(a.expr())
+	n = py_int(a.expr())
 	if not 0 <= n <= 9:
 		raise DomainError(f"Fix: argument must be 0–9, got {n}")
-	a.env.fix_digits = int(n)
+	a.env.fix_digits = n
 	a.end_cmd()
 
 # Graph type
