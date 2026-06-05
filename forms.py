@@ -181,7 +181,7 @@ def matr_to_list(a: ArgParser) -> None:
 		for var, col_data in zip(list_vars, zip(*mat.data)):
 			var.value = TiList(list(col_data))
 	else:
-		col = require_int(a.expr()) - 1
+		col = int(require_int(a.expr())) - 1
 		if not (0 <= col < mat.cols):
 			raise InvalidDimError(
 				f"Matr►list: column {col + 1} out of range for {mat.rows}×{mat.cols} matrix"

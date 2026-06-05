@@ -111,16 +111,20 @@ def xor(a, b):  return a ^ b
 @pure_op
 @vectorized
 def ncr(n, r):
+	require_int(n)
+	require_int(r)
 	try:
-		return math.comb(require_int(n), require_int(r))
+		return math.comb(int(n), int(r))
 	except ValueError:
 		raise DomainError(f"nCr: invalid arguments ({n}, {r})")
 
 @pure_op
 @vectorized
 def npr(n, r):
+	require_int(n)
+	require_int(r)
 	try:
-		return math.perm(require_int(n), require_int(r))
+		return math.perm(int(n), int(r))
 	except ValueError:
 		raise DomainError(f"nPr: invalid arguments ({n}, {r})")
 

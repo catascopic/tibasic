@@ -159,25 +159,26 @@ def polar_to_rect_y(env, r, theta):
 
 # ── Amortization: bal(, ΣPrn(, ΣInt( ─────────────────────────────────────────
 
-def _bal(env, m: int, roundvalue=None):
-	"""Balance after m payments, using TVM variables from env."""
+def _bal(env, n, roundvalue=None):
+	"""Balance after n payments, using TVM variables from env."""
 	r = env.i_pct.resolve() / 100
 	pv = env.pv.resolve()
 	pmt = env.pmt.resolve()
 	if roundvalue is not None:
+		roundvalue = int(roundvalue)
 		b = pv
-		for _ in range(m):
+		for _ in range(int(n)):
 			b = round(b * (1 + r) + pmt, roundvalue)
 		return b
 	if r == 0:
-		return pv + pmt * m
-	return pv * (1 + r) ** m + pmt * ((1 + r) ** m - 1) / r
+		return pv + pmt * n
+	return pv * (1 + r) ** n + pmt * ((1 + r) ** n - 1) / r
 
 
 @env_func
 def bal(env, n, roundvalue=None):
 	"""bal(n[,roundvalue]) — remaining balance after n payments."""
-	n = require_int(n)
+	require_int(n)
 	if n < 0:
 		raise DomainError("bal: n must be non-negative")
 	if roundvalue is not None:
@@ -188,8 +189,8 @@ def bal(env, n, roundvalue=None):
 @env_func
 def sigma_prn(env, n1, n2, roundvalue=None):
 	"""ΣPrn(n1,n2[,roundvalue]) — principal paid from payment n1 through n2."""
-	n1 = require_int(n1)
-	n2 = require_int(n2)
+	require_int(n1)
+	require_int(n2)
 	if roundvalue is not None:
 		roundvalue = require_int(roundvalue)
 	if n1 < 1 or n2 < 0:
@@ -200,8 +201,8 @@ def sigma_prn(env, n1, n2, roundvalue=None):
 @env_func
 def sigma_int(env, n1, n2, roundvalue=None):
 	"""ΣInt(n1,n2[,roundvalue]) — interest paid from payment n1 through n2."""
-	n1 = require_int(n1)
-	n2 = require_int(n2)
+	require_int(n1)
+	require_int(n2)
 	if roundvalue is not None:
 		roundvalue = require_int(roundvalue)
 	if n1 < 1 or n2 < 0:

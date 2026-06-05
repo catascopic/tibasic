@@ -58,7 +58,7 @@ def fix(a):
 	n = require_int(a.expr())
 	if not 0 <= n <= 9:
 		raise DomainError(f"Fix: argument must be 0–9, got {n}")
-	a.env.fix_digits = n
+	a.env.fix_digits = int(n)
 	a.end_cmd()
 
 # Graph type

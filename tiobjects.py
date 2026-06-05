@@ -44,10 +44,7 @@ def require_int(value: Any, exc_cls=DomainError) -> int:
 	require_real(value, exc_cls)
 	if not value.is_integer():
 		raise exc_cls(f"Expected integer, got {value}")
-	return int(value)
-
-def require_int_dim(value: Any) -> int:
-	return require_int(value, InvalidDimError)
+	return value
 
 def require_list(value: Any) -> TiList:
 	return _require_type(value, TiList)
@@ -65,6 +62,11 @@ def require_str(value: Any) -> TiString:
 	return _require_type(value, TiString)
 
 
+def _get_dim(value: Any) -> int:
+	require_int(value, InvalidDimError)
+	return int(value)
+
+
 class TiList:
 	__slots__ = ('data',)
 
@@ -75,19 +77,19 @@ class TiList:
 
 	@classmethod
 	def alloc(cls, size: Number) -> TiList:
-		return cls(list(repeat(0.0, require_int_dim(size))))
+		return cls(list(repeat(0.0, _get_dim(size))))
 
 	def _check_index(self, index):
-		# Hold off on require_int_dim because __setitem__ has these decoupled
+		# Hold off on _get_dim because __setitem__ has these decoupled
 		if not (1 <= index <= len(self)):
 			raise InvalidDimError(f"out of bounds: {index}; dim: {len(self)}")
 		return index
 
 	def __getitem__(self, index: Number) -> Number:
-		return self.data[self._check_index(require_int_dim(index)) - 1]
+		return self.data[self._check_index(_get_dim(index)) - 1]
 
 	def __setitem__(self, index: Number, value: Number) -> None:
-		index = require_int_dim(index)
+		index = _get_dim(index)
 		if index == len(self) + 1:
 			self.data.append(value)
 		else:
@@ -103,7 +105,7 @@ class TiList:
 		return TiList([-a for a in self.data])
 
 	def set_dim(self, value: Any) -> None:
-		value = require_int_dim(value)
+		value = _get_dim(value)
 		dim = len(self)
 		if value < dim:
 			del self.data[value:]
@@ -150,8 +152,8 @@ def _check_valid_dim(value: Any) -> tuple[int, int]:
 	if len(value) != 2:
 		raise InvalidDimError(f"Matrix dimensions must be 2 elements, but got {value}")
 	rows, cols = value
-	rows = require_int_dim(rows)
-	cols = require_int_dim(cols)
+	rows = _get_dim(rows)
+	cols = _get_dim(cols)
 	if not (1 <= rows <= 99):
 		raise InvalidDimError(f"Required: 1 <= rows <= 99; got {rows}")
 	if not (1 <= cols <= 99):
@@ -185,8 +187,8 @@ class TiMatrix:
 		if len(index) != 2:
 			raise ArgumentError(f"Matrix index must have 2 elements but got {index}")
 		row_index, col_index = index
-		row_index = require_int_dim(row_index)
-		col_index = require_int_dim(col_index)
+		row_index = _get_dim(row_index)
+		col_index = _get_dim(col_index)
 		if not (1 <= row_index <= self.rows):
 			raise InvalidDimError(f"{row_index=}")
 		if not (1 <= col_index <= self.cols):
@@ -210,13 +212,13 @@ class TiMatrix:
 		] for r in range(new_rows)]
 
 	def get_row(self, r: Any) -> list:
-		n = require_int_dim(r)
+		n = _get_dim(r)
 		if not (1 <= n <= self.rows):
 			raise InvalidDimError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
 		return self.data[n - 1]
 
 	def set_row(self, r: Any, row: list) -> None:
-		n = require_int_dim(r)
+		n = _get_dim(r)
 		if not (1 <= n <= self.rows):
 			raise InvalidDimError(f"row {r} out of range for {self.rows}×{self.cols} matrix")
 		self.data[n - 1] = row
@@ -269,19 +271,20 @@ class TiMatrix:
 	def __pow__(self, n: Any) -> TiMatrix:
 		if not isinstance(n, float):
 			return NotImplemented
-		n = require_int(n)
+		require_int(n)
 		if self.rows != self.cols:
 			raise DomainError(f"Matrix power requires a square matrix, got {self.rows}×{self.cols}")
 		if n < 0:
 			raise DomainError("Negative matrix power not supported")
+		bits = int(n)
 		size = self.rows
 		result = TiMatrix([[float(r == c) for c in range(size)] for r in range(size)])
 		base = self
-		while n > 0:
-			if n & 1:
+		while bits > 0:
+			if bits & 1:
 				result = result @ base
 			base = base @ base
-			n >>= 1
+			bits >>= 1
 		return result
 
 	def __eq__(self, other: object) -> bool:

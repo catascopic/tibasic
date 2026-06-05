@@ -1,5 +1,9 @@
 test fractional powers
 
+int(require_int(day))
+
+Safeguard mode
+
 op/data type tests:
 first, I made a mistake: Matrix + number is a DataTypeError
 Also, there are actually sort of two more data types: complex numbers, and lists containing complex numbers

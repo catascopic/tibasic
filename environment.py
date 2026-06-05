@@ -143,38 +143,38 @@ class Environment:
 	def set_date(self, year, month, day):
 		now = datetime.now()
 		v = now + self._datetime_offset
-		new_v = datetime(require_int(year), require_int(month), require_int(day), v.hour, v.minute, v.second)
+		new_v = datetime(int(require_int(year)), int(require_int(month)), int(require_int(day)), v.hour, v.minute, v.second)
 		self._datetime_offset = new_v - now
 
 	def set_time(self, hour, minute, second):
 		now = datetime.now()
 		v = now + self._datetime_offset
-		new_v = datetime(v.year, v.month, v.day, require_int(hour), require_int(minute), require_int(second))
+		new_v = datetime(v.year, v.month, v.day, int(require_int(hour)), int(require_int(minute)), int(require_int(second)))
 		self._datetime_offset = new_v - now
 
 	def check_tmr(self, start):
 		return float(int(self._now().timestamp()) - int(require_real(start)))
 
 	def set_dt_fmt(self, fmt):
-		fmt = require_int(fmt)
+		fmt = int(require_int(fmt))
 		if fmt not in {1, 2, 3}:
 			raise DomainError(f"setDtFmt: expected 1, 2, or 3; got {fmt}")
 		self.dt_fmt = fmt
 
 	def set_tm_fmt(self, fmt):
-		fmt = require_int(fmt)
+		fmt = int(require_int(fmt))
 		if fmt not in {12, 24}:
 			raise DomainError(f"setTmFmt: expected 12 or 24; got {fmt}")
 		self.tm_fmt = fmt
 
 	def get_dt_str(self, fmt):
-		fmt = require_int(fmt)
+		fmt = int(require_int(fmt))
 		if fmt not in {1, 2, 3}:
 			raise DomainError(f"getDtStr: invalid format {fmt}")
 		return TiString.from_str(self._now().strftime(['%m/%d/%y', '%d/%m/%y', '%y/%m/%d'][fmt - 1]))
 
 	def get_tm_str(self, fmt):
-		fmt = require_int(fmt)
+		fmt = int(require_int(fmt))
 		now = self._now()
 		if fmt == 24:
 			time_str = now.strftime('%H:%M')
