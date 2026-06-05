@@ -1,11 +1,12 @@
+I'm going a little crazy over integers. I want to make sure all numbers that are in the virtual calculator memory are floats, and I've gone through and made sure every function returns a float. However, sometimes a python function (like range) needs an actual int. And I might have gone a little overboard in keeping these ints contained.
+Originally, I had require_int, which made sure the input was a whole number, and then converted it to an int. I decided that was potentially unsafe, and I removed the conversion, so you just get back a float that's a whole number. And then if I actually need to provide an int to a function like range, I call int() on it inline. And in cases where the int is needed in a loop, I'll precompute it, but I don't like the idea of overwriting the original value (i.e. doing n = int(n)), so sometimes I'll come up with a new temporary variable, and sometimes I won't. It feels a little silly. Plus now there's a bunch of duplicated int checks: see set_date, which has to now do `int(require_int(year)), int(require_int(month)), int(require_int(day))`.
+What's the best way to handle this? I was thinking I could create get_py_int() or something, which would do both. This should be fine as long as I'm careful.
+PS: There are two failing tests right now, we'll get to those later.
+
 test fractional powers
 
-int(require_int(day))
-
-Safeguard mode
-
 op/data type tests:
-first, I made a mistake: Matrix + number is a DataTypeError
+first, I made a mistake: Matrix + number is a DataTypeError (I fixed this)
 Also, there are actually sort of two more data types: complex numbers, and lists containing complex numbers
 Matrices cannot contain complex numbers, and this is also currently not enforced!
 eq/ne is defined for comparing 2 complex numbers, but the other 4 raise DataTypeError
