@@ -2,10 +2,9 @@ import cmath
 import math
 
 from decorators import vectorized, call_vectorized
-from functools import partial, wraps
+from functools import wraps
 from numbers import Number
-from errors import DataTypeError, DomainError, DivideByZeroError, NonRealAnsError
-from modes import ComplexMode
+from errors import DataTypeError, DomainError, DivideByZeroError
 from tiobjects import TiMatrix, require_real, require_int, require_num, require_matrix, py_int
 
 
@@ -16,19 +15,6 @@ from tiobjects import TiMatrix, require_real, require_int, require_num, require_
 #   - lt/gt/le/ge: TypeError from missing __lt__ etc. is converted to DataTypeError
 
 
-def pure_op(func):
-	"""Wraps a pure (lhs, rhs) binary operator to accept but ignore env.
-
-	Use as the outer decorator so the inner (vectorized) function sees only
-	the two operands while the parser can always call op(lhs, rhs, env).
-	The original 2-arg function is kept accessible as .fn for direct calls.
-	"""
-	@wraps(func)
-	def wrapper(env, lhs, rhs):
-		return func(lhs, rhs)
-	wrapper.fn = func
-	return wrapper
-
 def comparison(func):
 	@wraps(func)
 	def apply(a, b):
@@ -36,7 +22,7 @@ def comparison(func):
 			return float(func(a, b))
 		except TypeError:
 			raise DataTypeError(f"'{func.__name__}' not supported between {type(a).__name__} and {type(b).__name__}")
-	return pure_op(vectorized(apply))
+	return vectorized(apply)
 
 @comparison
 def eq(a, b):
@@ -66,35 +52,32 @@ def ge(a, b): return a >= b
 # ── Pure arithmetic operators ────────────────────────────────────────────────
 # TiList broadcasting is handled by TiList's magic methods (__add__, etc.).
 
-@pure_op
 def add(a, b):
 	try:
 		return a + b
-	except TypeError: 
+	except TypeError:
 		raise DataTypeError(f"cannot add {a} and {b}")
 
-@pure_op
 def sub(a, b):
 	try:
 		return a - b
-	except TypeError: 
+	except TypeError:
 		raise DataTypeError(f"cannot subtract {a} and {b}")
 
-@pure_op
 def mul(a, b):
 	try:
 		return a * b
-	except TypeError: 
+	except TypeError:
 		raise DataTypeError(f"cannot multiply {a} by {b}")
 
-@pure_op
 def div(a, b):
 	try:
 		return a / b
 	except ZeroDivisionError:
 		raise DivideByZeroError
-	except TypeError: 
+	except TypeError:
 		raise DataTypeError(f"cannot divide {a} by {b}")
+
 
 # ── Pure logical operators ────────────────────────────────────────────────────
 
@@ -102,8 +85,7 @@ def logical(func):
 	@wraps(func)
 	def apply(a, b):
 		return float(func(bool(require_real(a)), bool(require_real(b))))
-	return pure_op(vectorized(apply))
-
+	return vectorized(apply)
 
 @logical
 def and_(a, b): return a & b
@@ -117,7 +99,6 @@ def xor(a, b):  return a ^ b
 
 # ── Pure combinatorics operators ─────────────────────────────────────────────
 
-@pure_op
 @vectorized
 def ncr(n, r):
 	try:
@@ -125,7 +106,6 @@ def ncr(n, r):
 	except ValueError:
 		raise DomainError(f"nCr: invalid arguments ({n}, {r})")
 
-@pure_op
 @vectorized
 def npr(n, r):
 	try:
@@ -135,31 +115,27 @@ def npr(n, r):
 
 
 # ── Env-aware binary operators ────────────────────────────────────────────────
-# These need env to check ComplexMode; they are NOT wrapped with @pure_op.
+# These may return complex numbers; the parser checks env.real_only after calling them.
 
 
-def power(env, base, exp):
-	"""^ operator — checks ComplexMode before returning a non-real result."""
+def power(base, exp):
+	"""^ operator — returns complex when the result is non-real."""
 	try:
 		result = base ** exp
 	except ValueError:
-		if env.real_only:
-			raise NonRealAnsError(f"{base}^{power}")
 		return cmath.exp(cmath.log(complex(base)) * exp)
 	except TypeError:
 		raise DataTypeError(f"{base}^{exp} not supported")
 	return result
 
 
-def xth_root(env, x, n):
-	"""ˣ√ operator — checks ComplexMode before returning a non-real result."""
+def xth_root(x, n):
+	"""ˣ√ operator — returns complex when the result is non-real."""
 	if isinstance(n, TiMatrix):
 		raise DataTypeError(f"xth root not supported for matrix")
 	try:
 		return n ** (1 / x)
 	except ValueError:
-		if env.real_only:
-			raise NonRealAnsError(f"{x}th root {n}")
 		return cmath.exp(cmath.log(n) / x)
 	except TypeError:
 		raise DataTypeError(f"{x}th root of {n} not supported")

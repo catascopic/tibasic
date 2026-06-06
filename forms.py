@@ -49,7 +49,7 @@ def ans_index_or_mul(a: ArgParser):
 		return ans[a.parse_indices(2)]
 	b = a.expr()
 	a.end_func()
-	return operators.mul.fn(ans, b)
+	return operators.mul(ans, b)
 
 @forms_func
 def seq(a: ArgParser) -> TiList:

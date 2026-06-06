@@ -52,7 +52,9 @@
       "Bash(python -m pytest test_tibasic.py --tb=line -q)",
       "Bash(python -m pytest test_tibasic.py::TestComplexList::test_complex_list_eq_complex_scalar -v -s)",
       "Bash(python -m pytest test_tibasic.py::TestIndexing::test_matrix_index_one_arg -v)",
-      "Bash(python -m pytest test_tibasic.py::TestIndexing::test_bad_list_index test_tibasic.py::TestNesting::test_ans_index_or_mul_scalar test_tibasic.py::TestUndefinedVars::test_store_index_1_undefined_list -v)"
+      "Bash(python -m pytest test_tibasic.py::TestIndexing::test_bad_list_index test_tibasic.py::TestNesting::test_ans_index_or_mul_scalar test_tibasic.py::TestUndefinedVars::test_store_index_1_undefined_list -v)",
+      "Bash(python -m pytest test_tibasic.py::TestCompleXor::test_xor -v)",
+      "Bash(python -m pytest test_tibasic.py -x -q)"
     ]
   }
 }

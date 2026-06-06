@@ -12,7 +12,7 @@ from catalog import (
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
 from environment import Environment, Variable, UserList
-from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError, InvalidDimError, UndefinedError
+from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 
 
 @dataclass
@@ -41,6 +41,10 @@ class Parser:
 		return f"tokens={self.tokens}, pos={self.pos}"
 
 	# ── Primitives ─────────────────────────────────────────────────────────────
+
+	@staticmethod
+	def _is_complex(val) -> bool:
+		return isinstance(val, complex) or (isinstance(val, TiList) and val.is_complex)
 
 	@property
 	def has_next(self):
@@ -378,14 +382,19 @@ class Parser:
 				if left_bp <= min_bp:
 					break
 				self.advance()
-				lhs = t.operator(self.env, lhs, self.parse_expr(right_bp))
+				lhs_was_complex = self._is_complex(lhs)
+				rhs = self.parse_expr(right_bp)
+				lhs = t.operator(lhs, rhs)
+				if self.env.real_only and not lhs_was_complex and not self._is_complex(rhs):
+					if self._is_complex(lhs):
+						raise NonRealAnsError(repr(lhs))
 				continue
 
 			# Implicit multiplication
 			if _can_start_atom(t):
 				if 60 <= min_bp:
 					break
-				lhs = operators.mul.fn(lhs, self.parse_expr(61))
+				lhs = operators.mul(lhs, self.parse_expr(61))
 				continue
 
 			break
