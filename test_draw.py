@@ -144,6 +144,51 @@ class TestPixelValidation:
 			run('Pxl-On( 1')
 
 
+# ── Pt-On: graph-coordinate → pixel translation ─────────────────────────────────
+
+class TestPointOn:
+	def test_origin_standard_window(self):
+		# Default window -10..10: (0,0) maps to the center pixel (31, 47)
+		env = run('Pt-On( 0,0')
+		assert env.screen.get(31, 47)
+
+	def test_reads_back_via_pxl_test(self):
+		env = run('Pt-On( 0,0')
+		assert calc('pxl-Test( 31,47', env) == 1
+
+	def test_top_left_corner(self):
+		# (Xmin, Ymax) -> (row 0, col 0)
+		env = run('Pt-On( ~10,10')
+		assert env.screen.get(0, 0)
+
+	def test_bottom_right_corner(self):
+		# (Xmax, Ymin) -> (row 62, col 94)
+		env = run('Pt-On( 10,~10')
+		assert env.screen.get(62, 94)
+
+	def test_off_screen_draws_nothing(self):
+		env = run('Pt-On( 100,100')
+		assert not any(env.screen.buffer)
+
+	def test_round_half_up_lands_on_higher_column(self):
+		# Window 0..188 makes column = x / 2, so x=1 -> 0.5 -> rounds up to 1
+		env = Environment()
+		env.window.xmin.value = 0
+		env.window.xmax.value = 188
+		run('Pt-On( 1,0', env)
+		assert env.screen.get(31, 1)
+		assert not env.screen.get(31, 0)
+
+	def test_round_half_up_again(self):
+		# x=3 -> 1.5 -> rounds up to 2
+		env = Environment()
+		env.window.xmin.value = 0
+		env.window.xmax.value = 188
+		run('Pt-On( 3,0', env)
+		assert env.screen.get(31, 2)
+		assert not env.screen.get(31, 1)
+
+
 # ── Use inside a stored program ─────────────────────────────────────────────────
 
 class TestPixelInProgram:

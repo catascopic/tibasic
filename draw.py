@@ -1,13 +1,47 @@
 from __future__ import annotations
 
+import math
+
 from decorators import env_func
 from errors import DomainError
-from tiobjects import py_int
+from tiobjects import py_int, require_real
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
 # rows 0–62 (63 rows) and columns 0–94 (95 columns), inclusive.
 MAX_ROW = 62
 MAX_COL = 94
+
+# The graph screen (used by point/graph commands) spans the same region.
+# 95 columns → 94 intervals; 63 rows → 62 intervals.
+GRAPH_COL_SPAN = 94
+GRAPH_ROW_SPAN = 62
+
+
+def _round_half_up(value: float) -> int:
+	"""Round to the nearest integer with ties going up (x.5 → x+1).
+
+	The calculator rounds graph→pixel coordinates this way; Python's built-in
+	round() uses banker's rounding (round-half-to-even), which differs at .5.
+	"""
+	return math.floor(value + 0.5)
+
+
+def _point_to_pixel(env, x: float, y: float):
+	"""Translate graph coordinates (x, y) to (row, column).
+
+	Returns None if the point falls outside the visible graph screen, in which
+	case the calculator simply draws nothing (no error).
+	"""
+	w = env.window
+	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
+	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
+	# Multiply before dividing: it keeps exact half-integers exact (e.g.
+	# 3*94/188 == 1.5), whereas dividing first can yield 1.4999… and round wrong.
+	col = _round_half_up((x - xmin) * GRAPH_COL_SPAN / (xmax - xmin))
+	row = _round_half_up((ymax - y) * GRAPH_ROW_SPAN / (ymax - ymin))
+	if 0 <= row <= MAX_ROW and 0 <= col <= MAX_COL:
+		return row, col
+	return None
 
 
 def _validate(row, col) -> tuple[int, int]:
@@ -41,3 +75,10 @@ def pxl_change(env, row, col) -> None:
 def pxl_test(env, row, col) -> float:
 	row, col = _validate(row, col)
 	return float(env.screen.get(row, col))
+
+
+@env_func
+def pt_on(env, x, y) -> None:
+	pixel = _point_to_pixel(env, require_real(x), require_real(y))
+	if pixel is not None:
+		env.screen.set(*pixel, True)
