@@ -21,10 +21,12 @@ def pure_op(func):
 
 	Use as the outer decorator so the inner (vectorized) function sees only
 	the two operands while the parser can always call op(lhs, rhs, env).
+	The original 2-arg function is kept accessible as .fn for direct calls.
 	"""
 	@wraps(func)
 	def wrapper(env, lhs, rhs):
 		return func(lhs, rhs)
+	wrapper.fn = func
 	return wrapper
 
 def comparison(func):

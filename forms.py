@@ -43,12 +43,13 @@ def dim(a: ArgParser):
 def ans_index_or_mul(a: ArgParser):
 	ans = a.env.ans
 	if isinstance(ans, TiList):
-		return ans[a.parse_indices(1)]
+		(index,) = a.parse_indices(1)
+		return ans[index]
 	if isinstance(ans, TiMatrix):
 		return ans[a.parse_indices(2)]
-	a.expr()
-	b = a.end_func()
-	return operators.mul(None, ans, b)
+	b = a.expr()
+	a.end_func()
+	return operators.mul.fn(ans, b)
 
 @forms_func
 def seq(a: ArgParser) -> TiList:

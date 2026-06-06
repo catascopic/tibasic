@@ -340,7 +340,8 @@ class Parser:
 		return value
 
 	def parse_list_index(self):
-		return ArgParser(self).parse_indices(1)
+		(index,) = ArgParser(self).parse_indices(1)
+		return index
 
 	def parse_matrix_indices(self):
 		return ArgParser(self).parse_indices(2)
@@ -384,7 +385,7 @@ class Parser:
 			if _can_start_atom(t):
 				if 60 <= min_bp:
 					break
-				lhs = operators.mul(None, lhs, self.parse_expr(61))
+				lhs = operators.mul.fn(lhs, self.parse_expr(61))
 				continue
 
 			break
