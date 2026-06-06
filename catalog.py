@@ -9,6 +9,7 @@ import operators as ops
 import envfunctions as ef
 import forms
 import modes
+import draw
 
 
 
@@ -104,7 +105,7 @@ L_PAREN   = token(0x10, char='(')
 R_PAREN   = token(0x11, char=')')
 
 token(0x12, 'round(',       func=pf.round)
-token(0x13, 'pxl-Test(')
+token(0x13, 'pxl-Test(', func=draw.pxl_test)
 token(0x14, 'augment(',     func=pf.augment)
 token(0x15, 'rowSwap(',     func=pf.row_swap)
 token(0x16, 'row+(',        func=pf.row_plus)
@@ -386,9 +387,9 @@ token(0x9D, 'Vertical ')
 token(0x9E, 'Pt-On(')
 token(0x9F, 'Pt-Off(')
 token(0xA0, 'Pt-Change(')
-token(0xA1, 'Pxl-On(')
-token(0xA2, 'Pxl-Off(')
-token(0xA3, 'Pxl-Change(')
+token(0xA1, 'Pxl-On(',     cmd=draw.pxl_on)
+token(0xA2, 'Pxl-Off(',    cmd=draw.pxl_off)
+token(0xA3, 'Pxl-Change(', cmd=draw.pxl_change)
 token(0xA4, 'Shade(')
 token(0xA5, 'Circle(')
 token(0xA6, 'Horizontal ')

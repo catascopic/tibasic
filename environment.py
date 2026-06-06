@@ -15,6 +15,7 @@ from tiobjects import (
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidDimError, UndefinedError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 from signals import StopSignal
+from screen import Screen
 
 
 class Environment:
@@ -55,6 +56,8 @@ class Environment:
 		self.clock_on      = True
 		# Window / graphing variables (Xscl, Xmin, Xmax, …)
 		self.window = WindowVars()
+		# LCD pixel buffer (used by Pxl-/Pt-/Line/etc. drawing commands)
+		self.screen = Screen()
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
 		self.n_tvm = RealVariable()   # 𝐍 (number of payments)
 		self.i_pct = RealVariable()   # I% (interest rate per period, as percentage)

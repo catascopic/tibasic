@@ -60,7 +60,8 @@
       "Bash(python -m pytest test_tibasic.py::TestSkipStatement test_tibasic.py::TestCapture -v)",
       "Bash(python -m pytest test_program.py::TestIfThenElse -v)",
       "Bash(python -m pytest test_program.py -q)",
-      "Bash(python -m pytest test_program.py test_tibasic.py test_functions.py -q)"
+      "Bash(python -m pytest test_program.py test_tibasic.py test_functions.py -q)",
+      "Bash(python -m pytest test_draw.py -q)"
     ]
   }
 }
