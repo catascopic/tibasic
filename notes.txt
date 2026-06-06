@@ -1,5 +1,3 @@
-TiCall: can change to not be a class, instead set property
-
 Still don't love the nonreal answer check
 
 remove exceptions from get/set item?

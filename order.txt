@@ -1,5 +1,4 @@
-For functions only (not operators):
-Can you clean up purefunctions/envfunctions/forms and put the functions in order within their files?
+New task: Can you clean up purefunctions/envfunctions/forms and put the functions in order within their files?
 Function order goes like this: on the calculator functions are grouped by menus. The full menu layout is given here: 'webref/Command Menu Map (Black & White) - TI-Basic Developer.htm'.
 Please reorder the functions by row and then by column, so for Math, it goes MATH,NUM,CPX,PRB. The four together consist of a category (collectively called Math). to_frac should be first and rand_int_no_rep should be last.
 Between categories, please put a separator that looks like this:

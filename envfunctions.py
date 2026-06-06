@@ -14,8 +14,6 @@ from modes import ComplexMode
 from tiobjects import require_num, require_real, require_int, require_str, py_int
 
 
-# ── Trig / coordinate helpers ─────────────────────────────────────────────────
-
 def trig(func):
 	"""Decorator for trig functions: vectorize and convert input from current angle mode."""
 	@wraps(func)
@@ -35,7 +33,9 @@ def inv_trig(func):
 	return env_vectorized(apply)
 
 
-# ── Trig functions ────────────────────────────────────────────────────────────
+############################
+# DESIGNATED KEY FUNCTIONS #
+############################
 
 @trig
 def sin(x):
@@ -60,9 +60,6 @@ def acos(x):
 @inv_trig
 def atan(x):
 	return math.atan(x)
-
-
-# ── Logarithms / roots (env-aware for ComplexMode) ───────────────────────────
 
 @env_vectorized
 def sqrt(env, x):
@@ -101,6 +98,10 @@ def log(env, x):
 		raise NonRealAnsError(f"log({x}): non-real result")
 	return cmath.log10(x)
 
+####################
+# MATH FUNCTIONS   #
+####################
+
 @env_vectorized
 def log_base(env, x, base):
 	require_num(x)
@@ -117,28 +118,9 @@ def log_base(env, x, base):
 		raise NonRealAnsError(f"logBASE({x}, {base}): non-real result")
 	return cmath.log(x, base)
 
-@env_vectorized
-def acosh(env, x):
-	require_real(x)
-	if x >= 1:
-		return math.acosh(x)
-	if env.real_only:
-		raise NonRealAnsError(f"acosh({x}): non-real result")
-	return cmath.acosh(x)
-
-@env_vectorized
-def atanh(env, x):
-	require_real(x)
-	if abs(x) < 1:
-		return math.atanh(x)
-	if abs(x) == 1:
-		raise DomainError(f"atanh: undefined for ±1")
-	if env.real_only:
-		raise NonRealAnsError(f"tanh⁻¹({x}): non-real result")
-	return cmath.atanh(x)
-
-
-# ── Coordinate conversions ────────────────────────────────────────────────────
+####################
+# ANGLE FUNCTIONS  #
+####################
 
 @env_vectorized
 def rect_to_polar_radius(env, x, y):
@@ -156,8 +138,9 @@ def polar_to_rect_x(env, r, theta):
 def polar_to_rect_y(env, r, theta):
 	return require_real(r) * math.sin(env.to_rad(require_real(theta)))
 
-
-# ── Amortization: bal(, ΣPrn(, ΣInt( ─────────────────────────────────────────
+############
+# FINANCE  #
+############
 
 def _bal(env, n, roundvalue=None):
 	"""Balance after n payments, using TVM variables from env."""
@@ -210,7 +193,9 @@ def sigma_int(env, n1, n2, roundvalue=None):
 	return (n2 - n1 + 1) * env.pmt.resolve() - sprn
 
 
-# ── expr( ─────────────────────────────────────────────────────────────────────
+####################
+# STRING FUNCTIONS #
+####################
 
 @env_func
 def expr(env, string):
@@ -225,7 +210,29 @@ def expr(env, string):
 		return result
 
 
-# ── Clock / date-time ─────────────────────────────────────────────────────────
+###########
+# CATALOG #
+###########
+
+@env_vectorized
+def acosh(env, x):
+	require_real(x)
+	if x >= 1:
+		return math.acosh(x)
+	if env.real_only:
+		raise NonRealAnsError(f"acosh({x}): non-real result")
+	return cmath.acosh(x)
+
+@env_vectorized
+def atanh(env, x):
+	require_real(x)
+	if abs(x) < 1:
+		return math.atanh(x)
+	if abs(x) == 1:
+		raise DomainError(f"atanh: undefined for ±1")
+	if env.real_only:
+		raise NonRealAnsError(f"tanh⁻¹({x}): non-real result")
+	return cmath.atanh(x)
 
 
 class set_time_wrapper(TiCall):

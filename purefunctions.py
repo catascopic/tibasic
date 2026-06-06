@@ -22,8 +22,7 @@ from errors import (
 from decorators import pure_func, pure_vectorized, vectorized
 
 
-
-# ── Decorators ────────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def handle_complex(func):
 	"""Apply a real-valued func separately to the real and imaginary parts."""
@@ -44,33 +43,27 @@ def matrix_vectorized(func):
 	return pure_func(apply)
 
 
-# ── length( ───────────────────────────────────────────────────────────────────────
-
-@pure_func
-def length(string):
-	return len(require_str(string))
-
-
-# ── Numeric functions ────────────────────────────────────────────────────────────
-
 @pure_vectorized
 def not_(x):
 	return float(not require_real(x))
 
-@matrix_vectorized
-@handle_complex
-def i_part(x):
-	return float(math.trunc(require_num(x)))
+############################
+# DESIGNATED KEY FUNCTIONS #
+############################
 
-@matrix_vectorized
-@handle_complex
-def int_(x):
-	return float(math.floor(require_num(x)))
+@pure_vectorized
+def pow10(x):
+	return 10 ** require_num(x)
 
-@matrix_vectorized
-@handle_complex
-def f_part(x):
-	return x - math.trunc(require_num(x))
+@pure_vectorized
+def exp(x):
+	require_num(x)
+	return cmath.exp(x) if isinstance(x, complex) else math.exp(x)
+
+
+##################
+# MATH FUNCTIONS #
+##################
 
 @pure_vectorized
 def cbrt(x):
@@ -80,6 +73,137 @@ def cbrt(x):
 			return 0
 		return cmath.exp(cmath.log(x) / 3)
 	return math.cbrt(x)
+
+@matrix_vectorized
+def abs(x):
+	return builtins.abs(require_num(x))
+
+@matrix_vectorized
+def round(x, decimals=9):
+	return builtins.round(require_num(x), py_int(decimals))
+
+@matrix_vectorized
+@handle_complex
+def i_part(x):
+	return float(math.trunc(require_num(x)))
+
+@matrix_vectorized
+@handle_complex
+def f_part(x):
+	return x - math.trunc(require_num(x))
+
+@matrix_vectorized
+@handle_complex
+def int_(x):
+	return float(math.floor(require_num(x)))
+
+def _minmax(fn, a, b):
+	if b is None:
+		return fn(require_list(a))
+	if isinstance(a, TiList) and isinstance(b, TiList):
+		if len(a) != len(b):
+			raise DimMismatchError(f"{fn.__name__}: dim mismatch ({len(a)} vs {len(b)})")
+		return TiList([fn(x, y) for x, y in zip(a, b)])
+	if isinstance(a, Number) and isinstance(b, Number):
+		return fn(a, b)
+	raise DataTypeError(f"{fn.__name__}: both args must be the same type (both numeric or both list)")
+
+@pure_func
+def min(a, b=None):
+	return _minmax(builtins.min, a, b)
+
+@pure_func
+def max(a, b=None):
+	return _minmax(builtins.max, a, b)
+
+@pure_vectorized
+def lcm(a, b):
+	return float(math.lcm(py_int(a), py_int(b)))
+
+@pure_vectorized
+def gcd(a, b):
+	return float(math.gcd(py_int(a), py_int(b)))
+
+@pure_vectorized
+def remainder(a, b):
+	require_int(a)
+	require_int(b)
+	if a < 0:
+		raise DomainError(f"a must be non-negative but got {a}")
+	if b < 1:
+		raise DomainError(f"b must be positive but got {b}")
+	return a % b
+
+@pure_vectorized
+def conj(x):
+	require_num(x)
+	return complex(x.real, -x.imag) if isinstance(x, complex) else x
+
+@pure_vectorized
+def real(x):
+	require_num(x)
+	return x.real if isinstance(x, complex) else x
+
+@pure_vectorized
+def imag(x):
+	require_num(x)
+	return x.imag if isinstance(x, complex) else 0
+
+# Technically works on matrices, but since matrices can't store complex numbers, the result is all 0s.
+# TiBasicDev thinks this is basically a bug, so I'm not implementing it in order to discourage it.
+# (If you want a matrix of all 0s, you can just do 0[A].)
+@pure_vectorized
+def angle(x):
+	require_num(x)
+	return cmath.phase(x)
+
+@vectorized
+def _rand_int_single(low, high):
+	if low > high:
+		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
+	return float(random.randint(py_int(low), py_int(high)))
+
+@pure_func
+def rand_int(low, high, n=None):
+	if n is None:
+		return _rand_int_single(low, high)
+	low = py_int(low)
+	high = py_int(high)
+	if low > high:
+		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
+	n = py_int(n)
+	return TiList([float(random.randint(low, high)) for _ in range(n)])
+
+@pure_func
+def rand_norm(mu, sigma, n=None):
+	require_real(mu)
+	require_real(sigma)
+	if n is None:
+		return random.gauss(mu, sigma)
+	return TiList([random.gauss(mu, sigma) for _ in range(py_int(n))])
+
+@pure_func
+def rand_bin(n, p, simulations=None):
+	n = py_int(n)
+	if not (0 <= p <= 1):
+		raise DomainError("randBin: p must be in [0, 1]")
+	if n <= 0:
+		raise DomainError("randBin: n must be positive")
+	if simulations is None:
+		return builtins.sum(1 for _ in range(n) if random.random() < p)
+	simulations = py_int(simulations)
+	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(simulations)])
+
+@pure_func
+def rand_int_no_rep(low, high):
+	lst = list(range(py_int(low), py_int(high) + 1))
+	random.shuffle(lst)
+	return TiList(lst)
+
+
+####################
+# LIST FUNCTIONS   #
+####################
 
 @pure_func
 def cum_sum(obj):
@@ -110,63 +234,6 @@ def augment(a, b):
 		return TiMatrix([r1 + r2 for r1, r2 in zip(a.data, b.data)])
 	raise DataTypeError(f"augment: both args must be lists or both must be matrices; got {a}, {b}")
 
-@pure_vectorized
-def real(x):
-	require_num(x)
-	return x.real if isinstance(x, complex) else x
-
-@pure_vectorized
-def imag(x):
-	require_num(x)
-	return x.imag if isinstance(x, complex) else 0
-
-@pure_vectorized
-def conj(x):
-	require_num(x)
-	return complex(x.real, -x.imag) if isinstance(x, complex) else x
-
-# Technically works on matrices, but since matrices can't store complex numbers, the result is all 0s.
-# TiBasicDev thinks this is basically a bug, so I'm not implementing it in order to discourage it.
-# (If you want a matrix of all 0s, you can just do 0[A].)
-@pure_vectorized
-def angle(x):
-	require_num(x)
-	return cmath.phase(x)
-
-
-# ── String functions ────────────────────────────────────────────────────────────
-
-@pure_func
-def in_string(string, substring, start=1):
-	v = require_str(string).tokens
-	s = require_str(substring).tokens
-	start = py_int(start)
-	for i in range(start - 1, len(v) - len(s) + 1):
-		if v[i:i + len(s)] == s:
-			return i + 1
-	return 0
-
-@pure_func
-def sub(*args):
-	# DO NOT REMOVE THIS!
-	# This is a weird feature of sub(, but it's true: with a single numeric
-	# argument, sub( divides it by 100 like the undocumented % operator.
-	if len(args) == 1:
-		return require_num(args[0]) / 100
-	if len(args) == 3:
-		string, start, length = args
-		require_str(string)
-		start = py_int(start)
-		length = py_int(length)
-		if length < 1:
-			raise DomainError(f"sub: length must be ≥ 1, got {length}")
-		if not (1 <= start <= len(string) - length + 1):
-			raise InvalidDimError(f"sub: index out of range")
-		return TiString(string.tokens[start - 1 : start + length - 1])
-	raise ArgumentError(f"Invalid arguments: {args}")
-
-# ── Aggregate / statistics ───────────────────────────────────────────────────────
-
 @pure_func
 def mean(lst, freqlist=None):
 	require_list(lst)
@@ -174,51 +241,6 @@ def mean(lst, freqlist=None):
 		return builtins.sum(lst) / len(lst)
 	require_list(freqlist)
 	return builtins.sum(x * w for x, w in zip(lst, freqlist)) / builtins.sum(freqlist)
-
-@pure_func
-def variance(lst, freqlist=None):
-	require_list(lst)
-	if freqlist is None:
-		n = len(lst)
-		if n < 2:
-			raise StatError("stdDev: need at least 2 elements")
-		m = mean(lst)
-		return builtins.sum((x - m) ** 2 for x in lst) / (n - 1)
-	require_list(freqlist)
-	if len(lst) != len(freqlist):
-		raise DimMismatchError("stdDev: dim mismatch")
-	m = mean(lst, freqlist)
-	total_w = builtins.sum(freqlist)
-	if total_w <= 1:
-		raise StatError("stdDev: total frequency must be > 1")
-	return builtins.sum(w * (x - m) ** 2 for x, w in zip(lst, freqlist)) / (total_w - 1)
-
-@pure_func
-def stddev(lst, freqlist=None):
-	return math.sqrt(variance(lst, freqlist))
-
-@matrix_vectorized
-def round(x, decimals=9):
-	return builtins.round(require_num(x), py_int(decimals))
-
-def _minmax(fn, a, b):
-	if b is None:
-		return fn(require_list(a))
-	if isinstance(a, TiList) and isinstance(b, TiList):
-		if len(a) != len(b):
-			raise DimMismatchError(f"{fn.__name__}: dim mismatch ({len(a)} vs {len(b)})")
-		return TiList([fn(x, y) for x, y in zip(a, b)])
-	if isinstance(a, Number) and isinstance(b, Number):
-		return fn(a, b)
-	raise DataTypeError(f"{fn.__name__}: both args must be the same type (both numeric or both list)")
-
-@pure_func
-def max(a, b=None):
-	return _minmax(builtins.max, a, b)
-
-@pure_func
-def min(a, b=None):
-	return _minmax(builtins.min, a, b)
 
 @pure_func
 def median(lst, freqlist=None):
@@ -247,38 +269,6 @@ def median(lst, freqlist=None):
 	if total % 2:
 		return nth(total // 2)
 	return (nth(total // 2 - 1) + nth(total // 2)) / 2
-
-
-@matrix_vectorized
-def abs(x):
-	return builtins.abs(require_num(x))
-
-@pure_func
-def det(mat):
-	require_matrix(mat)
-	n = mat.rows
-	if n == 0 or n != mat.cols:
-		raise InvalidDimError(f"det requires a square matrix, got {mat.rows}×{mat.cols}")
-	work = [row.copy() for row in mat.data]
-	sign = 1.0
-	for col in range(n):
-		pivot = next((r for r in range(col, n) if work[r][col] != 0), None)
-		if pivot is None:
-			return 0.0
-		if pivot != col:
-			work[col], work[pivot] = work[pivot], work[col]
-			sign = -sign
-		for row in range(col + 1, n):
-			if work[row][col] != 0:
-				factor = work[row][col] / work[col][col]
-				for j in range(col, n):
-					work[row][j] -= factor * work[col][j]
-	return sign * math.prod(work[i][i] for i in range(n))
-
-@pure_func
-def identity(n):
-	size = py_int(n)
-	return TiMatrix([[float(r == c) for c in range(size)] for r in range(size)])
 
 @pure_func
 def sum(lst, start=None, end=None):
@@ -314,124 +304,68 @@ def prod(lst, start=None, end=None):
 
 	return math.prod(data[start - 1 : end])
 
-
-# ── Transcendental functions ────────────────────────────────────────────────────
-
-@pure_vectorized
-def pow10(x):
-	return 10 ** require_num(x)
-
-@pure_vectorized
-def exp(x):
-	require_num(x)
-	return cmath.exp(x) if isinstance(x, complex) else math.exp(x)
-
-@pure_vectorized
-def sinh(x):
-	return math.sinh(require_real(x))
-
-@pure_vectorized
-def cosh(x):
-	return math.cosh(require_real(x))
-
-@pure_vectorized
-def tanh(x):
-	return math.tanh(require_real(x))
-
-@pure_vectorized
-def asinh(x):
-	return math.asinh(require_real(x))
-
-
-# ── Integer / combinatorics ─────────────────────────────────────────────────────
-
-@pure_vectorized
-def lcm(a, b):
-	return float(math.lcm(py_int(a), py_int(b)))
-
-@pure_vectorized
-def gcd(a, b):
-	return float(math.gcd(py_int(a), py_int(b)))
-
-@pure_vectorized
-def remainder(a, b):
-	require_int(a)
-	require_int(b)
-	if a < 0:
-		raise DomainError(f"a must be non-negative but got {a}")
-	if b < 1:
-		raise DomainError(f"b must be positive but got {b}")
-	return a % b
-
-# ── Random ──────────────────────────────────────────────────────────────────────
+@pure_func
+def variance(lst, freqlist=None):
+	require_list(lst)
+	if freqlist is None:
+		n = len(lst)
+		if n < 2:
+			raise StatError("stdDev: need at least 2 elements")
+		m = mean(lst)
+		return builtins.sum((x - m) ** 2 for x in lst) / (n - 1)
+	require_list(freqlist)
+	if len(lst) != len(freqlist):
+		raise DimMismatchError("stdDev: dim mismatch")
+	m = mean(lst, freqlist)
+	total_w = builtins.sum(freqlist)
+	if total_w <= 1:
+		raise StatError("stdDev: total frequency must be > 1")
+	return builtins.sum(w * (x - m) ** 2 for x, w in zip(lst, freqlist)) / (total_w - 1)
 
 @pure_func
-def rand_list(n):
-	return TiList([random.random() for _ in range(py_int(n))])
+def stddev(lst, freqlist=None):
+	return math.sqrt(variance(lst, freqlist))
 
-@vectorized
-def _rand_int_single(low, high):
-	if low > high:
-		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
-	return float(random.randint(py_int(low), py_int(high)))
+##########
+# MATRIX #
+##########
 
 @pure_func
-def rand_int(low, high, n=None):
-	if n is None:
-		return _rand_int_single(low, high)
-	low = py_int(low)
-	high = py_int(high)
-	if low > high:
-		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
-	n = py_int(n)
-	return TiList([float(random.randint(low, high)) for _ in range(n)])
-
-@pure_func
-def rand_norm(mu, sigma, n=None):
-	require_real(mu)
-	require_real(sigma)
-	if n is None:
-		return random.gauss(mu, sigma)
-	return TiList([random.gauss(mu, sigma) for _ in range(py_int(n))])
-
-@pure_func
-def rand_int_no_rep(low, high):
-	lst = list(range(py_int(low), py_int(high) + 1))
-	random.shuffle(lst)
-	return TiList(lst)
-
-# ── Matrix row operations ────────────────────────────────────────────────────
-
-@pure_func
-def row_swap(mat, row1, row2):
+def det(mat):
 	require_matrix(mat)
-	result = mat.copy()
-	result.set_row(row1, mat.get_row(row2))
-	result.set_row(row2, mat.get_row(row1))
-	return result
+	n = mat.rows
+	if n == 0 or n != mat.cols:
+		raise InvalidDimError(f"det requires a square matrix, got {mat.rows}×{mat.cols}")
+	work = [row.copy() for row in mat.data]
+	sign = 1.0
+	for col in range(n):
+		pivot = next((r for r in range(col, n) if work[r][col] != 0), None)
+		if pivot is None:
+			return 0.0
+		if pivot != col:
+			work[col], work[pivot] = work[pivot], work[col]
+			sign = -sign
+		for row in range(col + 1, n):
+			if work[row][col] != 0:
+				factor = work[row][col] / work[col][col]
+				for j in range(col, n):
+					work[row][j] -= factor * work[col][j]
+	return sign * math.prod(work[i][i] for i in range(n))
 
 @pure_func
-def row_plus(mat, row1, row2):
-	require_matrix(mat)
-	result = mat.copy()
-	result.set_row(row2, [a + b for a, b in zip(mat.get_row(row2), mat.get_row(row1))])
-	return result
+def identity(n):
+	size = py_int(n)
+	return TiMatrix([[float(r == c) for c in range(size)] for r in range(size)])
 
 @pure_func
-def times_row(factor, mat, row):
-	require_matrix(mat)
-	result = mat.copy()
-	result.set_row(row, [factor * x for x in mat.get_row(row)])
-	return result
-
-@pure_func
-def times_row_plus(factor, mat, row1, row2):
-	require_matrix(mat)
-	result = mat.copy()
-	result.set_row(row2, [factor * a + b for a, b in zip(mat.get_row(row1), mat.get_row(row2))])
-	return result
-
-# ── ref / rref ───────────────────────────────────────────────────────────────
+def rand_m(rows, cols):
+	rows = py_int(rows)
+	cols = py_int(cols)
+	if not (1 <= rows <= 99) or not (1 <= cols <= 99):
+		raise InvalidDimError("randM: dimensions must be 1-99")
+	# Per spec: entries are successive randInt(-9,9) calls filled bottom-right to top-left
+	data = [random.randint(-9, 9) for _ in range(rows * cols)]
+	return TiMatrix([list(row) for row in batched(reversed(data), cols)])
 
 def _row_reduce(mat, get_range):
 	require_matrix(mat)
@@ -471,33 +405,77 @@ def ref(mat):
 def rref(mat):
 	return _row_reduce(mat, lambda pivot_row, rows: range(rows))
 
-
-# ── randM / randBin ──────────────────────────────────────────────────────────
+@pure_func
+def row_swap(mat, row1, row2):
+	require_matrix(mat)
+	result = mat.copy()
+	result.set_row(row1, mat.get_row(row2))
+	result.set_row(row2, mat.get_row(row1))
+	return result
 
 @pure_func
-def rand_m(rows, cols):
-	rows = py_int(rows)
-	cols = py_int(cols)
-	if not (1 <= rows <= 99) or not (1 <= cols <= 99):
-		raise InvalidDimError("randM: dimensions must be 1-99")
-	# Per spec: entries are successive randInt(-9,9) calls filled bottom-right to top-left
-	data = [random.randint(-9, 9) for _ in range(rows * cols)]
-	return TiMatrix([list(row) for row in batched(reversed(data), cols)])
+def row_plus(mat, row1, row2):
+	require_matrix(mat)
+	result = mat.copy()
+	result.set_row(row2, [a + b for a, b in zip(mat.get_row(row2), mat.get_row(row1))])
+	return result
 
 @pure_func
-def rand_bin(n, p, simulations=None):
-	n = py_int(n)
-	if not (0 <= p <= 1):
-		raise DomainError("randBin: p must be in [0, 1]")
-	if n <= 0:
-		raise DomainError("randBin: n must be positive")
-	if simulations is None:
-		return builtins.sum(1 for _ in range(n) if random.random() < p)
-	simulations = py_int(simulations)
-	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(simulations)])
+def times_row(factor, mat, row):
+	require_matrix(mat)
+	result = mat.copy()
+	result.set_row(row, [factor * x for x in mat.get_row(row)])
+	return result
+
+@pure_func
+def times_row_plus(factor, mat, row1, row2):
+	require_matrix(mat)
+	result = mat.copy()
+	result.set_row(row2, [factor * a + b for a, b in zip(mat.get_row(row1), mat.get_row(row2))])
+	return result
 
 
-# ── Date / time utilities ────────────────────────────────────────────────────
+####################
+# STRING FUNCTIONS #
+####################
+
+@pure_func
+def length(string):
+	return len(require_str(string))
+
+@pure_func
+def in_string(string, substring, start=1):
+	v = require_str(string).tokens
+	s = require_str(substring).tokens
+	start = py_int(start)
+	for i in range(start - 1, len(v) - len(s) + 1):
+		if v[i:i + len(s)] == s:
+			return i + 1
+	return 0
+
+@pure_func
+def sub(*args):
+	# DO NOT REMOVE THIS!
+	# This is a weird feature of sub(, but it's true: with a single numeric
+	# argument, sub( divides it by 100 like the undocumented % operator.
+	if len(args) == 1:
+		return require_num(args[0]) / 100
+	if len(args) == 3:
+		string, start, length = args
+		require_str(string)
+		start = py_int(start)
+		length = py_int(length)
+		if length < 1:
+			raise DomainError(f"sub: length must be ≥ 1, got {length}")
+		if not (1 <= start <= len(string) - length + 1):
+			raise InvalidDimError(f"sub: index out of range")
+		return TiString(string.tokens[start - 1 : start + length - 1])
+	raise ArgumentError(f"Invalid arguments: {args}")
+
+
+############
+# FINANCE  #
+############
 
 @pure_func
 def time_cnv(seconds):
@@ -555,13 +533,10 @@ def _parse_dbd_date(d):
 	except ValueError as e:
 		raise DomainError(f"dbd: invalid date ({year}/{month}/{day})") from e
 
-
 @pure_vectorized
 def dbd(date1: float, date2: float):
 	"""Days between two dates in TI Finance format (MM.DDYY or DDMM.YY)."""
 	return (_parse_dbd_date(date2) - _parse_dbd_date(date1)).days
-
-# ── Finance ──────────────────────────────────────────────────────────────────
 
 def _expand_cash_flows(cflist, cffreq):
 	"""Expand a cash flow list with optional frequencies into a flat list."""
@@ -649,7 +624,10 @@ def nom(eff_rate, cp):
 		raise DomainError("►Nom: effective rate must be > -100%")
 	return 100 * cp * ((eff_rate / 100 + 1) ** (1 / cp) - 1)
 
-# ── Probability distributions ────────────────────────────────────────────────
+
+#################
+# DISTRIBUTIONS #
+#################
 
 def _regularized_inc_gamma(a, x):
 	"""Lower regularized incomplete gamma function P(a, x) via series."""
@@ -791,6 +769,28 @@ def inv_norm(p, mu=0, sigma=1):
 	return mu + sigma * z
 
 @pure_func
+def inv_t(p, df):
+	require_real(p)
+	require_real(df)
+	if p <= 0:
+		return -1e99
+	if p >= 1:
+		return 1e99
+	# Newton's method starting from normal approximation
+	x = inv_norm(p)
+	for _ in range(50):
+		fx = tcdf(-1e99, x, df) - p
+		fpx = tpdf(x, df)
+		# TODO: calculator doesn't go below 1e-99
+		if builtins.abs(fpx) < 1e-300:
+			break
+		dx = fx / fpx
+		x -= dx
+		if builtins.abs(dx) < 1e-12:
+			break
+	return x
+
+@pure_func
 def tpdf(t, df):
 	require_real(t)
 	require_real(df)
@@ -812,28 +812,6 @@ def tcdf(lower, upper, df):
 		else:
 			return 0.5 * ib
 	return _t_cdf(upper, df) - _t_cdf(lower, df)
-
-@pure_func
-def inv_t(p, df):
-	require_real(p)
-	require_real(df)
-	if p <= 0:
-		return -1e99
-	if p >= 1:
-		return 1e99
-	# Newton's method starting from normal approximation
-	x = inv_norm(p)
-	for _ in range(50):
-		fx = tcdf(-1e99, x, df) - p
-		fpx = tpdf(x, df)
-		# TODO: calculator doesn't go below 1e-99
-		if builtins.abs(fpx) < 1e-300:
-			break
-		dx = fx / fpx
-		x -= dx
-		if builtins.abs(dx) < 1e-12:
-			break
-	return x
 
 @pure_func
 def chi_sq_pdf(x, df):
@@ -924,3 +902,29 @@ def geometcdf(p, n):
 	require_real(p)
 	n = require_int(n)
 	return 1 - (1 - p) ** n
+
+
+###########
+# CATALOG #
+###########
+
+
+@pure_func
+def rand_list(n):
+	return TiList([random.random() for _ in range(py_int(n))])
+
+@pure_vectorized
+def sinh(x):
+	return math.sinh(require_real(x))
+
+@pure_vectorized
+def cosh(x):
+	return math.cosh(require_real(x))
+
+@pure_vectorized
+def tanh(x):
+	return math.tanh(require_real(x))
+
+@pure_vectorized
+def asinh(x):
+	return math.asinh(require_real(x))

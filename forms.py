@@ -1,5 +1,6 @@
 from __future__ import annotations
 import operator
+from functools import wraps
 from itertools import zip_longest
 from typing import TYPE_CHECKING
 
@@ -13,32 +14,6 @@ from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str, py_int
 
 
-# You'd think dim could be a pure function, right? For a while, it was.
-# But then I realized empty lists are illegal everywhere, with a single exception.
-# dim( reads a variable's stored dimension rather than its value: it accesses
-# .value (raw storage) instead of .resolve(), so dim(L1) returns 0 for an empty
-# list where a bare reference to L1 would raise InvalidDimError.  This mirrors
-# the calculator, where dim( works on both sides of → for the same reason.
-
-@forms_func
-def dim(a: ArgParser):
-	if a.peek().is_list_start():
-		var = a.list_var()
-		val = var.value
-		if val is None:
-			raise UndefinedError(f"Undefined list variable")
-		a.end_func()
-		return len(val)
-
-	value = a.expr()
-	a.end_func()
-	if isinstance(value, TiList):
-		return len(value)
-	# Don't need direct matrix variable access because empty matrices aren't possible
-	if isinstance(value, TiMatrix):
-		return TiList([value.rows, value.cols])
-	raise DataTypeError(f"dim: expected list or matrix; got {value}")
-
 @forms_func
 def ans_index_or_mul(a: ArgParser):
 	ans = a.env.ans
@@ -51,37 +26,9 @@ def ans_index_or_mul(a: ArgParser):
 	a.end_func()
 	return operators.mul(ans, b)
 
-@forms_func
-def seq(a: ArgParser) -> TiList:
-	formula = a.thunk()
-	var = a.numeric_var()
-	start = require_real(a.expr())
-	end = require_real(a.expr())
-	step = require_real(a.expr(optional=True, default=1))
-	a.end_func()
-	n = start
-	result = []
-	if step == 0:
-		raise IncrementError("seq: step cannot be zero")
-
-	if step > 0:
-		if start > end + 1e-10:
-			raise IncrementError(f"seq: step is positive but start ({start}) > end ({end})")
-		op = operator.le
-		end += 1e-10
-	else:
-		if start < end - 1e-10:
-			raise IncrementError(f"seq: step is negative but start ({start}) < end ({end})")
-		op = operator.ge
-		end -= 1e-10
-
-	with a.env.nest_guard(seq), var.scoped():
-		while op(n, end):
-			var.value = n
-			result.append(formula.eval())
-			n += step
-
-	return TiList(result)
+####################
+# MATH FUNCTIONS   #
+####################
 
 @forms_func
 def sigma(a: ArgParser) -> float:
@@ -112,7 +59,6 @@ def n_deriv(a: ArgParser) -> float:
 		var.value = val - h
 		bwd = formula.eval()
 	return (fwd - bwd) / (2 * h)
-
 
 # G7K15 nodes (positive half + 0) and weights on [-1, 1]
 _K15_NODES = [
@@ -168,38 +114,10 @@ def fn_int(a: ArgParser) -> float:
 			return formula.eval()
 		return _adaptive_gk15(f, lo, hi, tol)
 
-@forms_func
-def matr_to_list(a: ArgParser) -> None:
-	mat = a.expr()
-	if not isinstance(mat, TiMatrix):
-		raise DataTypeError("Matr►list: first argument must be a matrix")
-	if a.peek().is_list_start():
-		list_vars = [a.list_var()]
-		while a.has_next:
-			list_vars.append(a.list_var())
-		for var, col_data in zip(list_vars, zip(*mat.data)):
-			var.value = TiList(list(col_data))
-	else:
-		col = py_int(a.expr()) - 1
-		if not (0 <= col < mat.cols):
-			raise InvalidDimError(
-				f"Matr►list: column {col + 1} out of range for {mat.rows}×{mat.cols} matrix"
-			)
-		a.list_var().value = TiList([mat.data[r][col] for r in range(mat.rows)])
-	a.end_paren_cmd()
 
-@forms_func
-def list_to_matr(a: ArgParser) -> None:
-	list_vals = []
-	while True:
-		list_vals.append(require_list(a.expr()))
-		if not a.has_next:
-			raise ArgumentError("List►matr: expected matrix variable as last argument")
-		if a.peek().is_matrix_var():
-			mat_var = a.matrix_var()
-			break
-	mat_var.value = TiMatrix([list(row) for row in zip_longest(*(lst.data for lst in list_vals), fillvalue=0.0)])
-	a.end_paren_cmd()
+##################
+# LIST FUNCTIONS #
+##################
 
 def _sort(a: ArgParser, reverse: bool):
 	main = a.list_var().resolve()
@@ -207,7 +125,7 @@ def _sort(a: ArgParser, reverse: bool):
 	while a.has_next:
 		deps.append(a.list_var().resolve())
 	a.end_paren_cmd()
-	
+
 	for d in deps:
 		if len(d) != len(main):
 			raise DimMismatchError(f"SortA/SortD: dependent list length {len(d)} doesn't match {len(main)}")
@@ -229,6 +147,32 @@ def sort_a(a: ArgParser):
 def sort_d(a: ArgParser):
 	_sort(a, True)
 
+# You'd think dim could be a pure function, right? For a while, it was.
+# But then I realized empty lists are illegal everywhere, with a single exception.
+# dim( reads a variable's stored dimension rather than its value: it accesses
+# .value (raw storage) instead of .resolve(), so dim(L1) returns 0 for an empty
+# list where a bare reference to L1 would raise InvalidDimError.  This mirrors
+# the calculator, where dim( works on both sides of → for the same reason.
+
+@forms_func
+def dim(a: ArgParser):
+	if a.peek().is_list_start():
+		var = a.list_var()
+		val = var.value
+		if val is None:
+			raise UndefinedError(f"Undefined list variable")
+		a.end_func()
+		return len(val)
+
+	value = a.expr()
+	a.end_func()
+	if isinstance(value, TiList):
+		return len(value)
+	# Don't need direct matrix variable access because empty matrices aren't possible
+	if isinstance(value, TiMatrix):
+		return TiList([value.rows, value.cols])
+	raise DataTypeError(f"dim: expected list or matrix; got {value}")
+
 @forms_func
 def fill(a: ArgParser):
 	fill_value = require_real(a.expr())
@@ -245,6 +189,76 @@ def fill(a: ArgParser):
 			lst.data[i] = fill_value
 	else:
 		raise DataTypeError("Fill(: expected a list or matrix variable")
+
+@forms_func
+def seq(a: ArgParser) -> TiList:
+	formula = a.thunk()
+	var = a.numeric_var()
+	start = require_real(a.expr())
+	end = require_real(a.expr())
+	step = require_real(a.expr(optional=True, default=1))
+	a.end_func()
+	n = start
+	result = []
+	if step == 0:
+		raise IncrementError("seq: step cannot be zero")
+
+	if step > 0:
+		if start > end + 1e-10:
+			raise IncrementError(f"seq: step is positive but start ({start}) > end ({end})")
+		op = operator.le
+		end += 1e-10
+	else:
+		if start < end - 1e-10:
+			raise IncrementError(f"seq: step is negative but start ({start}) < end ({end})")
+		op = operator.ge
+		end -= 1e-10
+
+	with a.env.nest_guard(seq), var.scoped():
+		while op(n, end):
+			var.value = n
+			result.append(formula.eval())
+			n += step
+
+	return TiList(result)
+
+@forms_func
+def list_to_matr(a: ArgParser) -> None:
+	list_vals = []
+	while True:
+		list_vals.append(require_list(a.expr()))
+		if not a.has_next:
+			raise ArgumentError("List►matr: expected matrix variable as last argument")
+		if a.peek().is_matrix_var():
+			mat_var = a.matrix_var()
+			break
+	mat_var.value = TiMatrix([list(row) for row in zip_longest(*(lst.data for lst in list_vals), fillvalue=0.0)])
+	a.end_paren_cmd()
+
+@forms_func
+def matr_to_list(a: ArgParser) -> None:
+	mat = a.expr()
+	if not isinstance(mat, TiMatrix):
+		raise DataTypeError("Matr►list: first argument must be a matrix")
+	if a.peek().is_list_start():
+		list_vars = [a.list_var()]
+		while a.has_next:
+			list_vars.append(a.list_var())
+		for var, col_data in zip(list_vars, zip(*mat.data)):
+			var.value = TiList(list(col_data))
+	else:
+		col = py_int(a.expr()) - 1
+		if not (0 <= col < mat.cols):
+			raise InvalidDimError(
+				f"Matr►list: column {col + 1} out of range for {mat.rows}×{mat.cols} matrix"
+			)
+		a.list_var().value = TiList([mat.data[r][col] for r in range(mat.rows)])
+	a.end_paren_cmd()
+
+
+##############
+# STATISTICS #
+##############
 
 @forms_func
 def clr_list(a):
@@ -265,16 +279,6 @@ def clr_all_lists(env):
 			list_var.value.clear()
 	for lst in env.user_lists.values():
 		lst.clear()
-
-@forms_func
-def del_var(a):
-	"""DelVar variable — clear one variable without consuming the statement separator.
-
-	Bunches: DelVar ADelVar B and DelVar ADisp X are both valid on the same line.
-	Does not update Ans.
-	"""
-	a.any_var().value = None
-	# No end_cmd() call; leaves separator in place for next command
 
 @forms_func
 def set_up_editor(a):
@@ -298,6 +302,10 @@ def set_up_editor(a):
 
 	a.end_cmd()
 
+####################
+# STRING FUNCTIONS #
+####################
+
 @forms_func
 def equ_to_string(a: ArgParser) -> None:
 	"""Equ►String(equvar, strvar) — copy the equation's tokens into a string variable."""
@@ -314,9 +322,9 @@ def string_to_equ(a: ArgParser) -> None:
 	a.end_paren_cmd()
 	equ_var.value = TiEquation(string.tokens)
 
-####################
-# PROGRAM COMMANDS #
-####################
+############
+# PROGRAMS #
+############
 
 class program_command(TiCall):
 	"""Decorator for no-arg commands that require a running program.
@@ -348,6 +356,15 @@ def else_cmd(prgm):
 	prgm.begin_else()
 
 @forms_func
+def for_cmd(a: ArgParser):
+	var   = a.numeric_var()
+	start = require_real(a.expr())
+	end   = require_real(a.expr())
+	step  = require_real(a.expr(optional=True, default=1.0))
+	a.end_paren_cmd()
+	a.current_program().begin_for(var, start, end, step)
+
+@forms_func
 def while_cmd(a: ArgParser):
 	condition = a.thunk()
 	a.end_cmd()
@@ -358,15 +375,6 @@ def repeat_cmd(a: ArgParser):
 	condition = a.thunk()
 	a.end_cmd()
 	a.current_program().begin_repeat(condition)
-
-@forms_func
-def for_cmd(a: ArgParser):
-	var   = a.numeric_var()
-	start = require_real(a.expr())
-	end   = require_real(a.expr())
-	step  = require_real(a.expr(optional=True, default=1.0))
-	a.end_paren_cmd()
-	a.current_program().begin_for(var, start, end, step)
 
 @program_command
 def end_cmd(prgm):
@@ -384,14 +392,6 @@ def goto_cmd(a: ArgParser):
 	name = a.label_name()
 	a.end_cmd()
 	a.current_program().goto(name)
-
-@program_command
-def return_cmd(prgm):
-	raise ReturnSignal()
-
-@program_command
-def stop_cmd(prgm):
-	raise StopSignal()
 
 @forms_func
 def is_gt_cmd(a: ArgParser):
@@ -412,6 +412,24 @@ def prgm(a: ArgParser):
 	prgm_name = a.program_name()
 	a.end_cmd()
 	a.env.run_program(prgm_name)
+
+@program_command
+def return_cmd(prgm):
+	raise ReturnSignal()
+
+@program_command
+def stop_cmd(prgm):
+	raise StopSignal()
+
+@forms_func
+def del_var(a):
+	"""DelVar variable — clear one variable without consuming the statement separator.
+
+	Bunches: DelVar ADelVar B and DelVar ADisp X are both valid on the same line.
+	Does not update Ans.
+	"""
+	a.any_var().value = None
+	# No end_cmd() call; leaves separator in place for next command
 
 @forms_func
 def disp(a: ArgParser):
