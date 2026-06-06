@@ -1356,3 +1356,112 @@ class TestRandM:
 	def test_too_many_rows_raises(self):
 		with pytest.raises(InvalidDimError): calc('randM( 100,1')
 
+
+# ── Unary operator type compatibility ────────────────────────────────────────
+
+class TestNegate:
+	def test_real(self):
+		assert calc('~5') == -5
+
+	def test_complex(self):
+		assert calc('~i') == approx(-1j)
+
+	def test_real_list(self):
+		assert calc('~{1,2,3}').data == [-1, -2, -3]
+
+	def test_complex_list(self):
+		assert calc('~{i,2i}').data == approx([-1j, -2j])
+
+	def test_matrix(self):
+		assert calc('~[[1,2][3,4]]').data == [[-1, -2], [-3, -4]]
+
+	def test_string(self):
+		with pytest.raises(TypeError): calc('~"A"')
+
+
+class TestInvert:
+	def test_real(self):
+		assert calc('4 INV') == approx(0.25)
+
+	def test_complex(self):
+		assert calc('i INV') == approx(-1j)
+
+	def test_real_list(self):
+		assert calc('{2,4} INV').data == approx([0.5, 0.25])
+
+	def test_complex_list(self):
+		assert calc('{i,2i} INV').data == approx([-1j, -0.5j])
+
+	def test_matrix(self):
+		result = calc('[[2,0][0,4]] INV')
+		assert result.data == approx_mat([[0.5, 0], [0, 0.25]])
+
+	def test_string(self):
+		with pytest.raises(TypeError): calc('"A" INV')
+
+
+class TestFactorial:
+	def test_real(self):
+		assert calc('5 FACT') == approx(120)
+
+	def test_complex(self):
+		with pytest.raises(DataTypeError): calc('i FACT')
+
+	def test_real_list(self):
+		assert calc('{3,4} FACT').data == approx([6, 24])
+
+	def test_complex_list(self):
+		with pytest.raises(DataTypeError): calc('{i,2i} FACT')
+
+	def test_matrix(self):
+		with pytest.raises(DataTypeError): calc('[[2,3]] FACT')
+
+	def test_string(self):
+		with pytest.raises(DataTypeError): calc('"A" FACT')
+
+
+class TestNot:
+	def test_real_zero(self):
+		assert calc('not( 0') == 1.0
+
+	def test_real_nonzero(self):
+		assert calc('not( 5') == 0.0
+
+	def test_complex(self):
+		with pytest.raises(DataTypeError): calc('not( i')
+
+	def test_real_list(self):
+		assert calc('not( {1,0,3}').data == [0.0, 1.0, 0.0]
+
+	def test_complex_list(self):
+		with pytest.raises(DataTypeError): calc('not( {i,2i}')
+
+	def test_matrix(self):
+		with pytest.raises(DataTypeError): calc('not( [[1,0]]')
+
+	def test_string(self):
+		with pytest.raises(DataTypeError): calc('not( "A"')
+
+
+class TestTranspose:
+	def test_square(self):
+		assert calc('[[1,2][3,4]] TRANSPOSE').data == [[1, 3], [2, 4]]
+
+	def test_row_to_column(self):
+		assert calc('[[1,2,3]] TRANSPOSE').data == [[1], [2], [3]]
+
+	def test_column_to_row(self):
+		assert calc('[[1][2][3]] TRANSPOSE').data == [[1, 2, 3]]
+
+	def test_involution(self):
+		result = calc('( [[1,2,3][4,5,6]] TRANSPOSE ) TRANSPOSE')
+		assert result.data == [[1, 2, 3], [4, 5, 6]]
+
+	def test_non_matrix_raises(self):
+		with pytest.raises(DataTypeError): calc('5 TRANSPOSE')
+
+	def test_vertical_stack_via_transpose(self):
+		# (augment(Aᵀ, Bᵀ))ᵀ stacks two row vectors as rows of a new matrix
+		result = calc('( augment( [[1,2,3]] TRANSPOSE , [[4,5,6]] TRANSPOSE ) TRANSPOSE')
+		assert result.data == [[1, 2, 3], [4, 5, 6]]
+
