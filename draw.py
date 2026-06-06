@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 from argspec import env, expr
-from decorators import preparse
+from decorators import nullary_command, preparse
 from errors import DomainError
 from tiobjects import py_int, require_real
 
@@ -78,8 +78,27 @@ def pxl_test(env, row, col) -> float:
 	return float(env.screen.get(row, col))
 
 
+@nullary_command
+def clr_draw(env) -> None:
+	env.screen.clear()
+
+
 @preparse(env, expr, expr)
 def pt_on(env, x, y) -> None:
 	pixel = _point_to_pixel(env, require_real(x), require_real(y))
 	if pixel is not None:
 		env.screen.set(*pixel, True)
+
+
+@preparse(env, expr, expr)
+def pt_off(env, x, y) -> None:
+	pixel = _point_to_pixel(env, require_real(x), require_real(y))
+	if pixel is not None:
+		env.screen.set(*pixel, False)
+
+
+@preparse(env, expr, expr)
+def pt_change(env, x, y) -> None:
+	pixel = _point_to_pixel(env, require_real(x), require_real(y))
+	if pixel is not None:
+		env.screen.toggle(*pixel)

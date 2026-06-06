@@ -190,6 +190,60 @@ class TestPointOn:
 		assert not env.screen.get(31, 1)
 
 
+# ── Pt-Off / Pt-Change ──────────────────────────────────────────────────────────
+
+class TestPointOff:
+	def test_turns_off_lit_pixel(self):
+		env = run('Pt-On( 0,0')
+		run('Pt-Off( 0,0', env)
+		assert not env.screen.get(31, 47)
+
+	def test_off_screen_no_error(self):
+		env = run('Pt-Off( 100,100')
+		assert not any(env.screen.buffer)
+
+	def test_off_is_idempotent(self):
+		env = run('Pt-Off( 0,0')
+		run('Pt-Off( 0,0', env)
+		assert not env.screen.get(31, 47)
+
+
+class TestPointChange:
+	def test_toggles_on(self):
+		env = run('Pt-Change( 0,0')
+		assert env.screen.get(31, 47)
+
+	def test_toggles_off(self):
+		env = run('Pt-On( 0,0')
+		run('Pt-Change( 0,0', env)
+		assert not env.screen.get(31, 47)
+
+	def test_off_screen_no_error(self):
+		env = run('Pt-Change( 100,100')
+		assert not any(env.screen.buffer)
+
+
+# ── ClrDraw ──────────────────────────────────────────────────────────────────────
+
+class TestClrDraw:
+	def test_clears_pixels(self):
+		env = run('Pxl-On( 3,5')
+		run('ClrDraw', env)
+		assert not any(env.screen.buffer)
+
+	def test_clears_after_pt_on(self):
+		env = run('Pt-On( 0,0')
+		run('ClrDraw', env)
+		assert not any(env.screen.buffer)
+
+	def test_clear_then_draw(self):
+		env = run('Pxl-On( 10,10')
+		run('ClrDraw', env)
+		run('Pxl-On( 20,20', env)
+		assert env.screen.get(20, 20)
+		assert not env.screen.get(10, 10)
+
+
 # ── Use inside a stored program ─────────────────────────────────────────────────
 
 class TestPixelInProgram:

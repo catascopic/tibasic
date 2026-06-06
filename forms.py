@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 import operators
-from argspec import env, expr, thunk, numeric_var, optional, rest
+from argspec import env, expr, thunk, numeric_var, list_var, list_var_prefix_optional, equation_var, string_var, optional, rest
 from decorators import forms_func, preparse, nullary_command, TiCall
 from errors import DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
@@ -31,30 +31,20 @@ def ans_index_or_mul(a: ArgParser):
 # MATH FUNCTIONS #
 ##################
 
-@forms_func
-def sigma(a: ArgParser) -> float:
-	formula = a.thunk()
-	var = a.numeric_var()
-	start = a.expr()
-	end = a.expr()
-	a.end_func()
+@preparse(env, thunk, numeric_var, expr, expr)
+def sigma(env, formula, var, start, end) -> float:
 	total = 0
 	n = start
-	with a.env.nest_guard(sigma), var.scoped():
+	with env.nest_guard(sigma), var.scoped():
 		while n <= end:
 			var.value = n
 			total += formula.eval()
 			n += 1
 	return total
 
-@forms_func
-def n_deriv(a: ArgParser) -> float:
-	formula = a.thunk()
-	var = a.numeric_var()
-	val = a.expr()
-	h = a.expr(optional=True, default=0.001)
-	a.end_func()
-	with a.env.nest_guard(n_deriv, max_depth=1), var.scoped():
+@preparse(env, thunk, numeric_var, expr, optional(expr, 0.001))
+def n_deriv(env, formula, var, val, h) -> float:
+	with env.nest_guard(n_deriv, max_depth=1), var.scoped():
 		var.value = val + h
 		fwd = formula.eval()
 		var.value = val - h
@@ -101,15 +91,9 @@ def _adaptive_gk15(f, lo, hi, tol, depth=0):
 		_adaptive_gk15(f, mid, hi, tol / 2, depth + 1)
 	)
 
-@forms_func
-def fn_int(a: ArgParser) -> float:
-	formula = a.thunk()
-	var = a.numeric_var()
-	lo = a.expr()
-	hi = a.expr()
-	tol = a.expr(optional=True, default=1e-5)
-	a.end_func()
-	with a.env.nest_guard('fnInt'), var.scoped():
+@preparse(env, thunk, numeric_var, expr, expr, optional(expr, 1e-5))
+def fn_int(env, formula, var, lo, hi, tol) -> float:
+	with env.nest_guard('fnInt'), var.scoped():
 		def f(x):
 			var.value = x
 			return formula.eval()
@@ -120,12 +104,9 @@ def fn_int(a: ArgParser) -> float:
 # LIST FUNCTIONS #
 ##################
 
-def _sort(a: ArgParser, reverse: bool):
-	main = a.list_var().resolve()
-	deps = []
-	while a.has_next:
-		deps.append(a.list_var().resolve())
-	a.end_paren_cmd()
+def _sort(main_var, dep_vars, reverse: bool):
+	main = main_var.resolve()
+	deps = [v.resolve() for v in dep_vars]
 
 	for d in deps:
 		if len(d) != len(main):
@@ -140,13 +121,13 @@ def _sort(a: ArgParser, reverse: bool):
 		for d in deps:
 			d.data = [d.data[i] for i in indices]
 
-@forms_func
-def sort_a(a: ArgParser):
-	_sort(a, False)
+@preparse(list_var, rest(list_var))
+def sort_a(main_var, dep_vars):
+	_sort(main_var, dep_vars, False)
 
-@forms_func
-def sort_d(a: ArgParser):
-	_sort(a, True)
+@preparse(list_var, rest(list_var))
+def sort_d(main_var, dep_vars):
+	_sort(main_var, dep_vars, True)
 
 # You'd think dim could be a pure function, right? For a while, it was.
 # But then I realized empty lists are illegal everywhere, with a single exception.
@@ -258,16 +239,13 @@ def matr_to_list(a: ArgParser) -> None:
 # STATISTICS #
 ##############
 
-@forms_func
-def clr_list(a):
+@preparse(list_var, rest(list_var))
+def clr_list(first, rest_vars):
 	"""ClrList list[, list, ...] — clear each named list to empty; silently skip nonexistent lists."""
-	while True:
-		lst = a.list_var().value
+	for var in [first] + rest_vars:
+		lst = var.value
 		if lst is not None:
 			lst.clear()
-		if not a.has_next:
-			break
-	a.end_cmd()
 
 @nullary_command
 def clr_all_lists(env):
@@ -278,47 +256,36 @@ def clr_all_lists(env):
 	for lst in env.user_lists.values():
 		lst.clear()
 
-@forms_func
-def set_up_editor(a):
+@preparse(env, rest(list_var_prefix_optional))
+def set_up_editor(env, list_vars):
 	"""SetUpEditor [list, ...] — ensure lists exist, creating empty ones as needed.
 
 	With no arguments, ensures L1–L6 all exist (the default list editor columns).
 	With arguments, ensures each named list exists (standard or user-defined).
 	Does not modify lists that already contain data.
 	"""
-	if a.has_next:
-		while True:
-			var = a.list_var_prefix_optional()
+	if list_vars:
+		for var in list_vars:
 			if var.value is None:
 				var.value = TiList([])
-			if not a.has_next:
-				break
 	else:
-		for list_var in a.env.lists:
-			if list_var.value is None:
-				list_var.value = TiList([])
-
-	a.end_cmd()
+		for var in env.lists:
+			if var.value is None:
+				var.value = TiList([])
 
 ###########
 # STRINGS #
 ###########
 
-@forms_func
-def equ_to_string(a: ArgParser) -> None:
+@preparse(equation_var, string_var)
+def equ_to_string(equ_var, str_var) -> None:
 	"""Equ►String(equvar, strvar) — copy the equation's tokens into a string variable."""
-	equ_var = a.equation_var()
-	str_var = a.string_var()
-	a.end_paren_cmd()
 	str_var.value = TiString(equ_var.resolve().tokens)
 
-@forms_func
-def string_to_equ(a: ArgParser) -> None:
+@preparse(expr, equation_var)
+def string_to_equ(string, equ_var) -> None:
 	"""String►Equ(str_expr, equvar) — parse a string value into an equation variable."""
-	string = require_str(a.expr())
-	equ_var = a.equation_var()
-	a.end_paren_cmd()
-	equ_var.value = TiEquation(string.tokens)
+	equ_var.value = TiEquation(require_str(string).tokens)
 
 ############
 # PROGRAMS #
