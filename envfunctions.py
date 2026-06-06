@@ -33,9 +33,9 @@ def inv_trig(func):
 	return env_vectorized(apply)
 
 
-############################
-# DESIGNATED KEY FUNCTIONS #
-############################
+##################
+# MAIN FUNCTIONS #
+##################
 
 @trig
 def sin(x):

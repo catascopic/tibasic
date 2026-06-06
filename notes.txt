@@ -1,16 +1,8 @@
 Still don't love the nonreal answer check
 
-remove exceptions from get/set item?
-
 Tests to make sure list isn't created for 1@$Q(2
 
-TestOperatorTypes: should each have six blocks of six items for all six datatypes
-Also, can you parameterize these tests?
-
-Remove guard statements in collections
-
 test fractional powers
-
 
 Move decorators to where they're used?
 utils.py: decorators, signals, other low-level things? Token?
@@ -53,6 +45,11 @@ I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
 
 ********
+
+Remove guard statements in collections
+remove exceptions from get/set item?
+TestOperatorTypes: should each have six blocks of six items for all six datatypes
+Also, can you parameterize these tests?
 
 Okay, here's something really annoying, and I'm wondering if this is a bug:
 1=i: ERR

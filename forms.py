@@ -26,9 +26,9 @@ def ans_index_or_mul(a: ArgParser):
 	a.end_func()
 	return operators.mul(ans, b)
 
-####################
-# MATH FUNCTIONS   #
-####################
+##################
+# MATH FUNCTIONS #
+##################
 
 @forms_func
 def sigma(a: ArgParser) -> float:
@@ -302,9 +302,9 @@ def set_up_editor(a):
 
 	a.end_cmd()
 
-####################
-# STRING FUNCTIONS #
-####################
+###########
+# STRINGS #
+###########
 
 @forms_func
 def equ_to_string(a: ArgParser) -> None:

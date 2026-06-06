@@ -47,9 +47,9 @@ def matrix_vectorized(func):
 def not_(x):
 	return float(not require_real(x))
 
-############################
-# DESIGNATED KEY FUNCTIONS #
-############################
+##################
+# MAIN FUNCTIONS #
+##################
 
 @pure_vectorized
 def pow10(x):
@@ -59,7 +59,6 @@ def pow10(x):
 def exp(x):
 	require_num(x)
 	return cmath.exp(x) if isinstance(x, complex) else math.exp(x)
-
 
 ##################
 # MATH FUNCTIONS #
@@ -157,6 +156,10 @@ def angle(x):
 	require_num(x)
 	return cmath.phase(x)
 
+@pure_func
+def rand_list(n):
+	return TiList([random.random() for _ in range(py_int(n))])
+
 @vectorized
 def _rand_int_single(low, high):
 	if low > high:
@@ -200,10 +203,9 @@ def rand_int_no_rep(low, high):
 	random.shuffle(lst)
 	return TiList(lst)
 
-
-####################
-# LIST FUNCTIONS   #
-####################
+##################
+# LIST FUNCTIONS #
+##################
 
 @pure_func
 def cum_sum(obj):
@@ -277,11 +279,7 @@ def sum(lst, start=None, end=None):
 		return builtins.sum(data)
 
 	start = py_int(start)
-	if end is None:
-		end = len(data)
-	else:
-		end = py_int(end)
-
+	end = len(data) if end is None else py_int(end)
 	if not (1 <= start <= end <= len(data)):
 		raise InvalidDimError(f"sum: index out of range (start={start}, end={end}, dim={len(data)})")
 
@@ -294,11 +292,7 @@ def prod(lst, start=None, end=None):
 		return math.prod(data)
 
 	start = py_int(start)
-	if end is None:
-		end = len(data)
-	else:
-		end = py_int(end)
-
+	end = len(data) if end is None else py_int(end)
 	if not (1 <= start <= end <= len(data)):
 		raise InvalidDimError(f"prod: index out of range (start={start}, end={end}, dim={len(data)})")
 
@@ -316,19 +310,21 @@ def variance(lst, freqlist=None):
 	require_list(freqlist)
 	if len(lst) != len(freqlist):
 		raise DimMismatchError("stdDev: dim mismatch")
+		
 	m = mean(lst, freqlist)
 	total_w = builtins.sum(freqlist)
 	if total_w <= 1:
 		raise StatError("stdDev: total frequency must be > 1")
+
 	return builtins.sum(w * (x - m) ** 2 for x, w in zip(lst, freqlist)) / (total_w - 1)
 
 @pure_func
 def stddev(lst, freqlist=None):
 	return math.sqrt(variance(lst, freqlist))
 
-##########
-# MATRIX #
-##########
+####################
+# MATRIX FUNCTIONS #
+####################
 
 @pure_func
 def det(mat):
@@ -350,6 +346,7 @@ def det(mat):
 				factor = work[row][col] / work[col][col]
 				for j in range(col, n):
 					work[row][j] -= factor * work[col][j]
+
 	return sign * math.prod(work[i][i] for i in range(n))
 
 @pure_func
@@ -363,8 +360,9 @@ def rand_m(rows, cols):
 	cols = py_int(cols)
 	if not (1 <= rows <= 99) or not (1 <= cols <= 99):
 		raise InvalidDimError("randM: dimensions must be 1-99")
+
 	# Per spec: entries are successive randInt(-9,9) calls filled bottom-right to top-left
-	data = [random.randint(-9, 9) for _ in range(rows * cols)]
+	data = [float(random.randint(-9, 9)) for _ in range(rows * cols)]
 	return TiMatrix([list(row) for row in batched(reversed(data), cols)])
 
 def _row_reduce(mat, get_range):
@@ -472,10 +470,9 @@ def sub(*args):
 		return TiString(string.tokens[start - 1 : start + length - 1])
 	raise ArgumentError(f"Invalid arguments: {args}")
 
-
-############
-# FINANCE  #
-############
+###########
+# FINANCE #
+###########
 
 @pure_func
 def time_cnv(seconds):
@@ -903,15 +900,9 @@ def geometcdf(p, n):
 	n = require_int(n)
 	return 1 - (1 - p) ** n
 
-
 ###########
 # CATALOG #
 ###########
-
-
-@pure_func
-def rand_list(n):
-	return TiList([random.random() for _ in range(py_int(n))])
 
 @pure_vectorized
 def sinh(x):

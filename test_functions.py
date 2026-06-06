@@ -1238,4 +1238,121 @@ class TestFill:
 		env = run('SetUpEditor L1')
 		with pytest.raises(InvalidDimError):
 			run('Fill( 7, L1', env)
-		
+
+
+# ── logBASE ───────────────────────────────────────────────────────────────────
+
+class TestLogBase:
+	def test_base_2(self):
+		assert calc('logBASE( 8,2') == approx(3)
+
+	def test_base_10(self):
+		assert calc('logBASE( 1000,10') == approx(3)
+
+	def test_fractional_result(self):
+		assert calc('logBASE( 4,8') == approx(2/3)
+
+	def test_x_zero_raises(self):
+		with pytest.raises(DomainError): calc('logBASE( 0,2')
+
+	def test_base_one_raises(self):
+		with pytest.raises(DomainError): calc('logBASE( 2,1')
+
+	def test_base_negative_raises(self):
+		with pytest.raises(DomainError): calc('logBASE( 2,~1')
+
+	def test_x_negative_real_mode_raises(self):
+		with pytest.raises(NonRealAnsError): calc('logBASE( ~1,2')
+
+	def test_x_negative_complex_mode(self):
+		result = calc('logBASE( ~1,2', cpx())
+		assert isinstance(result, complex)
+		assert result.imag == approx(math.pi / math.log(2))
+
+
+# ── randBin ───────────────────────────────────────────────────────────────────
+
+class TestRandBin:
+	def test_single_in_range(self):
+		result = calc('randBin( 10,0.5')
+		assert result.is_integer()
+		assert 0 <= result <= 10
+
+	def test_p_zero_always_zero(self):
+		assert calc('randBin( 10,0') == 0
+
+	def test_p_one_always_n(self):
+		assert calc('randBin( 10,1') == 10
+
+	def test_list_form(self):
+		result = calc('randBin( 10,0.5,5')
+		assert isinstance(result, TiList)
+		assert len(result) == 5
+		assert all(0 <= x <= 10 for x in result)
+
+	def test_n_zero_raises(self):
+		with pytest.raises(DomainError): calc('randBin( 0,0.5')
+
+	def test_p_negative_raises(self):
+		with pytest.raises(DomainError): calc('randBin( 10,~0.1')
+
+	def test_p_above_one_raises(self):
+		with pytest.raises(DomainError): calc('randBin( 10,1.5')
+
+
+# ── randIntNoRep ──────────────────────────────────────────────────────────────
+
+class TestRandIntNoRep:
+	def test_contains_all_values(self):
+		result = calc('randIntNoRep( 1,5')
+		assert isinstance(result, TiList)
+		assert sorted(result.data) == [1, 2, 3, 4, 5]
+
+	def test_single_element(self):
+		result = calc('randIntNoRep( 3,3')
+		assert isinstance(result, TiList)
+		assert result.data == [3]
+
+	def test_negative_range(self):
+		result = calc('randIntNoRep( ~2,2')
+		assert sorted(result.data) == [-2, -1, 0, 1, 2]
+
+	def test_length(self):
+		result = calc('randIntNoRep( 1,10')
+		assert len(result) == 10
+
+	def test_no_duplicates(self):
+		result = calc('randIntNoRep( 1,20')
+		assert len(set(result.data)) == 20
+
+
+# ── randM ─────────────────────────────────────────────────────────────────────
+
+class TestRandM:
+	def test_shape(self):
+		result = calc('randM( 2,3')
+		assert isinstance(result, TiMatrix)
+		assert result.rows == 2 and result.cols == 3
+
+	def test_entries_in_range(self):
+		result = calc('randM( 3,3')
+		assert all(-9 <= result.data[r][c] <= 9 for r in range(3) for c in range(3))
+
+	def test_entries_are_integers(self):
+		result = calc('randM( 2,4')
+		assert all(float(v).is_integer() for row in result.data for v in row)
+
+	def test_one_by_one(self):
+		result = calc('randM( 1,1')
+		assert result.rows == 1 and result.cols == 1
+		assert -9 <= result.data[0][0] <= 9
+
+	def test_zero_rows_raises(self):
+		with pytest.raises(InvalidDimError): calc('randM( 0,2')
+
+	def test_zero_cols_raises(self):
+		with pytest.raises(InvalidDimError): calc('randM( 2,0')
+
+	def test_too_many_rows_raises(self):
+		with pytest.raises(InvalidDimError): calc('randM( 100,1')
+
