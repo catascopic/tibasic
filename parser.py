@@ -507,7 +507,7 @@ class Parser:
 
 		Processes the stream statement-by-statement via skip_statement.
 		FOR/WHILE/REPEAT always open a new block; THEN opens one only when the
-		immediately preceding non-empty statement was IF — a bare Then (without a
+		immediately preceding statement was IF — a bare Then (without a
 		preceding If) is transparent to the depth counter.  At depth 0 the scan
 		stops at END (always) or ELSE (when *else_mode*).  Leaves pos just past
 		the stopping token.  Raises TiSyntaxError if no match is found.
@@ -522,17 +522,23 @@ class Parser:
 					depth += 1
 			elif t in {FOR, WHILE, REPEAT}:
 				depth += 1
-			elif t is END or (else_mode and t is ELSE):
+			if t is END:
 				if depth == 0:
-					self.advance()
-					self.end_statement()
-					return t
+					break
 				depth -= 1
+			elif t is ELSE and else_mode and depth == 0:
+				break
 			self.skip_statement()
 			prev_if = t is IF
+		else:
+			# If loop exits normally, the block was unclosed.
+			# This is legal in TI-Basic, and the program will just exit.
+			# TODO: emit warning for unclosed block
+			return EOF_TOKEN
 
-		# Implicitly close all blocks at end of program
-		# TODO: emit warning for unmatched block
+		self.advance()
+		self.end_statement()
+		return t
 
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 

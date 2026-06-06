@@ -337,6 +337,27 @@ class TestIfThenElse:
 			3@C
 			""")
 
+	def test_nested_else_in_false_branch_does_not_close_outer_block(self):
+		# When the outer If is false, skip_block(else_mode=True) scans for the
+		# matching Else/End.  An inner Else at depth>0 must NOT decrement depth —
+		# it is the middle of its own block, not a closer.  If it does decrement,
+		# depth hits 0 early; the inner End is then mistaken for the outer End;
+		# the outer Else is reached with an empty block stack → TiSyntaxError.
+		env = run("""
+		If 0
+		Then
+			If 1
+			Then
+				1@A
+			Else
+				2@A
+			End
+		Else
+			3@A
+		End
+		""")
+		assert var(env, 'A') == 3
+
 	def test_end_without_block_raises(self):
 		with pytest.raises(TiSyntaxError):
 			run('End')

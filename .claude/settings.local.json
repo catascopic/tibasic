@@ -57,7 +57,10 @@
       "Bash(python -m pytest test_tibasic.py -x -q)",
       "Bash(python -m pytest test_tibasic.py --collect-only -q)",
       "Bash(python -m pytest test_functions.py::TestLogBase test_functions.py::TestRandBin test_functions.py::TestRandIntNoRep test_functions.py::TestRandM -v)",
-      "Bash(python -m pytest test_tibasic.py::TestSkipStatement test_tibasic.py::TestCapture -v)"
+      "Bash(python -m pytest test_tibasic.py::TestSkipStatement test_tibasic.py::TestCapture -v)",
+      "Bash(python -m pytest test_program.py::TestIfThenElse -v)",
+      "Bash(python -m pytest test_program.py -q)",
+      "Bash(python -m pytest test_program.py test_tibasic.py test_functions.py -q)"
     ]
   }
 }

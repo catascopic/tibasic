@@ -111,6 +111,9 @@ class Program:
 		(which correctly ignores LBL tokens inside string literals).
 		Raises LabelError if the label is not found.
 		"""
+		if self._block_stack:
+			pass  # TODO: emit warning for jumping out of a block
+		
 		p = self._parser
 		lbl_pos = p.pos
 		p.pos = 0
