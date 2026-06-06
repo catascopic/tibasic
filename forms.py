@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 import operators
+from argspec import expr, thunk, numeric_var, optional, rest
 from decorators import forms_func, nullary_command, TiCall
 from errors import DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
@@ -192,12 +193,10 @@ def fill(a: ArgParser):
 
 @forms_func
 def seq(a: ArgParser) -> TiList:
-	formula = a.thunk()
-	var = a.numeric_var()
-	start = require_real(a.expr())
-	end = require_real(a.expr())
-	step = require_real(a.expr(optional=True, default=1))
-	a.end_func()
+	formula, var, start, end, step = a.take(thunk, numeric_var, expr, expr, optional(expr, 1))
+	start = require_real(start)
+	end = require_real(end)
+	step = require_real(step)
 	n = start
 	result = []
 	if step == 0:

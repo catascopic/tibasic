@@ -759,6 +759,30 @@ class ArgParser:
 		while self._next:
 			args.append(self.expr())
 		return args
+
+	def take(self, *specs) -> list:
+		"""Parse a fixed argument schema (see argspec.py), finalize, return values.
+
+		Each spec names an ArgParser parse method.  Because exactly the declared
+		arguments are consumed, the existing trailing-comma machinery reports the
+		right errors with no extra code: a missing required argument raises
+		ArgumentError from the parse method, and a surplus argument is caught by
+		the end_func() below.  This covers the common case (an expression
+		function); a command needing end_paren_cmd(), or anything that must
+		inspect values before closing, parses the arguments the old-fashioned way.
+		"""
+		out = []
+		for spec in specs:
+			parse = getattr(self, spec.method)
+			if spec.variadic:
+				items = []
+				while self._next:
+					items.append(parse())
+				out.append(items)
+			else:
+				out.append(parse(optional=spec.optional, default=spec.default))
+		self.end_func()
+		return out
 	
 	def parse_indices(self, count):
 		indices = tuple(py_int(self.expr(), InvalidDimError) for _ in range(count))

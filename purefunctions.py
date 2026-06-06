@@ -1,5 +1,6 @@
 import cmath
 import builtins
+import decimal as _decimal
 import math
 import operator
 import random
@@ -19,7 +20,8 @@ from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
 	DomainError, StatError, ArgumentError,
 )
-from decorators import pure_func, pure_vectorized, vectorized
+from argspec import expr, optional
+from decorators import pure_func, pure_vectorized, vectorized, forms_func
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -77,9 +79,25 @@ def cbrt(x):
 def abs(x):
 	return builtins.abs(require_num(x))
 
+def _ti_round(x: float, decimals: int) -> float:
+	"""Round half away from zero — TI-84 behavior.
+
+	Python's built-in round() uses banker's rounding (half-to-even), so
+	round(0.5) == 0.  TI always rounds 0.5 up (away from zero), so we use
+	decimal.ROUND_HALF_UP.  str(x) gives the shortest round-trip representation,
+	which matches the ~10 significant digits TI operates with internally.
+	"""
+	quant = _decimal.Decimal(10) ** -decimals
+	return float(_decimal.Decimal(str(x)).quantize(quant, rounding=_decimal.ROUND_HALF_UP))
+
+
 @matrix_vectorized
 def round(x, decimals=9):
-	return builtins.round(require_num(x), py_int(decimals))
+	x = require_num(x)
+	n = py_int(decimals)
+	if isinstance(x, complex):
+		return complex(_ti_round(x.real, n), _ti_round(x.imag, n))
+	return _ti_round(x, n)
 
 @matrix_vectorized
 @handle_complex
@@ -441,8 +459,9 @@ def times_row_plus(factor, mat, row1, row2):
 def length(string):
 	return len(require_str(string))
 
-@pure_func
-def in_string(string, substring, start=1):
+@forms_func
+def in_string(a):
+	string, substring, start = a.take(expr, expr, optional(expr, 1))
 	v = require_str(string).tokens
 	s = require_str(substring).tokens
 	start = py_int(start)
