@@ -54,29 +54,7 @@ class Environment:
 		self.tm_fmt        = 12
 		self.clock_on      = True
 		# Window / graphing variables (Xscl, Xmin, Xmax, …)
-		self.window = [
-			RealVariable(1),    # [0]  Xscl
-			RealVariable(1),    # [1]  Yscl
-			RealVariable(-10),  # [2]  Xmin
-			RealVariable(10),   # [3]  Xmax
-			RealVariable(-10),  # [4]  Ymin
-			RealVariable(10),   # [5]  Ymax
-			RealVariable(),     # [6]  Tmin
-			RealVariable(),     # [7]  Tmax
-			RealVariable(),     # [8]  θmin
-			RealVariable(),     # [9]  θmax
-			RealVariable(),     # [10] TblStart
-			RealVariable(1),    # [11] PlotStart
-			RealVariable(10),   # [12] nMax
-			RealVariable(1),    # [13] nMin
-			RealVariable(1),    # [14] ΔTbl
-			RealVariable(),     # [15] Tstep
-			RealVariable(),     # [16] θstep
-			RealVariable(),     # [17] ΔX
-			RealVariable(),     # [18] ΔY
-			RealVariable(4),    # [19] XFact
-			RealVariable(4),    # [20] YFact
-		]
+		self.window = WindowVars()
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
 		self.n_tvm = RealVariable()   # 𝐍 (number of payments)
 		self.i_pct = RealVariable()   # I% (interest rate per period, as percentage)
@@ -348,6 +326,35 @@ class EquationVariable(Variable):
 		if isinstance(value, TiString):
 			return TiEquation(value.tokens)
 		raise DataTypeError(f"Expected equation or string; got {value}")
+
+
+class WindowVars:
+	"""Named storage for all TI-84 window/graphing variables."""
+
+	def __init__(self):
+		self.xscl       = RealVariable(1)
+		self.yscl       = RealVariable(1)
+		self.xmin       = RealVariable(-10)
+		self.xmax       = RealVariable(10)
+		self.ymin       = RealVariable(-10)
+		self.ymax       = RealVariable(10)
+		self.tmin       = RealVariable()
+		self.tmax       = RealVariable()
+		self.theta_min  = RealVariable()
+		self.theta_max  = RealVariable()
+		self.tbl_start  = RealVariable()
+		self.plot_start = RealVariable(1)
+		self.n_max      = RealVariable(10)
+		self.n_min      = RealVariable(1)
+		self.delta_tbl  = RealVariable(1)
+		self.tstep      = RealVariable()
+		self.theta_step = RealVariable()
+		self.delta_x    = RealVariable()
+		self.delta_y    = RealVariable()
+		self.x_fact     = RealVariable(4)
+		self.y_fact     = RealVariable(4)
+		self.plot_step  = RealVariable(1)
+		self.xres       = RealVariable(1)
 
 
 class UserList(ListVariable):
