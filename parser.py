@@ -773,6 +773,10 @@ class ArgParser:
 		"""
 		out = []
 		for spec in specs:
+			if spec.method == 'env':
+				# Not parsed: inject the environment in this positional slot.
+				out.append(self.env)
+				continue
 			parse = getattr(self, spec.method)
 			if spec.variadic:
 				items = []

@@ -32,6 +32,10 @@ class ArgSpec:
 
 
 # Spec vocabulary — names match ArgParser parse methods.
+# `env` is special: it is not parsed from the token stream. take() injects
+# ArgParser.env in that slot, letting a function declare its env dependency
+# positionally in the schema instead of via a separate decorator.
+env          = ArgSpec('env')
 expr         = ArgSpec('expr')
 thunk        = ArgSpec('thunk')
 numeric_var  = ArgSpec('numeric_var')

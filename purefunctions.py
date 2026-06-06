@@ -21,7 +21,7 @@ from errors import (
 	DomainError, StatError, ArgumentError,
 )
 from argspec import expr, optional
-from decorators import pure_func, pure_vectorized, vectorized, forms_func
+from decorators import pure_func, pure_vectorized, vectorized, forms_func, preparse
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -459,9 +459,8 @@ def times_row_plus(factor, mat, row1, row2):
 def length(string):
 	return len(require_str(string))
 
-@forms_func
-def in_string(a):
-	string, substring, start = a.take(expr, expr, optional(expr, 1))
+@preparse(expr, expr, optional(expr, 1))
+def in_string(string, substring, start):
 	v = require_str(string).tokens
 	s = require_str(substring).tokens
 	start = py_int(start)

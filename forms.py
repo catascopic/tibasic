@@ -8,8 +8,8 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 import operators
-from argspec import expr, thunk, numeric_var, optional, rest
-from decorators import forms_func, nullary_command, TiCall
+from argspec import env, expr, thunk, numeric_var, optional, rest
+from decorators import forms_func, preparse, nullary_command, TiCall
 from errors import DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str, py_int
@@ -191,9 +191,8 @@ def fill(a: ArgParser):
 	else:
 		raise DataTypeError("Fill(: expected a list or matrix variable")
 
-@forms_func
-def seq(a: ArgParser) -> TiList:
-	formula, var, start, end, step = a.take(thunk, numeric_var, expr, expr, optional(expr, 1))
+@preparse(env, thunk, numeric_var, expr, expr, optional(expr, 1))
+def seq(env, formula, var, start, end, step) -> TiList:
 	start = require_real(start)
 	end = require_real(end)
 	step = require_real(step)
@@ -213,7 +212,7 @@ def seq(a: ArgParser) -> TiList:
 		op = operator.ge
 		end -= 1e-10
 
-	with a.env.nest_guard(seq), var.scoped():
+	with env.nest_guard(seq), var.scoped():
 		while op(n, end):
 			var.value = n
 			result.append(formula.eval())

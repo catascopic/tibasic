@@ -81,6 +81,50 @@ class forms_func(TiCall):
 		return self.func(a)
 
 
+class PreparsedFunc(TiCall):
+	"""Wraps a plain core function with a declarative arg schema (see argspec.py).
+
+	The schema is a sequence of ArgSpec values, one per core parameter.  An
+	`env` spec injects ArgParser.env in that slot without consuming a token;
+	every other spec parses from the token stream via the named parse method.
+	take() finalizes (end_func), so missing/surplus arguments raise the right
+	TiError for free.
+
+	If vectorize=True the core maps over TiList arguments.  When the schema
+	carries an `env` slot, env is threaded through unchanged rather than being
+	mapped over (via _vectorized_with_env).
+
+	The core stays a plain function, so functions remain callable from other
+	Python code (composability) via TiCall.__call__.
+	"""
+	def __init__(self, core: Callable, schema: tuple, vectorize: bool = False) -> None:
+		if vectorize:
+			has_env = any(s.method == 'env' for s in schema)
+			func = _vectorized_with_env(core) if has_env else vectorized(core)
+		else:
+			func = core
+		super().__init__(func)
+		self.schema = schema
+
+	def call_with_parser(self, a: ArgParser):
+		args = a.take(*self.schema)
+		return self.func(*args)
+
+
+def preparse(*schema, vectorize: bool = False):
+	"""Declarative-schema decorator replacing pure_func/env_func/*_vectorized.
+
+	    @preparse(env, expr, expr)
+	    def pxl_on(env, row, col): ...
+
+	    @preparse(expr, optional(expr, 0), vectorize=True)
+	    def round(x, n): ...
+	"""
+	def decorator(core: Callable) -> PreparsedFunc:
+		return PreparsedFunc(core, schema, vectorize=vectorize)
+	return decorator
+
+
 def pure_vectorized(func):
 	"""Same as pure_func, but also vectorized."""
 	return pure_func(vectorized(func))

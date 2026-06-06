@@ -4,7 +4,7 @@ import pytest
 
 from environment import Environment
 from screen import Screen
-from errors import DomainError
+from errors import ArgumentError, DomainError
 from test_tibasic import calc, run, toks
 from test_program import run as run_program
 
@@ -135,12 +135,13 @@ class TestPixelValidation:
 			calc('pxl-Test( 63,0')
 
 	def test_too_many_args(self):
-		# Fixed-arity env_func: surplus args bind past the signature -> TypeError
-		with pytest.raises(TypeError):
+		# Fixed schema (env, expr, expr): surplus arg caught by end_func()
+		with pytest.raises(ArgumentError):
 			run('Pxl-On( 1,2,3')
 
 	def test_missing_arg(self):
-		with pytest.raises(TypeError):
+		# Fixed schema: the second expr finds no argument -> ArgumentError
+		with pytest.raises(ArgumentError):
 			run('Pxl-On( 1')
 
 
