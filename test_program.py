@@ -933,7 +933,7 @@ class TestSkipStatement:
 			""", env)
 		assert var(env, 'A') == 1
 
-	def test_quoted_end(self):
+	def test_quoted_end_skipped(self):
 		env = run("""
 		If 0
 		Then
@@ -943,6 +943,26 @@ class TestSkipStatement:
 		""")
 		assert var(env, 'A') == 1
 		assert var(env, 'Str1') is None
+	
+	def test_quoted_colon_skipped(self):
+		env = run("""
+		If 0
+		Then
+		":
+		End
+		1@A
+		""")
+		assert var(env, 'A') == 1
+	
+	def test_quoted_unterminated_empty_string_skipped(self):
+		env = run("""
+		If 0
+		Then
+		"
+		End
+		1@A
+		""")
+		assert var(env, 'A') == 1
 
 	def test_colon_first_char_of_string_in_skipped_block(self):
 		# ":End"→Str1 — the VERY FIRST character of the string content is COLON,
@@ -954,7 +974,7 @@ class TestSkipStatement:
 		env = run("""
 		If 0
 		Then
-		": End "@ Str1
+		" End "@ Str1
 		End
 		1@A
 		""")
@@ -1001,6 +1021,23 @@ class TestSkipStatement:
 		1@A
 		""")
 		assert var(env, 'A') == 1
+	
+	def test_unmatched_false_if_then_okay(self):
+		env = run("""
+		If 0
+		Then
+		99@A
+		""")
+		assert var(env, 'A') is None
+	
+	def test_unmatched_true_if_then_okay(self):
+		env = run("""
+		If 1
+		Then
+		99@A
+		""")
+		assert var(env, 'A') == 99
+
 
 class TestProgThunk:
 

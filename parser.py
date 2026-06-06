@@ -344,8 +344,7 @@ class Parser:
 		return value
 
 	def parse_list_index(self):
-		(index,) = ArgParser(self).parse_indices(1)
-		return index
+		return ArgParser(self).parse_indices(1)[0]
 
 	def parse_matrix_indices(self):
 		return ArgParser(self).parse_indices(2)
@@ -517,7 +516,7 @@ class Parser:
 		prev_if = False
 		start_pos = self.pos
 		while self.has_next:
-			t = self.advance()
+			t = self.peek()
 			if t is THEN:
 				if prev_if:
 					depth += 1
@@ -525,13 +524,15 @@ class Parser:
 				depth += 1
 			elif t is END or (else_mode and t is ELSE):
 				if depth == 0:
+					self.advance()
 					self.end_statement()
 					return t
 				depth -= 1
 			self.skip_statement()
 			prev_if = t is IF
 
-		raise TiSyntaxError("Unmatched block: End not found", pos=self.pos)
+		# Implicitly close all blocks at end of program
+		# TODO: emit warning for unmatched block
 
 	# ── Statement dispatcher ───────────────────────────────────────────────────
 

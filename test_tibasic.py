@@ -20,8 +20,15 @@ from tiobjects import TiList, TiMatrix, TiString
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def filter_token(t):
+	# Skip lower-case letters because they can screw things up
+	if len(t.text) == 1 and t.text.islower():
+		# But make exceptions (theta is correctly considered lower-case!)
+		return len(t.code) == 1
+	return True
 
-lookup = {_t.text.strip().replace(' ', '_'): _t for _t in ALL_TOKENS}
+
+lookup = {_t.text.strip().replace(' ', '_'): _t for _t in ALL_TOKENS if filter_token(_t)}
 lookup['~'] = catalog.NEG
 lookup['@'] = catalog.STORE
 lookup['e'] = catalog.SCI_E
@@ -96,6 +103,14 @@ def deg():
 
 def approx_mat(matrix, **kwargs):
 	return [pytest.approx(row, **kwargs) for row in matrix]
+
+
+class TestLookup:
+	def test_lookup(self):
+		with pytest.raises(KeyError):
+			q = toks('q')[0]
+			print(q.code, b'\xBB\xB0' <= q.code <= b'\xBB\xCA')
+			
 
 
 # ── Arithmetic ────────────────────────────────────────────────────────────────
@@ -675,7 +690,7 @@ class TestThunkCapture:
 	def test_string_literal_in_seq_formula(self):
 		# seq(length("a,b"), X, 1, 3) — the comma in the string must not split the thunk
 		# "a,b" has length 3; result should be {3,3,3}
-		env = run('seq( length( "a,b"),X,1,3')
+		env = run('seq( length( "A,B"),X,1,3')
 		assert env.ans.data == [3, 3, 3]
 
 	def test_colon_inside_thunk_raises(self):
@@ -1714,6 +1729,68 @@ class TestIllegalNest:
 	def test_expr_explicit_close(self):
 		env = run('expr( "2+2@A')
 		assert var(env, 'A') == 4
+
+
+class TestCapture:
+	"""Verify that Parser.capture() correctly identifies the boundary of a
+	formula argument in the presence of nested delimiters, string literals,
+	and the STORE-is-always-illegal rule.
+
+	capture() stops at a top-level COMMA or R_PAREN (whichever closes the
+	enclosing call), at COLON (statement separator), or at NEWLINE.  It must
+	NOT stop at delimiters that are nested inside function calls, list/matrix
+	literals, or string literals.
+	"""
+
+	# ── Nested delimiters: inner commas must not split the argument ───────────
+
+	def test_nested_list_commas_transparent(self):
+		# sum({X,X+1}) inside Σ: commas inside the list literal {X,X+1} are
+		# inside an open brace and must not be seen as the argument separator.
+		# sum({X,X+1}) = X+(X+1) = 2X+1; Σ over X=1..3 → 3+5+7 = 15.
+		assert calc('Σ( sum( {X,X+1}),X,1,3') == approx(15)
+
+	def test_nested_function_commas_transparent(self):
+		# max(X,2) inside Σ: the comma between X and 2 is inside a function
+		# call (open paren on the stack) and must not terminate the thunk.
+		# Σ(max(X,2), X=1..4) = 2+2+3+4 = 11.
+		assert calc('Σ( max( X,2),X,1,4') == approx(11)
+
+	def test_nested_matrix_commas_transparent(self):
+		# det([[1,X][X,1]]) inside seq: commas inside the matrix literal are
+		# inside [[ ]] (bracket-stack) and must not split arguments.
+		# det([[1,X][X,1]]) = 1-X²; for X=1,2,3 → 0, -3, -8.
+		result = calc('seq( det( [[1,X][X,1]]),X,1,3')
+		assert result.data == approx([0, -3, -8])
+
+	# ── String literals: commas and colons are content, not syntax ────────────
+
+	def test_string_comma_not_argument_separator(self):
+		# The comma inside "A,B" is enclosed by a QUOTE pair; capture's
+		# in_string flag must suppress the normal comma-terminates logic.
+		# inString("A,B","A") == 1 for every iteration → Σ = 3.
+		assert calc('Σ( inString( "A,B","A"),X,1,3') == approx(3)
+
+	def test_string_colon_not_thunk_terminator(self):
+		# A COLON inside a string literal must not end the thunk.
+		# length("A:B") == 3 (three tokens: A, COLON, B) for every iteration.
+		# Σ over X=1..3 → 9.
+		assert calc('Σ( length( "A:B"),X,1,3') == approx(9)
+
+	def test_two_string_args_commas_handled(self):
+		# inString has two string arguments; the comma between them must be
+		# recognised as an argument separator (stack depth = 1 inside inString(,
+		# so the inString comma is at depth 1, not 0 — it does not end the thunk).
+		# inString("AB","B") == 2 always → Σ over X=1..3 = 6.
+		assert calc('Σ( inString( "AB","B"),X,1,3') == approx(6)
+
+	# ── STORE is always illegal in formula context ────────────────────────────
+
+	def test_store_in_formula_raises(self):
+		# STORE (→) is unconditionally rejected by capture, even before the
+		# in_string check.  It can never be a valid part of a formula argument.
+		with pytest.raises(TiSyntaxError):
+			calc('Σ( X @ A , X , 1 , 3')
 
 
 # ── Syntax ────────────────────────────────────────────────────────────────────

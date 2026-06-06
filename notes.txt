@@ -1,6 +1,6 @@
-Still don't love the nonreal answer check
+peek/next/match/match_separator
 
-Tests to make sure list isn't created for 1@$Q(2
+Still don't love the nonreal answer check
 
 test fractional powers
 
@@ -10,12 +10,6 @@ utils.py: decorators, signals, other low-level things? Token?
 Refactor window: inner object
 
 test_copy_string: okay to share internal data?
-
-Can you make some program tests that test the logic of skip_statement and skip_block, as well as capture (thunk parsing)?
-I refactored the skipping logic to be more concise, but I want to test the edge cases, such as:
-STORE closing strings
-quoted colons/commas
-Any other edge cases
 
 Thunk:
 Hard to tell if commands are straight-up invalid
@@ -45,6 +39,12 @@ I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
 
 ********
+
+Can you make some program tests that test the logic of skip_statement and capture (thunk parsing)?
+I refactored the skipping logic to be more concise, but I want to test the edge cases, such as:
+STORE acting as an implicit string delimiter
+quoted colons/commas
+Any other edge cases you can think of (take a look at how these methods works)
 
 Remove guard statements in collections
 remove exceptions from get/set item?
