@@ -50,7 +50,8 @@
       "Bash(python -m pytest test_tibasic.py test_program.py -x -q)",
       "Bash(python -m pytest test_tibasic.py test_program.py -q)",
       "Bash(python -m pytest test_tibasic.py --tb=line -q)",
-      "Bash(python -m pytest test_tibasic.py::TestComplexList::test_complex_list_eq_complex_scalar -v -s)"
+      "Bash(python -m pytest test_tibasic.py::TestComplexList::test_complex_list_eq_complex_scalar -v -s)",
+      "Bash(python -m pytest test_tibasic.py::TestIndexing::test_matrix_index_one_arg -v)"
     ]
   }
 }

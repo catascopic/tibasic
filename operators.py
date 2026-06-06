@@ -27,7 +27,6 @@ def pure_op(func):
 		return func(lhs, rhs)
 	return wrapper
 
-
 def comparison(func):
 	@wraps(func)
 	def apply(a, b):
@@ -36,7 +35,6 @@ def comparison(func):
 		except TypeError:
 			raise DataTypeError(f"'{func.__name__}' not supported between {type(a).__name__} and {type(b).__name__}")
 	return pure_op(vectorized(apply))
-
 
 @comparison
 def eq(a, b):
@@ -66,32 +64,35 @@ def ge(a, b): return a >= b
 # ── Pure arithmetic operators ────────────────────────────────────────────────
 # TiList broadcasting is handled by TiList's magic methods (__add__, etc.).
 
-def arithmetic(func):
-	@wraps(func)
-	def apply(a, b):
-		try:
-			return func(a, b)
-		except TypeError: 
-			raise DataTypeError(f"'{func.__name__}' not supported between {type(a).__name__} and {type(b).__name__}")
-	return pure_op(apply)
+@pure_op
+def add(a, b):
+	try:
+		return a + b
+	except TypeError: 
+		raise DataTypeError(f"cannot add {a} and {b}")
 
+@pure_op
+def sub(a, b):
+	try:
+		return a - b
+	except TypeError: 
+		raise DataTypeError(f"cannot subtract {a} and {b}")
 
-@arithmetic
-def add(a, b): return a + b
+@pure_op
+def mul(a, b):
+	try:
+		return a * b
+	except TypeError: 
+		raise DataTypeError(f"cannot multiply {a} by {b}")
 
-@arithmetic
-def sub(a, b): return a - b
-
-@arithmetic
-def mul(a, b): return a * b
-
-@arithmetic
+@pure_op
 def div(a, b):
 	try:
 		return a / b
 	except ZeroDivisionError:
 		raise DivideByZeroError
-
+	except TypeError: 
+		raise DataTypeError(f"cannot divide {a} by {b}")
 
 # ── Pure logical operators ────────────────────────────────────────────────────
 

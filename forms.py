@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
+import operators
 from decorators import forms_func, nullary_command, TiCall
 from errors import DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
@@ -41,16 +42,13 @@ def dim(a: ArgParser):
 @forms_func
 def ans_index_or_mul(a: ArgParser):
 	ans = a.env.ans
-	args = a.parse_args()
-	a.end_func()
-	if isinstance(ans, TiMatrix):
-		return ans[args]
-	if len(args) != 1:
-		raise ArgumentError(f"Too many arguments: {args}")
-	(arg,) = args
 	if isinstance(ans, TiList):
-		return ans[arg]
-	return ans * arg
+		return ans[a.parse_indices(1)]
+	if isinstance(ans, TiMatrix):
+		return ans[a.parse_indices(2)]
+	a.expr()
+	b = a.end_func()
+	return operators.mul(None, ans, b)
 
 @forms_func
 def seq(a: ArgParser) -> TiList:

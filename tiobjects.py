@@ -88,20 +88,19 @@ class TiList:
 		return cls(list(repeat(0.0, _get_dim(size))))
 
 	def _check_index(self, index):
-		# Hold off on _get_dim because __setitem__ has these decoupled
 		if not (1 <= index <= len(self)):
 			raise InvalidDimError(f"out of bounds: {index}; dim: {len(self)}")
 		return index
 
-	def __getitem__(self, index: Number) -> Number:
-		return self.data[self._check_index(_get_dim(index)) - 1]
+	def __getitem__(self, index: int) -> Number:
+		return self.data[self._check_index(index) - 1]
 
-	def __setitem__(self, index: Number, value: Number) -> None:
+	def __setitem__(self, index: int, value: Number) -> None:
 		if isinstance(value, complex):
 			self._upgrade_to_complex()
 		elif self.is_complex:
 			value = complex(value)
-		index = _get_dim(index)
+
 		if index == len(self) + 1:
 			self.data.append(value)
 		else:
@@ -210,11 +209,7 @@ class TiMatrix:
 		return len(self.data[0]) if self.data else 0
 
 	def _check_index(self, index: Any) -> tuple[int, int]:
-		if len(index) != 2:
-			raise ArgumentError(f"Matrix index must have 2 elements but got {index}")
 		row_index, col_index = index
-		row_index = _get_dim(row_index)
-		col_index = _get_dim(col_index)
 		if not (1 <= row_index <= self.rows):
 			raise InvalidDimError(f"{row_index=}")
 		if not (1 <= col_index <= self.cols):
@@ -226,8 +221,8 @@ class TiMatrix:
 		return self.data[row_index - 1][col_index - 1]
 
 	def __setitem__(self, index: Any, value: Any) -> None:
-		require_real(value)
 		row_index, col_index = self._check_index(index)
+		require_real(value)
 		self.data[row_index - 1][col_index - 1] = value
 
 	def set_dim(self, dim_list: TiList) -> None:

@@ -1,12 +1,14 @@
-Remove guard statements in collections
+remove exceptions from get/set item?
 
-Parameterize these tests?
+Tests to make sure list isn't created for 1@$Q(2
+
+TestOperatorTypes: should each have six blocks of six items for all six datatypes
+Also, can you parameterize these tests?
+
+Remove guard statements in collections
 
 test fractional powers
 
-For index tests:
-Wrong number of arguments should produce ArgumentError.
-Indices should be parsed in a similar way to ArgParser.
 
 Move decorators to where they're used?
 utils.py: decorators, signals, other low-level things? Token?

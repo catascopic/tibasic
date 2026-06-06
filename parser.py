@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from numbers import Number
 
-from tiobjects import TiList, TiMatrix, TiString, require_num, require_real
+import operators
+from tiobjects import TiList, TiMatrix, TiString, require_num, require_real, py_int
 from titoken import Token, EOF_TOKEN
 from catalog import (
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
@@ -324,8 +325,7 @@ class Parser:
 		if t.is_matrix_var():
 			val = t.variable(self.env).resolve()
 			if self.eat_if(L_PAREN):
-				val = val[self.parse_row_col()]
-				self.eat_if(R_PAREN)
+				val = val[self.parse_matrix_indices()]
 			return val
 
 		if t.variable is not None:
@@ -336,16 +336,14 @@ class Parser:
 	def parse_list_atom(self, var):
 		value = var.resolve()
 		if self.eat_if(L_PAREN):
-			value = value[self.parse_expr()]
-			self.eat_if(R_PAREN)
+			value = value[self.parse_list_index()]
 		return value
 
-	def parse_row_col(self):
-		row = self.parse_expr()
-		self.expect(COMMA)
-		col = self.parse_expr()
-		self.eat_if(R_PAREN)
-		return row, col
+	def parse_list_index(self):
+		return ArgParser(self).parse_indices(1)
+
+	def parse_matrix_indices(self):
+		return ArgParser(self).parse_indices(2)
 
 	# ── Pratt expression parser ────────────────────────────────────────────────
 
@@ -386,11 +384,7 @@ class Parser:
 			if _can_start_atom(t):
 				if 60 <= min_bp:
 					break
-				rhs = self.parse_expr(61)
-				try:
-					lhs = lhs * rhs
-				except TypeError: 
-					raise DataTypeError(f"Cannot implicitly multiply {lhs} by {rhs}")
+				lhs = operators.mul(None, lhs, self.parse_expr(61))
 				continue
 
 			break
@@ -417,8 +411,7 @@ class Parser:
 		elif t.is_matrix_var():
 			var = t.variable(self.env)
 			if self.eat_if(L_PAREN):
-				var.resolve()[self.parse_row_col()] = value
-				self.eat_if(R_PAREN)
+				var.resolve()[self.parse_matrix_indices()] = value
 			else:
 				var.store(value)
 
@@ -435,13 +428,14 @@ class Parser:
 			raise TiSyntaxError(f"Invalid store target: {t}")
 
 	def parse_store_list(self, var: Variable, value):
-		if self.eat_if(L_PAREN):			
+		if self.eat_if(L_PAREN):
+			index = self.parse_list_index()
 			if var.value is None:
 				lst = TiList()
-				lst[self.parse_expr()] = value
+				lst[index] = value
 				var.value = lst
 			else:
-				var.value[self.parse_expr()] = value
+				var.value[index] = value
 			self.eat_if(R_PAREN)
 		else:
 			var.store(value)
@@ -748,6 +742,11 @@ class ArgParser:
 		while self._next:
 			args.append(self.expr())
 		return args
+	
+	def parse_indices(self, count):
+		indices = tuple(py_int(self.expr(), InvalidDimError) for _ in range(count))
+		self.end_func()
+		return indices
 
 	def peek(self):
 		return self._parser.peek()
@@ -767,8 +766,8 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('[[1]]@ [A]')
-	test('i [A]')
+	test('{1,2,3@ L1')
+	test('1@ L1 (1,2')
 
 	# test(3,STORE,(0x5C,0),'(2,1')
 	env.dump()
