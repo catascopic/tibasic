@@ -111,17 +111,32 @@ class PreparsedFunc(TiCall):
 		return self.func(*args)
 
 
-def preparse(*schema, vectorize: bool = False):
-	"""Declarative-schema decorator replacing pure_func/env_func/*_vectorized.
+def preparse(*schema):
+	"""Declarative-schema decorator for functions called once per invocation.
 
 	    @preparse(env, expr, expr)
 	    def pxl_on(env, row, col): ...
 
-	    @preparse(expr, optional(expr, 0), vectorize=True)
+	    @preparse(expr, optional(expr, 0))
 	    def round(x, n): ...
 	"""
 	def decorator(core: Callable) -> PreparsedFunc:
-		return PreparsedFunc(core, schema, vectorize=vectorize)
+		return PreparsedFunc(core, schema)
+	return decorator
+
+
+def preparse_vectorized(*schema):
+	"""Like preparse, but maps over TiList arguments (env, if present, is
+	threaded through rather than vectorized over).
+
+	    @preparse_vectorized(expr)
+	    def sinh(x): ...
+
+	    @preparse_vectorized(env, expr)
+	    def some_env_math(env, x): ...
+	"""
+	def decorator(core: Callable) -> PreparsedFunc:
+		return PreparsedFunc(core, schema, vectorize=True)
 	return decorator
 
 

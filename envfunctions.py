@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from decorators import env_func, env_vectorized, TiCall
+from argspec import env, expr as expr_spec, optional
+from decorators import preparse, preparse_vectorized, TiCall
 from environment import Environment
 from errors import TiSyntaxError, DomainError, NonRealAnsError
 from modes import ComplexMode
@@ -19,7 +20,7 @@ def trig(func):
 	@wraps(func)
 	def apply(env, x):
 		return func(env.to_rad(require_real(x)))
-	return env_vectorized(apply)
+	return preparse_vectorized(env, expr_spec)(apply)
 
 def inv_trig(func):
 	"""Decorator for inverse trig functions: vectorize, convert output to current angle mode,
@@ -30,7 +31,7 @@ def inv_trig(func):
 			return env.from_rad(func(require_real(x)))
 		except ValueError:
 			raise DomainError(f"{func.__name__}: argument out of domain: {x}")
-	return env_vectorized(apply)
+	return preparse_vectorized(env, expr_spec)(apply)
 
 
 ##################
@@ -61,7 +62,7 @@ def acos(x):
 def atan(x):
 	return math.atan(x)
 
-@env_vectorized
+@preparse_vectorized(env, expr_spec)
 def sqrt(env, x):
 	require_num(x)
 	if isinstance(x, complex):
@@ -72,7 +73,7 @@ def sqrt(env, x):
 		raise NonRealAnsError(f"√({x}): non-real result")
 	return cmath.sqrt(x)
 
-@env_vectorized
+@preparse_vectorized(env, expr_spec)
 def ln(env, x):
 	require_num(x)
 	if isinstance(x, complex):
@@ -85,7 +86,7 @@ def ln(env, x):
 		raise NonRealAnsError(f"ln({x}): non-real result")
 	return cmath.log(x)
 
-@env_vectorized
+@preparse_vectorized(env, expr_spec)
 def log(env, x):
 	require_num(x)
 	if isinstance(x, complex):
@@ -102,7 +103,7 @@ def log(env, x):
 # MATH FUNCTIONS   #
 ####################
 
-@env_vectorized
+@preparse_vectorized(env, expr_spec, expr_spec)
 def log_base(env, x, base):
 	require_num(x)
 	require_num(base)
@@ -122,19 +123,19 @@ def log_base(env, x, base):
 # ANGLE FUNCTIONS  #
 ####################
 
-@env_vectorized
+@preparse_vectorized(env, expr_spec, expr_spec)
 def rect_to_polar_radius(env, x, y):
 	return math.hypot(require_real(x), require_real(y))
 
-@env_vectorized
+@preparse_vectorized(env, expr_spec, expr_spec)
 def rect_to_polar_angle(env, x, y):
 	return env.from_rad(math.atan2(require_real(y), require_real(x)))
 
-@env_vectorized
+@preparse_vectorized(env, expr_spec, expr_spec)
 def polar_to_rect_x(env, r, theta):
 	return require_real(r) * math.cos(env.to_rad(require_real(theta)))
 
-@env_vectorized
+@preparse_vectorized(env, expr_spec, expr_spec)
 def polar_to_rect_y(env, r, theta):
 	return require_real(r) * math.sin(env.to_rad(require_real(theta)))
 
@@ -157,7 +158,7 @@ def _bal(env, n, roundvalue=None):
 	return pv * (1 + r) ** n + pmt * ((1 + r) ** n - 1) / r
 
 
-@env_func
+@preparse(env, expr_spec, optional(expr_spec))
 def bal(env, n, roundvalue=None):
 	"""bal(n[,roundvalue]) — remaining balance after n payments."""
 	n = py_int(n)
@@ -168,7 +169,7 @@ def bal(env, n, roundvalue=None):
 	return _bal(env, n, roundvalue)
 
 
-@env_func
+@preparse(env, expr_spec, expr_spec, optional(expr_spec))
 def sigma_prn(env, n1, n2, roundvalue=None):
 	"""ΣPrn(n1,n2[,roundvalue]) — principal paid from payment n1 through n2."""
 	n1 = py_int(n1)
@@ -180,7 +181,7 @@ def sigma_prn(env, n1, n2, roundvalue=None):
 	return _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
 
 
-@env_func
+@preparse(env, expr_spec, expr_spec, optional(expr_spec))
 def sigma_int(env, n1, n2, roundvalue=None):
 	"""ΣInt(n1,n2[,roundvalue]) — interest paid from payment n1 through n2."""
 	n1 = py_int(n1)
@@ -197,7 +198,7 @@ def sigma_int(env, n1, n2, roundvalue=None):
 # STRING FUNCTIONS #
 ####################
 
-@env_func
+@preparse(env, expr_spec)
 def expr(env, string):
 	"""Evaluate a TiString as a TI-BASIC expression."""
 	from parser import Parser
@@ -214,7 +215,7 @@ def expr(env, string):
 # CATALOG #
 ###########
 
-@env_vectorized
+@preparse_vectorized(env, expr_spec)
 def acosh(env, x):
 	require_real(x)
 	if x >= 1:
@@ -223,7 +224,7 @@ def acosh(env, x):
 		raise NonRealAnsError(f"acosh({x}): non-real result")
 	return cmath.acosh(x)
 
-@env_vectorized
+@preparse_vectorized(env, expr_spec)
 def atanh(env, x):
 	require_real(x)
 	if abs(x) < 1:
@@ -247,6 +248,6 @@ set_time   = set_time_wrapper(Environment.set_time)
 set_dt_fmt = set_time_wrapper(Environment.set_dt_fmt)
 set_tm_fmt = set_time_wrapper(Environment.set_tm_fmt)
 
-check_tmr  = env_func(Environment.check_tmr)
-get_dt_str = env_func(Environment.get_dt_str)
-get_tm_str = env_func(Environment.get_tm_str)
+check_tmr  = preparse(env)(Environment.check_tmr)
+get_dt_str = preparse(env)(Environment.get_dt_str)
+get_tm_str = preparse(env)(Environment.get_tm_str)
