@@ -5,6 +5,7 @@ to the test rather than being swallowed by run_line.
 """
 
 import pytest
+from pytest import approx
 
 from environment import Environment
 from errors import IncrementError, TiSyntaxError, LabelError
@@ -816,3 +817,224 @@ class TestEngima:
 		""")
 		assert var(env, 'I') == 26
 		assert var(env, 'J') == 17
+
+
+# ── skip_statement edge cases ─────────────────────────────────────────────────
+
+class TestSkipStatement:
+	"""Verify that skip_statement (and skip_block which calls it) correctly
+	navigates tricky statement content: strings with colons/STORE inside them,
+	empty strings, and nested control structures.
+
+	Each test arranges a program where mishandling a skipped statement would
+	produce a wrong variable value or raise an unexpected exception.
+	"""
+
+	# ── Bare If (false): skip_statement called directly on the next statement ─
+
+	def test_store_terminates_string(self):
+		# "HELLO→Str1 uses STORE as an implicit string terminator (no closing ").
+		# skip_statement must stop scanning string content at STORE and then
+		# consume the remainder of the statement (the variable name) before
+		# returning.  A=1 confirms that only one statement was skipped.
+		env = run("""
+		If 0
+		"HELLO@ Str1
+		1@A
+		""")
+		assert var(env, 'A') == 1
+
+	def test_colon_inside_string_not_separator(self):
+		# The COLON inside "A:B" is string content; skip_statement's inner
+		# string-scanning loop must swallow it without returning early.
+		# A=1 confirms that only "A:B"→Str1 was skipped (one statement).
+		env = run("""
+		If 0
+		"A:B"@ Str1
+		1@A
+		""")
+		assert var(env, 'A') == 1
+
+	def test_empty_string_skipped_as_one_statement(self):
+		# ""→Str1 is a valid statement (empty string assignment).
+		# skip_statement sees QUOTE immediately followed by QUOTE — the inner
+		# loop breaks right away — then continues to consume →Str1 normally.
+		env = run("""
+		If 0
+		""@ Str1
+		1@A
+		""")
+		assert var(env, 'A') == 1
+
+	# ── If-Then (false): skip_block calls skip_statement for each statement ──
+
+	def test_then_block_fully_skipped(self):
+		# All statements inside a false Then block must be skipped.
+		env = run("""
+		If 0
+		Then
+		99@A
+		End
+		1@A
+		""")
+		assert var(env, 'A') == 1
+
+	def test_then_else_runs_else_block(self):
+		# False If-Then-Else: the Then block is skipped, the Else block runs.
+		env = run("""
+		If 0
+		Then
+		1@A
+		Else
+		2@A
+		End
+		""")
+		assert var(env, 'A') == 2
+
+	def test_string_colon_in_skipped_then_block(self):
+		# "A:B"→Str1 inside a false Then block: skip_block advances the leading
+		# QUOTE as the "statement command token", then calls skip_statement for
+		# the rest.  The COLON that is part of "A:B" must not make skip_statement
+		# return early — if it does, the remaining fragment (:B"→Str1) is parsed
+		# as a new statement and the block structure goes out of sync.
+		env = run("""
+		If 0
+		Then
+		"A:B"@ Str1
+		99@A
+		End
+		1@A
+		""")
+		assert var(env, 'A') == 1
+
+	def test_store_terminated_string_in_skipped_block(self):
+		# "HELLO→Str1 inside a false Then block.  After skip_block consumes the
+		# leading QUOTE, skip_statement processes HELLO, then encounters STORE,
+		# which is handled as a normal (non-separator) token at that point.
+		# The statement must be consumed completely before the separator.
+		env = run("""
+		If 0
+		Then
+		"HELLO@ Str1
+		99@A
+		End
+		1@A
+		""")
+		assert var(env, 'A') == 1
+
+	def test_quoted_then(self):
+		env = Environment()
+		with pytest.raises(TiSyntaxError):
+			run("""
+			If 0
+			" Then
+			1@A
+			End
+			""", env)
+		assert var(env, 'A') == 1
+
+	def test_quoted_end(self):
+		env = run("""
+		If 0
+		Then
+		" End @ Str1
+		End
+		1@A
+		""")
+		assert var(env, 'A') == 1
+		assert var(env, 'Str1') is None
+
+	def test_colon_first_char_of_string_in_skipped_block(self):
+		# ":End"→Str1 — the VERY FIRST character of the string content is COLON,
+		# immediately followed by the End token.
+		# If skip_block's pre-consumed QUOTE causes skip_statement to see that
+		# COLON as a statement terminator, skip_statement returns immediately and
+		# the very next token (End, inside the string) is mistaken for the block's
+		# closing End, causing the whole block to exit one statement early.
+		env = run("""
+		If 0
+		Then
+		": End "@ Str1
+		End
+		1@A
+		""")
+		assert var(env, 'A') == 1
+		assert var(env, 'Str1') is None
+
+	def test_nested_if_then_depth_tracked(self):
+		# A nested If-Then inside the skipped block must increment depth so that
+		# the inner End does not close the outer block.
+		env = run("""
+		If 0
+		Then
+		If 1
+		Then
+		99 @ A
+		End
+		End
+		1 @ A
+		""")
+		assert var(env, 'A') == 1
+
+	def test_then_without_preceding_if_is_transparent(self):
+		# A bare Then (not preceded by If on the same statement) must NOT
+		# increment depth inside skip_block — prev_if will be False for it.
+		# If it erroneously incremented depth, the actual End would decrement to
+		# depth=1 instead of 0 and skip_block would continue past the End,
+		# consuming the 1→A statement and never returning.
+		env = run("""
+		If 0
+		Then
+		Then
+		End
+		1@A
+		""")
+		assert var(env, 'A') == 1
+
+	def test_for_loop_body_skipped_when_range_empty(self):
+		# For(N,5,1) — step defaults to 1, start > end, body never runs.
+		# skip_block must consume the body and End without executing anything.
+		env = run("""
+		For( N,5,1
+		99@A
+		End
+		1@A
+		""")
+		assert var(env, 'A') == 1
+
+class TestProgThunk:
+
+	def test_while_condition_reevaluated(self):
+		# The While condition is captured once and re-evaluated on every loop-back.
+		# It must read the CURRENT value of A each time.
+		env = run("""
+		0@A
+		While A<3
+		A+1@A
+		End
+		""")
+		assert var(env, 'A') == 3
+
+	def test_repeat_runs_body_before_checking_condition(self):
+		# Repeat executes the body at least once before evaluating the condition.
+		# Starting with A=0: body sets A=1, condition A=3 is false → repeat;
+		# body sets A=2, still false; body sets A=3, condition true → exit.
+		env = run("""
+		0@A
+		Repeat A=3
+		A+1@A
+		End
+		""")
+		assert var(env, 'A') == 3
+
+	def test_while_compound_condition_in_thunk(self):
+		# A compound condition (A>0 and A≠3) is captured as a single thunk.
+		# The `and` operator's comma-free syntax means no extra stack tracking
+		# is needed; this test confirms the thunk boundary is the COLON.
+		env = run("""
+		5@A
+		While A>0 and A≠3
+		A-1@A
+		End
+		""")
+		assert var(env, 'A') == 3
