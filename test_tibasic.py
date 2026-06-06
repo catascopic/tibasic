@@ -776,6 +776,91 @@ class TestStoreDim:
 		assert var(env, '[A]') is None
 
 
+# ── Complex list flag ────────────────────────────────────────────────────────
+
+class TestComplexList:
+
+	def test_upgrade_promotes_existing_elements(self):
+		# Storing a list with a complex element promotes ALL elements to complex
+		env = run('{1,2,i}@ L1')
+		lst = var(env, 'L1')
+		assert lst.is_complex
+		assert all(isinstance(x, complex) for x in lst.data)
+		assert lst.data == [1+0j, 2+0j, 1j]
+
+	def test_sticky_after_real_store(self):
+		# Once complex, storing a real list still keeps all elements complex
+		env = run('{1,i}@ L1')
+		run('{3,4}@ L1', env)
+		lst = var(env, 'L1')
+		assert lst.is_complex
+		assert all(isinstance(x, complex) for x in lst.data)
+		assert lst.data == [3+0j, 4+0j]
+
+	def test_set_dim_zero_does_not_reset(self):
+		# 0→dim(L1) clears elements but leaves the complex flag intact
+		env = run('{1,i}@ L1')
+		run('0@ dim( L1', env)
+		lst = var(env, 'L1')
+		assert lst.is_complex
+		assert lst.data == []
+
+	def test_new_elements_after_set_dim_are_complex(self):
+		# Expanding a complex list fills new slots with 0+0j, not 0
+		env = run('{1,i}@ L1')
+		run('0@ dim( L1', env)
+		run('3@ dim( L1', env)
+		lst = var(env, 'L1')
+		assert lst.is_complex
+		assert all(isinstance(x, complex) for x in lst.data)
+		assert lst.data == [0+0j, 0+0j, 0+0j]
+
+	def test_clr_list_resets_flag(self):
+		# ClrList clears both elements and the complex flag
+		env = run('{1,i}@ L1')
+		assert var(env, 'L1').is_complex
+		run('ClrList L1', env)
+		lst = var(env, 'L1')
+		assert not lst.is_complex
+		assert lst.data == []
+
+	def test_after_clr_list_new_store_is_real(self):
+		# After ClrList, storing real values keeps them as floats
+		env = run('{1,i}@ L1')
+		run('ClrList L1', env)
+		run('{5,6,7}@ L1', env)
+		lst = var(env, 'L1')
+		assert not lst.is_complex
+		assert all(isinstance(x, float) for x in lst.data)
+
+	def test_element_store_upgrades_list(self):
+		# Storing a complex value into an element upgrades the whole list
+		env = run('{1,2,3}@ L1')
+		assert not var(env, 'L1').is_complex
+		run('i@ L1 (2', env)
+		lst = var(env, 'L1')
+		assert lst.is_complex
+		assert all(isinstance(x, complex) for x in lst.data)
+		assert lst.data == [1+0j, 1j, 3+0j]
+
+	def test_complex_list_eq_complex_scalar(self):
+		# {1,i}=i → {0,1} — real element in complex list compares as complex
+		env = run('{1,i}@ L1')
+		assert calc('L1 = i', env).data == [0.0, 1.0]
+
+	def test_complex_list_eq_real_scalar_errors(self):
+		# Complex list vs real scalar → ERR:DATA TYPE
+		env = run('{1,i}@ L1')
+		with pytest.raises(DataTypeError): calc('L1 = 1', env)
+
+	def test_real_list_eq_complex_scalar_errors(self):
+		# Real list vs complex scalar → ERR:DATA TYPE (even after ClrList reset)
+		env = run('{1,i}@ L1')
+		run('ClrList L1', env)
+		run('{1,2}@ L1', env)
+		with pytest.raises(DataTypeError): calc('L1 = i', env)
+
+
 # ── Undefined variable behavior ───────────────────────────────────────────────
 
 class TestUndefinedVars:

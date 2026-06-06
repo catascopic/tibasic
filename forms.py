@@ -253,8 +253,7 @@ def clr_list(a):
 	while True:
 		lst = a.list_var().value
 		if lst is not None:
-			lst.set_dim(0)
-			lst.is_complex = False
+			lst.clear()
 		if not a.has_next:
 			break
 	a.end_cmd()
@@ -264,11 +263,9 @@ def clr_all_lists(env):
 	"""ClrAllLists — set every defined list (L1–L6 and user lists) to empty."""
 	for list_var in env.lists:
 		if list_var.value is not None:
-			list_var.value.set_dim(0)
-			list_var.value.is_complex = False
+			list_var.value.clear()
 	for lst in env.user_lists.values():
-		lst.set_dim(0)
-		lst.is_complex = False
+		lst.clear()
 
 @forms_func
 def del_var(a):

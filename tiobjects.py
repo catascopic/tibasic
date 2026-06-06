@@ -77,18 +77,11 @@ class TiList:
 
 	def __init__(self, data: list[Number] | None = None) -> None:
 		self.data = [] if data is None else data
-		if not all(isinstance(i, Number) for i in self.data):
+		if not all(isinstance(e, Number) for e in self.data):
 			raise ValueError(self.data)
 		self.is_complex = False
-		if any(isinstance(i, complex) for i in self.data):
+		if any(isinstance(e, complex) for e in self.data):
 			self._upgrade_to_complex()
-
-	def _upgrade_to_complex(self) -> None:
-		"""Promote every element to complex and set the is_complex flag. No-op if already complex."""
-		if not self.is_complex:
-			self.is_complex = True
-			for i, e in enumerate(self.data):
-				self.data[i] = complex(e)
 
 	@classmethod
 	def alloc(cls, size: Number) -> TiList:
@@ -121,7 +114,7 @@ class TiList:
 		return iter(self.data)
 
 	def __neg__(self) -> TiList:
-		return TiList([-a for a in self.data])
+		return TiList([-e for e in self.data])
 
 	def set_dim(self, value: Any) -> None:
 		value = _get_dim(value)
@@ -132,6 +125,16 @@ class TiList:
 			fill_value = 0+0j if self.is_complex else 0.0
 			self.data.extend(repeat(fill_value, value - dim))
 
+	def _upgrade_to_complex(self) -> None:
+		"""Promote every element to complex and set the is_complex flag. No-op if already complex."""
+		if not self.is_complex:
+			self.is_complex = True
+			self.data[:] = [complex(e) for e in self.data]
+
+	def clear(self):
+		self.data.clear()
+		self.is_complex = False
+			
 	def copy(self) -> TiList:
 		result = TiList()
 		result.data = self.data.copy()
@@ -139,7 +142,7 @@ class TiList:
 		return result
 
 	def __repr__(self) -> str:
-		return f"{{{','.join(repr_num(i) for i in self)}}}"
+		return f"{{{','.join(repr_num(e) for e in self.data)}}}"
 
 
 def _vectorize_op(op: Callable) -> Callable:
