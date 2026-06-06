@@ -33,16 +33,22 @@ def comparison(func):
 	def apply(a, b):
 		try:
 			return float(func(a, b))
-		except TypeError: 
+		except TypeError:
 			raise DataTypeError(f"'{func.__name__}' not supported between {type(a).__name__} and {type(b).__name__}")
 	return pure_op(vectorized(apply))
 
 
 @comparison
-def eq(a, b): return a == b
+def eq(a, b):
+	if isinstance(a, complex) != isinstance(b, complex):
+		raise DataTypeError("Cannot compare complex and real number with = or ≠")
+	return a == b
 
 @comparison
-def ne(a, b): return a != b
+def ne(a, b):
+	if isinstance(a, complex) != isinstance(b, complex):
+		raise DataTypeError("Cannot compare complex and real number with = or ≠")
+	return a != b
 
 @comparison
 def lt(a, b): return a < b

@@ -254,6 +254,7 @@ def clr_list(a):
 		lst = a.list_var().value
 		if lst is not None:
 			lst.set_dim(0)
+			lst.is_complex = False
 		if not a.has_next:
 			break
 	a.end_cmd()
@@ -264,8 +265,10 @@ def clr_all_lists(env):
 	for list_var in env.lists:
 		if list_var.value is not None:
 			list_var.value.set_dim(0)
+			list_var.value.is_complex = False
 	for lst in env.user_lists.values():
 		lst.set_dim(0)
+		lst.is_complex = False
 
 @forms_func
 def del_var(a):

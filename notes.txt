@@ -1,13 +1,4 @@
-On the new op/data type tests:
-first, I made a mistake: Matrix + number is a DataTypeError (I fixed this)
-Also, there are actually sort of two more data types: complex numbers, and lists containing complex numbers.
-I updated the add test, but I'd like you to do the others. Probably some of them will break.
-Matrices cannot contain complex numbers, and I think I fixed this, but they still might be able to sneak in.
-On the calculator, eq/ne is defined for comparing 2 complex numbers, but the other 4 cause err:data type. Comparing complex and real with any 6 comparison operators is also err:data type.
-This might be a hard to implement her because complex == real is defined at the python level
-I'm wondering if I might have to make a custom complex class
-Actually, just making everything a custom type might make things easier!
-
+Remove guard statements in collections
 
 Parameterize these tests?
 
@@ -58,6 +49,24 @@ I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
 
 ********
+
+Okay, here's something really annoying, and I'm wondering if this is a bug:
+1=i: ERR
+i=1: ERR
+{1,1}=i: ERR
+{1,i}=1: ERR
+{1,i}=i: {0,1}
+What do you think the underlying rule could be?
+
+On the new op/data type tests:
+first, I made a mistake: Matrix + number is a DataTypeError (I fixed this)
+Also, there are actually sort of two more data types: complex numbers, and lists containing complex numbers.
+I updated the add test, but I'd like you to do the others. Probably some of them will break.
+Matrices cannot contain complex numbers, and I think I fixed this, but they still might be able to sneak in.
+On the calculator, eq/ne is defined for comparing 2 complex numbers, but the other 4 cause err:data type. Comparing complex and real with any 6 comparison operators is also err:data type.
+This might be a hard to implement her because complex == real is defined at the python level
+I'm wondering if I might have to make a custom complex class
+Actually, just making everything a custom type might make things easier!
 
 I'm going a little crazy over integers. I want to make sure all numbers that are in the virtual calculator memory are floats, and I've gone through and made sure every function returns a float. However, sometimes a python function (like range) needs an actual int. And I might have gone a little overboard in keeping these ints contained.
 Originally, I had require_int, which made sure the input was a whole number, and then converted it to an int. I decided that was potentially unsafe, and I removed the conversion, so you just get back a float that's a whole number. And then if I actually need to provide an int to a function like range, I call int() on it inline. And in cases where the int is needed in a loop, I'll precompute it, but I don't like the idea of overwriting the original value (i.e. doing n = int(n)), so sometimes I'll come up with a new temporary variable, and sometimes I won't. It feels a little silly. Plus now there's a bunch of duplicated int checks: see set_date, which has to now do `int(require_int(year)), int(require_int(month)), int(require_int(day))`.

@@ -73,12 +73,22 @@ def _get_dim(value: Any) -> int:
 
 
 class TiList:
-	__slots__ = ('data',)
+	__slots__ = ('data', 'is_complex')
 
 	def __init__(self, data: list[Number] | None = None) -> None:
 		self.data = [] if data is None else data
 		if not all(isinstance(i, Number) for i in self.data):
 			raise ValueError(self.data)
+		self.is_complex = False
+		if any(isinstance(i, complex) for i in self.data):
+			self._upgrade_to_complex()
+
+	def _upgrade_to_complex(self) -> None:
+		"""Promote every element to complex and set the is_complex flag. No-op if already complex."""
+		if not self.is_complex:
+			self.is_complex = True
+			for i, e in enumerate(self.data):
+				self.data[i] = complex(e)
 
 	@classmethod
 	def alloc(cls, size: Number) -> TiList:
@@ -94,6 +104,10 @@ class TiList:
 		return self.data[self._check_index(_get_dim(index)) - 1]
 
 	def __setitem__(self, index: Number, value: Number) -> None:
+		if isinstance(value, complex):
+			self._upgrade_to_complex()
+		elif self.is_complex:
+			value = complex(value)
 		index = _get_dim(index)
 		if index == len(self) + 1:
 			self.data.append(value)
@@ -115,10 +129,14 @@ class TiList:
 		if value < dim:
 			del self.data[value:]
 		elif value > dim:
-			self.data.extend(repeat(0, value - dim))
+			fill_value = 0+0j if self.is_complex else 0.0
+			self.data.extend(repeat(fill_value, value - dim))
 
 	def copy(self) -> TiList:
-		return TiList(self.data.copy())
+		result = TiList()
+		result.data = self.data.copy()
+		result.is_complex = self.is_complex
+		return result
 
 	def __repr__(self) -> str:
 		return f"{{{','.join(repr_num(i) for i in self)}}}"

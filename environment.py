@@ -327,6 +327,12 @@ class ListVariable(Variable):
 	def normalize(self, value):
 		return require_list(value).copy()
 
+	def store(self, new_value) -> None:
+		was_complex = self.value is not None and self.value.is_complex
+		self.value = self.normalize(new_value)
+		if was_complex:
+			self.value._upgrade_to_complex()
+
 class MatrixVariable(Variable):
 	def normalize(self, value):
 		return require_matrix(value).copy()
