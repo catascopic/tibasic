@@ -87,8 +87,11 @@ class PreparsedFunc(TiCall):
 	The schema is a sequence of ArgSpec values, one per core parameter.  An
 	`env` spec injects ArgParser.env in that slot without consuming a token;
 	every other spec parses from the token stream via the named parse method.
-	take() finalizes (end_func), so missing/surplus arguments raise the right
-	TiError for free.
+
+	`finalize` controls which ArgParser end method is called after parsing:
+	  'func'      — end_func()       for expression functions (default)
+	  'cmd'       — end_cmd()        for no-paren commands (If, While, Goto …)
+	  'paren_cmd' — end_paren_cmd()  for paren commands (For(, Pxl-On(, …)
 
 	If vectorize=True the core maps over TiList arguments.  When the schema
 	carries an `env` slot, env is threaded through unchanged rather than being
@@ -97,7 +100,13 @@ class PreparsedFunc(TiCall):
 	The core stays a plain function, so functions remain callable from other
 	Python code (composability) via TiCall.__call__.
 	"""
-	def __init__(self, core: Callable, schema: tuple, vectorize: bool = False) -> None:
+	def __init__(
+		self,
+		core: Callable,
+		schema: tuple,
+		vectorize: bool = False,
+		finalize: str = 'func',
+	) -> None:
 		if vectorize:
 			has_env = any(s.method == 'env' for s in schema)
 			func = _vectorized_with_env(core) if has_env else vectorized(core)
@@ -105,23 +114,30 @@ class PreparsedFunc(TiCall):
 			func = core
 		super().__init__(func)
 		self.schema = schema
+		self.finalize = finalize
 
 	def call_with_parser(self, a: ArgParser):
 		args = a.take(*self.schema)
+		getattr(a, f'end_{self.finalize}')()
 		return self.func(*args)
 
 
-def preparse(*schema):
+def preparse(*schema, finalize: str = 'func'):
 	"""Declarative-schema decorator for functions called once per invocation.
 
-	    @preparse(env, expr, expr)
+	`finalize` selects the ArgParser end method (default 'func'):
+	  'func'      — end_func()       expression functions; does not eat separator
+	  'cmd'       — end_cmd()        no-paren commands; eats trailing separator
+	  'paren_cmd' — end_paren_cmd()  paren commands;    eats ) + separator
+
+	    @preparse(env, expr, expr, finalize='paren_cmd')
 	    def pxl_on(env, row, col): ...
 
 	    @preparse(expr, optional(expr, 0))
 	    def round(x, n): ...
 	"""
 	def decorator(core: Callable) -> PreparsedFunc:
-		return PreparsedFunc(core, schema)
+		return PreparsedFunc(core, schema, finalize=finalize)
 	return decorator
 
 

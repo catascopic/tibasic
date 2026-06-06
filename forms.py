@@ -8,8 +8,8 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 import operators
-from argspec import env, expr, thunk, numeric_var, list_var, list_var_prefix_optional, equation_var, string_var, optional, rest
-from decorators import forms_func, preparse, nullary_command, TiCall
+from argspec import env, expr, thunk, numeric_var, list_var, list_var_prefix_optional, equation_var, string_var, label_name, program_name, optional, rest
+from decorators import forms_func, preparse, nullary_command
 from errors import DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str, py_int
@@ -121,11 +121,11 @@ def _sort(main_var, dep_vars, reverse: bool):
 		for d in deps:
 			d.data = [d.data[i] for i in indices]
 
-@preparse(list_var, rest(list_var))
+@preparse(list_var, rest(list_var), finalize='paren_cmd')
 def sort_a(main_var, dep_vars):
 	_sort(main_var, dep_vars, False)
 
-@preparse(list_var, rest(list_var))
+@preparse(list_var, rest(list_var), finalize='paren_cmd')
 def sort_d(main_var, dep_vars):
 	_sort(main_var, dep_vars, True)
 
@@ -239,7 +239,7 @@ def matr_to_list(a: ArgParser) -> None:
 # STATISTICS #
 ##############
 
-@preparse(list_var, rest(list_var))
+@preparse(list_var, rest(list_var), finalize='cmd')
 def clr_list(first, rest_vars):
 	"""ClrList list[, list, ...] — clear each named list to empty; silently skip nonexistent lists."""
 	for var in [first] + rest_vars:
@@ -256,7 +256,7 @@ def clr_all_lists(env):
 	for lst in env.user_lists.values():
 		lst.clear()
 
-@preparse(env, rest(list_var_prefix_optional))
+@preparse(env, rest(list_var_prefix_optional), finalize='cmd')
 def set_up_editor(env, list_vars):
 	"""SetUpEditor [list, ...] — ensure lists exist, creating empty ones as needed.
 
@@ -277,12 +277,12 @@ def set_up_editor(env, list_vars):
 # STRINGS #
 ###########
 
-@preparse(equation_var, string_var)
+@preparse(equation_var, string_var, finalize='paren_cmd')
 def equ_to_string(equ_var, str_var) -> None:
 	"""Equ►String(equvar, strvar) — copy the equation's tokens into a string variable."""
 	str_var.value = TiString(equ_var.resolve().tokens)
 
-@preparse(expr, equation_var)
+@preparse(expr, equation_var, finalize='paren_cmd')
 def string_to_equ(string, equ_var) -> None:
 	"""String►Equ(str_expr, equvar) — parse a string value into an equation variable."""
 	equ_var.value = TiEquation(require_str(string).tokens)
@@ -291,99 +291,68 @@ def string_to_equ(string, equ_var) -> None:
 # PROGRAMS #
 ############
 
-class program_command(TiCall):
-	"""Decorator for no-arg commands that require a running program.
-
-	Calls no_args() + end(), then passes the current Program to the function.
-	Raises InvalidCommandError automatically if called outside a program.
-	Use for Return, Stop, Else, End, etc.
-	"""
-	def call_with_parser(self, a: ArgParser) -> None:
-		a.no_args()
-		a.end_cmd()
-		self.func(a.current_program())
-
-@forms_func
-def if_cmd(a: ArgParser):
-	cond = bool(a.expr())
-	a.end_cmd()
-	a.current_program().begin_if(cond)
+@preparse(env, expr, finalize='cmd')
+def if_cmd(env, cond):
+	env.current_program().begin_if(bool(cond))
 
 @forms_func
 def then_cmd(a: ArgParser):
 	"""Then without a preceding If: always a syntax error."""
 	raise TiSyntaxError("Then without If")
 
-@program_command
-def else_cmd(prgm):
+@nullary_command
+def else_cmd(env):
 	"""If we encounter Else this way, always skip the block.
 	(Else blocks are only executed when encountered while skipping an If-Then block.)"""
-	prgm.begin_else()
+	env.current_program().begin_else()
 
-@forms_func
-def for_cmd(a: ArgParser):
-	var   = a.numeric_var()
-	start = require_real(a.expr())
-	end   = require_real(a.expr())
-	step  = require_real(a.expr(optional=True, default=1.0))
-	a.end_paren_cmd()
-	a.current_program().begin_for(var, start, end, step)
+@preparse(env, numeric_var, expr, expr, optional(expr, 1.0), finalize='paren_cmd')
+def for_cmd(env, var, start, end, step):
+	env.current_program().begin_for(
+		var, require_real(start), require_real(end), require_real(step)
+	)
 
-@forms_func
-def while_cmd(a: ArgParser):
-	condition = a.thunk()
-	a.end_cmd()
-	a.current_program().begin_while(condition)
+@preparse(env, thunk, finalize='cmd')
+def while_cmd(env, condition):
+	env.current_program().begin_while(condition)
 
-@forms_func
-def repeat_cmd(a: ArgParser):
-	condition = a.thunk()
-	a.end_cmd()
-	a.current_program().begin_repeat(condition)
+@preparse(env, thunk, finalize='cmd')
+def repeat_cmd(env, condition):
+	env.current_program().begin_repeat(condition)
 
-@program_command
-def end_cmd(prgm):
-	prgm.end_block()
+@nullary_command
+def end_cmd(env):
+	env.current_program().end_block()
 
-@forms_func
-def lbl_cmd(a: ArgParser):
-	"""Lbl is a no-op at runtime; just verify the syntax."""
-	a.label_name()
-	a.end_cmd()
-	a.current_program()  # raises if not in a program
+@preparse(env, label_name, finalize='cmd')
+def lbl_cmd(env, name):
+	"""Lbl is a no-op at runtime; just verify the syntax and that we're in a program."""
+	env.current_program()  # raises if not in a program
 
-@forms_func
-def goto_cmd(a: ArgParser):
-	name = a.label_name()
-	a.end_cmd()
-	a.current_program().goto(name)
+@preparse(env, label_name, finalize='cmd')
+def goto_cmd(env, name):
+	env.current_program().goto(name)
 
-@forms_func
-def is_gt_cmd(a: ArgParser):
-	var = a.numeric_var()
-	threshold = require_real(a.expr())
-	a.end_paren_cmd()
-	a.current_program().is_gt(var, threshold)
+@preparse(env, numeric_var, expr, finalize='paren_cmd')
+def is_gt_cmd(env, var, threshold):
+	env.current_program().is_gt(var, require_real(threshold))
 
-@forms_func
-def ds_lt_cmd(a: ArgParser):
-	var = a.numeric_var()
-	threshold = require_real(a.expr())
-	a.end_paren_cmd()
-	a.current_program().ds_lt(var, threshold)
+@preparse(env, numeric_var, expr, finalize='paren_cmd')
+def ds_lt_cmd(env, var, threshold):
+	env.current_program().ds_lt(var, require_real(threshold))
 
-@forms_func
-def prgm(a: ArgParser):
-	prgm_name = a.program_name()
-	a.end_cmd()
-	a.env.run_program(prgm_name)
+@preparse(env, program_name, finalize='cmd')
+def prgm(env, name):
+	env.run_program(name)
 
-@program_command
-def return_cmd(prgm):
+@nullary_command
+def return_cmd(env):
+	env.current_program()  # raises if not in a program
 	raise ReturnSignal()
 
-@program_command
-def stop_cmd(prgm):
+@nullary_command
+def stop_cmd(env):
+	env.current_program()  # raises if not in a program
 	raise StopSignal()
 
 @forms_func

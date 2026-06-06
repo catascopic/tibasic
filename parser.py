@@ -12,7 +12,7 @@ from catalog import (
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
 from environment import Environment, Variable, UserList
-from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
+from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError, NonRealAnsError
 
 
 @dataclass
@@ -694,17 +694,6 @@ class ArgParser:
 		"""Read up to 8 alphanumeric characters as a program name (for prgm)."""
 		return self._parser.read_name(8)
 
-	def current_program(self):
-		"""Return the innermost currently-executing Program.
-
-		Raises InvalidCommandError if called from outside a program (e.g. from
-		the home screen).  The stack trace identifies the calling command.
-		"""
-		prog = self.env.current_program
-		if prog is None:
-			raise InvalidCommandError("This command cannot be used outside a program")
-		return prog
-
 	def no_args(self) -> None:
 		"""Raise TiSyntaxError if any tokens follow on this statement.
 
@@ -761,15 +750,16 @@ class ArgParser:
 		return args
 
 	def take(self, *specs) -> list:
-		"""Parse a fixed argument schema (see argspec.py), finalize, return values.
+		"""Parse a fixed argument schema (see argspec.py); return values.
 
 		Each spec names an ArgParser parse method.  Because exactly the declared
 		arguments are consumed, the existing trailing-comma machinery reports the
 		right errors with no extra code: a missing required argument raises
-		ArgumentError from the parse method, and a surplus argument is caught by
-		the end_func() below.  This covers the common case (an expression
-		function); a command needing end_paren_cmd(), or anything that must
-		inspect values before closing, parses the arguments the old-fashioned way.
+		ArgumentError from the parse method.
+
+		Finalization (end_func / end_cmd / end_paren_cmd) is the caller's
+		responsibility; PreparsedFunc.call_with_parser handles it based on the
+		`finalize` parameter passed to @preparse.
 		"""
 		out = []
 		for spec in specs:
@@ -785,7 +775,6 @@ class ArgParser:
 				out.append(items)
 			else:
 				out.append(parse(optional=spec.optional, default=spec.default))
-		self.end_func()
 		return out
 	
 	def parse_indices(self, count):

@@ -12,7 +12,7 @@ from tiobjects import (
 	TiList, TiMatrix, TiString, TiEquation, 
 	require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation, py_int,
 )
-from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidDimError, UndefinedError
+from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 from signals import StopSignal
 from screen import Screen
@@ -223,10 +223,16 @@ class Environment:
 	def __repr__(self):
 		return f"ENV({','.join(f"{name}={value!r}" for name, value in self._iter_values())})"
 
-	@property
 	def current_program(self):
-		"""The innermost currently-executing Program, or None if running interactively."""
-		return self.program_stack[-1] if self.program_stack else None
+		"""Return the innermost currently-executing Program.
+
+		Raises InvalidCommandError if called outside a program (e.g. from the
+		home screen), matching the calculator's ERR:INVALID for control-flow
+		commands like Return, Goto, and End.
+		"""
+		if not self.program_stack:
+			raise InvalidCommandError("This command cannot be used outside a program")
+		return self.program_stack[-1]
 
 	def print_screen(self):
 		pass

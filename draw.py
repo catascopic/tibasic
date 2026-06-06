@@ -54,25 +54,25 @@ def _validate(row, col) -> tuple[int, int]:
 	return row, col
 
 
-@preparse(env, expr, expr)
+@preparse(env, expr, expr, finalize='paren_cmd')
 def pxl_on(env, row, col) -> None:
 	row, col = _validate(row, col)
 	env.screen.set(row, col, True)
 
 
-@preparse(env, expr, expr)
+@preparse(env, expr, expr, finalize='paren_cmd')
 def pxl_off(env, row, col) -> None:
 	row, col = _validate(row, col)
 	env.screen.set(row, col, False)
 
 
-@preparse(env, expr, expr)
+@preparse(env, expr, expr, finalize='paren_cmd')
 def pxl_change(env, row, col) -> None:
 	row, col = _validate(row, col)
 	env.screen.toggle(row, col)
 
 
-@preparse(env, expr, expr)
+@preparse(env, expr, expr, finalize='paren_cmd')
 def pxl_test(env, row, col) -> float:
 	row, col = _validate(row, col)
 	return float(env.screen.get(row, col))
@@ -83,21 +83,21 @@ def clr_draw(env) -> None:
 	env.screen.clear()
 
 
-@preparse(env, expr, expr)
+@preparse(env, expr, expr, finalize='paren_cmd')
 def pt_on(env, x, y) -> None:
 	pixel = _point_to_pixel(env, require_real(x), require_real(y))
 	if pixel is not None:
 		env.screen.set(*pixel, True)
 
 
-@preparse(env, expr, expr)
+@preparse(env, expr, expr, finalize='paren_cmd')
 def pt_off(env, x, y) -> None:
 	pixel = _point_to_pixel(env, require_real(x), require_real(y))
 	if pixel is not None:
 		env.screen.set(*pixel, False)
 
 
-@preparse(env, expr, expr)
+@preparse(env, expr, expr, finalize='paren_cmd')
 def pt_change(env, x, y) -> None:
 	pixel = _point_to_pixel(env, require_real(x), require_real(y))
 	if pixel is not None:

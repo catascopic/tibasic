@@ -23,7 +23,7 @@ class Program:
 
 	Programs are pushed onto env.program_stack for the duration of their
 	execution so that control-flow commands can access the current program
-	via env.current_program.
+	via env.current_program().
 	"""
 
 	def __init__(self, tokens: list, env: Environment):

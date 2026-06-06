@@ -1,3 +1,12 @@
+Can you make an enum for finalize? I'd also rename finalize "end" (keep it shorter), and the enum would be FUNC, CMD, CMD_FUNC, NONE (the last of which would allow DelVar to use preparsed).
+
+I think most of the program commands can use preparse. We'd just have to give Environment a current_program method. Also, I feel like the program_command could be refactored or maybe removed.
+
+add to ArgSpec: number, real, integer, etc. Still have to work around vectorized, but could make special handler for this (vectorized_num?)
+
+
+one_or_more/zero_or_more
+
 peek/next/match/match_separator
 
 Still don't love the nonreal answer check
