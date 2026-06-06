@@ -15,16 +15,12 @@ Thunk:
 Hard to tell if commands are straight-up invalid
 On the calculator, I think it's impossible to write a seq( command that produces zero elements
 
-Earlier I was removing all the explicit conversions to float, but that was actually correct.
-The calculator only deals in floating-point numbers, and we should only be using ints internally.
-
 The program table in Environment should probably be a dataclass called ProgramData, and have a reference to the name of the program. Then the class Program be given a ProgramData and then it would know its own name, which would be good for debugging if nothing else.
 
 Rename Thunk to Formula
 Aho-Corasick parser for testing
 Make sure deg symbol vs D/M/S format is working
 Add aliases to any token that has a character that can't be typed on the keyboard
-
 
 TODO:
 
@@ -39,6 +35,9 @@ I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
 
 ********
+
+Earlier I was removing all the explicit conversions to float, but that was actually correct.
+The calculator only deals in floating-point numbers, and we should only be using ints internally.
 
 Can you make some program tests that test the logic of skip_statement and capture (thunk parsing)?
 I refactored the skipping logic to be more concise, but I want to test the edge cases, such as:

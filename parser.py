@@ -507,10 +507,10 @@ class Parser:
 
 		Processes the stream statement-by-statement via skip_statement.
 		FOR/WHILE/REPEAT always open a new block; THEN opens one only when the
-		immediately preceding statement was IF — a bare Then (without a
-		preceding If) is transparent to the depth counter.  At depth 0 the scan
-		stops at END (always) or ELSE (when *else_mode*).  Leaves pos just past
-		the stopping token.  Raises TiSyntaxError if no match is found.
+		immediately preceding statement was IF (a bare Then without a preceding
+		If is transparent to the depth counter). At depth 0 the scan stops at 
+		END (always) or ELSE (in *else_mode*). Leaves pos just past the
+		stopping token.
 		"""
 		depth = 0
 		prev_if = False
