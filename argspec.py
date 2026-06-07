@@ -40,7 +40,8 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class ArgSpec:
-	method: str                    # name of the ArgParser parse method to call
+	method: str                    # name of the ArgParser parse method that extracts the value
+	validate: str = ''             # name of a value validator @preparse applies (real/numeric/integer)
 	optional: bool = False         # if absent, the slot is omitted from the call
 	variadic: bool = False         # greedily consume the rest; yields a list
 	vectorize: bool = False        # map element-wise over a TiList in this slot
@@ -51,7 +52,8 @@ class ArgSpec:
 			('?', self.optional), ('*', self.variadic),
 			('~', self.vectorize), ('#', self.matrix),
 		) if on)
-		return f"{self.method}{flags}"
+		name = f"{self.method}:{self.validate}" if self.validate else self.method
+		return f"{name}{flags}"
 
 
 def _as_spec(annotation) -> ArgSpec:
@@ -67,12 +69,15 @@ def _as_spec(annotation) -> ArgSpec:
 
 # ── Vocabulary ──────────────────────────────────────────────────────────────
 # Each alias is Annotated[<value type the core receives>, ArgSpec('<method>')].
+# The value types all extract via the `expr` parser method and differ only in the
+# value validator @preparse applies (so a TiList/TiMatrix in a vectorized slot is
+# validated element-wise, not rejected wholesale).
 # `env` is special: it is injected from ArgParser.env without consuming a token.
 
 expr    = Annotated[Any,           ArgSpec('expr')]
-numeric = Annotated[Number,        ArgSpec('numeric')]  # enforces require_num at parse time
-real    = Annotated[float,         ArgSpec('real')]     # enforces require_real at parse time
-integer = Annotated[int,           ArgSpec('integer')]  # enforces py_int at parse time
+numeric = Annotated[Number,        ArgSpec('expr', validate='numeric')]  # require_num per value
+real    = Annotated[float,         ArgSpec('expr', validate='real')]     # require_real per value
+integer = Annotated[float,         ArgSpec('expr', validate='integer')]  # require_int per value; call int() when a Python int is needed
 thunk   = Annotated['Thunk',       ArgSpec('thunk')]
 
 num_var      = Annotated['Variable', ArgSpec('numeric_var')]

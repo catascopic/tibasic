@@ -628,21 +628,6 @@ class ArgParser:
 		return self._parser.parse_expr()
 
 	@_parse_arg
-	def real(self):
-		x = self._parser.parse_expr()
-		return x if isinstance(x, (TiList, TiMatrix)) else require_real(x)
-
-	@_parse_arg
-	def numeric(self):
-		x = self._parser.parse_expr()
-		return x if isinstance(x, (TiList, TiMatrix)) else require_num(x)
-
-	@_parse_arg
-	def integer(self):
-		x = self._parser.parse_expr()
-		return x if isinstance(x, (TiList, TiMatrix)) else py_int(x)
-
-	@_parse_arg
 	def thunk(self):
 		return self._parser.capture()
 

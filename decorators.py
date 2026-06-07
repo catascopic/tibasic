@@ -7,12 +7,51 @@ from itertools import repeat
 from numbers import Number
 from typing import Any, TYPE_CHECKING
 
-from tiobjects import TiList, TiMatrix
+from tiobjects import TiList, TiMatrix, require_num, require_real, require_int
 from errors import DimMismatchError
 from argspec import _as_spec, schema_from_signature
 
 if TYPE_CHECKING:
 	from parser import ArgParser
+
+
+# ── Per-parameter value validation ───────────────────────────────────────────
+# Value validation is a schema concern, not the parser's: ArgParser only extracts
+# values, and @preparse wraps the core so each argument is checked by its slot's
+# validator just before the call.  Because this wrapper sits *inside* the
+# vectorization wrapper, a vectorized slot's validator sees one scalar element at
+# a time — exactly where "is this element real/integer?" belongs.
+
+_VALIDATORS: dict[str, Callable] = {
+	'numeric': require_num,
+	'real': require_real,
+	'integer': require_int,
+}
+
+
+def _make_validated(core: Callable, schema: tuple) -> Callable:
+	"""Wrap *core* so each positional argument is passed through its slot's value
+	validator first.  Returns *core* unchanged when no slot declares a validator.
+
+	Validators run on scalars.  For a variadic slot (which holds a list of values
+	in one slot) the validator is mapped over the elements."""
+	slots = tuple((_VALIDATORS.get(s.validate), s.variadic) for s in schema)
+	if not any(v for v, _ in slots):
+		return core
+
+	@wraps(core)
+	def apply(*args: Any) -> Any:
+		checked = []
+		for (validate, variadic), a in zip(slots, args):
+			if validate is None:
+				checked.append(a)
+			elif variadic:
+				checked.append([validate(x) for x in a])
+			else:
+				checked.append(validate(a))
+		checked.extend(args[len(slots):])
+		return core(*checked)
+	return apply
 
 
 # ── Per-parameter vectorization (new) ────────────────────────────────────────
@@ -186,14 +225,18 @@ class PreparsedFunc(TiCall):
 		else:
 			schema = tuple(_as_spec(s) for s in schema)
 
+		# Validation wraps the core innermost; vectorization (if any) wraps that,
+		# so a vectorized slot's validator runs per element.
+		validated = _make_validated(core, schema)
+
 		if vectorize:
 			# Legacy whole-function vectorization (preparse_vectorized).
 			has_env = any(s.method == 'env' for s in schema)
-			func = _vectorized_with_env(core) if has_env else vectorized(core)
+			func = _vectorized_with_env(validated) if has_env else vectorized(validated)
 		else:
 			vec = frozenset(i for i, s in enumerate(schema) if s.vectorize)
 			mat = frozenset(i for i, s in enumerate(schema) if s.matrix)
-			func = _make_vectorized(core, vec, mat) if vec else core
+			func = _make_vectorized(validated, vec, mat) if vec else validated
 
 		super().__init__(func)
 		self.schema = schema

@@ -5,7 +5,6 @@ import math
 from argspec import PassEnv, integer, numeric, real
 from decorators import nullary_command, preparse, CMD_FUNC
 from errors import DomainError
-from tiobjects import py_int
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
 # rows 0–62 (63 rows) and columns 0–94 (95 columns), inclusive.
@@ -45,13 +44,11 @@ def _point_to_pixel(env, x: float, y: float):
 	return None
 
 
-def _validate(row, col) -> tuple[int, int]:
-	"""Coerce a (row, column) pair to ints and check the Pxl- addressable range."""
-	row = py_int(row)
-	col = py_int(col)
+def _validate(row: float, col: float) -> tuple[int, int]:
+	"""Check the Pxl-addressable range, then return Python ints for screen indexing."""
 	if not (0 <= row <= MAX_ROW and 0 <= col <= MAX_COL):
 		raise DomainError(f"Pixel out of range: row={row}, column={col}")
-	return row, col
+	return int(row), int(col)
 
 
 @preparse(CMD_FUNC)
