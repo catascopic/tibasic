@@ -12,7 +12,7 @@ from argspec import expr as expr_spec, numeric, real, integer, vectorized, thunk
 from decorators import preparse_func, forms_func, TiCall
 from environment import Environment
 from errors import (
-	TiSyntaxError, DomainError, NonRealAnsError,
+	TiSyntaxError, DomainError,
 	DataTypeError, IncrementError, UndefinedError,
 )
 from modes import ComplexMode
@@ -55,37 +55,31 @@ def atan(env: PassEnv, x: vectorized[real]):
 	return _inv_trig(math.atan, env, x)
 
 @preparse_func
-def sqrt(env: PassEnv, x: vectorized[numeric]):
+def sqrt(x: vectorized[numeric]):
 	if isinstance(x, complex):
 		return cmath.sqrt(x)
 	if x >= 0:
 		return math.sqrt(x)
-	if env.real_only:
-		raise NonRealAnsError(f"√({x}): non-real result")
 	return cmath.sqrt(x)
 
 @preparse_func
-def ln(env: PassEnv, x: vectorized[numeric]):
+def ln(x: vectorized[numeric]):
 	if isinstance(x, complex):
 		return cmath.log(x)
 	if x > 0:
 		return math.log(x)
 	if x == 0:
 		raise DomainError("ln: undefined for 0")
-	if env.real_only:
-		raise NonRealAnsError(f"ln({x}): non-real result")
 	return cmath.log(x)
 
 @preparse_func
-def log(env: PassEnv, x: vectorized[numeric]):
+def log(x: vectorized[numeric]):
 	if isinstance(x, complex):
 		return cmath.log10(x)
 	if x > 0:
 		return math.log10(x)
 	if x == 0:
 		raise DomainError("log: undefined for 0")
-	if env.real_only:
-		raise NonRealAnsError(f"log({x}): non-real result")
 	return cmath.log10(x)
 
 ####################
@@ -93,7 +87,7 @@ def log(env: PassEnv, x: vectorized[numeric]):
 ####################
 
 @preparse_func
-def log_base(env: PassEnv, x: vectorized[numeric], base: vectorized[numeric]):
+def log_base(x: vectorized[numeric], base: vectorized[numeric]):
 	if isinstance(x, complex) or isinstance(base, complex):
 		return cmath.log(x, base)
 	if base <= 0 or base == 1:
@@ -102,8 +96,6 @@ def log_base(env: PassEnv, x: vectorized[numeric], base: vectorized[numeric]):
 		raise DomainError("logBASE: undefined for x=0")
 	if x > 0:
 		return math.log(x, base)
-	if env.real_only:
-		raise NonRealAnsError(f"logBASE({x}, {base}): non-real result")
 	return cmath.log(x, base)
 
 ####################
@@ -345,21 +337,17 @@ def dim(a: ArgParser):
 ###########
 
 @preparse_func
-def acosh(env: PassEnv, x: vectorized[real]):
+def acosh(x: vectorized[real]):
 	if x >= 1:
 		return math.acosh(x)
-	if env.real_only:
-		raise NonRealAnsError(f"acosh({x}): non-real result")
 	return cmath.acosh(x)
 
 @preparse_func
-def atanh(env: PassEnv, x: vectorized[real]):
+def atanh(x: vectorized[real]):
 	if abs(x) < 1:
 		return math.atanh(x)
 	if abs(x) == 1:
 		raise DomainError(f"atanh: undefined for ±1")
-	if env.real_only:
-		raise NonRealAnsError(f"tanh⁻¹({x}): non-real result")
 	return cmath.atanh(x)
 
 

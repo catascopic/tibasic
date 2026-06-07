@@ -12,7 +12,7 @@ from catalog import (
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
 from environment import Environment, Variable, UserList
-from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError, NonRealAnsError
+from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError
 
 
 @dataclass
@@ -41,10 +41,6 @@ class Parser:
 		return f"tokens={self.tokens}, pos={self.pos}"
 
 	# ── Primitives ─────────────────────────────────────────────────────────────
-
-	@staticmethod
-	def _is_complex(val) -> bool:
-		return isinstance(val, complex) or (isinstance(val, TiList) and val.is_complex)
 
 	@property
 	def has_next(self):
@@ -381,12 +377,8 @@ class Parser:
 				if left_bp <= min_bp:
 					break
 				self.advance()
-				lhs_was_complex = self._is_complex(lhs)
 				rhs = self.parse_expr(right_bp)
-				lhs = t.operator(lhs, rhs)
-				if self.env.real_only and not lhs_was_complex and not self._is_complex(rhs):
-					if self._is_complex(lhs):
-						raise NonRealAnsError(repr(lhs))
+				lhs = self.env.guard_real((lhs, rhs), t.operator(lhs, rhs))
 				continue
 
 			# Implicit multiplication

@@ -9,10 +9,11 @@ from datetime import datetime, date, timedelta
 from typing import Any, ClassVar, TYPE_CHECKING
 
 from tiobjects import (
-	TiList, TiMatrix, TiString, TiEquation, 
+	TiList, TiMatrix, TiString, TiEquation,
 	require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation, py_int,
+	is_complex_val,
 )
-from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError
+from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 from signals import StopSignal
 from screen import Screen
@@ -111,6 +112,12 @@ class Environment:
 	@property
 	def real_only(self):
 		return self.complex_mode is ComplexMode.REAL
+
+	def guard_real(self, inputs, result):
+		"""Raise NonRealAnsError if real-mode is active and a real-input operation produced a complex result."""
+		if self.real_only and is_complex_val(result) and not any(is_complex_val(x) for x in inputs):
+			raise NonRealAnsError(repr(result))
+		return result
 
 	def set_random_seed(self, value):
 		random.seed(require_real(value))

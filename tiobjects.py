@@ -21,6 +21,10 @@ if TYPE_CHECKING:
 def repr_num(value: Number) -> str:
 	return repr(int(value) if not isinstance(value, complex) and value.is_integer() else value)
 
+def is_complex_val(x) -> bool:
+	"""Return True if x is a complex scalar or a TiList containing complex elements."""
+	return isinstance(x, complex) or (isinstance(x, TiList) and x.is_complex)
+
 
 # ── Guard functions ───────────────────────────────────────────────────────────────
 

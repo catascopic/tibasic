@@ -220,7 +220,7 @@ class PreparsedFunc(TiCall):
 		args = a.take(*self.schema)
 		if self.end_method is not None:
 			getattr(a, self.end_method)()
-		return self.func(*args)
+		return a.env.guard_real(args, self.func(*args))
 
 
 def preparse(end: Finalize | None = None):

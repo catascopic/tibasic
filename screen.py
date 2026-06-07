@@ -1,4 +1,10 @@
 from __future__ import annotations
+import sys
+
+
+# Half-block characters: each covers 1 column × 2 rows.
+# Index by (top_pixel << 1 | bottom_pixel) — or equivalently top*2 + bottom.
+_HALF_BLOCK = ' ▄▀█'
 
 
 class Screen:
@@ -34,3 +40,26 @@ class Screen:
 
 	def clear(self) -> None:
 		self.buffer = bytearray(self.ROWS * self.COLS)
+
+	def display(self) -> str:
+		"""Render the screen as a string of half-block characters (' ▄▀█').
+
+		Each character covers 1 column × 2 rows, so the result is
+		(ROWS/2) × COLS characters — 32 × 96 for the standard 64×96 screen.
+		ROWS is even, so no padding is needed.
+		"""
+		lines = []
+		for top_row in range(0, self.ROWS, 2):
+			bot_row = top_row + 1
+			line = []
+			for col in range(self.COLS):
+				top = self.buffer[self._index(top_row, col)]
+				bot = self.buffer[self._index(bot_row, col)]
+				line.append(_HALF_BLOCK[top << 1 | bot])
+			lines.append(''.join(line))
+		return '\n'.join(lines)
+
+	def show(self) -> None:
+		"""Print the screen to stdout, forcing UTF-8 so sextant characters survive on Windows."""
+		out = self.display() + '\n'
+		sys.stdout.buffer.write(out.encode('utf-8'))

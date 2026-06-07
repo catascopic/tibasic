@@ -62,7 +62,8 @@
       "Bash(python -m pytest test_program.py -q)",
       "Bash(python -m pytest test_program.py test_tibasic.py test_functions.py -q)",
       "Bash(python -m pytest test_draw.py -q)",
-      "Bash(python -m pytest test_program.py::TestIfThenElse::test_then_colon_separated_from_if test_program.py::TestIsGtDsLt::test_is_gt_skips_colon_separated_statement -v)"
+      "Bash(python -m pytest test_program.py::TestIfThenElse::test_then_colon_separated_from_if test_program.py::TestIsGtDsLt::test_is_gt_skips_colon_separated_statement -v)",
+      "Bash(python pt_test.py)"
     ]
   }
 }

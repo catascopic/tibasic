@@ -244,6 +244,66 @@ class TestClrDraw:
 		assert not env.screen.get(10, 10)
 
 
+# ── Pt-On mark shapes ───────────────────────────────────────────────────────────
+
+class TestPointMarks:
+	"""Verify pixel patterns for each mark value (assumed shapes; check on hardware)."""
+
+	def _pt_on_mark(self, mark_tok: str):
+		"""Run Pt-On(0,0,mark) and return the set of (row,col) pixels that are on."""
+		env = run(f'Pt-On( 0,0,{mark_tok}')
+		return {(r, c) for r in range(63) for c in range(95) if env.screen.get(r, c)}
+
+	def test_mark_1_is_dot(self):
+		assert self._pt_on_mark('1') == {(31, 47)}
+
+	def test_unknown_mark_defaults_to_dot(self):
+		# Any value not in {2,3,6,7} is treated as a dot
+		assert self._pt_on_mark('4') == {(31, 47)}
+		assert self._pt_on_mark('5') == {(31, 47)}
+
+	def test_mark_2_is_3x3_box(self):
+		pixels = self._pt_on_mark('2')
+		# Box is the 8-pixel ring; centre is not set
+		expected = {(31 + dr, 47 + dc) for dr in (-1, 0, 1) for dc in (-1, 0, 1)
+		            if (dr, dc) != (0, 0)}
+		assert pixels == expected
+
+	def test_mark_6_same_as_2(self):
+		assert self._pt_on_mark('6') == self._pt_on_mark('2')
+
+	def test_mark_3_is_cross(self):
+		pixels = self._pt_on_mark('3')
+		expected = {(31, 47), (30, 47), (32, 47), (31, 46), (31, 48)}
+		assert pixels == expected
+
+	def test_mark_7_same_as_3(self):
+		assert self._pt_on_mark('7') == self._pt_on_mark('3')
+
+	def test_box_clips_at_edge(self):
+		# Pt-On at top-left corner: the 3×3 hollow box clips to the visible region.
+		# The 8 ring offsets are: (-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1).
+		# After clipping to row>=0, col>=0 only (0,1),(1,-1→clipped),(1,0),(1,1) survive,
+		# i.e. (0,1), (1,0), (1,1).
+		env = run('Pt-On( ~10,10,2')  # corner (row 0, col 0)
+		pixels = {(r, c) for r in range(63) for c in range(95) if env.screen.get(r, c)}
+		expected = {(0, 1), (1, 0), (1, 1)}
+		assert pixels == expected
+
+	def test_pt_off_with_mark_clears_shape(self):
+		env = run('Pt-On( 0,0,2')
+		run('Pt-Off( 0,0,2', env)
+		assert not any(env.screen.buffer)
+
+	def test_pt_change_with_mark_toggles(self):
+		env = run('Pt-Change( 0,0,3')
+		cross = {(31, 47), (30, 47), (32, 47), (31, 46), (31, 48)}
+		for r, c in cross:
+			assert env.screen.get(r, c)
+		run('Pt-Change( 0,0,3', env)
+		assert not any(env.screen.buffer)
+
+
 # ── Use inside a stored program ─────────────────────────────────────────────────
 
 class TestPixelInProgram:
