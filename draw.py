@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import math
 
-from argspec import env, expr
+from argspec import PassEnv, integer, numeric, real
 from decorators import nullary_command, preparse, CMD_FUNC
 from errors import DomainError
-from tiobjects import py_int, require_real
+from tiobjects import py_int
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
 # rows 0–62 (63 rows) and columns 0–94 (95 columns), inclusive.
@@ -54,26 +54,26 @@ def _validate(row, col) -> tuple[int, int]:
 	return row, col
 
 
-@preparse(env, expr, expr, end=CMD_FUNC)
-def pxl_on(env, row, col) -> None:
+@preparse(CMD_FUNC)
+def pxl_on(env: PassEnv, row: integer, col: integer) -> None:
 	row, col = _validate(row, col)
 	env.screen.set(row, col, True)
 
 
-@preparse(env, expr, expr, end=CMD_FUNC)
-def pxl_off(env, row, col) -> None:
+@preparse(CMD_FUNC)
+def pxl_off(env: PassEnv, row: integer, col: integer) -> None:
 	row, col = _validate(row, col)
 	env.screen.set(row, col, False)
 
 
-@preparse(env, expr, expr, end=CMD_FUNC)
-def pxl_change(env, row, col) -> None:
+@preparse(CMD_FUNC)
+def pxl_change(env: PassEnv, row: integer, col: integer) -> None:
 	row, col = _validate(row, col)
 	env.screen.toggle(row, col)
 
 
-@preparse(env, expr, expr, end=CMD_FUNC)
-def pxl_test(env, row, col) -> float:
+@preparse(CMD_FUNC)
+def pxl_test(env: PassEnv, row: integer, col: integer) -> float:
 	row, col = _validate(row, col)
 	return float(env.screen.get(row, col))
 
@@ -83,22 +83,22 @@ def clr_draw(env) -> None:
 	env.screen.clear()
 
 
-@preparse(env, expr, expr, end=CMD_FUNC)
-def pt_on(env, x, y) -> None:
-	pixel = _point_to_pixel(env, require_real(x), require_real(y))
+@preparse(CMD_FUNC)
+def pt_on(env: PassEnv, x: real, y: real) -> None:
+	pixel = _point_to_pixel(env, x, y)
 	if pixel is not None:
 		env.screen.set(*pixel, True)
 
 
-@preparse(env, expr, expr, end=CMD_FUNC)
-def pt_off(env, x, y) -> None:
-	pixel = _point_to_pixel(env, require_real(x), require_real(y))
+@preparse(CMD_FUNC)
+def pt_off(env: PassEnv, x: real, y: real) -> None:
+	pixel = _point_to_pixel(env, x, y)
 	if pixel is not None:
 		env.screen.set(*pixel, False)
 
 
-@preparse(env, expr, expr, end=CMD_FUNC)
-def pt_change(env, x, y) -> None:
-	pixel = _point_to_pixel(env, require_real(x), require_real(y))
+@preparse(CMD_FUNC)
+def pt_change(env: PassEnv, x: real, y: real) -> None:
+	pixel = _point_to_pixel(env, x, y)
 	if pixel is not None:
 		env.screen.toggle(*pixel)

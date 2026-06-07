@@ -1,3 +1,5 @@
+integer/numeric shouldn't just call expr!
+
 @nullary_command -> @preparse(env, end=CMD)
 one_or_more/zero_or_more
 
@@ -42,6 +44,21 @@ I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
 
 ********
+
+Would this be a good time to try to resolve the Vectorized issue? It would be really nice if we could do this:
+@preparsed(FUNC)
+def gcd(a: vectorized[numeric], b: vectorized[numeric])
+
+Another crazy idea: instead of duplicating the param info in the preparse method, we make a bunch of annotated types. I kind of suggested this but I'm coming around to it. For example:
+
+thunk = Annotated[Thunk, 'thunk']
+num_var = Annotated[Variable, 'num_var']
+expr = Annotated[Any, 'expr']
+
+Then preparsed just reads these.
+We could also have optional[expr] which is maybe the same thing as `expr | None` or maybe it's something more preparsed-friendly
+env would also have a special type, Annotated[Environment, 'pass_env'] or something like that.
+Is this crazy? Is this contorting the typing system to do something it shouldn't?
 
 Okay, some thoughts on the current paradigm:
 First, I don't think we need default values at all for optional params! The optional value is in the actual function, and the parser just calls it with fewer params.

@@ -7,12 +7,53 @@ from itertools import repeat
 from numbers import Number
 from typing import Any, TYPE_CHECKING
 
-from tiobjects import TiList
+from tiobjects import TiList, TiMatrix
 from errors import DimMismatchError
+from argspec import _as_spec, schema_from_signature
 
 if TYPE_CHECKING:
 	from parser import ArgParser
 
+
+# ── Per-parameter vectorization (new) ────────────────────────────────────────
+# Vectorization is driven by per-spec flags: a `vectorized[...]` parameter maps
+# over a TiList in its slot; a `matrix_vectorized[...]` parameter also maps over
+# a TiMatrix.  `vec` / `mat` are the sets of such positions in the arg tuple.
+
+def map_vectorized(func: Callable, args: tuple, vec: frozenset, mat: frozenset) -> Any:
+	# A single matrix in a matrix-capable slot is mapped via transform; every
+	# other argument (including the other matrix-slot scalars) is held constant.
+	for i in mat:
+		if i < len(args) and isinstance(args[i], TiMatrix):
+			return args[i].transform(
+				lambda x, j=i: func(*args[:j], x, *args[j + 1:])
+			)
+	# Otherwise map over TiLists in the vectorized slots, broadcasting the rest.
+	lengths: set[int] = set()
+	cols = []
+	for i, a in enumerate(args):
+		if i in vec and isinstance(a, TiList):
+			lengths.add(len(a))
+			cols.append(a)
+		else:
+			cols.append(repeat(a))
+	if not lengths:
+		return func(*args)
+	if len(lengths) != 1:
+		raise DimMismatchError(f"Dim mismatch: {lengths}")
+	return TiList([func(*row) for row in zip(*cols)])
+
+
+def _make_vectorized(core: Callable, vec: frozenset, mat: frozenset) -> Callable:
+	@wraps(core)
+	def apply(*args: Any) -> Any:
+		return map_vectorized(core, args, vec, mat)
+	return apply
+
+
+# ── Whole-function vectorization (legacy) ────────────────────────────────────
+# Used by preparse_vectorized / pure_vectorized / env_vectorized: maps over every
+# TiList/Number argument uniformly, threading env through untouched.
 
 def call_vectorized(func: Callable, args: tuple) -> Any:
 	len_check = set()
@@ -116,16 +157,19 @@ _END_METHOD = {
 class PreparsedFunc(TiCall):
 	"""Wraps a plain core function with a declarative arg schema (see argspec.py).
 
-	The schema is a sequence of ArgSpec values, one per core parameter.  An
-	`env` spec injects ArgParser.env in that slot without consuming a token;
-	every other spec parses from the token stream via the named parse method.
+	The schema is a tuple of ArgSpec values, one per core parameter.  It may be
+	passed explicitly (legacy positional form) or, when `schema` is None, read
+	from the core's type annotations via `schema_from_signature`.  An `env` spec
+	injects ArgParser.env in that slot without consuming a token; every other
+	spec parses from the token stream via the named parse method.
 
 	`end` is a Finalize member controlling which ArgParser end method is called
 	after parsing (FUNC end_func, CMD end_cmd, CMD_FUNC end_paren_cmd, NONE none).
 
-	If vectorize=True the core maps over TiList arguments.  When the schema
-	carries an `env` slot, env is threaded through unchanged rather than being
-	mapped over (via _vectorized_with_env).
+	Vectorization is per-parameter: any spec flagged `vectorize` maps over a
+	TiList in its slot, and a `matrix` spec also maps over a TiMatrix.  (The
+	legacy `vectorize=True` flag, set by preparse_vectorized, instead maps the
+	whole function over every TiList/Number argument, threading env through.)
 
 	The core stays a plain function, so functions remain callable from other
 	Python code (composability) via TiCall.__call__.
@@ -133,15 +177,24 @@ class PreparsedFunc(TiCall):
 	def __init__(
 		self,
 		core: Callable,
-		schema: tuple,
+		schema: tuple | None = None,
 		vectorize: bool = False,
 		end: Finalize = Finalize.FUNC,
 	) -> None:
+		if schema is None:
+			schema = schema_from_signature(core)
+		else:
+			schema = tuple(_as_spec(s) for s in schema)
+
 		if vectorize:
+			# Legacy whole-function vectorization (preparse_vectorized).
 			has_env = any(s.method == 'env' for s in schema)
 			func = _vectorized_with_env(core) if has_env else vectorized(core)
 		else:
-			func = core
+			vec = frozenset(i for i, s in enumerate(schema) if s.vectorize)
+			mat = frozenset(i for i, s in enumerate(schema) if s.matrix)
+			func = _make_vectorized(core, vec, mat) if vec else core
+
 		super().__init__(func)
 		self.schema = schema
 		self.end_method = _END_METHOD[end]
@@ -153,23 +206,42 @@ class PreparsedFunc(TiCall):
 		return self.func(*args)
 
 
-def preparse(*schema, end: Finalize = Finalize.FUNC):
-	"""Declarative-schema decorator for functions called once per invocation.
+def preparse(*args, end: Finalize | None = None):
+	"""Declarative decorator for functions/commands called once per invocation.
 
-	`end` is a Finalize member selecting the ArgParser end method (default FUNC):
+	The schema comes from the core's parameter annotations (see argspec.py):
+
+	    @preparse(FUNC)
+	    def gcd(a: vectorized[numeric], b: vectorized[numeric]) -> float: ...
+
+	    @preparse(CMD_FUNC)
+	    def pxl_on(env: PassEnv, row: expr, col: expr) -> None: ...
+
+	The Finalize mode may be given positionally (as above) or via `end=`.  It
+	selects the ArgParser end method (default FUNC):
 	  FUNC      — end_func()       expression functions; does not eat separator
 	  CMD       — end_cmd()        no-paren commands; eats trailing separator
 	  CMD_FUNC  — end_paren_cmd()  paren commands;    eats ) + separator
 	  NONE      — (nothing)        leaves the parser untouched (e.g. DelVar)
 
-	    @preparse(env, expr, expr, end=CMD_FUNC)
-	    def pxl_on(env, row, col): ...
+	A legacy positional schema is still accepted; in that case the schema is
+	taken from the arguments rather than the annotations:
 
 	    @preparse(expr, optional(expr))
 	    def round(x, n=9): ...
 	"""
+	schema = []
+	for a in args:
+		if isinstance(a, Finalize):
+			if end is not None and end is not a:
+				raise TypeError("preparse: end mode given both positionally and via end=")
+			end = a
+		else:
+			schema.append(a)
+	final_end = Finalize.FUNC if end is None else end
+
 	def decorator(core: Callable) -> PreparsedFunc:
-		return PreparsedFunc(core, schema, end=end)
+		return PreparsedFunc(core, tuple(schema) or None, end=final_end)
 	return decorator
 
 

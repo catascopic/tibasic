@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from argspec import env, expr as expr_spec, optional
-from decorators import preparse, preparse_vectorized, TiCall
+from argspec import env, expr as expr_spec, optional, numeric, vectorized, PassEnv
+from decorators import preparse, preparse_vectorized, TiCall, FUNC
 from environment import Environment
 from errors import TiSyntaxError, DomainError, NonRealAnsError
 from modes import ComplexMode
@@ -62,8 +62,8 @@ def acos(x):
 def atan(x):
 	return math.atan(x)
 
-@preparse_vectorized(env, expr_spec)
-def sqrt(env, x):
+@preparse(FUNC)
+def sqrt(env: PassEnv, x: vectorized[numeric]):
 	require_num(x)
 	if isinstance(x, complex):
 		return cmath.sqrt(x)

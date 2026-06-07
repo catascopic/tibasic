@@ -20,8 +20,9 @@ from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
 	DomainError, StatError, ArgumentError,
 )
-from argspec import expr, optional, rest
-from decorators import vectorized, call_vectorized, preparse, preparse_vectorized, PreparsedFunc
+from argspec import expr, numeric, integer, vectorized, matrix_vectorized, optional, rest
+from decorators import preparse, preparse_vectorized, FUNC
+from decorators import vectorized as _vectorized
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -32,20 +33,6 @@ def handle_complex(func):
 	def apply(a):
 		return complex(func(a.real), func(a.imag)) if isinstance(a, complex) else func(a)
 	return apply
-
-
-def matrix_vectorized(*schema):
-	"""Like preparse_vectorized, but the first argument also applies element-wise
-	to a TiMatrix.  Takes an argspec schema like preparse does."""
-	def decorator(func):
-		@wraps(func)
-		def apply(a, *args):
-			if isinstance(a, TiMatrix):
-				return a.transform(lambda x: func(x, *args))
-			return call_vectorized(func, (a, *args))
-		# apply already handles vectorization, so PreparsedFunc.vectorize stays off.
-		return PreparsedFunc(apply, schema)
-	return decorator
 
 
 @preparse_vectorized(expr)
@@ -78,8 +65,8 @@ def cbrt(x):
 		return cmath.exp(cmath.log(x) / 3)
 	return math.cbrt(x)
 
-@matrix_vectorized(expr)
-def abs(x):
+@preparse(FUNC)
+def abs(x: matrix_vectorized[numeric]):
 	return builtins.abs(require_num(x))
 
 def _ti_round(x: float, decimals: int) -> float:
@@ -94,27 +81,27 @@ def _ti_round(x: float, decimals: int) -> float:
 	return float(_decimal.Decimal(str(x)).quantize(quant, rounding=_decimal.ROUND_HALF_UP))
 
 
-@matrix_vectorized(expr, optional(expr))
-def round(x, decimals=9):
+@preparse(FUNC)
+def round(x: matrix_vectorized[numeric], decimals: integer = 9):
 	x = require_num(x)
 	n = py_int(decimals)
 	if isinstance(x, complex):
 		return complex(_ti_round(x.real, n), _ti_round(x.imag, n))
 	return _ti_round(x, n)
 
-@matrix_vectorized(expr)
+@preparse(FUNC)
 @handle_complex
-def i_part(x):
+def i_part(x: matrix_vectorized[numeric]):
 	return float(math.trunc(require_num(x)))
 
-@matrix_vectorized(expr)
+@preparse(FUNC)
 @handle_complex
-def f_part(x):
+def f_part(x: matrix_vectorized[numeric]):
 	return x - math.trunc(require_num(x))
 
-@matrix_vectorized(expr)
+@preparse(FUNC)
 @handle_complex
-def int_(x):
+def int_(x: matrix_vectorized[numeric]):
 	return float(math.floor(require_num(x)))
 
 def _minmax(fn, a, b):
@@ -136,16 +123,16 @@ def min(a, b=None):
 def max(a, b=None):
 	return _minmax(builtins.max, a, b)
 
-@preparse_vectorized(expr, expr)
-def lcm(a, b):
+@preparse(FUNC)
+def lcm(a: vectorized[numeric], b: vectorized[numeric]) -> float:
 	return float(math.lcm(py_int(a), py_int(b)))
 
-@preparse_vectorized(expr, expr)
-def gcd(a, b):
+@preparse(FUNC)
+def gcd(a: vectorized[numeric], b: vectorized[numeric]) -> float:
 	return float(math.gcd(py_int(a), py_int(b)))
 
-@preparse_vectorized(expr, expr)
-def remainder(a, b):
+@preparse(FUNC)
+def remainder(a: vectorized[numeric], b: vectorized[numeric]):
 	require_int(a)
 	require_int(b)
 	if a < 0:
@@ -181,7 +168,7 @@ def angle(x):
 def rand_list(n):
 	return TiList([random.random() for _ in range(py_int(n))])
 
-@vectorized
+@_vectorized
 def _rand_int_single(low, high):
 	if low > high:
 		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")

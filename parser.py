@@ -628,6 +628,10 @@ class ArgParser:
 		return self._parser.parse_expr()
 
 	@_parse_arg
+	def real(self):
+		return require_real(self._parser.parse_expr())
+
+	@_parse_arg
 	def thunk(self):
 		return self._parser.capture()
 
