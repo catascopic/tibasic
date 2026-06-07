@@ -1,7 +1,7 @@
 import cmath
 import math
 
-from decorators import vectorized, call_vectorized
+from decorators import vectorized
 from functools import wraps
 from numbers import Number
 from errors import DataTypeError, DomainError, DivideByZeroError

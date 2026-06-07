@@ -2,14 +2,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from enum import Enum, auto
-from functools import partial, wraps, update_wrapper
+from functools import wraps, update_wrapper
 from itertools import repeat
 from numbers import Number
 from typing import Any, TYPE_CHECKING
 
 from tiobjects import TiList, TiMatrix, require_num, require_real, require_int
 from errors import DimMismatchError
-from argspec import _as_spec, schema_from_signature
+from argspec import schema_from_signature
 
 if TYPE_CHECKING:
 	from parser import ArgParser
@@ -91,9 +91,9 @@ def _make_vectorized(core: Callable, vec: frozenset, mat: frozenset) -> Callable
 	return apply
 
 
-# ── Whole-function vectorization (legacy) ────────────────────────────────────
-# Used by preparse_vectorized / pure_vectorized / env_vectorized: maps over every
-# TiList/Number argument uniformly, threading env through untouched.
+# ── Whole-function vectorization ─────────────────────────────────────────────
+# The `vectorized` decorator (used by operators.py) maps a function over every
+# TiList/Number argument uniformly, broadcasting scalars.
 
 def call_vectorized(func: Callable, args: tuple) -> Any:
 	len_check = set()
@@ -117,13 +117,6 @@ def vectorized(func: Callable) -> Callable:
 	@wraps(func)
 	def apply(*args: Any) -> Any:
 		return call_vectorized(func, args)
-	return apply
-
-
-def _vectorized_with_env(func: Callable) -> Callable:
-	@wraps(func)
-	def apply(env: Any, *args: Any) -> Any:
-		return call_vectorized(partial(func, env), args)
 	return apply
 
 
@@ -197,19 +190,16 @@ _END_METHOD = {
 class PreparsedFunc(TiCall):
 	"""Wraps a plain core function with a declarative arg schema (see argspec.py).
 
-	The schema is a tuple of ArgSpec values, one per core parameter.  It may be
-	passed explicitly (legacy positional form) or, when `schema` is None, read
-	from the core's type annotations via `schema_from_signature`.  An `env` spec
-	injects ArgParser.env in that slot without consuming a token; every other
-	spec parses from the token stream via the named parse method.
+	The schema is read from the core's type annotations via
+	`schema_from_signature`: one ArgSpec per parameter.  An `env` spec injects
+	ArgParser.env in that slot without consuming a token; every other spec parses
+	from the token stream via the named parse method.
 
 	`end` is a Finalize member controlling which ArgParser end method is called
 	after parsing (FUNC end_func, CMD end_cmd, CMD_FUNC end_paren_cmd, NONE none).
 
 	Vectorization is per-parameter: any spec flagged `vectorize` maps over a
-	TiList in its slot, and a `matrix` spec also maps over a TiMatrix.  (The
-	legacy `vectorize=True` flag, set by preparse_vectorized, instead maps the
-	whole function over every TiList/Number argument, threading env through.)
+	TiList in its slot, and a `matrix` spec also maps over a TiMatrix.
 
 	The core stays a plain function, so functions remain callable from other
 	Python code (composability) via TiCall.__call__.
@@ -217,27 +207,17 @@ class PreparsedFunc(TiCall):
 	def __init__(
 		self,
 		core: Callable,
-		schema: tuple | None = None,
-		vectorize: bool = False,
 		end: Finalize = Finalize.FUNC,
 	) -> None:
-		if schema is None:
-			schema = schema_from_signature(core)
-		else:
-			schema = tuple(_as_spec(s) for s in schema)
+		schema = schema_from_signature(core)
 
 		# Validation wraps the core innermost; vectorization (if any) wraps that,
 		# so a vectorized slot's validator runs per element.
 		validated = _make_validated(core, schema)
 
-		if vectorize:
-			# Legacy whole-function vectorization (preparse_vectorized).
-			has_env = any(s.method == 'env' for s in schema)
-			func = _vectorized_with_env(validated) if has_env else vectorized(validated)
-		else:
-			vec = frozenset(i for i, s in enumerate(schema) if s.vectorize)
-			mat = frozenset(i for i, s in enumerate(schema) if s.matrix)
-			func = _make_vectorized(validated, vec, mat) if vec else validated
+		vec = frozenset(i for i, s in enumerate(schema) if s.vectorize)
+		mat = frozenset(i for i, s in enumerate(schema) if s.matrix)
+		func = _make_vectorized(validated, vec, mat) if vec else validated
 
 		super().__init__(func)
 		self.schema = schema
@@ -250,7 +230,7 @@ class PreparsedFunc(TiCall):
 		return self.func(*args)
 
 
-def preparse(*args, end: Finalize | None = None):
+def preparse(end: Finalize | None = None):
 	"""Declarative decorator for functions/commands called once per invocation.
 
 	The schema comes from the core's parameter annotations (see argspec.py):
@@ -261,57 +241,18 @@ def preparse(*args, end: Finalize | None = None):
 	    @preparse(CMD_FUNC)
 	    def pxl_on(env: PassEnv, row: expr, col: expr) -> None: ...
 
-	The Finalize mode may be given positionally (as above) or via `end=`.  It
-	selects the ArgParser end method (default FUNC):
+	`end` is a Finalize member (given positionally as above or via `end=`)
+	selecting the ArgParser end method (default FUNC):
 	  FUNC      — end_func()       expression functions; does not eat separator
 	  CMD       — end_cmd()        no-paren commands; eats trailing separator
 	  CMD_FUNC  — end_paren_cmd()  paren commands;    eats ) + separator
 	  NONE      — (nothing)        leaves the parser untouched (e.g. DelVar)
-
-	A legacy positional schema is still accepted; in that case the schema is
-	taken from the arguments rather than the annotations:
-
-	    @preparse(expr, optional(expr))
-	    def round(x, n=9): ...
 	"""
-	schema = []
-	for a in args:
-		if isinstance(a, Finalize):
-			if end is not None and end is not a:
-				raise TypeError("preparse: end mode given both positionally and via end=")
-			end = a
-		else:
-			schema.append(a)
 	final_end = Finalize.FUNC if end is None else end
 
 	def decorator(core: Callable) -> PreparsedFunc:
-		return PreparsedFunc(core, tuple(schema) or None, end=final_end)
+		return PreparsedFunc(core, end=final_end)
 	return decorator
-
-
-def preparse_vectorized(*schema):
-	"""Like preparse, but maps over TiList arguments (env, if present, is
-	threaded through rather than vectorized over).
-
-	    @preparse_vectorized(expr)
-	    def sinh(x): ...
-
-	    @preparse_vectorized(env, expr)
-	    def some_env_math(env, x): ...
-	"""
-	def decorator(core: Callable) -> PreparsedFunc:
-		return PreparsedFunc(core, schema, vectorize=True)
-	return decorator
-
-
-def pure_vectorized(func):
-	"""Same as pure_func, but also vectorized."""
-	return pure_func(vectorized(func))
-
-
-def env_vectorized(func):
-	"""Same as env_func, but also vectorized."""
-	return env_func(_vectorized_with_env(func))
 
 
 class nullary_command(TiCall):

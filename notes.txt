@@ -1,8 +1,6 @@
 map_vectorized: use index-based instead of frozenset
 flatten variadic?
 
-does vectorized make sure only the marked arguments get vectorized?
-
 @nullary_command -> @preparse(env, end=CMD)
 one_or_more/zero_or_more
 
@@ -47,6 +45,10 @@ I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
 
 ********
+
+does vectorized make sure only the marked arguments get vectorized?
+
+
 integer/numeric shouldn't just call expr!
 
 Would this be a good time to try to resolve the Vectorized issue? It would be really nice if we could do this:

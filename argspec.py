@@ -7,8 +7,7 @@ of the vocabulary aliases below.  @preparse reads the signature (see
     @preparse(FUNC)
     def gcd(a: vectorized[numeric], b: vectorized[numeric]) -> float: ...
 
-Optionality and arity fall straight out of the signature — there is no separate
-`optional(...)` / `rest(...)` to keep in sync:
+Optionality and arity fall straight out of the signature:
 
   * a parameter with a default is optional; when the caller omits it, take()
     omits it too, so the function's own default applies;
@@ -17,10 +16,6 @@ Optionality and arity fall straight out of the signature — there is no separat
 Each alias is an ``Annotated[T, ArgSpec(...)]``.  The ArgSpec metadata names the
 ArgParser parse method; the base type ``T`` is the value the core function
 actually receives, so the annotations stay truthful to a type checker too.
-
-Legacy positional schemas — ``@preparse(env, expr, optional(expr))`` — still
-work: anywhere a spec is consumed it is normalized via `_as_spec`, which accepts
-both bare ArgSpec values and the Annotated aliases.
 
 This module imports nothing from the project at runtime (only stdlib), so the
 heavyweight parser/forms modules can import the vocabulary with no circular-import
@@ -120,23 +115,6 @@ class matrix_vectorized:
 	matrix per call."""
 	def __class_getitem__(cls, item):
 		return _mark(item, vectorize=True, matrix=True)
-
-
-# ── Legacy positional-schema helpers ────────────────────────────────────────
-# New-style schemas express these through the signature (a default → optional,
-# ``*args`` → variadic), but the old positional form is still accepted.
-
-def optional(spec) -> ArgSpec:
-	"""Mark a spec optional (legacy positional form). No default is stored: an
-	omitted optional simply isn't passed, so the function's signature default
-	applies."""
-	return replace(_as_spec(spec), optional=True)
-
-
-def rest(spec) -> ArgSpec:
-	"""Greedily consume all remaining arguments (legacy positional form); yields
-	a list.  Must be the last entry in a schema."""
-	return replace(_as_spec(spec), variadic=True)
 
 
 # ── Schema extraction from a function signature ─────────────────────────────
