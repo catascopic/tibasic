@@ -1,11 +1,9 @@
-Can you make an enum for finalize? I'd also rename finalize "end" (keep it shorter), and the enum would be FUNC, CMD, CMD_FUNC, NONE (the last of which would allow DelVar to use preparsed).
-
-I think most of the program commands can use preparse. We'd just have to give Environment a current_program method. Also, I feel like the program_command could be refactored or maybe removed.
+@nullary_command -> @preparse(env, end=CMD)
+one_or_more/zero_or_more
 
 add to ArgSpec: number, real, integer, etc. Still have to work around vectorized, but could make special handler for this (vectorized_num?)
 
-
-one_or_more/zero_or_more
+I want to revisit making parse
 
 peek/next/match/match_separator
 
@@ -44,6 +42,21 @@ I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
 
 ********
+
+Okay, some thoughts on the current paradigm:
+First, I don't think we need default values at all for optional params! The optional value is in the actual function, and the parser just calls it with fewer params.
+Crazy idea: What do you think about a mini-language for preparse? For example:
+@preparse('FUNC:thunk,num_var,real,real,real?')
+def expr(...
+the FUNC: tells the parser what kind of command it is, i.e. which style ending to parse.
+Also, this mini-language could specify vectorizable params like this:
+@preparsed('FUNC:$real,$real')
+def gcd(...
+(`$` because it's my unofficial "user list" symbol. Could be something different.)
+Also, we could support `+` and `*`, because ClrList takes one or more args, while others take zero or more.
+But if that seems bad, I'd like to change finalize a bit: I'd like it to be an enum (though enums annoy me because I wish I could directly import the constants). I'd also rename finalize "end" (just to keep it shorter), and the enum would be FUNC, CMD, CMD_FUNC, NONE (the last of which would allow DelVar to use preparsed).
+
+I think most of the program commands can use preparse. We'd just have to give Environment a current_program method. Also, I feel like the program_command could be refactored or maybe removed.
 
 Earlier I was removing all the explicit conversions to float, but that was actually correct.
 The calculator only deals in floating-point numbers, and we should only be using ints internally.

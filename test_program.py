@@ -219,6 +219,17 @@ class TestIfOneLine:
 		assert var(env, 'B') is None
 		assert var(env, 'C') == 30
 
+	def test_false_skips_colon_separated_statement(self):
+		# If 0:stmt — the separator ':' must be consumed by end_cmd *before*
+		# skip_statement runs; otherwise skip_statement eats the colon and
+		# 'stmt' executes instead of being skipped.
+		env = run("""
+		If 0:42@A
+		99@B
+		""")
+		assert var(env, 'A') is None
+		assert var(env, 'B') == 99
+
 
 # ── If / Then / Else / End ────────────────────────────────────────────────────
 
@@ -357,6 +368,27 @@ class TestIfThenElse:
 		End
 		""")
 		assert var(env, 'A') == 3
+
+	def test_then_colon_separated_from_if(self):
+		# If cond:Then on the same line — end_cmd must eat the ':' before
+		# begin_if peeks for Then; otherwise begin_if sees ':' and misses Then,
+		# causing the bare Then on the next "statement" to raise TiSyntaxError.
+		env = run("""
+		If 1: Then
+			42@A
+		End
+		""")
+		assert var(env, 'A') == 42
+
+	def test_then_false_colon_separated_skips_body(self):
+		env = run("""
+		If 0: Then
+			42@A
+		End
+		99@B
+		""")
+		assert var(env, 'A') is None
+		assert var(env, 'B') == 99
 
 	def test_end_without_block_raises(self):
 		with pytest.raises(TiSyntaxError):
@@ -575,6 +607,27 @@ class TestIsGtDsLt:
 		99@B
 		42@C
 		""", env)
+		assert var(env, 'B') is None   # skipped
+		assert var(env, 'C') == 42
+
+	def test_is_gt_skips_colon_separated_statement(self):
+		# IS>(A,5):stmt — end_paren_cmd must eat both ')' and ':' before is_gt
+		# calls skip_statement; otherwise skip_statement eats ':' and 'stmt'
+		# executes instead of being skipped.
+		env = run("""
+		5@A
+		IS>( A,5):99@B
+		42@C
+		""")
+		assert var(env, 'B') is None   # skipped
+		assert var(env, 'C') == 42
+
+	def test_ds_lt_skips_colon_separated_statement(self):
+		env = run("""
+		3@A
+		DS<( A,3):99@B
+		42@C
+		""")
 		assert var(env, 'B') is None   # skipped
 		assert var(env, 'C') == 42
 

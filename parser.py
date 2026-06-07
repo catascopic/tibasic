@@ -593,8 +593,8 @@ def _can_start_atom(t: Token) -> bool:
 
 
 def _parse_arg(method):
-	def wrapper(self, optional=False, default=None):
-		return self._arg(lambda: method(self), optional, default)
+	def wrapper(self):
+		return self._arg(lambda: method(self))
 	return wrapper
 
 
@@ -616,10 +616,8 @@ class ArgParser:
 		self._parser = parser
 		self._next = parser.peek() not in {COLON, NEWLINE, EOF_TOKEN}
 
-	def _arg(self, parse_fn, optional=False, default=None):
+	def _arg(self, parse_fn):
 		if not self._next:
-			if optional:
-				return default
 			raise ArgumentError("Missing argument: expected comma before next argument")
 		val = parse_fn()
 		self._next = self._parser.eat_if(COMMA)
@@ -675,6 +673,7 @@ class ArgParser:
 			return UserList(self.env, self._parser.read_name(5))
 		return self._parser.parse_list_var()
 
+	@_parse_arg
 	def any_var(self) -> Variable:
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
 		t = self._parser.advance()
@@ -759,7 +758,11 @@ class ArgParser:
 
 		Finalization (end_func / end_cmd / end_paren_cmd) is the caller's
 		responsibility; PreparsedFunc.call_with_parser handles it based on the
-		`finalize` parameter passed to @preparse.
+		`end` parameter passed to @preparse.
+
+		Absent trailing optionals are simply omitted from the result, so the
+		core function is called with fewer arguments and the defaults in its own
+		signature apply.
 		"""
 		out = []
 		for spec in specs:
@@ -773,8 +776,11 @@ class ArgParser:
 				while self._next:
 					items.append(parse())
 				out.append(items)
+			elif spec.optional and not self._next:
+				# Absent optional: omit it (and any following optionals).
+				break
 			else:
-				out.append(parse(optional=spec.optional, default=spec.default))
+				out.append(parse())
 		return out
 	
 	def parse_indices(self, count):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from enum import Enum, auto
 from functools import partial, wraps, update_wrapper
 from itertools import repeat
 from numbers import Number
@@ -81,6 +82,37 @@ class forms_func(TiCall):
 		return self.func(a)
 
 
+class Finalize(Enum):
+	"""Which ArgParser end method PreparsedFunc calls after parsing.
+
+	  FUNC      — end_func()       expression functions; eats ), no separator
+	  CMD       — end_cmd()        no-paren commands; eats trailing separator
+	  CMD_FUNC  — end_paren_cmd()  paren commands; eats ) + separator
+	  NONE      — (nothing)        leaves the parser untouched so the command
+	                               bunches with whatever follows (e.g. DelVar)
+
+	The members are re-exported as bare module-level names (FUNC, CMD, …) so
+	call sites can write `@preparse(..., end=CMD)` after a plain
+	`from decorators import CMD`.
+	"""
+	FUNC = auto()
+	CMD = auto()
+	CMD_FUNC = auto()
+	NONE = auto()
+
+
+# Bare aliases so callers can `from decorators import FUNC, CMD, CMD_FUNC, NONE`.
+FUNC, CMD, CMD_FUNC, NONE = Finalize
+
+# Maps each Finalize mode to the ArgParser end method name (None = no call).
+_END_METHOD = {
+	Finalize.FUNC: 'end_func',
+	Finalize.CMD: 'end_cmd',
+	Finalize.CMD_FUNC: 'end_paren_cmd',
+	Finalize.NONE: None,
+}
+
+
 class PreparsedFunc(TiCall):
 	"""Wraps a plain core function with a declarative arg schema (see argspec.py).
 
@@ -88,10 +120,8 @@ class PreparsedFunc(TiCall):
 	`env` spec injects ArgParser.env in that slot without consuming a token;
 	every other spec parses from the token stream via the named parse method.
 
-	`finalize` controls which ArgParser end method is called after parsing:
-	  'func'      — end_func()       for expression functions (default)
-	  'cmd'       — end_cmd()        for no-paren commands (If, While, Goto …)
-	  'paren_cmd' — end_paren_cmd()  for paren commands (For(, Pxl-On(, …)
+	`end` is a Finalize member controlling which ArgParser end method is called
+	after parsing (FUNC end_func, CMD end_cmd, CMD_FUNC end_paren_cmd, NONE none).
 
 	If vectorize=True the core maps over TiList arguments.  When the schema
 	carries an `env` slot, env is threaded through unchanged rather than being
@@ -105,7 +135,7 @@ class PreparsedFunc(TiCall):
 		core: Callable,
 		schema: tuple,
 		vectorize: bool = False,
-		finalize: str = 'func',
+		end: Finalize = Finalize.FUNC,
 	) -> None:
 		if vectorize:
 			has_env = any(s.method == 'env' for s in schema)
@@ -114,30 +144,32 @@ class PreparsedFunc(TiCall):
 			func = core
 		super().__init__(func)
 		self.schema = schema
-		self.finalize = finalize
+		self.end_method = _END_METHOD[end]
 
 	def call_with_parser(self, a: ArgParser):
 		args = a.take(*self.schema)
-		getattr(a, f'end_{self.finalize}')()
+		if self.end_method is not None:
+			getattr(a, self.end_method)()
 		return self.func(*args)
 
 
-def preparse(*schema, finalize: str = 'func'):
+def preparse(*schema, end: Finalize = Finalize.FUNC):
 	"""Declarative-schema decorator for functions called once per invocation.
 
-	`finalize` selects the ArgParser end method (default 'func'):
-	  'func'      — end_func()       expression functions; does not eat separator
-	  'cmd'       — end_cmd()        no-paren commands; eats trailing separator
-	  'paren_cmd' — end_paren_cmd()  paren commands;    eats ) + separator
+	`end` is a Finalize member selecting the ArgParser end method (default FUNC):
+	  FUNC      — end_func()       expression functions; does not eat separator
+	  CMD       — end_cmd()        no-paren commands; eats trailing separator
+	  CMD_FUNC  — end_paren_cmd()  paren commands;    eats ) + separator
+	  NONE      — (nothing)        leaves the parser untouched (e.g. DelVar)
 
-	    @preparse(env, expr, expr, finalize='paren_cmd')
+	    @preparse(env, expr, expr, end=CMD_FUNC)
 	    def pxl_on(env, row, col): ...
 
-	    @preparse(expr, optional(expr, 0))
-	    def round(x, n): ...
+	    @preparse(expr, optional(expr))
+	    def round(x, n=9): ...
 	"""
 	def decorator(core: Callable) -> PreparsedFunc:
-		return PreparsedFunc(core, schema, finalize=finalize)
+		return PreparsedFunc(core, schema, end=end)
 	return decorator
 
 

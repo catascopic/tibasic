@@ -8,8 +8,8 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 import operators
-from argspec import env, expr, thunk, numeric_var, list_var, list_var_prefix_optional, equation_var, string_var, label_name, program_name, optional, rest
-from decorators import forms_func, preparse, nullary_command
+from argspec import env, expr, thunk, numeric_var, list_var, list_var_prefix_optional, equation_var, string_var, label_name, program_name, any_var, optional, rest
+from decorators import forms_func, preparse, nullary_command, CMD, CMD_FUNC, NONE
 from errors import DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError, UndefinedError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_num, require_real, require_int, require_list, require_str, py_int
@@ -42,8 +42,8 @@ def sigma(env, formula, var, start, end) -> float:
 			n += 1
 	return total
 
-@preparse(env, thunk, numeric_var, expr, optional(expr, 0.001))
-def n_deriv(env, formula, var, val, h) -> float:
+@preparse(env, thunk, numeric_var, expr, optional(expr))
+def n_deriv(env, formula, var, val, h=0.001) -> float:
 	with env.nest_guard(n_deriv, max_depth=1), var.scoped():
 		var.value = val + h
 		fwd = formula.eval()
@@ -91,8 +91,8 @@ def _adaptive_gk15(f, lo, hi, tol, depth=0):
 		_adaptive_gk15(f, mid, hi, tol / 2, depth + 1)
 	)
 
-@preparse(env, thunk, numeric_var, expr, expr, optional(expr, 1e-5))
-def fn_int(env, formula, var, lo, hi, tol) -> float:
+@preparse(env, thunk, numeric_var, expr, expr, optional(expr))
+def fn_int(env, formula, var, lo, hi, tol=1e-5) -> float:
 	with env.nest_guard('fnInt'), var.scoped():
 		def f(x):
 			var.value = x
@@ -121,11 +121,11 @@ def _sort(main_var, dep_vars, reverse: bool):
 		for d in deps:
 			d.data = [d.data[i] for i in indices]
 
-@preparse(list_var, rest(list_var), finalize='paren_cmd')
+@preparse(list_var, rest(list_var), end=CMD_FUNC)
 def sort_a(main_var, dep_vars):
 	_sort(main_var, dep_vars, False)
 
-@preparse(list_var, rest(list_var), finalize='paren_cmd')
+@preparse(list_var, rest(list_var), end=CMD_FUNC)
 def sort_d(main_var, dep_vars):
 	_sort(main_var, dep_vars, True)
 
@@ -172,8 +172,8 @@ def fill(a: ArgParser):
 	else:
 		raise DataTypeError("Fill(: expected a list or matrix variable")
 
-@preparse(env, thunk, numeric_var, expr, expr, optional(expr, 1))
-def seq(env, formula, var, start, end, step) -> TiList:
+@preparse(env, thunk, numeric_var, expr, expr, optional(expr))
+def seq(env, formula, var, start, end, step=1) -> TiList:
 	start = require_real(start)
 	end = require_real(end)
 	step = require_real(step)
@@ -239,7 +239,7 @@ def matr_to_list(a: ArgParser) -> None:
 # STATISTICS #
 ##############
 
-@preparse(list_var, rest(list_var), finalize='cmd')
+@preparse(list_var, rest(list_var), end=CMD)
 def clr_list(first, rest_vars):
 	"""ClrList list[, list, ...] — clear each named list to empty; silently skip nonexistent lists."""
 	for var in [first] + rest_vars:
@@ -256,7 +256,7 @@ def clr_all_lists(env):
 	for lst in env.user_lists.values():
 		lst.clear()
 
-@preparse(env, rest(list_var_prefix_optional), finalize='cmd')
+@preparse(env, rest(list_var_prefix_optional), end=CMD)
 def set_up_editor(env, list_vars):
 	"""SetUpEditor [list, ...] — ensure lists exist, creating empty ones as needed.
 
@@ -277,12 +277,12 @@ def set_up_editor(env, list_vars):
 # STRINGS #
 ###########
 
-@preparse(equation_var, string_var, finalize='paren_cmd')
+@preparse(equation_var, string_var, end=CMD_FUNC)
 def equ_to_string(equ_var, str_var) -> None:
 	"""Equ►String(equvar, strvar) — copy the equation's tokens into a string variable."""
 	str_var.value = TiString(equ_var.resolve().tokens)
 
-@preparse(expr, equation_var, finalize='paren_cmd')
+@preparse(expr, equation_var, end=CMD_FUNC)
 def string_to_equ(string, equ_var) -> None:
 	"""String►Equ(str_expr, equvar) — parse a string value into an equation variable."""
 	equ_var.value = TiEquation(require_str(string).tokens)
@@ -291,7 +291,7 @@ def string_to_equ(string, equ_var) -> None:
 # PROGRAMS #
 ############
 
-@preparse(env, expr, finalize='cmd')
+@preparse(env, expr, end=CMD)
 def if_cmd(env, cond):
 	env.current_program().begin_if(bool(cond))
 
@@ -306,17 +306,17 @@ def else_cmd(env):
 	(Else blocks are only executed when encountered while skipping an If-Then block.)"""
 	env.current_program().begin_else()
 
-@preparse(env, numeric_var, expr, expr, optional(expr, 1.0), finalize='paren_cmd')
-def for_cmd(env, var, start, end, step):
+@preparse(env, numeric_var, expr, expr, optional(expr), end=CMD_FUNC)
+def for_cmd(env, var, start, end, step=1.0):
 	env.current_program().begin_for(
 		var, require_real(start), require_real(end), require_real(step)
 	)
 
-@preparse(env, thunk, finalize='cmd')
+@preparse(env, thunk, end=CMD)
 def while_cmd(env, condition):
 	env.current_program().begin_while(condition)
 
-@preparse(env, thunk, finalize='cmd')
+@preparse(env, thunk, end=CMD)
 def repeat_cmd(env, condition):
 	env.current_program().begin_repeat(condition)
 
@@ -324,24 +324,24 @@ def repeat_cmd(env, condition):
 def end_cmd(env):
 	env.current_program().end_block()
 
-@preparse(env, label_name, finalize='cmd')
+@preparse(env, label_name, end=CMD)
 def lbl_cmd(env, name):
 	"""Lbl is a no-op at runtime; just verify the syntax and that we're in a program."""
 	env.current_program()  # raises if not in a program
 
-@preparse(env, label_name, finalize='cmd')
+@preparse(env, label_name, end=CMD)
 def goto_cmd(env, name):
 	env.current_program().goto(name)
 
-@preparse(env, numeric_var, expr, finalize='paren_cmd')
+@preparse(env, numeric_var, expr, end=CMD_FUNC)
 def is_gt_cmd(env, var, threshold):
 	env.current_program().is_gt(var, require_real(threshold))
 
-@preparse(env, numeric_var, expr, finalize='paren_cmd')
+@preparse(env, numeric_var, expr, end=CMD_FUNC)
 def ds_lt_cmd(env, var, threshold):
 	env.current_program().ds_lt(var, require_real(threshold))
 
-@preparse(env, program_name, finalize='cmd')
+@preparse(env, program_name, end=CMD)
 def prgm(env, name):
 	env.run_program(name)
 
@@ -355,15 +355,15 @@ def stop_cmd(env):
 	env.current_program()  # raises if not in a program
 	raise StopSignal()
 
-@forms_func
-def del_var(a):
+@preparse(any_var, end=NONE)
+def del_var(var):
 	"""DelVar variable — clear one variable without consuming the statement separator.
 
-	Bunches: DelVar ADelVar B and DelVar ADisp X are both valid on the same line.
-	Does not update Ans.
+	end=NONE leaves the parser untouched (no finalizer), so DelVar bunches with
+	whatever follows: DelVar ADelVar B and DelVar ADisp X are both valid on the
+	same line.  Does not update Ans.
 	"""
-	a.any_var().value = None
-	# No end_cmd() call; leaves separator in place for next command
+	var.value = None
 
 @forms_func
 def disp(a: ArgParser):

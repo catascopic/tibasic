@@ -94,7 +94,7 @@ def _ti_round(x: float, decimals: int) -> float:
 	return float(_decimal.Decimal(str(x)).quantize(quant, rounding=_decimal.ROUND_HALF_UP))
 
 
-@matrix_vectorized(expr, optional(expr, 9))
+@matrix_vectorized(expr, optional(expr))
 def round(x, decimals=9):
 	x = require_num(x)
 	n = py_int(decimals)
@@ -128,11 +128,11 @@ def _minmax(fn, a, b):
 		return fn(a, b)
 	raise DataTypeError(f"{fn.__name__}: both args must be the same type (both numeric or both list)")
 
-@preparse(expr, optional(expr, None))
+@preparse(expr, optional(expr))
 def min(a, b=None):
 	return _minmax(builtins.min, a, b)
 
-@preparse(expr, optional(expr, None))
+@preparse(expr, optional(expr))
 def max(a, b=None):
 	return _minmax(builtins.max, a, b)
 
@@ -187,7 +187,7 @@ def _rand_int_single(low, high):
 		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
 	return float(random.randint(py_int(low), py_int(high)))
 
-@preparse(expr, expr, optional(expr, None))
+@preparse(expr, expr, optional(expr))
 def rand_int(low, high, n=None):
 	if n is None:
 		return _rand_int_single(low, high)
@@ -198,7 +198,7 @@ def rand_int(low, high, n=None):
 	n = py_int(n)
 	return TiList([float(random.randint(low, high)) for _ in range(n)])
 
-@preparse(expr, expr, optional(expr, None))
+@preparse(expr, expr, optional(expr))
 def rand_norm(mu, sigma, n=None):
 	require_real(mu)
 	require_real(sigma)
@@ -206,7 +206,7 @@ def rand_norm(mu, sigma, n=None):
 		return random.gauss(mu, sigma)
 	return TiList([random.gauss(mu, sigma) for _ in range(py_int(n))])
 
-@preparse(expr, expr, optional(expr, None))
+@preparse(expr, expr, optional(expr))
 def rand_bin(n, p, simulations=None):
 	n = py_int(n)
 	if not (0 <= p <= 1):
@@ -257,7 +257,7 @@ def augment(a, b):
 		return TiMatrix([r1 + r2 for r1, r2 in zip(a.data, b.data)])
 	raise DataTypeError(f"augment: both args must be lists or both must be matrices; got {a}, {b}")
 
-@preparse(expr, optional(expr, None))
+@preparse(expr, optional(expr))
 def mean(lst, freqlist=None):
 	require_list(lst)
 	if freqlist is None:
@@ -265,7 +265,7 @@ def mean(lst, freqlist=None):
 	require_list(freqlist)
 	return builtins.sum(x * w for x, w in zip(lst, freqlist)) / builtins.sum(freqlist)
 
-@preparse(expr, optional(expr, None))
+@preparse(expr, optional(expr))
 def median(lst, freqlist=None):
 	require_list(lst)
 	if freqlist is None:
@@ -293,7 +293,7 @@ def median(lst, freqlist=None):
 		return nth(total // 2)
 	return (nth(total // 2 - 1) + nth(total // 2)) / 2
 
-@preparse(expr, optional(expr, None), optional(expr, None))
+@preparse(expr, optional(expr), optional(expr))
 def sum(lst, start=None, end=None):
 	data = require_list(lst).data
 	if start is None:
@@ -306,7 +306,7 @@ def sum(lst, start=None, end=None):
 
 	return builtins.sum(data[start - 1 : end])
 
-@preparse(expr, optional(expr, None), optional(expr, None))
+@preparse(expr, optional(expr), optional(expr))
 def prod(lst, start=None, end=None):
 	data = require_list(lst).data
 	if start is None:
@@ -319,7 +319,7 @@ def prod(lst, start=None, end=None):
 
 	return math.prod(data[start - 1 : end])
 
-@preparse(expr, optional(expr, None))
+@preparse(expr, optional(expr))
 def variance(lst, freqlist=None):
 	require_list(lst)
 	if freqlist is None:
@@ -339,7 +339,7 @@ def variance(lst, freqlist=None):
 
 	return builtins.sum(w * (x - m) ** 2 for x, w in zip(lst, freqlist)) / (total_w - 1)
 
-@preparse(expr, optional(expr, None))
+@preparse(expr, optional(expr))
 def stddev(lst, freqlist=None):
 	return math.sqrt(variance(lst, freqlist))
 
@@ -462,8 +462,8 @@ def times_row_plus(factor, mat, row1, row2):
 def length(string):
 	return len(require_str(string))
 
-@preparse(expr, expr, optional(expr, 1))
-def in_string(string, substring, start):
+@preparse(expr, expr, optional(expr))
+def in_string(string, substring, start=1):
 	v = require_str(string).tokens
 	s = require_str(substring).tokens
 	start = py_int(start)
@@ -572,7 +572,7 @@ def _expand_cash_flows(cflist, cffreq):
 		result.extend([cf] * int(freq))
 	return result
 
-@preparse(expr, expr, expr, optional(expr, None))
+@preparse(expr, expr, expr, optional(expr))
 def npv(rate, cf0, cflist, cffreq=None):
 	"""Net present value: CF0 + Σ CFj·(1+rate/100)^-j over expanded cash flows."""
 	rate  = require_real(rate)
@@ -583,7 +583,7 @@ def npv(rate, cf0, cflist, cffreq=None):
 	r = 1 + rate / 100
 	return cf0 + builtins.sum(cf * r ** -j for j, cf in enumerate(flows, 1))
 
-@preparse(expr, expr, optional(expr, None))
+@preparse(expr, expr, optional(expr))
 def irr(cf0, cflist, cffreq=None):
 	"""Internal rate of return: the rate (%) at which NPV equals zero."""
 	require_real(cf0)
@@ -735,7 +735,7 @@ def _inc_beta(a, b, x):
 			break
 	return math.exp(a * math.log(x) + b * math.log(1 - x) - lbeta) * h / a
 
-@preparse(expr, optional(expr, 0), optional(expr, 1))
+@preparse(expr, optional(expr), optional(expr))
 def normalpdf(x, mu=0, sigma=1):
 	require_real(x)
 	require_real(mu)
@@ -745,7 +745,7 @@ def normalpdf(x, mu=0, sigma=1):
 	z = (x - mu) / sigma
 	return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2 * math.pi))
 
-@preparse(expr, expr, optional(expr, 0), optional(expr, 1))
+@preparse(expr, expr, optional(expr), optional(expr))
 def normalcdf(lower, upper, mu=0, sigma=1):
 	require_real(lower)
 	require_real(upper)
@@ -757,7 +757,7 @@ def normalcdf(lower, upper, mu=0, sigma=1):
 		return 0.5 * (1 + math.erf(z / math.sqrt(2)))
 	return _cdf((upper - mu) / sigma) - _cdf((lower - mu) / sigma)
 
-@preparse(expr, optional(expr, 0), optional(expr, 1))
+@preparse(expr, optional(expr), optional(expr))
 def inv_norm(p, mu=0, sigma=1):
 	require_real(p)
 	require_real(mu)
@@ -875,7 +875,7 @@ def fcdf(lower, upper, df1, df2):
 		return _inc_beta(d1 / 2, d2 / 2, z)
 	return _cdf(upper, df1, df2) - _cdf(lower, df1, df2)
 
-@preparse(expr, expr, optional(expr, None))
+@preparse(expr, expr, optional(expr))
 def binompdf(n, p, k=None):
 	n = py_int(n)
 	require_real(p)
@@ -883,7 +883,7 @@ def binompdf(n, p, k=None):
 		return TiList([math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(n + 1)])
 	return math.comb(n, py_int(k)) * p ** k * (1 - p) ** (n - k)
 
-@preparse(expr, expr, optional(expr, None))
+@preparse(expr, expr, optional(expr))
 def binomcdf(n, p, k=None):
 	n = py_int(n)
 	require_real(p)
