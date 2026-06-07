@@ -1,6 +1,6 @@
 from __future__ import annotations
 from enum import Enum, auto
-from decorators import forms_func, nullary_command, nullary_bunch
+from decorators import forms_func, no_arg_command, no_arg_bunch
 from errors import DomainError
 from tiobjects import py_int
 
@@ -35,7 +35,7 @@ class GraphOrder(Enum):
 
 
 def _mode(attr, value):
-	@nullary_command
+	@no_arg_command
 	def cmd(env):
 		setattr(env, attr, value)
 	return cmd
@@ -101,8 +101,8 @@ re_theta_i = _mode('complex_mode', ComplexMode.RE_THETA_I)
 # TODO: FULL/HORIZ/G-T
 
 # Clock — these can bunch (ClockOnClockOn is valid)
-@nullary_bunch
+@no_arg_bunch
 def clock_on(env): env.clock_on = True
 
-@nullary_bunch
+@no_arg_bunch
 def clock_off(env): env.clock_on = False

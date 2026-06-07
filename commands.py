@@ -6,7 +6,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 from argspec import expr, thunk, numeric_var, list_var, list_var_prefix_optional, equation_var, string_var, label_name, program_name, any_var, real, PassEnv
-from decorators import forms_func, preparse, nullary_command, CMD, CMD_FUNC, NONE
+from decorators import forms_func, preparse_cmd, preparse_cmd_func, preparse_bunch, no_arg_command
 from errors import DataTypeError, ArgumentError, InvalidDimError, DimMismatchError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_real, require_list, require_str, py_int
@@ -33,11 +33,11 @@ def _sort(main_var, dep_vars, reverse: bool):
 		for d in deps:
 			d.data = [d.data[i] for i in indices]
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def sort_a(main_var: list_var, *dep_vars: list_var):
 	_sort(main_var, dep_vars, False)
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def sort_d(main_var: list_var, *dep_vars: list_var):
 	_sort(main_var, dep_vars, True)
 
@@ -96,7 +96,7 @@ def matr_to_list(a: ArgParser) -> None:
 # STATISTICS #
 ##############
 
-@preparse(CMD)
+@preparse_cmd
 def clr_list(first: list_var, *rest_vars: list_var):
 	"""ClrList list[, list, ...] — clear each named list to empty; silently skip nonexistent lists."""
 	for var in (first, *rest_vars):
@@ -104,7 +104,7 @@ def clr_list(first: list_var, *rest_vars: list_var):
 		if lst is not None:
 			lst.clear()
 
-@nullary_command
+@no_arg_command
 def clr_all_lists(env):
 	"""ClrAllLists — set every defined list (L1–L6 and user lists) to empty."""
 	for list_var in env.lists:
@@ -113,7 +113,7 @@ def clr_all_lists(env):
 	for lst in env.user_lists.values():
 		lst.clear()
 
-@preparse(CMD)
+@preparse_cmd
 def set_up_editor(env: PassEnv, *list_vars: list_var_prefix_optional):
 	"""SetUpEditor [list, ...] — ensure lists exist, creating empty ones as needed.
 
@@ -134,12 +134,12 @@ def set_up_editor(env: PassEnv, *list_vars: list_var_prefix_optional):
 # STRINGS #
 ###########
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def equ_to_string(equ_var: equation_var, str_var: string_var) -> None:
 	"""Equ►String(equvar, strvar) — copy the equation's tokens into a string variable."""
 	str_var.value = TiString(equ_var.resolve().tokens)
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def string_to_equ(string: expr, equ_var: equation_var) -> None:
 	"""String►Equ(str_expr, equvar) — parse a string value into an equation variable."""
 	equ_var.value = TiEquation(require_str(string).tokens)
@@ -148,7 +148,7 @@ def string_to_equ(string: expr, equ_var: equation_var) -> None:
 # PROGRAMS #
 ############
 
-@preparse(CMD)
+@preparse_cmd
 def if_cmd(env: PassEnv, cond: expr):
 	env.current_program().begin_if(bool(cond))
 
@@ -157,60 +157,60 @@ def then_cmd(a: ArgParser):
 	"""Then without a preceding If: always a syntax error."""
 	raise TiSyntaxError("Then without If")
 
-@nullary_command
+@no_arg_command
 def else_cmd(env):
 	"""If we encounter Else this way, always skip the block.
 	(Else blocks are only executed when encountered while skipping an If-Then block.)"""
 	env.current_program().begin_else()
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def for_cmd(env: PassEnv, var: numeric_var, start: real, end: real, step: real = 1.0):
 	env.current_program().begin_for(var, start, end, step)
 
-@preparse(CMD)
+@preparse_cmd
 def while_cmd(env: PassEnv, condition: thunk):
 	env.current_program().begin_while(condition)
 
-@preparse(CMD)
+@preparse_cmd
 def repeat_cmd(env: PassEnv, condition: thunk):
 	env.current_program().begin_repeat(condition)
 
-@nullary_command
+@no_arg_command
 def end_cmd(env):
 	env.current_program().end_block()
 
-@preparse(CMD)
+@preparse_cmd
 def lbl_cmd(env: PassEnv, name: label_name):
 	"""Lbl is a no-op at runtime; just verify the syntax and that we're in a program."""
 	env.current_program()  # raises if not in a program
 
-@preparse(CMD)
+@preparse_cmd
 def goto_cmd(env: PassEnv, name: label_name):
 	env.current_program().goto(name)
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def is_gt_cmd(env: PassEnv, var: numeric_var, threshold: real):
 	env.current_program().is_gt(var, threshold)
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def ds_lt_cmd(env: PassEnv, var: numeric_var, threshold: real):
 	env.current_program().ds_lt(var, threshold)
 
-@preparse(CMD)
+@preparse_cmd
 def prgm(env: PassEnv, name: program_name):
 	env.run_program(name)
 
-@nullary_command
+@no_arg_command
 def return_cmd(env):
 	env.current_program()  # raises if not in a program
 	raise ReturnSignal()
 
-@nullary_command
+@no_arg_command
 def stop_cmd(env):
 	env.current_program()  # raises if not in a program
 	raise StopSignal()
 
-@preparse(NONE)
+@preparse_bunch
 def del_var(var: any_var):
 	"""DelVar variable — clear one variable without consuming the statement separator.
 

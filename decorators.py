@@ -164,19 +164,12 @@ class Finalize(Enum):
 	  CMD_FUNC  — end_paren_cmd()  paren commands; eats ) + separator
 	  NONE      — (nothing)        leaves the parser untouched so the command
 	                               bunches with whatever follows (e.g. DelVar)
-
-	The members are re-exported as bare module-level names (FUNC, CMD, …) so
-	call sites can write `@preparse(..., end=CMD)` after a plain
-	`from decorators import CMD`.
 	"""
 	FUNC = auto()
 	CMD = auto()
 	CMD_FUNC = auto()
 	NONE = auto()
 
-
-# Bare aliases so callers can `from decorators import FUNC, CMD, CMD_FUNC, NONE`.
-FUNC, CMD, CMD_FUNC, NONE = Finalize
 
 # Maps each Finalize mode to the ArgParser end method name (None = no call).
 _END_METHOD = {
@@ -231,22 +224,15 @@ class PreparsedFunc(TiCall):
 
 
 def preparse(end: Finalize | None = None):
-	"""Declarative decorator for functions/commands called once per invocation.
+	"""Return a decorator that wraps a core function as a PreparsedFunc.
 
-	The schema comes from the core's parameter annotations (see argspec.py):
+	Prefer the named aliases below over calling this directly:
+	  preparse_func     — expression functions  (end_func, eats `)`              )
+	  preparse_cmd      — no-paren commands     (end_cmd, eats trailing separator)
+	  preparse_cmd_func — paren commands        (end_paren_cmd, eats `) + sep`   )
+	  preparse_bunch    — bunching commands     (no finalizer, e.g. DelVar       )
 
-	    @preparse(FUNC)
-	    def gcd(a: vectorized[numeric], b: vectorized[numeric]) -> float: ...
-
-	    @preparse(CMD_FUNC)
-	    def pxl_on(env: PassEnv, row: expr, col: expr) -> None: ...
-
-	`end` is a Finalize member (given positionally as above or via `end=`)
-	selecting the ArgParser end method (default FUNC):
-	  FUNC      — end_func()       expression functions; does not eat separator
-	  CMD       — end_cmd()        no-paren commands; eats trailing separator
-	  CMD_FUNC  — end_paren_cmd()  paren commands;    eats ) + separator
-	  NONE      — (nothing)        leaves the parser untouched (e.g. DelVar)
+	Use this directly only when you need to select a Finalize mode dynamically.
 	"""
 	final_end = Finalize.FUNC if end is None else end
 
@@ -255,7 +241,14 @@ def preparse(end: Finalize | None = None):
 	return decorator
 
 
-class nullary_command(TiCall):
+# Named decorator aliases — preferred over calling preparse() directly.
+preparse_func     = preparse(Finalize.FUNC)
+preparse_cmd      = preparse(Finalize.CMD)
+preparse_cmd_func = preparse(Finalize.CMD_FUNC)
+preparse_bunch    = preparse(Finalize.NONE)
+
+
+class no_arg_command(TiCall):
 	"""Decorator for no-arg commands that consume the statement separator.
 
 	The decorated function receives only the environment.  The decorator itself
@@ -268,7 +261,7 @@ class nullary_command(TiCall):
 		self.func(a.env)
 
 
-class nullary_bunch(TiCall):
+class no_arg_bunch(TiCall):
 	"""Decorator for no-arg commands that do NOT consume the separator.
 
 	Does not check for surplus tokens — because the next token may be the start

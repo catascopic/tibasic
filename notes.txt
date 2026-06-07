@@ -1,3 +1,5 @@
+Revisit transform_to_domain_error decorator
+
 map_vectorized: use index-based instead of frozenset
 flatten variadic?
 

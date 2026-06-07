@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 import operators
 from argspec import expr as expr_spec, numeric, real, integer, vectorized, thunk, numeric_var, PassEnv
-from decorators import preparse, forms_func, TiCall, FUNC
+from decorators import preparse_func, forms_func, TiCall
 from environment import Environment
 from errors import (
 	TiSyntaxError, DomainError, NonRealAnsError,
@@ -19,56 +19,42 @@ from modes import ComplexMode
 from tiobjects import TiList, TiMatrix, require_str
 
 
-def trig(func):
-	"""Decorator for trig functions: vectorize and convert input from current angle mode."""
-	@preparse(FUNC)
-	def apply(env: PassEnv, x: vectorized[real]):
-		return func(env.to_rad(x))
-	apply.__name__ = func.__name__
-	return apply
-
-def inv_trig(func):
-	"""Decorator for inverse trig functions: vectorize, convert output to current angle mode,
-	and raise DomainError for out-of-domain inputs."""
-	@preparse(FUNC)
-	def apply(env: PassEnv, x: vectorized[real]):
-		try:
-			return env.from_rad(func(x))
-		except ValueError:
-			raise DomainError(f"{func.__name__}: argument out of domain: {x}")
-	apply.__name__ = func.__name__
-	return apply
+def _inv_trig(func, env, x):
+	try:
+		return env.from_rad(func(x))
+	except ValueError:
+		raise DomainError(f"{func.__name__}: argument out of domain: {x}")
 
 
 ##################
 # MAIN FUNCTIONS #
 ##################
 
-@trig
-def sin(x):
-	return math.sin(x)
+@preparse_func
+def sin(env: PassEnv, x: vectorized[real]):
+	return math.sin(env.to_rad(x))
 
-@trig
-def cos(x):
-	return math.cos(x)
+@preparse_func
+def cos(env: PassEnv, x: vectorized[real]):
+	return math.cos(env.to_rad(x))
 
-@trig
-def tan(x):
-	return math.tan(x)
+@preparse_func
+def tan(env: PassEnv, x: vectorized[real]):
+	return math.tan(env.to_rad(x))
 
-@inv_trig
-def asin(x):
-	return math.asin(x)
+@preparse_func
+def asin(env: PassEnv, x: vectorized[real]):
+	return _inv_trig(math.asin, env, x)
 
-@inv_trig
-def acos(x):
-	return math.acos(x)
+@preparse_func
+def acos(env: PassEnv, x: vectorized[real]):
+	return _inv_trig(math.acos, env, x)
 
-@inv_trig
-def atan(x):
-	return math.atan(x)
+@preparse_func
+def atan(env: PassEnv, x: vectorized[real]):
+	return _inv_trig(math.atan, env, x)
 
-@preparse(FUNC)
+@preparse_func
 def sqrt(env: PassEnv, x: vectorized[numeric]):
 	if isinstance(x, complex):
 		return cmath.sqrt(x)
@@ -78,7 +64,7 @@ def sqrt(env: PassEnv, x: vectorized[numeric]):
 		raise NonRealAnsError(f"√({x}): non-real result")
 	return cmath.sqrt(x)
 
-@preparse(FUNC)
+@preparse_func
 def ln(env: PassEnv, x: vectorized[numeric]):
 	if isinstance(x, complex):
 		return cmath.log(x)
@@ -90,7 +76,7 @@ def ln(env: PassEnv, x: vectorized[numeric]):
 		raise NonRealAnsError(f"ln({x}): non-real result")
 	return cmath.log(x)
 
-@preparse(FUNC)
+@preparse_func
 def log(env: PassEnv, x: vectorized[numeric]):
 	if isinstance(x, complex):
 		return cmath.log10(x)
@@ -106,7 +92,7 @@ def log(env: PassEnv, x: vectorized[numeric]):
 # MATH FUNCTIONS   #
 ####################
 
-@preparse(FUNC)
+@preparse_func
 def log_base(env: PassEnv, x: vectorized[numeric], base: vectorized[numeric]):
 	if isinstance(x, complex) or isinstance(base, complex):
 		return cmath.log(x, base)
@@ -124,19 +110,19 @@ def log_base(env: PassEnv, x: vectorized[numeric], base: vectorized[numeric]):
 # ANGLE FUNCTIONS  #
 ####################
 
-@preparse(FUNC)
+@preparse_func
 def rect_to_polar_radius(env: PassEnv, x: vectorized[real], y: vectorized[real]):
 	return math.hypot(x, y)
 
-@preparse(FUNC)
+@preparse_func
 def rect_to_polar_angle(env: PassEnv, x: vectorized[real], y: vectorized[real]):
 	return env.from_rad(math.atan2(y, x))
 
-@preparse(FUNC)
+@preparse_func
 def polar_to_rect_x(env: PassEnv, r: vectorized[real], theta: vectorized[real]):
 	return r * math.cos(env.to_rad(theta))
 
-@preparse(FUNC)
+@preparse_func
 def polar_to_rect_y(env: PassEnv, r: vectorized[real], theta: vectorized[real]):
 	return r * math.sin(env.to_rad(theta))
 
@@ -159,7 +145,7 @@ def _bal(env, n, roundvalue=None):
 	return pv * (1 + r) ** n + pmt * ((1 + r) ** n - 1) / r
 
 
-@preparse(FUNC)
+@preparse_func
 def bal(env: PassEnv, n: integer, roundvalue: integer = None):
 	"""bal(n[,roundvalue]) — remaining balance after n payments."""
 	n = int(n)
@@ -170,7 +156,7 @@ def bal(env: PassEnv, n: integer, roundvalue: integer = None):
 	return _bal(env, n, roundvalue)
 
 
-@preparse(FUNC)
+@preparse_func
 def sigma_prn(env: PassEnv, n1: integer, n2: integer, roundvalue: integer = None):
 	"""ΣPrn(n1,n2[,roundvalue]) — principal paid from payment n1 through n2."""
 	n1 = int(n1)
@@ -182,7 +168,7 @@ def sigma_prn(env: PassEnv, n1: integer, n2: integer, roundvalue: integer = None
 	return _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
 
 
-@preparse(FUNC)
+@preparse_func
 def sigma_int(env: PassEnv, n1: integer, n2: integer, roundvalue: integer = None):
 	"""ΣInt(n1,n2[,roundvalue]) — interest paid from payment n1 through n2."""
 	n1 = int(n1)
@@ -199,7 +185,7 @@ def sigma_int(env: PassEnv, n1: integer, n2: integer, roundvalue: integer = None
 # STRING FUNCTIONS #
 ####################
 
-@preparse(FUNC)
+@preparse_func
 def expr(env: PassEnv, string: expr_spec):
 	"""Evaluate a TiString as a TI-BASIC expression."""
 	from parser import Parser
@@ -216,7 +202,7 @@ def expr(env: PassEnv, string: expr_spec):
 # CALCULUS / SUMS  #
 ####################
 
-@preparse(FUNC)
+@preparse_func
 def sigma(env: PassEnv, formula: thunk, var: numeric_var, start: expr_spec, end: expr_spec) -> float:
 	total = 0
 	n = start
@@ -227,7 +213,7 @@ def sigma(env: PassEnv, formula: thunk, var: numeric_var, start: expr_spec, end:
 			n += 1
 	return total
 
-@preparse(FUNC)
+@preparse_func
 def n_deriv(env: PassEnv, formula: thunk, var: numeric_var, val: expr_spec, h: expr_spec = 0.001) -> float:
 	with env.nest_guard(n_deriv, max_depth=1), var.scoped():
 		var.value = val + h
@@ -276,7 +262,7 @@ def _adaptive_gk15(f, lo, hi, tol, depth=0):
 		_adaptive_gk15(f, mid, hi, tol / 2, depth + 1)
 	)
 
-@preparse(FUNC)
+@preparse_func
 def fn_int(env: PassEnv, formula: thunk, var: numeric_var, lo: expr_spec, hi: expr_spec, tol: expr_spec = 1e-5) -> float:
 	with env.nest_guard('fnInt'), var.scoped():
 		def f(x):
@@ -284,7 +270,7 @@ def fn_int(env: PassEnv, formula: thunk, var: numeric_var, lo: expr_spec, hi: ex
 			return formula.eval()
 		return _adaptive_gk15(f, lo, hi, tol)
 
-@preparse(FUNC)
+@preparse_func
 def seq(env: PassEnv, formula: thunk, var: numeric_var, start: real, end: real, step: real = 1) -> TiList:
 	n = start
 	result = []
@@ -358,7 +344,7 @@ def dim(a: ArgParser):
 # CATALOG #
 ###########
 
-@preparse(FUNC)
+@preparse_func
 def acosh(env: PassEnv, x: vectorized[real]):
 	if x >= 1:
 		return math.acosh(x)
@@ -366,7 +352,7 @@ def acosh(env: PassEnv, x: vectorized[real]):
 		raise NonRealAnsError(f"acosh({x}): non-real result")
 	return cmath.acosh(x)
 
-@preparse(FUNC)
+@preparse_func
 def atanh(env: PassEnv, x: vectorized[real]):
 	if abs(x) < 1:
 		return math.atanh(x)
@@ -389,14 +375,14 @@ set_time   = set_time_wrapper(Environment.set_time)
 set_dt_fmt = set_time_wrapper(Environment.set_dt_fmt)
 set_tm_fmt = set_time_wrapper(Environment.set_tm_fmt)
 
-@preparse(FUNC)
+@preparse_func
 def check_tmr(env: PassEnv):
 	return Environment.check_tmr(env)
 
-@preparse(FUNC)
+@preparse_func
 def get_dt_str(env: PassEnv):
 	return Environment.get_dt_str(env)
 
-@preparse(FUNC)
+@preparse_func
 def get_tm_str(env: PassEnv):
 	return Environment.get_tm_str(env)

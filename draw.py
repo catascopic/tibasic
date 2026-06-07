@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 from argspec import PassEnv, integer, numeric, real
-from decorators import nullary_command, preparse, CMD_FUNC
+from decorators import no_arg_command, preparse_cmd_func
 from errors import DomainError
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
@@ -51,50 +51,50 @@ def _validate(row: float, col: float) -> tuple[int, int]:
 	return int(row), int(col)
 
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def pxl_on(env: PassEnv, row: integer, col: integer) -> None:
 	row, col = _validate(row, col)
 	env.screen.set(row, col, True)
 
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def pxl_off(env: PassEnv, row: integer, col: integer) -> None:
 	row, col = _validate(row, col)
 	env.screen.set(row, col, False)
 
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def pxl_change(env: PassEnv, row: integer, col: integer) -> None:
 	row, col = _validate(row, col)
 	env.screen.toggle(row, col)
 
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def pxl_test(env: PassEnv, row: integer, col: integer) -> float:
 	row, col = _validate(row, col)
 	return float(env.screen.get(row, col))
 
 
-@nullary_command
+@no_arg_command
 def clr_draw(env) -> None:
 	env.screen.clear()
 
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def pt_on(env: PassEnv, x: real, y: real) -> None:
 	pixel = _point_to_pixel(env, x, y)
 	if pixel is not None:
 		env.screen.set(*pixel, True)
 
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def pt_off(env: PassEnv, x: real, y: real) -> None:
 	pixel = _point_to_pixel(env, x, y)
 	if pixel is not None:
 		env.screen.set(*pixel, False)
 
 
-@preparse(CMD_FUNC)
+@preparse_cmd_func
 def pt_change(env: PassEnv, x: real, y: real) -> None:
 	pixel = _point_to_pixel(env, x, y)
 	if pixel is not None:
