@@ -29,6 +29,7 @@ risk.  The base types live behind TYPE_CHECKING purely for static tooling.
 from __future__ import annotations
 
 import inspect
+from dataclasses import dataclass, replace
 from numbers import Number
 from typing import Annotated, Any, get_args, TYPE_CHECKING
 
@@ -37,22 +38,13 @@ if TYPE_CHECKING:
 	from parser import Thunk
 
 
+@dataclass(frozen=True)
 class ArgSpec:
-	__slots__ = ('method', 'optional', 'variadic', 'vectorize', 'matrix')
-
-	def __init__(
-		self,
-		method: str,
-		optional: bool = False,
-		variadic: bool = False,
-		vectorize: bool = False,
-		matrix: bool = False,
-	):
-		self.method = method        # name of the ArgParser parse method to call
-		self.optional = optional    # if absent, the slot is omitted from the call
-		self.variadic = variadic    # greedily consume the rest; yields a list
-		self.vectorize = vectorize  # map element-wise over a TiList in this slot
-		self.matrix = matrix        # also map element-wise over a TiMatrix (implies vectorize)
+	method: str                    # name of the ArgParser parse method to call
+	optional: bool = False         # if absent, the slot is omitted from the call
+	variadic: bool = False         # greedily consume the rest; yields a list
+	vectorize: bool = False        # map element-wise over a TiList in this slot
+	matrix: bool = False           # also map element-wise over a TiMatrix (implies vectorize)
 
 	def __repr__(self):
 		flags = ''.join(s for s, on in (
@@ -78,9 +70,9 @@ def _as_spec(annotation) -> ArgSpec:
 # `env` is special: it is injected from ArgParser.env without consuming a token.
 
 expr    = Annotated[Any,           ArgSpec('expr')]
-numeric = Annotated[Number,        ArgSpec('expr')]   # readable alias for expr
-real    = Annotated[float,         ArgSpec('real')]   # enforces require_real at parse time
-integer = Annotated[int,           ArgSpec('expr')]   # readable alias; core does py_int
+numeric = Annotated[Number,        ArgSpec('numeric')]  # enforces require_num at parse time
+real    = Annotated[float,         ArgSpec('real')]     # enforces require_real at parse time
+integer = Annotated[int,           ArgSpec('integer')]  # enforces py_int at parse time
 thunk   = Annotated['Thunk',       ArgSpec('thunk')]
 
 num_var      = Annotated['Variable', ArgSpec('numeric_var')]
@@ -106,8 +98,7 @@ def _mark(item, **flags) -> Annotated:
 	spec = _as_spec(item)
 	args = get_args(item)
 	base = args[0] if args else Any
-	merged = {'vectorize': spec.vectorize, 'matrix': spec.matrix, **flags}
-	return Annotated[base, ArgSpec(spec.method, **merged)]
+	return Annotated[base, replace(spec, **flags)]
 
 
 class vectorized:
@@ -134,15 +125,13 @@ def optional(spec) -> ArgSpec:
 	"""Mark a spec optional (legacy positional form). No default is stored: an
 	omitted optional simply isn't passed, so the function's signature default
 	applies."""
-	s = _as_spec(spec)
-	return ArgSpec(s.method, optional=True, vectorize=s.vectorize, matrix=s.matrix)
+	return replace(_as_spec(spec), optional=True)
 
 
 def rest(spec) -> ArgSpec:
 	"""Greedily consume all remaining arguments (legacy positional form); yields
 	a list.  Must be the last entry in a schema."""
-	s = _as_spec(spec)
-	return ArgSpec(s.method, variadic=True, vectorize=s.vectorize, matrix=s.matrix)
+	return replace(_as_spec(spec), variadic=True)
 
 
 # ── Schema extraction from a function signature ─────────────────────────────
@@ -168,10 +157,8 @@ def schema_from_signature(func) -> tuple:
 			)
 		spec = _as_spec(annotations[name])
 		if p.kind is inspect.Parameter.VAR_POSITIONAL:
-			spec = ArgSpec(spec.method, variadic=True,
-			               vectorize=spec.vectorize, matrix=spec.matrix)
+			spec = replace(spec, variadic=True)
 		elif p.default is not inspect.Parameter.empty:
-			spec = ArgSpec(spec.method, optional=True,
-			               vectorize=spec.vectorize, matrix=spec.matrix)
+			spec = replace(spec, optional=True)
 		schema.append(spec)
 	return tuple(schema)
