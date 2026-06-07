@@ -1,37 +1,38 @@
 from __future__ import annotations
 import cmath
 import math
-from functools import wraps
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from argspec import env, expr as expr_spec, optional, numeric, vectorized, PassEnv
-from decorators import preparse, preparse_vectorized, TiCall, FUNC
+from argspec import expr as expr_spec, numeric, real, integer, vectorized, PassEnv
+from decorators import preparse, TiCall, FUNC
 from environment import Environment
 from errors import TiSyntaxError, DomainError, NonRealAnsError
 from modes import ComplexMode
-from tiobjects import require_num, require_real, require_int, require_str, py_int
+from tiobjects import require_str
 
 
 def trig(func):
 	"""Decorator for trig functions: vectorize and convert input from current angle mode."""
-	@wraps(func)
-	def apply(env, x):
-		return func(env.to_rad(require_real(x)))
-	return preparse_vectorized(env, expr_spec)(apply)
+	@preparse(FUNC)
+	def apply(env: PassEnv, x: vectorized[real]):
+		return func(env.to_rad(x))
+	apply.__name__ = func.__name__
+	return apply
 
 def inv_trig(func):
 	"""Decorator for inverse trig functions: vectorize, convert output to current angle mode,
 	and raise DomainError for out-of-domain inputs."""
-	@wraps(func)
-	def apply(env, x):
+	@preparse(FUNC)
+	def apply(env: PassEnv, x: vectorized[real]):
 		try:
-			return env.from_rad(func(require_real(x)))
+			return env.from_rad(func(x))
 		except ValueError:
 			raise DomainError(f"{func.__name__}: argument out of domain: {x}")
-	return preparse_vectorized(env, expr_spec)(apply)
+	apply.__name__ = func.__name__
+	return apply
 
 
 ##################
@@ -64,7 +65,6 @@ def atan(x):
 
 @preparse(FUNC)
 def sqrt(env: PassEnv, x: vectorized[numeric]):
-	require_num(x)
 	if isinstance(x, complex):
 		return cmath.sqrt(x)
 	if x >= 0:
@@ -73,9 +73,8 @@ def sqrt(env: PassEnv, x: vectorized[numeric]):
 		raise NonRealAnsError(f"√({x}): non-real result")
 	return cmath.sqrt(x)
 
-@preparse_vectorized(env, expr_spec)
-def ln(env, x):
-	require_num(x)
+@preparse(FUNC)
+def ln(env: PassEnv, x: vectorized[numeric]):
 	if isinstance(x, complex):
 		return cmath.log(x)
 	if x > 0:
@@ -86,9 +85,8 @@ def ln(env, x):
 		raise NonRealAnsError(f"ln({x}): non-real result")
 	return cmath.log(x)
 
-@preparse_vectorized(env, expr_spec)
-def log(env, x):
-	require_num(x)
+@preparse(FUNC)
+def log(env: PassEnv, x: vectorized[numeric]):
 	if isinstance(x, complex):
 		return cmath.log10(x)
 	if x > 0:
@@ -103,10 +101,8 @@ def log(env, x):
 # MATH FUNCTIONS   #
 ####################
 
-@preparse_vectorized(env, expr_spec, expr_spec)
-def log_base(env, x, base):
-	require_num(x)
-	require_num(base)
+@preparse(FUNC)
+def log_base(env: PassEnv, x: vectorized[numeric], base: vectorized[numeric]):
 	if isinstance(x, complex) or isinstance(base, complex):
 		return cmath.log(x, base)
 	if base <= 0 or base == 1:
@@ -123,21 +119,21 @@ def log_base(env, x, base):
 # ANGLE FUNCTIONS  #
 ####################
 
-@preparse_vectorized(env, expr_spec, expr_spec)
-def rect_to_polar_radius(env, x, y):
-	return math.hypot(require_real(x), require_real(y))
+@preparse(FUNC)
+def rect_to_polar_radius(env: PassEnv, x: vectorized[real], y: vectorized[real]):
+	return math.hypot(x, y)
 
-@preparse_vectorized(env, expr_spec, expr_spec)
-def rect_to_polar_angle(env, x, y):
-	return env.from_rad(math.atan2(require_real(y), require_real(x)))
+@preparse(FUNC)
+def rect_to_polar_angle(env: PassEnv, x: vectorized[real], y: vectorized[real]):
+	return env.from_rad(math.atan2(y, x))
 
-@preparse_vectorized(env, expr_spec, expr_spec)
-def polar_to_rect_x(env, r, theta):
-	return require_real(r) * math.cos(env.to_rad(require_real(theta)))
+@preparse(FUNC)
+def polar_to_rect_x(env: PassEnv, r: vectorized[real], theta: vectorized[real]):
+	return r * math.cos(env.to_rad(theta))
 
-@preparse_vectorized(env, expr_spec, expr_spec)
-def polar_to_rect_y(env, r, theta):
-	return require_real(r) * math.sin(env.to_rad(require_real(theta)))
+@preparse(FUNC)
+def polar_to_rect_y(env: PassEnv, r: vectorized[real], theta: vectorized[real]):
+	return r * math.sin(env.to_rad(theta))
 
 ############
 # FINANCE  #
@@ -158,36 +154,36 @@ def _bal(env, n, roundvalue=None):
 	return pv * (1 + r) ** n + pmt * ((1 + r) ** n - 1) / r
 
 
-@preparse(env, expr_spec, optional(expr_spec))
-def bal(env, n, roundvalue=None):
+@preparse(FUNC)
+def bal(env: PassEnv, n: integer, roundvalue: integer = None):
 	"""bal(n[,roundvalue]) — remaining balance after n payments."""
-	n = py_int(n)
+	n = int(n)
 	if n < 0:
 		raise DomainError("bal: n must be non-negative")
 	if roundvalue is not None:
-		roundvalue = py_int(roundvalue)
+		roundvalue = int(roundvalue)
 	return _bal(env, n, roundvalue)
 
 
-@preparse(env, expr_spec, expr_spec, optional(expr_spec))
-def sigma_prn(env, n1, n2, roundvalue=None):
+@preparse(FUNC)
+def sigma_prn(env: PassEnv, n1: integer, n2: integer, roundvalue: integer = None):
 	"""ΣPrn(n1,n2[,roundvalue]) — principal paid from payment n1 through n2."""
-	n1 = py_int(n1)
-	n2 = py_int(n2)
+	n1 = int(n1)
+	n2 = int(n2)
 	if roundvalue is not None:
-		roundvalue = py_int(roundvalue)
+		roundvalue = int(roundvalue)
 	if n1 < 1 or n2 < 0:
 		raise DomainError("ΣPrn: payment numbers must be positive")
 	return _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
 
 
-@preparse(env, expr_spec, expr_spec, optional(expr_spec))
-def sigma_int(env, n1, n2, roundvalue=None):
+@preparse(FUNC)
+def sigma_int(env: PassEnv, n1: integer, n2: integer, roundvalue: integer = None):
 	"""ΣInt(n1,n2[,roundvalue]) — interest paid from payment n1 through n2."""
-	n1 = py_int(n1)
-	n2 = py_int(n2)
+	n1 = int(n1)
+	n2 = int(n2)
 	if roundvalue is not None:
-		roundvalue = py_int(roundvalue)
+		roundvalue = int(roundvalue)
 	if n1 < 1 or n2 < 0:
 		raise DomainError("ΣInt: payment numbers must be positive")
 	sprn = _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
@@ -198,8 +194,8 @@ def sigma_int(env, n1, n2, roundvalue=None):
 # STRING FUNCTIONS #
 ####################
 
-@preparse(env, expr_spec)
-def expr(env, string):
+@preparse(FUNC)
+def expr(env: PassEnv, string: expr_spec):
 	"""Evaluate a TiString as a TI-BASIC expression."""
 	from parser import Parser
 	require_str(string)
@@ -215,18 +211,16 @@ def expr(env, string):
 # CATALOG #
 ###########
 
-@preparse_vectorized(env, expr_spec)
-def acosh(env, x):
-	require_real(x)
+@preparse(FUNC)
+def acosh(env: PassEnv, x: vectorized[real]):
 	if x >= 1:
 		return math.acosh(x)
 	if env.real_only:
 		raise NonRealAnsError(f"acosh({x}): non-real result")
 	return cmath.acosh(x)
 
-@preparse_vectorized(env, expr_spec)
-def atanh(env, x):
-	require_real(x)
+@preparse(FUNC)
+def atanh(env: PassEnv, x: vectorized[real]):
 	if abs(x) < 1:
 		return math.atanh(x)
 	if abs(x) == 1:
@@ -248,6 +242,14 @@ set_time   = set_time_wrapper(Environment.set_time)
 set_dt_fmt = set_time_wrapper(Environment.set_dt_fmt)
 set_tm_fmt = set_time_wrapper(Environment.set_tm_fmt)
 
-check_tmr  = preparse(env)(Environment.check_tmr)
-get_dt_str = preparse(env)(Environment.get_dt_str)
-get_tm_str = preparse(env)(Environment.get_tm_str)
+@preparse(FUNC)
+def check_tmr(env: PassEnv):
+	return Environment.check_tmr(env)
+
+@preparse(FUNC)
+def get_dt_str(env: PassEnv):
+	return Environment.get_dt_str(env)
+
+@preparse(FUNC)
+def get_tm_str(env: PassEnv):
+	return Environment.get_tm_str(env)

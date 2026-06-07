@@ -1,4 +1,5 @@
 map_vectorized: use index-based instead of frozenset
+flatten variadic?
 
 does vectorized make sure only the marked arguments get vectorized?
 
