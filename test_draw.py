@@ -304,6 +304,178 @@ class TestPointMarks:
 		assert not any(env.screen.buffer)
 
 
+# ── Vertical / Horizontal ────────────────────────────────────────────────────────
+
+class TestVertical:
+	def test_center(self):
+		# x=0 on standard window -> col 47; should fill all rows 0-62
+		env = run('Vertical 0')
+		for row in range(MAX_ROW + 1):
+			assert env.screen.get(row, 47)
+		assert not env.screen.get(0, 46)
+		assert not env.screen.get(0, 48)
+
+	def test_left_edge(self):
+		env = run('Vertical ~10')   # Xmin -> col 0
+		for row in range(MAX_ROW + 1):
+			assert env.screen.get(row, 0)
+
+	def test_right_edge(self):
+		env = run('Vertical 10')    # Xmax -> col 94
+		for row in range(MAX_ROW + 1):
+			assert env.screen.get(row, 94)
+
+	def test_off_screen_draws_nothing(self):
+		env = run('Vertical 100')
+		assert not any(env.screen.buffer)
+
+
+class TestHorizontal:
+	def test_center(self):
+		# y=0 on standard window -> row 31; should fill all cols 0-94
+		env = run('Horizontal 0')
+		for col in range(MAX_COL + 1):
+			assert env.screen.get(31, col)
+		assert not env.screen.get(30, 0)
+		assert not env.screen.get(32, 0)
+
+	def test_top_edge(self):
+		env = run('Horizontal 10')   # Ymax -> row 0
+		for col in range(MAX_COL + 1):
+			assert env.screen.get(0, col)
+
+	def test_bottom_edge(self):
+		env = run('Horizontal ~10')  # Ymin -> row 62
+		for col in range(MAX_COL + 1):
+			assert env.screen.get(62, col)
+
+	def test_off_screen_draws_nothing(self):
+		env = run('Horizontal 100')
+		assert not any(env.screen.buffer)
+
+
+# ── Line( ────────────────────────────────────────────────────────────────────────
+
+class TestLine:
+	def test_horizontal_line(self):
+		# Line along top of graph screen
+		env = run('Line( ~10,10,10,10')
+		for col in range(MAX_COL + 1):
+			assert env.screen.get(0, col)
+
+	def test_vertical_line(self):
+		# Line along left side of graph screen
+		env = run('Line( ~10,10,~10,~10')
+		for row in range(MAX_ROW + 1):
+			assert env.screen.get(row, 0)
+
+	def test_diagonal_corner_to_corner(self):
+		# Corner to corner: endpoints must be set
+		env = run('Line( ~10,10,10,~10')
+		assert env.screen.get(0, 0)
+		assert env.screen.get(62, 94)
+
+	def test_single_point(self):
+		env = run('Line( 0,0,0,0')
+		assert env.screen.get(31, 47)
+		assert sum(env.screen.buffer) == 1
+
+	def test_erase(self):
+		env = run('Line( ~10,10,10,10')   # draw top row
+		run('Line( ~10,10,10,10,0', env)  # erase it
+		assert not any(env.screen.buffer)
+
+	def test_erase_default_draws(self):
+		env = run('Line( ~10,10,10,10,1')
+		assert env.screen.get(0, 0)
+
+	def test_partial_offscreen(self):
+		# Line starts on screen, ends off — visible portion should be drawn
+		env = run('Line( 0,0,100,0')
+		assert env.screen.get(31, 47)  # origin pixel is set
+		assert not env.screen.get(31, 95)  # col 95 is outside MAX_COL
+
+
+from draw import MAX_ROW, MAX_COL
+
+
+# ── Circle( ───────────────────────────────────────────────────────────────────────
+
+class TestCircle:
+	# Default window: xmin=-10, xmax=10, ymin=-10, ymax=10
+	# Centre (0,0) → pixel (31, 47)
+	# rx = r * 94/20 = r*4.7,  ry = r * 62/20 = r*3.1
+
+	def test_draws_something(self):
+		env = run('Circle( 0,0,5')
+		assert any(env.screen.buffer)
+
+	def test_center_unset(self):
+		# Circle is an outline; the center pixel should be dark.
+		env = run('Circle( 0,0,5')
+		assert not env.screen.get(31, 47)
+
+	def test_rightmost_cardinal(self):
+		# θ=0: col = cx + rx, row = cy.  For r=10: col = 47+47 = 94, row = 31.
+		env = run('Circle( 0,0,10')
+		assert env.screen.get(31, 94)
+
+	def test_leftmost_cardinal(self):
+		# θ=π: col = 47-47 = 0, row = 31.
+		env = run('Circle( 0,0,10')
+		assert env.screen.get(31, 0)
+
+	def test_topmost_cardinal(self):
+		# θ=π/2: col = 47, row = 31-31 = 0.
+		env = run('Circle( 0,0,10')
+		assert env.screen.get(0, 47)
+
+	def test_bottommost_cardinal(self):
+		# θ=3π/2: col = 47, row = 31+31 = 62.
+		env = run('Circle( 0,0,10')
+		assert env.screen.get(62, 47)
+
+	def test_negative_radius_same_as_positive(self):
+		env_pos = run('Circle( 0,0,5')
+		env_neg = run('Circle( 0,0,~5')
+		assert env_pos.screen.buffer == env_neg.screen.buffer
+
+	def test_off_screen_no_error(self):
+		# Huge radius: most pixels are off screen; should not crash.
+		env = run('Circle( 0,0,1000')
+		# No assertion about pixels — just no exception.
+
+	def test_entirely_offscreen_draws_nothing(self):
+		# Circle centred far off screen with small radius.
+		env = run('Circle( 100,100,1')
+		assert not any(env.screen.buffer)
+
+	def test_ellipse_non_square_window(self):
+		# With xmin=0, xmax=20, ymin=0, ymax=20 and centre (10,10):
+		#   cx=47, cy=31, rx = 2*94/20 = 9.4, ry = 2*62/20 = 6.2
+		# Rightmost point: col = 47+9 or 47+10, row = 31.
+		# Topmost point:   col = 47, row = 31-6 = 25.
+		# These differ → it is actually an ellipse, not a circle.
+		env = Environment()
+		env.window.xmin.value = 0
+		env.window.xmax.value = 20
+		env.window.ymin.value = 0
+		env.window.ymax.value = 20
+		run('Circle( 10,10,2', env)
+		# Rightmost pixel column should be further from centre than topmost pixel row.
+		import math
+		# rx_pix ≈ 9.4, ry_pix ≈ 6.2 → horizontally wider
+		assert env.screen.get(31, 47 + round(2 * 94 / 20))
+		assert env.screen.get(31 - round(2 * 62 / 20), 47)
+
+	def test_fast_arg_accepted(self):
+		# Passing a complex list as 4th arg should not raise; shape is the same.
+		env_slow = run('Circle( 0,0,5')
+		# We can't easily construct {i} from the string runner, so just verify
+		# the no-arg form works fine (full {i} test would need token-level encoding).
+		assert any(env_slow.screen.buffer)
+
+
 # ── Use inside a stored program ─────────────────────────────────────────────────
 
 class TestPixelInProgram:

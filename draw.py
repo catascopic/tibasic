@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import math
 
-from argspec import PassEnv, integer, real
-from decorators import no_arg_command, preparse_cmd_func
+from argspec import PassEnv, expr, integer, real
+from decorators import no_arg_command, preparse_cmd, preparse_cmd_func
 from errors import DomainError
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
@@ -39,22 +39,53 @@ def _round_half_up(value: float) -> int:
 	return math.floor(value + 0.5)
 
 
-def _point_to_pixel(env, x: float, y: float):
-	"""Translate graph coordinates (x, y) to (row, column).
-
-	Returns None if the point falls outside the visible graph screen, in which
-	case the calculator simply draws nothing (no error).
-	"""
+def _x_to_col(env, x: float) -> int:
 	w = env.window
 	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
+	return _round_half_up((x - xmin) * GRAPH_COL_SPAN / (xmax - xmin))
+
+
+def _y_to_row(env, y: float) -> int:
+	w = env.window
 	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
-	# Multiply before dividing: it keeps exact half-integers exact (e.g.
-	# 3*94/188 == 1.5), whereas dividing first can yield 1.4999… and round wrong.
-	col = _round_half_up((x - xmin) * GRAPH_COL_SPAN / (xmax - xmin))
-	row = _round_half_up((ymax - y) * GRAPH_ROW_SPAN / (ymax - ymin))
-	if 0 <= row <= MAX_ROW and 0 <= col <= MAX_COL:
-		return row, col
-	return None
+	return _round_half_up((ymax - y) * GRAPH_ROW_SPAN / (ymax - ymin))
+
+
+def _graph_to_pixel(env, x: float, y: float) -> tuple[int, int]:
+	"""Translate graph coordinates to (row, column), without bounds checking.
+
+	Used by Line( so Bresenham's can run end-to-end and clip per pixel.
+	"""
+	return _y_to_row(env, y), _x_to_col(env, x)
+
+
+def _point_to_pixel(env, x: float, y: float):
+	"""Translate graph coordinates to (row, column), or None if off-screen.
+
+	Used by Pt- commands, which draw nothing when the point is out of range.
+	"""
+	row, col = _graph_to_pixel(env, x, y)
+	return (row, col) if 0 <= row <= MAX_ROW and 0 <= col <= MAX_COL else None
+
+
+def _bresenham(r0: int, c0: int, r1: int, c1: int):
+	"""Yield (row, col) for every pixel on the line from (r0,c0) to (r1,c1)."""
+	dr = abs(r1 - r0)
+	dc = abs(c1 - c0)
+	sr = 1 if r1 > r0 else -1
+	sc = 1 if c1 > c0 else -1
+	err = dr - dc
+	while True:
+		yield r0, c0
+		if r0 == r1 and c0 == c1:
+			break
+		e2 = 2 * err
+		if e2 > -dc:
+			err -= dc
+			r0 += sr
+		if e2 < dr:
+			err += dr
+			c0 += sc
 
 
 def _apply_mark(screen, row: int, col: int, mark: int, action) -> None:
@@ -125,3 +156,61 @@ def pt_change(env: PassEnv, x: real, y: real, mark: integer = 1) -> None:
 	if pixel is not None:
 		row, col = pixel
 		_apply_mark(env.screen, row, col, int(mark), env.screen.toggle)
+
+
+@preparse_cmd
+def vertical(env: PassEnv, x: real) -> None:
+	"""Vertical X — draw a full-height line at graph x-coordinate X."""
+	col = _x_to_col(env, x)
+	if 0 <= col <= MAX_COL:
+		for row in range(MAX_ROW + 1):
+			env.screen.set(row, col, True)
+
+
+@preparse_cmd
+def horizontal(env: PassEnv, y: real) -> None:
+	"""Horizontal Y — draw a full-width line at graph y-coordinate Y."""
+	row = _y_to_row(env, y)
+	if 0 <= row <= MAX_ROW:
+		for col in range(MAX_COL + 1):
+			env.screen.set(row, col, True)
+
+
+@preparse_cmd_func
+def circle(env: PassEnv, x: real, y: real, r: real, _fast: expr = None) -> None:
+	"""Circle(X,Y,r[,{i}]) — draw a circle (or ellipse) at graph (X,Y) with graph radius r.
+
+	The optional 4th argument enables the 'fast circle' routine on real hardware
+	(Bresenham 8-fold symmetry); it is accepted here and silently ignored — we
+	always use the parametric approach, which handles non-square windows correctly.
+	Negative radius is treated as its absolute value.  Off-screen pixels are clipped.
+	"""
+	w = env.window
+	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
+	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
+	cy, cx = _graph_to_pixel(env, x, y)              # (row, col)
+	rx = abs(r) * GRAPH_COL_SPAN / (xmax - xmin)   # pixel semi-axis, horizontal
+	ry = abs(r) * GRAPH_ROW_SPAN / (ymax - ymin)    # pixel semi-axis, vertical
+	# Step finely enough that no pixel is skipped (~4 steps per pixel of circumference).
+	n = max(8, math.ceil(4 * math.pi * max(rx, ry)) + 1)
+	for i in range(n):
+		theta = 2 * math.pi * i / n
+		c   = cx + _round_half_up(rx * math.cos(theta))
+		row = cy - _round_half_up(ry * math.sin(theta))
+		if 0 <= row <= MAX_ROW and 0 <= c <= MAX_COL:
+			env.screen.set(row, c)
+
+
+@preparse_cmd_func
+def line(env: PassEnv, x1: real, y1: real, x2: real, y2: real, erase: real = 1) -> None:
+	"""Line(X1,Y1,X2,Y2[,erase]) — draw (or erase) a line between two graph points.
+
+	erase=0 turns pixels off; any other value (default 1) turns them on.
+	Off-screen pixels are clipped silently.
+	"""
+	on = (erase != 0)
+	r0, c0 = _graph_to_pixel(env, x1, y1)
+	r1, c1 = _graph_to_pixel(env, x2, y2)
+	for r, c in _bresenham(r0, c0, r1, c1):
+		if 0 <= r <= MAX_ROW and 0 <= c <= MAX_COL:
+			env.screen.set(r, c, on)
