@@ -772,10 +772,8 @@ class ArgParser:
 				continue
 			parse = getattr(self, spec.method)
 			if spec.variadic:
-				items = []
 				while self._next:
-					items.append(parse())
-				out.append(items)
+					out.append(parse())
 			elif spec.optional and not self._next:
 				# Absent optional: omit it (and any following optionals).
 				break

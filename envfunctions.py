@@ -1,17 +1,22 @@
 from __future__ import annotations
 import cmath
 import math
+import operator
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from argspec import expr as expr_spec, numeric, real, integer, vectorized, PassEnv
-from decorators import preparse, TiCall, FUNC
+import operators
+from argspec import expr as expr_spec, numeric, real, integer, vectorized, thunk, numeric_var, PassEnv
+from decorators import preparse, forms_func, TiCall, FUNC
 from environment import Environment
-from errors import TiSyntaxError, DomainError, NonRealAnsError
+from errors import (
+	TiSyntaxError, DomainError, NonRealAnsError,
+	DataTypeError, IncrementError, UndefinedError,
+)
 from modes import ComplexMode
-from tiobjects import require_str
+from tiobjects import TiList, TiMatrix, require_str
 
 
 def trig(func):
@@ -205,6 +210,148 @@ def expr(env: PassEnv, string: expr_spec):
 		if p.has_next:
 			raise TiSyntaxError(f"expr: evaluated string must contain a single expression; got: {string!r}")
 		return result
+
+
+####################
+# CALCULUS / SUMS  #
+####################
+
+@preparse(FUNC)
+def sigma(env: PassEnv, formula: thunk, var: numeric_var, start: expr_spec, end: expr_spec) -> float:
+	total = 0
+	n = start
+	with env.nest_guard(sigma), var.scoped():
+		while n <= end:
+			var.value = n
+			total += formula.eval()
+			n += 1
+	return total
+
+@preparse(FUNC)
+def n_deriv(env: PassEnv, formula: thunk, var: numeric_var, val: expr_spec, h: expr_spec = 0.001) -> float:
+	with env.nest_guard(n_deriv, max_depth=1), var.scoped():
+		var.value = val + h
+		fwd = formula.eval()
+		var.value = val - h
+		bwd = formula.eval()
+	return (fwd - bwd) / (2 * h)
+
+# G7K15 nodes (positive half + 0) and weights on [-1, 1]
+_K15_NODES = [
+	0.0,                0.2077849550078985, 0.4058451513773972, 0.5860872354676911,
+	0.7415311855993945, 0.8648644233597691, 0.9491079123427585, 0.9914553711208126
+]
+_K15_WEIGHTS = [
+	0.2094821410847278, 0.2044329400752989, 0.1903505780647854, 0.1690047266392679,
+	0.1406532597155259, 0.1047900103222502, 0.0630920926299786, 0.0229353220105292
+]
+# G7 uses nodes at indices 0, 2, 4, 6 (every other Kronrod node)
+_G7_WEIGHTS  = [
+	0.4179591836734694, None, 0.3818300505051189, None,
+	0.2797053914892767, None, 0.1294849661688697, None
+]
+
+def _gk15(f, lo, hi):
+	"""Apply G7K15 to [lo, hi]; return (k15_estimate, error)."""
+	mid = (lo + hi) / 2
+	half = (hi - lo) / 2
+	k15 = g7 = 0
+	for i, x in enumerate(_K15_NODES):
+		for sign in ([1] if x == 0 else [1, -1]):
+			fx = f(mid + sign * x * half)
+			k15 += _K15_WEIGHTS[i] * fx
+			if _G7_WEIGHTS[i] is not None:
+				g7 += _G7_WEIGHTS[i] * fx
+	k15 *= half
+	g7  *= half
+	return k15, abs(k15 - g7)
+
+def _adaptive_gk15(f, lo, hi, tol, depth=0):
+	k15, err = _gk15(f, lo, hi)
+	if err <= tol or depth >= 50:
+		return k15
+	mid = (lo + hi) / 2
+	return (
+		_adaptive_gk15(f, lo, mid, tol / 2, depth + 1) +
+		_adaptive_gk15(f, mid, hi, tol / 2, depth + 1)
+	)
+
+@preparse(FUNC)
+def fn_int(env: PassEnv, formula: thunk, var: numeric_var, lo: expr_spec, hi: expr_spec, tol: expr_spec = 1e-5) -> float:
+	with env.nest_guard('fnInt'), var.scoped():
+		def f(x):
+			var.value = x
+			return formula.eval()
+		return _adaptive_gk15(f, lo, hi, tol)
+
+@preparse(FUNC)
+def seq(env: PassEnv, formula: thunk, var: numeric_var, start: real, end: real, step: real = 1) -> TiList:
+	n = start
+	result = []
+	if step == 0:
+		raise IncrementError("seq: step cannot be zero")
+
+	if step > 0:
+		if start > end + 1e-10:
+			raise IncrementError(f"seq: step is positive but start ({start}) > end ({end})")
+		op = operator.le
+		end += 1e-10
+	else:
+		if start < end - 1e-10:
+			raise IncrementError(f"seq: step is negative but start ({start}) < end ({end})")
+		op = operator.ge
+		end -= 1e-10
+
+	with env.nest_guard(seq), var.scoped():
+		while op(n, end):
+			var.value = n
+			result.append(formula.eval())
+			n += step
+
+	return TiList(result)
+
+
+####################
+# ANS / DIMENSIONS #
+####################
+
+@forms_func
+def ans_index_or_mul(a: ArgParser):
+	ans = a.env.ans
+	if isinstance(ans, TiList):
+		(index,) = a.parse_indices(1)
+		return ans[index]
+	if isinstance(ans, TiMatrix):
+		return ans[a.parse_indices(2)]
+	b = a.expr()
+	a.end_func()
+	return operators.mul(ans, b)
+
+# You'd think dim could be a pure function, right? For a while, it was.
+# But then I realized empty lists are illegal everywhere, with a single exception.
+# dim( reads a variable's stored dimension rather than its value: it accesses
+# .value (raw storage) instead of .resolve(), so dim(L1) returns 0 for an empty
+# list where a bare reference to L1 would raise InvalidDimError.  This mirrors
+# the calculator, where dim( works on both sides of → for the same reason.
+
+@forms_func
+def dim(a: ArgParser):
+	if a.peek().is_list_start():
+		var = a.list_var()
+		val = var.value
+		if val is None:
+			raise UndefinedError(f"Undefined list variable")
+		a.end_func()
+		return len(val)
+
+	value = a.expr()
+	a.end_func()
+	if isinstance(value, TiList):
+		return len(value)
+	# Don't need direct matrix variable access because empty matrices aren't possible
+	if isinstance(value, TiMatrix):
+		return TiList([value.rows, value.cols])
+	raise DataTypeError(f"dim: expected list or matrix; got {value}")
 
 
 ###########

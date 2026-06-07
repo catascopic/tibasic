@@ -33,8 +33,8 @@ def _make_validated(core: Callable, schema: tuple) -> Callable:
 	"""Wrap *core* so each positional argument is passed through its slot's value
 	validator first.  Returns *core* unchanged when no slot declares a validator.
 
-	Validators run on scalars.  For a variadic slot (which holds a list of values
-	in one slot) the validator is mapped over the elements."""
+	Validators run on scalars.  A variadic slot maps the validator over every
+	remaining argument individually."""
 	slots = tuple((_VALIDATORS.get(s.validate), s.variadic) for s in schema)
 	if not any(v for v, _ in slots):
 		return core
@@ -42,14 +42,15 @@ def _make_validated(core: Callable, schema: tuple) -> Callable:
 	@wraps(core)
 	def apply(*args: Any) -> Any:
 		checked = []
-		for (validate, variadic), a in zip(slots, args):
-			if validate is None:
-				checked.append(a)
-			elif variadic:
-				checked.append([validate(x) for x in a])
-			else:
-				checked.append(validate(a))
-		checked.extend(args[len(slots):])
+		for i, (validate, variadic) in enumerate(slots):
+			if variadic:
+				tail = args[i:]
+				checked.extend(tail if validate is None else (validate(x) for x in tail))
+				break
+			if i >= len(args):
+				break  # trailing optional args were omitted by take()
+			a = args[i]
+			checked.append(a if validate is None else validate(a))
 		return core(*checked)
 	return apply
 

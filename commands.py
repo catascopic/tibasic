@@ -1,102 +1,15 @@
 from __future__ import annotations
-import operator
 from itertools import zip_longest
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-import operators
-from argspec import expr, thunk, numeric_var, equation_var, string_var, label_name, program_name, any_var, real, PassEnv
-from decorators import forms_func, preparse, nullary_command, FUNC, CMD, CMD_FUNC, NONE
-from errors import DataTypeError, ArgumentError, IncrementError, InvalidDimError, DimMismatchError, UndefinedError, TiSyntaxError
+from argspec import expr, thunk, numeric_var, list_var, list_var_prefix_optional, equation_var, string_var, label_name, program_name, any_var, real, PassEnv
+from decorators import forms_func, preparse, nullary_command, CMD, CMD_FUNC, NONE
+from errors import DataTypeError, ArgumentError, InvalidDimError, DimMismatchError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
 from tiobjects import TiList, TiMatrix, TiString, TiEquation, require_real, require_list, require_str, py_int
-
-
-@forms_func
-def ans_index_or_mul(a: ArgParser):
-	ans = a.env.ans
-	if isinstance(ans, TiList):
-		(index,) = a.parse_indices(1)
-		return ans[index]
-	if isinstance(ans, TiMatrix):
-		return ans[a.parse_indices(2)]
-	b = a.expr()
-	a.end_func()
-	return operators.mul(ans, b)
-
-##################
-# MATH FUNCTIONS #
-##################
-
-@preparse(FUNC)
-def sigma(env: PassEnv, formula: thunk, var: numeric_var, start: expr, end: expr) -> float:
-	total = 0
-	n = start
-	with env.nest_guard(sigma), var.scoped():
-		while n <= end:
-			var.value = n
-			total += formula.eval()
-			n += 1
-	return total
-
-@preparse(FUNC)
-def n_deriv(env: PassEnv, formula: thunk, var: numeric_var, val: expr, h: expr = 0.001) -> float:
-	with env.nest_guard(n_deriv, max_depth=1), var.scoped():
-		var.value = val + h
-		fwd = formula.eval()
-		var.value = val - h
-		bwd = formula.eval()
-	return (fwd - bwd) / (2 * h)
-
-# G7K15 nodes (positive half + 0) and weights on [-1, 1]
-_K15_NODES = [
-	0.0,                0.2077849550078985, 0.4058451513773972, 0.5860872354676911,
-	0.7415311855993945, 0.8648644233597691, 0.9491079123427585, 0.9914553711208126
-]
-_K15_WEIGHTS = [
-	0.2094821410847278, 0.2044329400752989, 0.1903505780647854, 0.1690047266392679,
-	0.1406532597155259, 0.1047900103222502, 0.0630920926299786, 0.0229353220105292
-]
-# G7 uses nodes at indices 0, 2, 4, 6 (every other Kronrod node)
-_G7_WEIGHTS  = [
-	0.4179591836734694, None, 0.3818300505051189, None,
-	0.2797053914892767, None, 0.1294849661688697, None
-]
-
-def _gk15(f, lo, hi):
-	"""Apply G7K15 to [lo, hi]; return (k15_estimate, error)."""
-	mid = (lo + hi) / 2
-	half = (hi - lo) / 2
-	k15 = g7 = 0
-	for i, x in enumerate(_K15_NODES):
-		for sign in ([1] if x == 0 else [1, -1]):
-			fx = f(mid + sign * x * half)
-			k15 += _K15_WEIGHTS[i] * fx
-			if _G7_WEIGHTS[i] is not None:
-				g7 += _G7_WEIGHTS[i] * fx
-	k15 *= half
-	g7  *= half
-	return k15, abs(k15 - g7)
-
-def _adaptive_gk15(f, lo, hi, tol, depth=0):
-	k15, err = _gk15(f, lo, hi)
-	if err <= tol or depth >= 50:
-		return k15
-	mid = (lo + hi) / 2
-	return (
-		_adaptive_gk15(f, lo, mid, tol / 2, depth + 1) +
-		_adaptive_gk15(f, mid, hi, tol / 2, depth + 1)
-	)
-
-@preparse(FUNC)
-def fn_int(env: PassEnv, formula: thunk, var: numeric_var, lo: expr, hi: expr, tol: expr = 1e-5) -> float:
-	with env.nest_guard('fnInt'), var.scoped():
-		def f(x):
-			var.value = x
-			return formula.eval()
-		return _adaptive_gk15(f, lo, hi, tol)
 
 
 ##################
@@ -120,49 +33,13 @@ def _sort(main_var, dep_vars, reverse: bool):
 		for d in deps:
 			d.data = [d.data[i] for i in indices]
 
-@forms_func
-def sort_a(a: ArgParser):
-	main_var = a.list_var()
-	dep_vars = []
-	while a.has_next:
-		dep_vars.append(a.list_var())
-	a.end_paren_cmd()
+@preparse(CMD_FUNC)
+def sort_a(main_var: list_var, *dep_vars: list_var):
 	_sort(main_var, dep_vars, False)
 
-@forms_func
-def sort_d(a: ArgParser):
-	main_var = a.list_var()
-	dep_vars = []
-	while a.has_next:
-		dep_vars.append(a.list_var())
-	a.end_paren_cmd()
+@preparse(CMD_FUNC)
+def sort_d(main_var: list_var, *dep_vars: list_var):
 	_sort(main_var, dep_vars, True)
-
-# You'd think dim could be a pure function, right? For a while, it was.
-# But then I realized empty lists are illegal everywhere, with a single exception.
-# dim( reads a variable's stored dimension rather than its value: it accesses
-# .value (raw storage) instead of .resolve(), so dim(L1) returns 0 for an empty
-# list where a bare reference to L1 would raise InvalidDimError.  This mirrors
-# the calculator, where dim( works on both sides of → for the same reason.
-
-@forms_func
-def dim(a: ArgParser):
-	if a.peek().is_list_start():
-		var = a.list_var()
-		val = var.value
-		if val is None:
-			raise UndefinedError(f"Undefined list variable")
-		a.end_func()
-		return len(val)
-
-	value = a.expr()
-	a.end_func()
-	if isinstance(value, TiList):
-		return len(value)
-	# Don't need direct matrix variable access because empty matrices aren't possible
-	if isinstance(value, TiMatrix):
-		return TiList([value.rows, value.cols])
-	raise DataTypeError(f"dim: expected list or matrix; got {value}")
 
 @forms_func
 def fill(a: ArgParser):
@@ -180,32 +57,6 @@ def fill(a: ArgParser):
 			lst.data[i] = fill_value
 	else:
 		raise DataTypeError("Fill(: expected a list or matrix variable")
-
-@preparse(FUNC)
-def seq(env: PassEnv, formula: thunk, var: numeric_var, start: real, end: real, step: real = 1) -> TiList:
-	n = start
-	result = []
-	if step == 0:
-		raise IncrementError("seq: step cannot be zero")
-
-	if step > 0:
-		if start > end + 1e-10:
-			raise IncrementError(f"seq: step is positive but start ({start}) > end ({end})")
-		op = operator.le
-		end += 1e-10
-	else:
-		if start < end - 1e-10:
-			raise IncrementError(f"seq: step is negative but start ({start}) < end ({end})")
-		op = operator.ge
-		end -= 1e-10
-
-	with env.nest_guard(seq), var.scoped():
-		while op(n, end):
-			var.value = n
-			result.append(formula.eval())
-			n += step
-
-	return TiList(result)
 
 @forms_func
 def list_to_matr(a: ArgParser) -> None:
@@ -245,14 +96,10 @@ def matr_to_list(a: ArgParser) -> None:
 # STATISTICS #
 ##############
 
-@forms_func
-def clr_list(a: ArgParser):
+@preparse(CMD)
+def clr_list(first: list_var, *rest_vars: list_var):
 	"""ClrList list[, list, ...] — clear each named list to empty; silently skip nonexistent lists."""
-	vars = [a.list_var()]
-	while a.has_next:
-		vars.append(a.list_var())
-	a.end_cmd()
-	for var in vars:
+	for var in (first, *rest_vars):
 		lst = var.value
 		if lst is not None:
 			lst.clear()
@@ -266,19 +113,14 @@ def clr_all_lists(env):
 	for lst in env.user_lists.values():
 		lst.clear()
 
-@forms_func
-def set_up_editor(a: ArgParser):
+@preparse(CMD)
+def set_up_editor(env: PassEnv, *list_vars: list_var_prefix_optional):
 	"""SetUpEditor [list, ...] — ensure lists exist, creating empty ones as needed.
 
 	With no arguments, ensures L1–L6 all exist (the default list editor columns).
 	With arguments, ensures each named list exists (standard or user-defined).
 	Does not modify lists that already contain data.
 	"""
-	env = a.env
-	list_vars = []
-	while a.has_next:
-		list_vars.append(a.list_var_prefix_optional())
-	a.end_cmd()
 	if list_vars:
 		for var in list_vars:
 			if var.value is None:
