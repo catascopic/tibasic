@@ -10,7 +10,7 @@ from typing import Any, TypeVar, TYPE_CHECKING
 
 from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
-	SingularMatrixError, DomainError
+	SingularMatrixError, DomainError, TiMemoryError
 )
 
 if TYPE_CHECKING:
@@ -397,10 +397,13 @@ class TiEquation:
 
 	def eval(self, env: Environment) -> Any:
 		from parser import Parser, EOF_TOKEN
-		parser = Parser(self.tokens, env)
-		value = parser.parse_expr()
-		parser.expect(EOF_TOKEN)
-		return value
+		try:
+			parser = Parser(self.tokens, env)
+			value = parser.parse_expr()
+			parser.expect(EOF_TOKEN)
+			return value
+		except RecursionError:
+			raise TiMemoryError("Equation recursion overflow (ERR:MEMORY)")
 
 	def __repr__(self) -> str:
 		return ''.join(t.text for t in self.tokens)

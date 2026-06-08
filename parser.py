@@ -329,7 +329,10 @@ class Parser:
 			return val
 
 		if t.variable is not None:
-			return t.variable(self.env).resolve()
+			value = t.variable(self.env).resolve()
+			if t.is_equation_var():
+				value = value.eval(self.env)
+			return value
 
 		raise TiSyntaxError(f"Unexpected token in expression: {t}")
 

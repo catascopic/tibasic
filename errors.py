@@ -96,3 +96,11 @@ class InvalidCommandError(TiError):
 	"""ERR:INVALID — a command was executed in a context where it is not allowed
 	(e.g. a block-level command run from the home screen instead of a program)."""
 	code = 'INVALID'
+
+
+class TiMemoryError(TiError):
+	"""ERR:MEMORY — the calculator ran out of memory.
+
+	In our interpreter this is raised when Python's call stack overflows (e.g.
+	Y₁=Y₁ → infinite recursion), matching the real calculator's ERR:MEMORY."""
+	code = 'MEMORY'
