@@ -310,24 +310,49 @@ def _trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
 	axis='y': iterate pixel rows;    f maps graph-y → graph-x  (DrawInv).
 	Consecutive points are joined with line segments in Connected mode, or drawn
 	as single pixels in Dot mode.  Points that f skips (None) break the curve.
+
+	ΔX (or ΔY) is computed once before the loop, matching the TI-84's behaviour
+	of storing it as a window variable rather than recomputing per sample.
 	"""
 	connected = env.draw_mode is DrawMode.CONNECTED
+	w = env.window
 	prev = None
 	if not inv:
-		span, to_indep, to_pixel = MAX_COL, _col_to_x, lambda v, col: (_y_to_row(env, v), col)
+		xmin = w.xmin.resolve()
+		delta = (w.xmax.resolve() - xmin) / GRAPH_COL_SPAN   # ΔX, computed once
+		to_indep = lambda i: xmin + i * delta
+		to_pixel = lambda v, col: (_y_to_row(env, v), col)
+		span = MAX_COL
 	else:
-		span, to_indep, to_pixel = MAX_ROW, _row_to_y, lambda v, row: (row, _x_to_col(env, v))
+		ymax = w.ymax.resolve()
+		delta = (ymax - w.ymin.resolve()) / GRAPH_ROW_SPAN    # ΔY, computed once
+		to_indep = lambda i: ymax - i * delta
+		to_pixel = lambda v, row: (row, _x_to_col(env, v))
+		span = MAX_ROW
+	# Guard zone: how far off-screen a coordinate may be before we clamp it.
+	# Clamping both endpoints keeps Bresenham bounded near vertical asymptotes
+	# while leaving ordinarily off-screen points (e.g. row=63 when MAX_ROW=62)
+	# unclamped so the Bresenham path through the visible region is identical to
+	# what the TI produces by running Bresenham end-to-end with per-pixel clipping.
+	_GUARD = MAX_ROW + MAX_COL   # generous but finite
 	for i in range(span + 1):
-		value = f(to_indep(env, i))
+		value = f(to_indep(i))
 		if value is None:
 			prev = None
 			continue
 		row, col = to_pixel(value, i)
 		if connected and prev is not None:
-			_plot_segment(env, prev[0], prev[1], row, col, on)
+			# Clamp both endpoints into the guard zone, then run Bresenham
+			# with per-pixel clipping — matching TI's native segment drawing.
+			gr = max(-_GUARD, min(MAX_ROW + _GUARD, row))
+			gc = max(-_GUARD, min(MAX_COL + _GUARD, col))
+			for r, c in _bresenham(prev[0], prev[1], gr, gc):
+				if 0 <= r <= MAX_ROW and 0 <= c <= MAX_COL:
+					env.screen.set(r, c, on)
 		elif 0 <= row <= MAX_ROW and 0 <= col <= MAX_COL:
 			env.screen.set(row, col, on)
-		prev = (row, col)
+		prev = (max(-_GUARD, min(MAX_ROW + _GUARD, row)),
+		        max(-_GUARD, min(MAX_COL + _GUARD, col)))
 
 
 def _shade_under(env, f, lo: float, hi: float) -> None:
