@@ -74,6 +74,17 @@ class Environment:
 		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
 		self._nest_depth: dict[object, int] = defaultdict(lambda: 0)  # tracks nesting depth for ILLEGAL NEST guards
 
+	# ── Graph variables ──────────────────────────────────────────────────────────
+	# X and Y are ordinary numeric variables (letters 'X' and 'Y'); the graph and
+	# drawing commands (DrawF, DrawInv, Tangent, …) read and update them by name.
+
+	@property
+	def x(self) -> Variable:
+		return self.numerics[23]
+
+	@property
+	def y(self) -> Variable:
+		return self.numerics[24]
 
 	def run(self, tokens):
 		"""

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import math
+from numbers import Number
 
-from argspec import PassEnv, expr, integer, real
+import purefunctions as pf
+from argspec import PassEnv, expr, integer, real, thunk
 from decorators import no_arg_command, preparse_cmd, preparse_cmd_func
-from errors import DomainError
+from errors import DomainError, TiError
+from modes import DrawMode
+from tiobjects import TiEquation
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
 # rows 0–62 (63 rows) and columns 0–94 (95 columns), inclusive.
@@ -49,6 +53,20 @@ def _y_to_row(env, y: float) -> int:
 	w = env.window
 	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
 	return _round_half_up((ymax - y) * GRAPH_ROW_SPAN / (ymax - ymin))
+
+
+def _col_to_x(env, col: float) -> float:
+	"""Inverse of _x_to_col: the graph x-coordinate at the centre of a pixel column."""
+	w = env.window
+	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
+	return xmin + col * (xmax - xmin) / GRAPH_COL_SPAN
+
+
+def _row_to_y(env, row: float) -> float:
+	"""Inverse of _y_to_row: the graph y-coordinate at the centre of a pixel row."""
+	w = env.window
+	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
+	return ymax - row * (ymax - ymin) / GRAPH_ROW_SPAN
 
 
 def _graph_to_pixel(env, x: float, y: float) -> tuple[int, int]:
@@ -214,3 +232,173 @@ def line(env: PassEnv, x1: real, y1: real, x2: real, y2: real, erase: real = 1) 
 	for r, c in _bresenham(r0, c0, r1, c1):
 		if 0 <= r <= MAX_ROW and 0 <= c <= MAX_COL:
 			env.screen.set(r, c, on)
+
+
+# ── Function graphing (DrawF / DrawInv) and distribution shading ────────────────
+
+# Errors the calculator silently swallows while evaluating a graphed expression:
+# the offending point is dropped rather than aborting the command.
+
+
+def _eval_real(env, formula):
+	"""Evaluate a thunk at the current variable values, returning a real float.
+
+	Returns None — i.e. "skip this point" — when evaluation raises one of the
+	ignored errors, or yields a complex, list, matrix, or other non-real value
+	(matching the calculator, which graphs nothing for such expressions).
+	"""
+	try:
+		y = formula.eval()
+		if isinstance(y, TiEquation):     # a bare Y= variable evaluates as a function of X
+			y = y.eval(env)
+	except TiError:
+		return None
+	if isinstance(y, complex):
+		if abs(y.imag) > 1e-12:
+			return None
+		y = y.real
+	if not isinstance(y, Number):
+		return None
+	return float(y)
+
+
+def _function_sampler(env, formula):
+	"""Return f(t): set X to t, evaluate *formula*, store the result in Y, return it.
+
+	X and Y are deliberately left holding their last values when the caller
+	finishes — DrawF/DrawInv/Tangent all "exit with the last coordinate stored".
+	"""
+
+	def f(t):
+		env.x.value = t
+		y = _eval_real(env, formula)
+		if y is not None:
+			env.y.value = y
+		return y
+
+	return f
+
+
+def _clip_segment(r0, c0, r1, c1):
+	"""Liang–Barsky clip of a segment to the screen rectangle [0,MAX_ROW]×[0,MAX_COL].
+
+	Returns integer endpoints (r0,c0,r1,c1) of the visible portion, or None if the
+	segment lies entirely outside.  Clipping first keeps Bresenham bounded even when
+	a near-vertical connecting line (e.g. across an asymptote) spans millions of rows.
+	"""
+	dr, dc = r1 - r0, c1 - c0
+	p = (-dc, dc, -dr, dr)
+	q = (c0, MAX_COL - c0, r0, MAX_ROW - r0)
+	u1, u2 = 0.0, 1.0
+	for pi, qi in zip(p, q):
+		if pi == 0:
+			if qi < 0:
+				return None              # parallel to a border and outside it
+		else:
+			t = qi / pi
+			if pi < 0:
+				if t > u2:
+					return None
+				u1 = max(u1, t)
+			else:
+				if t < u1:
+					return None
+				u2 = min(u2, t)
+	return (round(r0 + u1 * dr), round(c0 + u1 * dc),
+	        round(r0 + u2 * dr), round(c0 + u2 * dc))
+
+
+def _plot_segment(env, r0, c0, r1, c1, on):
+	"""Draw the visible part of the (possibly off-screen) segment from (r0,c0)-(r1,c1)."""
+	clipped = _clip_segment(r0, c0, r1, c1)
+	if clipped is None:
+		return
+	for r, c in _bresenham(*clipped):
+		if 0 <= r <= MAX_ROW and 0 <= c <= MAX_COL:
+			env.screen.set(r, c, on)
+
+
+def _trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
+	"""Sample f along one screen axis and plot the resulting curve.
+
+	axis='x': iterate pixel columns; f maps graph-x → graph-y  (DrawF).
+	axis='y': iterate pixel rows;    f maps graph-y → graph-x  (DrawInv).
+	Consecutive points are joined with line segments in Connected mode, or drawn
+	as single pixels in Dot mode.  Points that f skips (None) break the curve.
+	"""
+	connected = env.draw_mode is DrawMode.CONNECTED
+	prev = None
+	if not inv:
+		span, to_indep, to_pixel = MAX_COL, _col_to_x, lambda v, col: (_y_to_row(env, v), col)
+	else:
+		span, to_indep, to_pixel = MAX_ROW, _row_to_y, lambda v, row: (row, _x_to_col(env, v))
+	for i in range(span + 1):
+		value = f(to_indep(env, i))
+		if value is None:
+			prev = None
+			continue
+		row, col = to_pixel(value, i)
+		if connected and prev is not None:
+			_plot_segment(env, prev[0], prev[1], row, col, on)
+		elif 0 <= row <= MAX_ROW and 0 <= col <= MAX_COL:
+			env.screen.set(row, col, on)
+		prev = (row, col)
+
+
+def _shade_under(env, f, lo: float, hi: float) -> None:
+	"""Fill the area between the curve y=f(x) and the x-axis for lo ≤ x ≤ hi."""
+	axis_row = _y_to_row(env, 0.0)
+	for col in range(MAX_COL + 1):
+		x = _col_to_x(env, col)
+		if x < lo or x > hi:
+			continue
+		y = f(x)
+		if y is None:
+			continue
+		top, bot = sorted((_y_to_row(env, y), axis_row))
+		for row in range(max(top, 0), min(bot, MAX_ROW) + 1):
+			env.screen.set(row, col, True)
+
+
+@preparse_cmd
+def draw_f(env: PassEnv, formula: thunk) -> None:
+	"""DrawF expr — graph an expression in X as Y=f(X) (Func mode, regardless of mode)."""
+	_trace_curve(env, _function_sampler(env, formula))
+
+
+@preparse_cmd
+def draw_inv(env: PassEnv, formula: thunk) -> None:
+	"""DrawInv expr — graph the inverse of expr: X becomes vertical, Y horizontal."""
+	_trace_curve(env, _function_sampler(env, formula), inv=True)
+
+
+@preparse_cmd_func
+def shade_norm(env: PassEnv, lower: real, upper: real, mu: real = 0, sigma: real = 1) -> None:
+	"""ShadeNorm(lower,upper[,μ,σ]) — draw the normal curve, shade the interval's area."""
+	f = lambda x: pf.normalpdf(x, mu, sigma)
+	_trace_curve(env, f)
+	_shade_under(env, f, lower, upper)
+
+
+@preparse_cmd_func
+def shade_t(env: PassEnv, lower: real, upper: real, df: real) -> None:
+	"""Shade_t(lower,upper,df) — draw the Student-t curve, shade the interval's area."""
+	f = lambda x: pf.tpdf(x, df)
+	_trace_curve(env, f)
+	_shade_under(env, f, lower, upper)
+
+
+@preparse_cmd_func
+def shade_chi2(env: PassEnv, lower: real, upper: real, df: real) -> None:
+	"""Shadeχ²(lower,upper,df) — draw the chi-square curve, shade the interval's area."""
+	f = lambda x: pf.chi_sq_pdf(x, df)
+	_trace_curve(env, f)
+	_shade_under(env, f, lower, upper)
+
+
+@preparse_cmd_func
+def shade_f(env: PassEnv, lower: real, upper: real, df1: real, df2: real) -> None:
+	"""ShadeF(lower,upper,df1,df2) — draw the F curve, shade the interval's area."""
+	f = lambda x: pf.f_pdf(x, df1, df2)
+	_trace_curve(env, f)
+	_shade_under(env, f, lower, upper)

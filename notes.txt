@@ -1,3 +1,5 @@
+x_var, y_var properties
+
 Revisit transform_to_domain_error decorator
 
 map_vectorized: use index-based instead of frozenset
@@ -45,6 +47,8 @@ Modes: Horiz Full IndpntAuto IndpntAsk DependAuto DependAsk Time Web
 Finance: tvm_Pmt tvm_I% tvm_PV tvm_N tvm_FV Pmt_End Pmt_Bgn
 I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
+
+Okay, let's do Text(. Text can either do 3x5 or 5x7 if the alternate flag is set. Let's start with the alternate mode, because it's actually easier. You can find the data for the character in gl
 
 ********
 

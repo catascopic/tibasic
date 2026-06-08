@@ -5,8 +5,19 @@ import pytest
 from environment import Environment
 from screen import Screen
 from errors import ArgumentError, DomainError
-from test_tibasic import calc, run, toks
+from modes import DrawMode
+from test_tibasic import calc, run, toks, var
 from test_program import run as run_program
+
+
+def _col_count(env, col):
+	"""Number of lit pixels in a screen column (0..63)."""
+	return sum(env.screen.get(r, col) for r in range(64))
+
+
+def _lit(env):
+	"""Total number of lit pixels."""
+	return sum(env.screen.buffer)
 
 
 # ── Screen class ───────────────────────────────────────────────────────────────
@@ -474,6 +485,175 @@ class TestCircle:
 		# We can't easily construct {i} from the string runner, so just verify
 		# the no-arg form works fine (full {i} test would need token-level encoding).
 		assert any(env_slow.screen.buffer)
+
+
+# ── DrawF ──────────────────────────────────────────────────────────────────────
+
+class TestDrawF:
+	# Default window ±10 in both axes:  col→x is xmin + col*20/94,  y→row is (10-y)*62/20.
+
+	def test_constant_is_horizontal_line(self):
+		# Y=0 maps to row 31 for every column (a full-width line in Connected mode).
+		env = run('DrawF 0')
+		for col in range(MAX_COL + 1):
+			assert env.screen.get(31, col)
+		assert not env.screen.get(30, 0)
+		assert not env.screen.get(32, 0)
+
+	def test_identity_passes_through_origin(self):
+		# Y=X: a descending diagonal from (62,0) to (0,94), through (31,47).
+		env = run('DrawF X')
+		assert env.screen.get(31, 47)
+		assert env.screen.get(62, 0)
+		assert env.screen.get(0, 94)
+
+	def test_parabola_vertex_and_symmetry(self):
+		# Y=X²: vertex at the centre column, symmetric about it.
+		env = run('DrawF X²')
+		assert env.screen.get(31, 47)             # vertex (0,0)
+		# Point symmetry is exact in Dot mode; Connected adds ±1px rounding on the
+		# steep arms because the outline is traced left-to-right.
+		env_dot = Environment()
+		env_dot.draw_mode = DrawMode.DOT
+		run('DrawF X²', env_dot)
+		for k in range(1, 16):
+			left  = {r for r in range(64) if env_dot.screen.get(r, 47 - k)}
+			right = {r for r in range(64) if env_dot.screen.get(r, 47 + k)}
+			assert left == right
+
+	def test_updates_x_and_y_to_last_point(self):
+		# Exits with the last sampled coordinate stored (X=Xmax, Y=f(Xmax)).
+		env = run('DrawF X²')
+		assert var(env, 'X') == 10
+		assert var(env, 'Y') == 100
+
+	def test_connected_fills_more_than_dot(self):
+		# Connected mode joins the steep arms of the parabola; Dot mode leaves gaps.
+		env_conn = run('DrawF X²')
+		env_dot = Environment()
+		env_dot.draw_mode = DrawMode.DOT
+		run('DrawF X²', env_dot)
+		assert _lit(env_conn) > _lit(env_dot)
+
+	def test_dot_mode_one_pixel_per_column(self):
+		# Y=X stays on screen for every column, so Dot mode lights exactly one per column.
+		env = Environment()
+		env.draw_mode = DrawMode.DOT
+		run('DrawF X', env)
+		assert _lit(env) == MAX_COL + 1
+
+	def test_asymptote_does_not_crash(self):
+		# 1/X blows up at x=0 (the centre column); that point is skipped, not fatal.
+		env = run('DrawF 1/X')
+		assert _lit(env) > 0
+		# The centre column's exact x is 0 → divide-by-zero → no pixel plotted there
+		# by the sampler, and the connection across the gap is broken.
+
+	def test_list_expression_draws_nothing(self):
+		# A list-valued expression graphs nothing (no error either).
+		env = run('DrawF {1,2,3}')
+		assert _lit(env) == 0
+
+	def test_offscreen_curve_clips(self):
+		# Y=X²+100 is entirely above the window; nothing visible, no error.
+		env = run('DrawF X²+100')
+		assert _lit(env) == 0
+
+
+# ── DrawInv ─────────────────────────────────────────────────────────────────────
+
+class TestDrawInv:
+	def test_constant_is_vertical_line(self):
+		# Inverse of Y=0 puts the horizontal output at x=0 for every row → vertical line.
+		env = run('DrawInv 0')
+		for row in range(MAX_ROW + 1):
+			assert env.screen.get(row, 47)
+		assert not env.screen.get(0, 46)
+		assert not env.screen.get(0, 48)
+
+	def test_inverse_parabola_opens_right(self):
+		# DrawInv X² is the sideways parabola X=Y²: vertex at centre, opening right.
+		env = run('DrawInv X²')
+		assert env.screen.get(31, 47)             # vertex
+		# Rows above/below centre bend to the right (col > 47), never to the left.
+		assert any(env.screen.get(25, c) for c in range(48, 95))
+		assert not any(env.screen.get(25, c) for c in range(0, 47))
+
+	def test_identity_same_as_drawf(self):
+		# Y=X is its own inverse: DrawInv X draws the same diagonal as DrawF X.
+		env = run('DrawInv X')
+		assert env.screen.get(31, 47)
+		assert env.screen.get(62, 0)
+		assert env.screen.get(0, 94)
+
+
+# ── Distribution shading (ShadeNorm / Shade_t / Shadeχ² / ShadeF) ────────────────
+
+class TestShadeDistributions:
+	def _bell_window(self):
+		env = Environment()
+		env.window.xmin.value, env.window.xmax.value = -4, 4
+		env.window.ymin.value, env.window.ymax.value = 0, 0.5
+		return env
+
+	def test_shadenorm_fills_interval(self):
+		env = self._bell_window()
+		run('ShadeNorm( ~1,1', env)
+		# Centre column (x≈0) is inside [-1,1] → filled from axis up to the curve.
+		assert _col_count(env, 47) > 20
+		# A column well outside the interval shows only the thin curve outline.
+		assert _col_count(env, 90) < 5
+
+	def test_shadenorm_symmetric(self):
+		# The filled area is exactly symmetric; the connected outline rounds
+		# directionally, so allow a one-pixel difference per column.
+		env = self._bell_window()
+		run('ShadeNorm( ~1,1', env)
+		for k in range(1, 20):
+			assert abs(_col_count(env, 47 - k) - _col_count(env, 47 + k)) <= 1
+
+	def test_shadenorm_with_mean_and_sd(self):
+		# Non-standard normal: just verify it draws and shades without error.
+		env = Environment()
+		env.window.xmin.value, env.window.xmax.value = 0, 20
+		env.window.ymin.value, env.window.ymax.value = 0, 0.2
+		run('ShadeNorm( 5,15,10,2.5', env)
+		assert _lit(env) > 0
+
+	def test_shade_t_fills_interval(self):
+		env = Environment()
+		env.window.xmin.value, env.window.xmax.value = -4, 4
+		env.window.ymin.value, env.window.ymax.value = 0, 0.5
+		run('Shade_t( ~1,1,5', env)
+		assert _col_count(env, 47) > 20
+		assert _col_count(env, 90) < 5
+
+	def test_shade_chi2_draws_and_shades(self):
+		env = Environment()
+		env.window.xmin.value, env.window.xmax.value = 0, 10
+		env.window.ymin.value, env.window.ymax.value = 0, 0.3
+		run('Shadeχ²( 0,4,3', env)
+		assert _lit(env) > 0
+		# A column inside the shaded region is fuller than one past the upper bound.
+		inside = _col_count(env, _x_col(env, 2))
+		outside = _col_count(env, _x_col(env, 8))
+		assert inside > outside
+
+	def test_shade_f_draws_and_shades(self):
+		env = Environment()
+		env.window.xmin.value, env.window.xmax.value = 0, 5
+		env.window.ymin.value, env.window.ymax.value = 0, 1
+		run('ShadeF( 0,2,3,10', env)
+		assert _lit(env) > 0
+		inside = _col_count(env, _x_col(env, 1))
+		outside = _col_count(env, _x_col(env, 4))
+		assert inside > outside
+
+
+def _x_col(env, x):
+	"""Pixel column for graph x-coordinate (test helper mirroring draw._x_to_col)."""
+	from draw import _x_to_col
+	return _x_to_col(env, x)
 
 
 # ── Use inside a stored program ─────────────────────────────────────────────────

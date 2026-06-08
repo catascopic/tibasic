@@ -2,11 +2,6 @@ from __future__ import annotations
 import sys
 
 
-# Half-block characters: each covers 1 column × 2 rows.
-# Index by (top_pixel << 1 | bottom_pixel) — or equivalently top*2 + bottom.
-_HALF_BLOCK = ' ▄▀█'
-
-
 class Screen:
 	"""The calculator's monochrome LCD: 64 rows × 96 columns.
 
@@ -49,17 +44,13 @@ class Screen:
 		ROWS is even, so no padding is needed.
 		"""
 		lines = []
-		for top_row in range(0, self.ROWS, 2):
-			bot_row = top_row + 1
+		for row in range(0, self.ROWS, 2):
 			line = []
 			for col in range(self.COLS):
-				top = self.buffer[self._index(top_row, col)]
-				bot = self.buffer[self._index(bot_row, col)]
-				line.append(_HALF_BLOCK[top << 1 | bot])
+				index = self._index(row, col)
+				line.append(' ▄▀█'[self.buffer[index] << 1 | self.buffer[index + self.COLS]])
 			lines.append(''.join(line))
 		return '\n'.join(lines)
 
 	def show(self) -> None:
-		"""Print the screen to stdout, forcing UTF-8 so sextant characters survive on Windows."""
-		out = self.display() + '\n'
-		sys.stdout.buffer.write(out.encode('utf-8'))
+		print(self.display())
