@@ -23,10 +23,9 @@ MAX_COL = 94
 # mark 2/6 = 3×3 filled box (9 pixels)
 # mark 3/7 = 3×3 cross / plus sign (5 pixels)
 # anything else = dot (1 pixel)
-_DOT    = ((0, 0),)
 _CROSS  = ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1))
 _BOX    = ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1))
-_MARK_OFFSETS = {2: _BOX, 3: _CROSS, 6: _BOX, 7: _CROSS}
+_MARK_OFFSETS = {2.0: _BOX, 3.0: _CROSS, 6.0: _BOX, 7.0: _CROSS}
 
 
 def _round_half_up(value: float) -> int:
@@ -40,27 +39,31 @@ def _round_half_up(value: float) -> int:
 
 def _x_to_col(env, x: float) -> int:
 	w = env.window
-	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
+	xmin = w.xmin.resolve()
+	xmax = w.xmax.resolve()
 	return _round_half_up((x - xmin) * MAX_COL / (xmax - xmin))
 
 
 def _y_to_row(env, y: float) -> int:
 	w = env.window
-	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
+	ymin = w.ymin.resolve()
+	ymax = w.ymax.resolve()
 	return _round_half_up((ymax - y) * MAX_ROW / (ymax - ymin))
 
 
 def _col_to_x(env, col: float) -> float:
 	"""Inverse of _x_to_col: the graph x-coordinate at the centre of a pixel column."""
 	w = env.window
-	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
+	xmin = w.xmin.resolve()
+	xmax = w.xmax.resolve()
 	return xmin + col * (xmax - xmin) / MAX_COL
 
 
 def _row_to_y(env, row: float) -> float:
 	"""Inverse of _y_to_row: the graph y-coordinate at the centre of a pixel row."""
 	w = env.window
-	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
+	ymin = w.ymin.resolve()
+	ymax = w.ymax.resolve()
 	return ymax - row * (ymax - ymin) / MAX_ROW
 
 
@@ -140,25 +143,30 @@ def clr_draw(env) -> None:
 def _pt_action(env, x, y, mark, action) -> None:
 	row, col = _graph_to_pixel(env, x, y)
 	if _in_bounds(row, col):
-		for dr, dc in _MARK_OFFSETS.get(mark, _DOT):
-			r = row + dr
-			c = col + dc
-			if _in_bounds(r, c):
-				action(env.screen, r, c)
+		try:
+			points = _MARK_OFFSETS[mark, _DOT]
+		except KeyError:
+			action(env.screen, row, col)
+		else:
+			for dr, dc in points:
+				r = row + dr
+				c = col + dc
+				if _in_bounds(r, c):
+					action(env.screen, r, c)
 
 
 @preparse_cmd_func
-def pt_on(env: PassEnv, x: real, y: real, mark: integer = 1) -> None:
+def pt_on(env: PassEnv, x: real, y: real, mark: real = 1.0) -> None:
 	_pt_action(env, x, y, mark, Screen.set)
 
 
 @preparse_cmd_func
-def pt_off(env: PassEnv, x: real, y: real, mark: integer = 1) -> None:
+def pt_off(env: PassEnv, x: real, y: real, mark: real = 1.0) -> None:
 	_pt_action(env, x, y, mark, Screen.set_off)
 
 
 @preparse_cmd_func
-def pt_change(env: PassEnv, x: real, y: real, mark: integer = 1) -> None:
+def pt_change(env: PassEnv, x: real, y: real, mark: real = 1.0) -> None:
 	_pt_action(env, x, y, mark, Screen.toggle)
 
 
