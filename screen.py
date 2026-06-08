@@ -41,15 +41,18 @@ class Screen:
 
 		Each character covers 1 column × 2 rows, so the result is
 		(ROWS/2) × COLS characters — 32 × 96 for the standard 64×96 screen.
-		ROWS is even, so no padding is needed.
+		ROWS is even, so no padding is needed.  A border of '▒' surrounds the
+		content to make the screen edges visible.
 		"""
-		lines = []
+		border = '▒' * (self.COLS + 2)
+		lines = [border]
 		for row in range(0, self.ROWS, 2):
 			line = []
 			for col in range(self.COLS):
 				index = self._index(row, col)
 				line.append(' ▄▀█'[self.buffer[index] << 1 | self.buffer[index + self.COLS]])
-			lines.append(''.join(line))
+			lines.append('▒' + ''.join(line) + '▒')
+		lines.append(border)
 		return '\n'.join(lines)
 
 	def show(self) -> None:
