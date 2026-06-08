@@ -240,40 +240,25 @@ def line(env: PassEnv, x1: real, y1: real, x2: real, y2: real, erase: real = 1) 
 # the offending point is dropped rather than aborting the command.
 
 
-def _eval_real(env, formula):
-	"""Evaluate a thunk at the current variable values, returning a real float.
-
-	Returns None — i.e. "skip this point" — when evaluation raises one of the
-	ignored errors, or yields a complex, list, matrix, or other non-real value
-	(matching the calculator, which graphs nothing for such expressions).
-	"""
-	try:
-		y = formula.eval()
-		if isinstance(y, TiEquation):     # a bare Y= variable evaluates as a function of X
-			y = y.eval(env)
-	except TiError:
-		return None
-	if isinstance(y, complex):
-		if abs(y.imag) > 1e-12:
-			return None
-		y = y.real
-	if not isinstance(y, Number):
-		return None
-	return float(y)
-
-
 def _function_sampler(env, formula):
 	"""Return f(t): set X to t, evaluate *formula*, store the result in Y, return it.
 
 	X and Y are deliberately left holding their last values when the caller
 	finishes — DrawF/DrawInv/Tangent all "exit with the last coordinate stored".
+
+	Any complex result is skipped outright — the calculator does not graph points
+	whose Y value is complex, even if the imaginary part happens to be zero.
 	"""
 
-	def f(t):
-		env.x.value = t
-		y = _eval_real(env, formula)
-		if y is not None:
-			env.y.value = y
+	def f(x):
+		env.x.value = x
+		try:
+			y = formula.eval()
+		except TiError:
+			return None
+		if not isinstance(y, float):
+			return None
+		env.y.value = y
 		return y
 
 	return f
@@ -389,7 +374,7 @@ def shade_t(env: PassEnv, lower: real, upper: real, df: real) -> None:
 
 
 @preparse_cmd_func
-def shade_chi2(env: PassEnv, lower: real, upper: real, df: real) -> None:
+def shade_chi_sq(env: PassEnv, lower: real, upper: real, df: real) -> None:
 	"""Shadeχ²(lower,upper,df) — draw the chi-square curve, shade the interval's area."""
 	f = lambda x: pf.chi_sq_pdf(x, df)
 	_trace_curve(env, f)

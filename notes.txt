@@ -1,3 +1,7 @@
+Functions can return list!
+
+Fix: equations containting other equations
+
 x_var, y_var properties
 
 Revisit transform_to_domain_error decorator

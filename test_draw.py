@@ -628,7 +628,7 @@ class TestShadeDistributions:
 		assert _col_count(env, 47) > 20
 		assert _col_count(env, 90) < 5
 
-	def test_shade_chi2_draws_and_shades(self):
+	def test_shade_chi_sq_draws_and_shades(self):
 		env = Environment()
 		env.window.xmin.value, env.window.xmax.value = 0, 10
 		env.window.ymin.value, env.window.ymax.value = 0, 0.3
