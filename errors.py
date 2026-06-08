@@ -104,3 +104,8 @@ class TiMemoryError(TiError):
 	In our interpreter this is raised when Python's call stack overflows (e.g.
 	Y₁=Y₁ → infinite recursion), matching the real calculator's ERR:MEMORY."""
 	code = 'MEMORY'
+
+
+class TiOverflowError(TiError):
+	"""ERR:OVERFLOW — a calculation went beyond the bounds of (1e100, 1e-100)."""
+	code = 'OVERFLOW'

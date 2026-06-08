@@ -6,7 +6,7 @@ from numbers import Number
 import purefunctions as pf
 from argspec import PassEnv, expr, integer, real, thunk
 from decorators import no_arg_command, preparse_cmd, preparse_cmd_func
-from errors import DomainError, TiError
+from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
 from modes import DrawMode
 from screen import Screen
 from tiobjects import TiEquation
@@ -17,7 +17,6 @@ from tiobjects import TiEquation
 # 95 columns → 94 intervals; 63 rows → 62 intervals.
 MAX_ROW = 62
 MAX_COL = 94
-
 
 # Pt-On/Off/Change mark pixel offsets (Δrow, Δcol) relative to centre.
 # mark 2/6 = 3×3 filled box (9 pixels)
@@ -144,7 +143,7 @@ def _pt_action(env, x, y, mark, action) -> None:
 	row, col = _graph_to_pixel(env, x, y)
 	if _in_bounds(row, col):
 		try:
-			points = _MARK_OFFSETS[mark, _DOT]
+			points = _MARK_OFFSETS[mark]
 		except KeyError:
 			action(env.screen, row, col)
 		else:
@@ -250,7 +249,10 @@ def _function_sampler(env, formula):
 		env.x.value = x
 		try:
 			y = formula.eval()
-		except TiError:
+		except (
+			DataTypeError, DivideByZeroError, DomainError, IncrementError, 
+			NonRealAnsError, TiOverflowError, SingularMatrixError
+		):
 			return None
 		if not isinstance(y, float):
 			return None
