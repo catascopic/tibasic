@@ -1,5 +1,6 @@
-from __future__ import annotations
 import sys
+
+from itertools import batched
 
 
 class Screen:
@@ -19,41 +20,30 @@ class Screen:
 	COLS = 96
 
 	def __init__(self):
-		self.buffer = bytearray(self.ROWS * self.COLS)
-
-	def _index(self, row: int, col: int) -> int:
-		return row * self.COLS + col
+		self.buffer = tuple(bytearray(self.COLS) for _ in range(self.ROWS))
 
 	def get(self, row: int, col: int) -> bool:
-		return bool(self.buffer[self._index(row, col)])
+		return bool(self.buffer[row][col])
 
 	def set(self, row: int, col: int, on: bool = True) -> None:
-		self.buffer[self._index(row, col)] = 1 if on else 0
+		self.buffer[row][col] = 1 if on else 0
+
+	def set_off(self, row: int, col: int, on: bool = True) -> None:
+		self.set(row, col, False)
 
 	def toggle(self, row: int, col: int) -> None:
-		self.buffer[self._index(row, col)] ^= 1
+		self.buffer[row][col] ^= 1
 
 	def clear(self) -> None:
-		self.buffer = bytearray(self.ROWS * self.COLS)
+		for row in self.buffer:
+			row.__init__(self.COLS)  # hack?
 
-	def display(self) -> str:
-		"""Render the screen as a string of half-block characters (' ▄▀█').
-
-		Each character covers 1 column × 2 rows, so the result is
-		(ROWS/2) × COLS characters — 32 × 96 for the standard 64×96 screen.
-		ROWS is even, so no padding is needed.  A border of '▒' surrounds the
-		content to make the screen edges visible.
-		"""
-		border = '▒' * (self.COLS + 2)
-		lines = [border]
-		for row in range(0, self.ROWS, 2):
-			line = []
-			for col in range(self.COLS):
-				index = self._index(row, col)
-				line.append(' ▄▀█'[self.buffer[index] << 1 | self.buffer[index + self.COLS]])
-			lines.append('▒' + ''.join(line) + '▒')
-		lines.append(border)
-		return '\n'.join(lines)
-
-	def show(self) -> None:
-		print(self.display())
+	def show(self) -> str:
+		border = '▒' * (self.COLS + 4)
+		print(border)
+		for row1, row2 in batched(self.buffer, 2):
+			print('▒▒', end='')
+			for px1, px2 in zip(row1, row2, strict=True):
+				print(' ▀▄█'[~(px1 | (px2 << 1))], end='')
+			print('▒▒')
+		print(border)

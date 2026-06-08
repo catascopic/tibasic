@@ -8,30 +8,25 @@ from argspec import PassEnv, expr, integer, real, thunk
 from decorators import no_arg_command, preparse_cmd, preparse_cmd_func
 from errors import DomainError, TiError
 from modes import DrawMode
+from screen import Screen
 from tiobjects import TiEquation
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
 # rows 0–62 (63 rows) and columns 0–94 (95 columns), inclusive.
+# The graph screen (used by point/graph commands) spans the same region.
+# 95 columns → 94 intervals; 63 rows → 62 intervals.
 MAX_ROW = 62
 MAX_COL = 94
 
-# The graph screen (used by point/graph commands) spans the same region.
-# 95 columns → 94 intervals; 63 rows → 62 intervals.
-GRAPH_COL_SPAN = 94
-GRAPH_ROW_SPAN = 62
 
 # Pt-On/Off/Change mark pixel offsets (Δrow, Δcol) relative to centre.
 # mark 2/6 = 3×3 filled box (9 pixels)
 # mark 3/7 = 3×3 cross / plus sign (5 pixels)
 # anything else = dot (1 pixel)
-_BOX    = tuple((dr, dc) for dr in (-1, 0, 1) for dc in (-1, 0, 1) if (dr, dc) != (0, 0))
-_CROSS  = ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1))
 _DOT    = ((0, 0),)
-_MARK_OFFSETS = {2: _BOX, 6: _BOX, 3: _CROSS, 7: _CROSS}
-
-
-def _mark_offsets(mark: int):
-	return _MARK_OFFSETS.get(mark, _DOT)
+_CROSS  = ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1))
+_BOX    = ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1))
+_MARK_OFFSETS = {2: _BOX, 3: _CROSS, 6: _BOX, 7: _CROSS}
 
 
 def _round_half_up(value: float) -> int:
@@ -46,27 +41,27 @@ def _round_half_up(value: float) -> int:
 def _x_to_col(env, x: float) -> int:
 	w = env.window
 	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
-	return _round_half_up((x - xmin) * GRAPH_COL_SPAN / (xmax - xmin))
+	return _round_half_up((x - xmin) * MAX_COL / (xmax - xmin))
 
 
 def _y_to_row(env, y: float) -> int:
 	w = env.window
 	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
-	return _round_half_up((ymax - y) * GRAPH_ROW_SPAN / (ymax - ymin))
+	return _round_half_up((ymax - y) * MAX_ROW / (ymax - ymin))
 
 
 def _col_to_x(env, col: float) -> float:
 	"""Inverse of _x_to_col: the graph x-coordinate at the centre of a pixel column."""
 	w = env.window
 	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
-	return xmin + col * (xmax - xmin) / GRAPH_COL_SPAN
+	return xmin + col * (xmax - xmin) / MAX_COL
 
 
 def _row_to_y(env, row: float) -> float:
 	"""Inverse of _y_to_row: the graph y-coordinate at the centre of a pixel row."""
 	w = env.window
 	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
-	return ymax - row * (ymax - ymin) / GRAPH_ROW_SPAN
+	return ymax - row * (ymax - ymin) / MAX_ROW
 
 
 def _graph_to_pixel(env, x: float, y: float) -> tuple[int, int]:
@@ -106,43 +101,35 @@ def _bresenham(r0: int, c0: int, r1: int, c1: int):
 			c0 += sc
 
 
-def _apply_mark(screen, row: int, col: int, mark: int, action) -> None:
-	"""Apply *action(r, c)* to each pixel in the mark shape, clipping to screen bounds."""
-	for dr, dc in _mark_offsets(mark):
-		r, c = row + dr, col + dc
-		if 0 <= r <= MAX_ROW and 0 <= c <= MAX_COL:
-			action(r, c)
+def _in_bounds(row, col):
+	return 0 <= row <= MAX_ROW and 0 <= col <= MAX_COL
 
 
-def _validate(row: float, col: float) -> tuple[int, int]:
+def _validate(row, col):
 	"""Check the Pxl-addressable range, then return Python ints for screen indexing."""
-	if not (0 <= row <= MAX_ROW and 0 <= col <= MAX_COL):
+	if not _in_bounds(row, col):
 		raise DomainError(f"Pixel out of range: row={row}, column={col}")
 	return int(row), int(col)
 
 
 @preparse_cmd_func
 def pxl_on(env: PassEnv, row: integer, col: integer) -> None:
-	row, col = _validate(row, col)
-	env.screen.set(row, col, True)
+	env.screen.set(*_validate(row, col))
 
 
 @preparse_cmd_func
 def pxl_off(env: PassEnv, row: integer, col: integer) -> None:
-	row, col = _validate(row, col)
-	env.screen.set(row, col, False)
+	env.screen.set_off(*_validate(row, col))
 
 
 @preparse_cmd_func
 def pxl_change(env: PassEnv, row: integer, col: integer) -> None:
-	row, col = _validate(row, col)
-	env.screen.toggle(row, col)
+	env.screen.toggle(*_validate(row, col))
 
 
 @preparse_cmd_func
 def pxl_test(env: PassEnv, row: integer, col: integer) -> float:
-	row, col = _validate(row, col)
-	return float(env.screen.get(row, col))
+	return float(env.screen.get(*_validate(row, col)))
 
 
 @no_arg_command
@@ -150,30 +137,29 @@ def clr_draw(env) -> None:
 	env.screen.clear()
 
 
+def _pt_action(env, x, y, mark, action) -> None:
+	row, col = _graph_to_pixel(env, x, y)
+	if _in_bounds(row, col):
+		for dr, dc in _MARK_OFFSETS.get(mark, _DOT):
+			r = row + dr
+			c = col + dc
+			if _in_bounds(r, c):
+				action(env.screen, r, c)
+
+
 @preparse_cmd_func
 def pt_on(env: PassEnv, x: real, y: real, mark: integer = 1) -> None:
-	pixel = _point_to_pixel(env, x, y)
-	if pixel is not None:
-		row, col = pixel
-		_apply_mark(env.screen, row, col, int(mark),
-		            lambda r, c: env.screen.set(r, c, True))
+	_pt_action(env, x, y, mark, Screen.set)
 
 
 @preparse_cmd_func
 def pt_off(env: PassEnv, x: real, y: real, mark: integer = 1) -> None:
-	pixel = _point_to_pixel(env, x, y)
-	if pixel is not None:
-		row, col = pixel
-		_apply_mark(env.screen, row, col, int(mark),
-		            lambda r, c: env.screen.set(r, c, False))
+	_pt_action(env, x, y, mark, Screen.set_off)
 
 
 @preparse_cmd_func
 def pt_change(env: PassEnv, x: real, y: real, mark: integer = 1) -> None:
-	pixel = _point_to_pixel(env, x, y)
-	if pixel is not None:
-		row, col = pixel
-		_apply_mark(env.screen, row, col, int(mark), env.screen.toggle)
+	_pt_action(env, x, y, mark, Screen.toggle)
 
 
 @preparse_cmd
@@ -195,31 +181,6 @@ def horizontal(env: PassEnv, y: real) -> None:
 
 
 @preparse_cmd_func
-def circle(env: PassEnv, x: real, y: real, r: real, _fast: expr = None) -> None:
-	"""Circle(X,Y,r[,{i}]) — draw a circle (or ellipse) at graph (X,Y) with graph radius r.
-
-	The optional 4th argument enables the 'fast circle' routine on real hardware
-	(Bresenham 8-fold symmetry); it is accepted here and silently ignored — we
-	always use the parametric approach, which handles non-square windows correctly.
-	Negative radius is treated as its absolute value.  Off-screen pixels are clipped.
-	"""
-	w = env.window
-	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
-	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
-	cy, cx = _graph_to_pixel(env, x, y)              # (row, col)
-	rx = abs(r) * GRAPH_COL_SPAN / (xmax - xmin)   # pixel semi-axis, horizontal
-	ry = abs(r) * GRAPH_ROW_SPAN / (ymax - ymin)    # pixel semi-axis, vertical
-	# Step finely enough that no pixel is skipped (~4 steps per pixel of circumference).
-	n = max(8, math.ceil(4 * math.pi * max(rx, ry)) + 1)
-	for i in range(n):
-		theta = 2 * math.pi * i / n
-		c   = cx + _round_half_up(rx * math.cos(theta))
-		row = cy - _round_half_up(ry * math.sin(theta))
-		if 0 <= row <= MAX_ROW and 0 <= c <= MAX_COL:
-			env.screen.set(row, c)
-
-
-@preparse_cmd_func
 def line(env: PassEnv, x1: real, y1: real, x2: real, y2: real, erase: real = 1) -> None:
 	"""Line(X1,Y1,X2,Y2[,erase]) — draw (or erase) a line between two graph points.
 
@@ -230,8 +191,35 @@ def line(env: PassEnv, x1: real, y1: real, x2: real, y2: real, erase: real = 1) 
 	r0, c0 = _graph_to_pixel(env, x1, y1)
 	r1, c1 = _graph_to_pixel(env, x2, y2)
 	for r, c in _bresenham(r0, c0, r1, c1):
-		if 0 <= r <= MAX_ROW and 0 <= c <= MAX_COL:
+		if _in_bounds(r, c):
 			env.screen.set(r, c, on)
+
+
+@preparse_cmd_func
+def circle(env: PassEnv, x: real, y: real, r: real, _fast: expr = None) -> None:
+	"""Circle(X,Y,r[,{i}]) — draw a circle (or ellipse) at graph (X,Y) with graph radius r.
+
+	The optional 4th argument enables the 'fast circle' routine on real hardware
+	(Bresenham 8-fold symmetry); it is accepted here and silently ignored — we
+	always use the parametric approach, which handles non-square windows correctly.
+	Negative radius is treated as its absolute value.  Off-screen pixels are clipped.
+	"""
+	w = env.window
+	xmin = w.xmin.resolve()
+	xmax = w.xmax.resolve()
+	ymin = w.ymin.resolve()
+	ymax = w.ymax.resolve()
+	cy, cx = _graph_to_pixel(env, x, y)
+	rx = abs(r) * MAX_COL / (xmax - xmin)
+	ry = abs(r) * MAX_ROW / (ymax - ymin)
+	# Step finely enough that no pixel is skipped (~4 steps per pixel of circumference).
+	n = max(8, math.ceil(4 * math.pi * max(rx, ry)) + 1)
+	for i in range(n):
+		theta = 2 * math.pi * i / n
+		col = cx + _round_half_up(rx * math.cos(theta))
+		row = cy - _round_half_up(ry * math.sin(theta))
+		if _in_bounds(row, col):
+			env.screen.set(row, col)
 
 
 # ── Function graphing (DrawF / DrawInv) and distribution shading ────────────────
@@ -271,14 +259,14 @@ def _clip_segment(r0, c0, r1, c1):
 	segment lies entirely outside.  Clipping first keeps Bresenham bounded even when
 	a near-vertical connecting line (e.g. across an asymptote) spans millions of rows.
 	"""
-	dr, dc = r1 - r0, c1 - c0
-	p = (-dc, dc, -dr, dr)
-	q = (c0, MAX_COL - c0, r0, MAX_ROW - r0)
-	u1, u2 = 0.0, 1.0
-	for pi, qi in zip(p, q):
+	dr = r1 - r0
+	dc = c1 - c0
+	u1 = 0.0
+	u2 = 1.0
+	for pi, qi in ((-dc, c0), (dc, MAX_COL - c0), (-dr, r0), (dr, MAX_ROW - r0)):
 		if pi == 0:
 			if qi < 0:
-				return None              # parallel to a border and outside it
+				return None  # parallel to a border and outside it
 		else:
 			t = qi / pi
 			if pi < 0:
@@ -289,18 +277,12 @@ def _clip_segment(r0, c0, r1, c1):
 				if t < u1:
 					return None
 				u2 = min(u2, t)
-	return (round(r0 + u1 * dr), round(c0 + u1 * dc),
-	        round(r0 + u2 * dr), round(c0 + u2 * dc))
-
-
-def _plot_segment(env, r0, c0, r1, c1, on):
-	"""Draw the visible part of the (possibly off-screen) segment from (r0,c0)-(r1,c1)."""
-	clipped = _clip_segment(r0, c0, r1, c1)
-	if clipped is None:
-		return
-	for r, c in _bresenham(*clipped):
-		if 0 <= r <= MAX_ROW and 0 <= c <= MAX_COL:
-			env.screen.set(r, c, on)
+	return (
+		round(r0 + u1 * dr), 
+		round(c0 + u1 * dc), 
+		round(r0 + u2 * dr), 
+		round(c0 + u2 * dc),
+	)
 
 
 def _trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
@@ -315,25 +297,34 @@ def _trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
 	of storing it as a window variable rather than recomputing per sample.
 	"""
 	connected = env.draw_mode is DrawMode.CONNECTED
-	w = env.window
 	prev = None
+	w = env.window
 	if not inv:
 		xmin = w.xmin.resolve()
-		delta = (w.xmax.resolve() - xmin) / GRAPH_COL_SPAN   # ΔX, computed once
-		to_indep = lambda i: xmin + i * delta
-		to_pixel = lambda v, col: (_y_to_row(env, v), col)
+		delta = (w.xmax.resolve() - xmin) / MAX_COL   # ΔX, computed once
 		span = MAX_COL
+		def to_indep(i):
+			return xmin + i * delta
+		
+		def to_pixel(v, col):
+			return (_y_to_row(env, v), col)
+
 	else:
 		ymax = w.ymax.resolve()
-		delta = (ymax - w.ymin.resolve()) / GRAPH_ROW_SPAN    # ΔY, computed once
-		to_indep = lambda i: ymax - i * delta
-		to_pixel = lambda v, row: (row, _x_to_col(env, v))
+		delta = (ymax - w.ymin.resolve()) / MAX_ROW    # ΔY, computed once
 		span = MAX_ROW
+		def to_indep(i): 
+			return ymax - i * delta
+		
+		def to_pixel(v, row):
+			return (row, _x_to_col(env, v))
+
 	# Guard zone: how far off-screen a coordinate may be before we clamp it.
 	# Clamping both endpoints keeps Bresenham bounded near vertical asymptotes
 	# while leaving ordinarily off-screen points (e.g. row=63 when MAX_ROW=62)
 	# unclamped so the Bresenham path through the visible region is identical to
 	# what the TI produces by running Bresenham end-to-end with per-pixel clipping.
+
 	_GUARD = MAX_ROW + MAX_COL   # generous but finite
 	for i in range(span + 1):
 		value = f(to_indep(i))
@@ -341,18 +332,19 @@ def _trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
 			prev = None
 			continue
 		row, col = to_pixel(value, i)
+		curr = (
+			max(-_GUARD, min(MAX_ROW + _GUARD, row)),
+			max(-_GUARD, min(MAX_COL + _GUARD, col)),
+		)
 		if connected and prev is not None:
-			# Clamp both endpoints into the guard zone, then run Bresenham
-			# with per-pixel clipping — matching TI's native segment drawing.
-			gr = max(-_GUARD, min(MAX_ROW + _GUARD, row))
-			gc = max(-_GUARD, min(MAX_COL + _GUARD, col))
-			for r, c in _bresenham(prev[0], prev[1], gr, gc):
-				if 0 <= r <= MAX_ROW and 0 <= c <= MAX_COL:
+			for r, c in _bresenham(*prev, *curr):
+				if _in_bounds(r, c):
 					env.screen.set(r, c, on)
-		elif 0 <= row <= MAX_ROW and 0 <= col <= MAX_COL:
+
+		elif _in_bounds(row, col):
 			env.screen.set(row, col, on)
-		prev = (max(-_GUARD, min(MAX_ROW + _GUARD, row)),
-		        max(-_GUARD, min(MAX_COL + _GUARD, col)))
+
+		prev = curr
 
 
 def _shade_under(env, f, lo: float, hi: float) -> None:
@@ -367,7 +359,7 @@ def _shade_under(env, f, lo: float, hi: float) -> None:
 			continue
 		top, bot = sorted((_y_to_row(env, y), axis_row))
 		for row in range(max(top, 0), min(bot, MAX_ROW) + 1):
-			env.screen.set(row, col, True)
+			env.screen.set(row, col)
 
 
 @preparse_cmd

@@ -1,3 +1,46 @@
+Fixing up the @preparsed system:
+These are the calculator's "true" types: Real, Complex, List, ComplexList, Matrix, String, Equation.
+There's also Program, Pic, GDB, App, AppVar. However, these cannot really be used within expressions and so we can set them aside.
+I think ArgSpec should only be responsible for parsing true types. That means a function's signature could be (a: real) but not (a: integer). If we want to check if a number is an integer, we'll have to do that within the function body with require_int.
+However, the ArgSpec types should probably be a little different from the true type, mostly because some functions require real numbers but nothing requires complex; anything that can handle complex can also handle reals. So here's what I think the full list of expression types should be that @preparsed can handle.
+numeric (real or complex)
+real
+list (with or without is_complex set)
+real_list
+matrix
+string
+vectorized
+vectorized_real
+matrix_vectorized
+
+Currently, the "expr" ArgSpec is used everywhere, and I'm not sure there's actually anywhere that we should be using it with preparsed! cumSum( can take a list or matrix, so maybe there? Does that mean the sigature should be list|matrix?
+Also note that we can get rid of the weird validation wrapper that works with vectorized functions to validate every item in the list. All we care about at that layer is whether it's real or complex, and we can validate complex lists with is_complex.
+
+You'll notice there's no equation type, because it's not really a data type. Equations can be expressed as strings, or evaluated to an actual data type, but that's it.
+Of course, we do still want ArgSpecs for things other than data types:
+thunk
+numeric_var
+list_var
+list_var_prefix_optional
+matrix_var
+string_var
+deletable (any_var)
+
+matr-to-list and ClrList take a variadic[list_var], but maybe we're better off handling those with @forms_func? What do you think? It might not be too hard to keep the variadic logic.
+
+Finally, there's a few specialized types:
+label_name
+program_name
+
+
+
+
+ERR:DATA TYPE, ERR:DIVIDE BY 0, ERR:DOMAIN, ERR:INCREMENT, ERR:NONREAL ANS, ERR:OVERFLOW, and ERR:SINGULAR MAT. If one of these errors occurs, the data point will be omitted.
+
+
+
+Need argspecs for strings, matrices
+
 Functions can return list!
 
 Fix: equations containting other equations

@@ -59,12 +59,6 @@ def py_int(value: Any, exc_cls=DomainError) -> int:
 def require_list(value: Any) -> TiList:
 	return _require_type(value, TiList)
 
-def require_nonempty_list(value: Any) -> TiList:
-	lst = require_list(value)
-	if not lst.data:
-		raise InvalidDimError("list is empty")
-	return lst
-
 def require_matrix(value: Any) -> TiMatrix:
 	return _require_type(value, TiMatrix)
 
