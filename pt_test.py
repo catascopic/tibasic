@@ -77,7 +77,7 @@ def _print_commands() -> None:
 env = Environment()
 current_prefix  = 'Pt-On( '     # TI prefix prepended to user input
 current_display = 'Pt-On'       # shown in the prompt
-env.draw_mode = DrawMode.DOT
+# env.draw_mode = DrawMode.DOT
 
 print('Interactive drawing tester — blank line to quit.')
 print(_window_info(env))

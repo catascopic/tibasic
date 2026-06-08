@@ -10,7 +10,7 @@ from modes import AngleMode
 from errors import (
 	TiSyntaxError, IllegalNestError, DomainError, DimMismatchError,
 	StatError, IncrementError, DataTypeError, InvalidDimError, ArgumentError,
-	UndefinedError,
+	UndefinedError, TiMemoryError,
 )
 import catalog
 from titoken import Token
@@ -1858,3 +1858,125 @@ class TestVars:
 		27@θ
 		""")
 		assert calc('QWERTYUIOPASDFGHJKLZXCVBNMθ', env) == approx(math.factorial(27))
+
+
+# ── Equation variables ────────────────────────────────────────────────────────
+
+class TestEquationVars:
+	"""Y-vars (and other equation-type vars) auto-evaluate when read in expressions."""
+
+	def _env(self, **yfuncs) -> Environment:
+		"""Build an Environment with function Y-vars stored from formula strings via TI-BASIC.
+
+		Each formula is stored as a string literal: '" {formula} "@ {name}'.
+		The opening " and closing " are space-separated so toks() treats them as
+		individual QUOTE tokens; the formula tokens sit between them.
+		"""
+		env = Environment()
+		for name, formula in yfuncs.items():
+			run(f'" {formula} "@ {name}', env)
+		return env
+
+	# ── Basic evaluation ─────────────────────────────────────────────────────
+
+	def test_eval_single_var(self):
+		# Y1 = X; X = 5 → Y1 evaluates to 5
+		env = self._env(Y1='X')
+		env.x.value = 5.0
+		assert calc('Y1', env) == 5
+
+	def test_eval_constant_formula(self):
+		# Y1 = 3 + 4 → always 7, independent of X
+		env = self._env(Y1='3 + 4')
+		assert calc('Y1', env) == 7
+
+	def test_eval_in_arithmetic(self):
+		# Y1 = X; expression Y1 * 2 with X = 3 → 6
+		env = self._env(Y1='X')
+		env.x.value = 3.0
+		assert calc('Y1 * 2', env) == 6
+
+	def test_eval_complex_formula(self):
+		# Y1 = X ^ 2 + 1; X = 4 → 17
+		env = self._env(Y1='X ^ 2 + 1')
+		env.x.value = 4.0
+		assert calc('Y1', env) == 17
+
+	# ── Chaining ─────────────────────────────────────────────────────────────
+
+	def test_chain_two_deep(self):
+		# Y1 = Y2; Y2 = X; X = 7 → Y1 evaluates to 7
+		env = self._env(Y1='Y2', Y2='X')
+		env.x.value = 7.0
+		assert calc('Y1', env) == 7
+
+	def test_chain_with_operations(self):
+		# Y1 = Y2 + 1; Y2 = 3 * X; X = 2 → Y1 = 7
+		env = self._env(Y1='Y2 + 1', Y2='3 * X')
+		env.x.value = 2.0
+		assert calc('Y1', env) == 7
+
+	def test_chain_nine_deep(self):
+		# Y1 → Y2 → … → Y9 → X; X = 42 → Y1 evaluates to 42
+		env = self._env(Y1='Y2', Y2='Y3', Y3='Y4', Y4='Y5',
+		                Y5='Y6', Y6='Y7', Y7='Y8', Y8='Y9', Y9='X')
+		env.x.value = 42.0
+		assert calc('Y1', env) == 42
+
+	# ── Non-numeric return values ─────────────────────────────────────────────
+
+	def test_returns_list(self):
+		# An equation that evaluates to a list is legal
+		env = self._env(Y1='{ 1 , 2 , 3 }')
+		result = calc('Y1', env)
+		assert isinstance(result, TiList)
+		assert result.data == [1, 2, 3]
+
+	def test_returns_string_var(self):
+		# An equation that references a string variable returns a TiString
+		env = self._env(Y1='Str1')
+		env.strings[0].value = TiString.from_str('hello')
+		result = calc('Y1', env)
+		assert isinstance(result, TiString)
+		assert str(result) == 'hello'
+
+	# ── Undefined ─────────────────────────────────────────────────────────────
+
+	def test_undefined_raises(self):
+		# Y1 never stored → UndefinedError when read
+		with pytest.raises(UndefinedError):
+			calc('Y1')
+
+	# ── Recursion guard ───────────────────────────────────────────────────────
+
+	def test_self_reference_raises_memory_error(self):
+		# Y1 = Y1 → infinite recursion → ERR:MEMORY
+		env = self._env(Y1='Y1')
+		with pytest.raises(TiMemoryError):
+			calc('Y1', env)
+
+	def test_mutual_recursion_raises_memory_error(self):
+		# Y1 = Y2; Y2 = Y1 → ERR:MEMORY
+		env = self._env(Y1='Y2', Y2='Y1')
+		with pytest.raises(TiMemoryError):
+			calc('Y1', env)
+
+	# ── Token predicate coverage ──────────────────────────────────────────────
+
+	def test_is_equation_var_true_for_function_vars(self):
+		assert all(t.is_equation_var() for t in catalog.FUNCTION)
+
+	def test_is_equation_var_true_for_parametric_vars(self):
+		assert all(t.is_equation_var() for t in catalog.PARAMETRIC)
+
+	def test_is_equation_var_true_for_polar_vars(self):
+		assert all(t.is_equation_var() for t in catalog.POLAR)
+
+	def test_is_equation_var_true_for_sequence_vars(self):
+		assert all(t.is_equation_var() for t in catalog.SEQUENCE)
+
+	def test_is_equation_var_false_for_non_equation_vars(self):
+		from catalog import LISTS, MATRICES, STRINGS
+		assert not any(t.is_equation_var() for t in LISTS)
+		assert not any(t.is_equation_var() for t in MATRICES)
+		assert not any(t.is_equation_var() for t in STRINGS)
