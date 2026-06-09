@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from collections.abc import Callable
 
-from environment import Variable
-
 
 @dataclass(slots=True, frozen=True, eq=False)
 class Token:

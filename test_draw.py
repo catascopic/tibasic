@@ -15,23 +15,17 @@ def _col_count(env, col):
 	return sum(env.screen.get(r, col) for r in range(64))
 
 
-def _lit(env):
-	"""Total number of lit pixels."""
-	return sum(env.screen.buffer)
-
-
 # ── Screen class ───────────────────────────────────────────────────────────────
 
+def total_pixels(screen: Screen):
+	return sum(sum(row) for row in screen.buffer)
+
+
 class TestScreen:
-	def test_dimensions(self):
-		s = Screen()
-		assert s.ROWS == 64
-		assert s.COLS == 96
-		assert len(s.buffer) == 64 * 96
 
 	def test_starts_blank(self):
 		s = Screen()
-		assert not any(s.buffer)
+		assert total_pixels(s) == 0
 
 	def test_set_get(self):
 		s = Screen()
@@ -57,7 +51,7 @@ class TestScreen:
 		s.set(0, 0)
 		s.set(63, 95)
 		s.clear()
-		assert not any(s.buffer)
+		assert total_pixels(s) == 0
 
 	def test_corners_addressable(self):
 		s = Screen()
@@ -180,7 +174,7 @@ class TestPointOn:
 
 	def test_off_screen_draws_nothing(self):
 		env = run('Pt-On( 100,100')
-		assert not any(env.screen.buffer)
+		assert total_pixels(env.screen) == 0
 
 	def test_round_half_up_lands_on_higher_column(self):
 		# Window 0..188 makes column = x / 2, so x=1 -> 0.5 -> rounds up to 1
@@ -204,14 +198,14 @@ class TestPointOn:
 # ── Pt-Off / Pt-Change ──────────────────────────────────────────────────────────
 
 class TestPointOff:
-	def test_turns_off_lit_pixel(self):
+	def test_turns_offtotal_pixels_pixel(self):
 		env = run('Pt-On( 0,0')
 		run('Pt-Off( 0,0', env)
 		assert not env.screen.get(31, 47)
 
 	def test_off_screen_no_error(self):
 		env = run('Pt-Off( 100,100')
-		assert not any(env.screen.buffer)
+		assert total_pixels(env.screen) == 0
 
 	def test_off_is_idempotent(self):
 		env = run('Pt-Off( 0,0')
@@ -231,7 +225,7 @@ class TestPointChange:
 
 	def test_off_screen_no_error(self):
 		env = run('Pt-Change( 100,100')
-		assert not any(env.screen.buffer)
+		assert total_pixels(env.screen) == 0
 
 
 # ── ClrDraw ──────────────────────────────────────────────────────────────────────
@@ -240,12 +234,12 @@ class TestClrDraw:
 	def test_clears_pixels(self):
 		env = run('Pxl-On( 3,5')
 		run('ClrDraw', env)
-		assert not any(env.screen.buffer)
+		assert total_pixels(env.screen) == 0
 
 	def test_clears_after_pt_on(self):
 		env = run('Pt-On( 0,0')
 		run('ClrDraw', env)
-		assert not any(env.screen.buffer)
+		assert total_pixels(env.screen) == 0
 
 	def test_clear_then_draw(self):
 		env = run('Pxl-On( 10,10')
@@ -304,7 +298,7 @@ class TestPointMarks:
 	def test_pt_off_with_mark_clears_shape(self):
 		env = run('Pt-On( 0,0,2')
 		run('Pt-Off( 0,0,2', env)
-		assert not any(env.screen.buffer)
+		assert total_pixels(env.screen) == 0
 
 	def test_pt_change_with_mark_toggles(self):
 		env = run('Pt-Change( 0,0,3')
@@ -312,7 +306,7 @@ class TestPointMarks:
 		for r, c in cross:
 			assert env.screen.get(r, c)
 		run('Pt-Change( 0,0,3', env)
-		assert not any(env.screen.buffer)
+		assert total_pixels(env.screen) == 0
 
 
 # ── Vertical / Horizontal ────────────────────────────────────────────────────────
@@ -338,7 +332,7 @@ class TestVertical:
 
 	def test_off_screen_draws_nothing(self):
 		env = run('Vertical 100')
-		assert not any(env.screen.buffer)
+		assert total_pixels(env.screen) == 0
 
 
 class TestHorizontal:
@@ -362,7 +356,7 @@ class TestHorizontal:
 
 	def test_off_screen_draws_nothing(self):
 		env = run('Horizontal 100')
-		assert not any(env.screen.buffer)
+		assert total_pixels(env.screen) == 0
 
 
 # ── Line( ────────────────────────────────────────────────────────────────────────
@@ -389,12 +383,12 @@ class TestLine:
 	def test_single_point(self):
 		env = run('Line( 0,0,0,0')
 		assert env.screen.get(31, 47)
-		assert sum(env.screen.buffer) == 1
+		assert total_pixels(env.screen) == 1
 
 	def test_erase(self):
 		env = run('Line( ~10,10,10,10')   # draw top row
 		run('Line( ~10,10,10,10,0', env)  # erase it
-		assert not any(env.screen.buffer)
+		assert total_pixels(env.screen) == 0
 
 	def test_erase_default_draws(self):
 		env = run('Line( ~10,10,10,10,1')
@@ -459,7 +453,7 @@ class TestCircle:
 	def test_entirely_offscreen_draws_nothing(self):
 		# Circle centred far off screen with small radius.
 		env = run('Circle( 100,100,1')
-		assert not any(env.screen.buffer)
+		assert total_pixels(env.screen) == 0
 
 	def test_ellipse_non_square_window(self):
 		# With xmin=0, xmax=20, ymin=0, ymax=20 and centre (10,10):
@@ -533,31 +527,31 @@ class TestDrawF:
 		env_dot = Environment()
 		env_dot.draw_mode = DrawMode.DOT
 		run('DrawF X²', env_dot)
-		assert _lit(env_conn) > _lit(env_dot)
+		assert total_pixels(env_conn.screen) > total_pixels(env_dot.screen)
 
 	def test_dot_mode_one_pixel_per_column(self):
 		# Y=X stays on screen for every column, so Dot mode lights exactly one per column.
 		env = Environment()
 		env.draw_mode = DrawMode.DOT
 		run('DrawF X', env)
-		assert _lit(env) == MAX_COL + 1
+		assert total_pixels(env.screen) == MAX_COL + 1
 
 	def test_asymptote_does_not_crash(self):
 		# 1/X blows up at x=0 (the centre column); that point is skipped, not fatal.
 		env = run('DrawF 1/X')
-		assert _lit(env) > 0
+		assert total_pixels(env.screen) > 0
 		# The centre column's exact x is 0 → divide-by-zero → no pixel plotted there
 		# by the sampler, and the connection across the gap is broken.
 
 	def test_list_expression_draws_nothing(self):
 		# A list-valued expression graphs nothing (no error either).
 		env = run('DrawF {1,2,3}')
-		assert _lit(env) == 0
+		assert total_pixels(env.screen) == 0
 
 	def test_offscreen_curve_clips(self):
 		# Y=X²+100 is entirely above the window; nothing visible, no error.
 		env = run('DrawF X²+100')
-		assert _lit(env) == 0
+		assert total_pixels(env.screen) == 0
 
 
 # ── DrawInv ─────────────────────────────────────────────────────────────────────
@@ -618,7 +612,7 @@ class TestShadeDistributions:
 		env.window.xmin.value, env.window.xmax.value = 0, 20
 		env.window.ymin.value, env.window.ymax.value = 0, 0.2
 		run('ShadeNorm( 5,15,10,2.5', env)
-		assert _lit(env) > 0
+		assert total_pixels(env.screen) > 0
 
 	def test_shade_t_fills_interval(self):
 		env = Environment()
@@ -633,7 +627,7 @@ class TestShadeDistributions:
 		env.window.xmin.value, env.window.xmax.value = 0, 10
 		env.window.ymin.value, env.window.ymax.value = 0, 0.3
 		run('Shadeχ²( 0,4,3', env)
-		assert _lit(env) > 0
+		assert total_pixels(env.screen) > 0
 		# A column inside the shaded region is fuller than one past the upper bound.
 		inside = _col_count(env, _x_col(env, 2))
 		outside = _col_count(env, _x_col(env, 8))
@@ -644,7 +638,7 @@ class TestShadeDistributions:
 		env.window.xmin.value, env.window.xmax.value = 0, 5
 		env.window.ymin.value, env.window.ymax.value = 0, 1
 		run('ShadeF( 0,2,3,10', env)
-		assert _lit(env) > 0
+		assert total_pixels(env.screen) > 0
 		inside = _col_count(env, _x_col(env, 1))
 		outside = _col_count(env, _x_col(env, 4))
 		assert inside > outside

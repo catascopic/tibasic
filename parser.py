@@ -719,7 +719,7 @@ class ArgParser:
 		SetUpEditor accepts all three forms; ordinary list contexts require the prefix.
 		"""
 		if self.peek().is_numeric_var():
-			return UserList(self.env, self._parser.read_name(5))
+			return self._parser.parse_user_list()
 		return self._parser.parse_list_var()
 
 	@_parse_arg

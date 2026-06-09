@@ -1,3 +1,52 @@
+Move to their own file: Variable hierarchy, Thunk (UserList can stay in Environment or moved to Parser)
+Alternatively, could we make some kind of base-level file that also includes StopSignal/ReturnSignal and Token?
+Like utils.py but not utils, because that implies functions.
+Move all the require_* methods into this file too (or somewhere else)
+
+move eval method of TiString into Parser to keep tiobjects with no internal dependencies
+
+
+Instead of the type hints for @preparsed functions being annotated args, I think we should use actual types whenever possible and have ArgSpec know how to handle them. For example, we could actually use the Thunk type as a type hint. (We may want to move Thunk since it's in parser.py and doesn't need to be, especially now that Token is an interface and separated from catalog.) Some types would still have to be annotated, though. Like "Real" could be Annotated[float, <???>]. Or maybe it's just an alias for float?
+Here are my proposed ArgSpec types:
+
+[True Types]
+Real: alias for float
+Numeric: alias for float | complex (Could be Number, but I want to exclude int)
+TiList
+TiListReal: alias for TiList (with is_complex not set)
+TiListComplex: alias for TiList (with is_complex set). Is there a case for making TiListComplex an actual subclass? I would think not, but it would make the typing here nicer.
+TiMatrix
+TiString
+
+[Vectorized]
+Vectorized: At first I figured this should be an alias for TiList | Numeric, but I kind of think it should actually just be Numeric? By the time the function sees the data passed in, it will never actually be a list/matrix. I think this makes sense. Of course, it would have some annotation or simply a different object identity to differentiate it. And of course, its presence enables vectorized invocation.
+VectorizedReal: alias for Real
+MatrixVectorized: alias for Real. Also, MatrixVectorized functions will only ever have one parameter which can be a matrix. So the decorator doesn't have to do a dim mismatch check; it should instead ensure there's only one matrix in the args. Or maybe @preparsed should verify that there's at most one MatrixVectorized parameter. Maybe it should also ensure MatrixVectorized isn't used in conjunction with Vectorized.
+
+(Not sure whether it makes sense for Vectorized types to rely on annotations to determine their behavior, or whether ArgSpec would just rely on matching their object identity)
+
+[Variables] (These would use the actual class, which makes me think they should be moved out of environment.py. Also I kind of want to shorten their names to "Var". Maybe we could just have type aliases that use Var?)
+NumericVariable
+ListVariable
+MatrixVariable
+StringVariable
+EquationVariable
+Variable (any)
+ListVariablePrefixOptional: alias for ListVariable (better name for this? Again, I'm not sure whether to use annotations or if all these types should just be in a dict that tell the parser what to do)
+
+[Special]
+PassEnv (What do you think of calling this "ENV" just so it stands out and better signals it's not actually a parsed type?)
+Thunk
+LabelName: alias for a python str?
+ProgramName: same?
+
+
+
+
+
+
+
+
 Revisit transform_to_domain_error decorator
 
 @nullary_command -> @preparse(env, end=CMD)

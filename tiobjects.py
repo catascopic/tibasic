@@ -12,9 +12,9 @@ from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
 	SingularMatrixError, DomainError, TiMemoryError
 )
+from titoken import Token
 
 if TYPE_CHECKING:
-	from titoken import Token
 	from environment import Environment
 
 
@@ -104,6 +104,10 @@ def require_matrix_vectorizable(value: Any, exc_cls=DataTypeError) -> Any:
 	if isinstance(value, (Number, TiList, TiMatrix)):
 		return value
 	raise exc_cls(f"Expected a number, list, or matrix, got {value!r}")
+
+def require_equation(value: Any) -> TiEquation:
+	return _require_type(value, TiEquation)
+
 
 
 def _get_dim(value: Any) -> int:
@@ -439,9 +443,8 @@ class TiEquation:
 		except RecursionError:
 			raise TiMemoryError("Equation recursion overflow (ERR:MEMORY)")
 
-	def __repr__(self) -> str:
+	def __str__(self) -> str:
 		return ''.join(t.text for t in self.tokens)
 
-
-def require_equation(value: Any) -> TiEquation:
-	return _require_type(value, TiEquation)
+	def __repr__(self) -> str:
+		return '"' + str(self) + '"'
