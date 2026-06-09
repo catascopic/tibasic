@@ -1,13 +1,10 @@
-# TODO: Remove after moving Thunk
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-	from parser import Thunk
-
-from environment import Environment, Variable
+from core import Variable, Thunk
+from environment import Environment
 from errors import TiSyntaxError, IncrementError, LabelError
 from signals import ReturnSignal
 from tiobjects import require_real

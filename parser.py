@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from numbers import Number
 
 import operators
@@ -16,22 +15,9 @@ from catalog import (
 	LIST_PREFIX, RAND, DIM,
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
-from environment import Environment, Variable, UserList
+from environment import Environment
+from core import Variable, UserList, Thunk
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError
-
-
-@dataclass
-class Thunk:
-	tokens: list[Token]
-	env: Environment
-
-	def eval(self):
-		parser = Parser(self.tokens, self.env)
-		value = parser.parse_expr()
-		if parser.has_next:
-			# This is a ValueError, not a TiError, because the parser should always get this right
-			raise ValueError(f"Expected end of Thunk; remaining: {parser.tokens[parser.pos:]}")
-		return value
 
 
 class Parser:

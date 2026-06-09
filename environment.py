@@ -1,18 +1,16 @@
-# TODO: Remove after moving Variable hierarchy
 from __future__ import annotations
 
 import math
 import random
-from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from datetime import datetime, date, timedelta
 from typing import Any, ClassVar, TYPE_CHECKING
 
-from tiobjects import (
-	TiList, TiMatrix, TiString, TiEquation,
-	require_num, require_real, require_int, require_list, require_matrix, require_str, require_equation, py_int,
-	is_complex_val,
+from tiobjects import TiList, TiString, require_real, py_int, is_complex_val
+from core import (
+	Variable, NumericVariable, RealVariable,
+	ListVariable, MatrixVariable, StringVariable, EquationVariable,
 )
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
@@ -257,104 +255,9 @@ class Environment:
 		pass
 
 
-# ── Variable hierarchy ────────────────────────────────────────────────────────────
-
-class Variable(ABC):
-	"""Abstract base for all TI-BASIC variable types.
-
-	Concrete subclasses fall into two storage models:
-	  - Instance-stored (NumericVariable and its descendants, ListVariable, etc.):
-	    value lives in self.value; NumericVariable provides __init__(default=None)
-	    which subclasses inherit.  Other instance-stored classes have no __init__
-	    and therefore never accept a constructor default — intentional, since lists,
-	    matrices, strings and equations are always initialised to undefined (None).
-	  - Proxy-stored (UserList): value lives in env.user_lists[name]; the class
-	    manages its own __init__ and exposes value as a property.  It inherits from
-	    Variable without calling super().__init__() because there is no super
-	    __init__ to call.
-	"""
-	value = None  # class-level sentinel; instance writes shadow it
-
-	def resolve(self) -> Any:
-		"""Called when the user references a variable."""
-		if self.value is None:
-			raise UndefinedError(f"Undefined {type(self).__name__}")
-		return self.value
-
-	def store(self, new_value) -> None:
-		"""Called when the user stores a variable."""
-		self.value = self.normalize(new_value)
-
-	@abstractmethod
-	def normalize(self, value) -> Any:
-		"""Validates and coerces a value before storage. For structured types, returns a defensive copy."""
-		pass
-	
-	def __repr__(self):
-		return f"{type(self).__name__}({self.value})"
-
-
-class NumericVariable(Variable):
-	"""Numeric (real or complex) variable.  Accepts an optional constructor default
-	which RealVariable and other subclasses inherit — the only Variable subclasses
-	that are ever constructed with a non-None starting value."""
-
-	def __init__(self, default=None):
-		self.value = default
-
-	def resolve(self):
-		if self.value is None:
-			self.value = 0
-		return self.value
-
-	def normalize(self, value):
-		return require_num(value)
-		
-	@contextmanager
-	def scoped(self):
-		saved = self.resolve()
-		try:
-			yield
-		finally:
-			self.value = saved
-
-
-class RealVariable(NumericVariable):
-	def normalize(self, value):
-		return require_real(value)
-	
-class ListVariable(Variable):
-	def resolve(self):
-		lst = super().resolve()
-		if not lst.data:
-			raise InvalidDimError("empty list")
-		return lst
-
-	def normalize(self, value):
-		return require_list(value).copy()
-
-	def store(self, new_value) -> None:
-		was_complex = self.value is not None and self.value.is_complex
-		self.value = self.normalize(new_value)
-		if was_complex:
-			self.value._upgrade_to_complex()
-
-class MatrixVariable(Variable):
-	def normalize(self, value):
-		return require_matrix(value).copy()
-
-class StringVariable(Variable):
-	def normalize(self, value):
-		return require_str(value)
-
-class EquationVariable(Variable):
-	def normalize(self, value):
-		if isinstance(value, TiEquation):
-			return value
-		if isinstance(value, TiString):
-			return TiEquation(value.tokens)
-		raise DataTypeError(f"Expected equation or string; got {value}")
-
+# ── Window variables ──────────────────────────────────────────────────────────
+# The Variable hierarchy (Variable, NumericVariable, …) and UserList now live in
+# core.py; they are imported above.
 
 class WindowVars:
 	"""Named storage for all TI-84 window/graphing variables."""
@@ -383,31 +286,3 @@ class WindowVars:
 		self.y_fact     = RealVariable(4)
 		self.plot_step  = RealVariable(1)
 		self.xres       = RealVariable(1)
-
-
-class UserList(ListVariable):
-
-	def __init__(self, env: Environment, name: str):
-		self.lookup = env.user_lists
-		self.name = name
-		# Don't call super().__init__() — value is managed via the property below.
-
-	@property
-	def value(self):
-		return self.lookup.get(self.name)
-
-	@value.setter
-	def value(self, new_value):
-		if new_value is None:
-			self.lookup.pop(self.name, None)
-		else:
-			self.lookup[self.name] = new_value
-
-	def resolve(self) -> Any:
-		try:
-			lst = self.lookup[self.name]
-		except KeyError:
-			raise UndefinedError(f"User list {self.name!r} is not defined")
-		if not lst.data:
-			raise InvalidDimError("empty list")
-		return lst

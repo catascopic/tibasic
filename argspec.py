@@ -21,7 +21,6 @@ This module imports nothing from the project at runtime (only stdlib), so the
 heavyweight parser/forms modules can import the vocabulary with no circular-import
 risk.  The base types live behind TYPE_CHECKING purely for static tooling.
 """
-# TODO: Remove after moving Thunk, Variable
 from __future__ import annotations
 
 import inspect
@@ -30,8 +29,8 @@ from numbers import Number
 from typing import Annotated, Any, get_args, TYPE_CHECKING
 
 if TYPE_CHECKING:
-	from environment import Environment, Variable
-	from parser import Thunk
+	from environment import Environment
+	from core import Variable, Thunk
 
 
 @dataclass(frozen=True)
