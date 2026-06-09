@@ -20,9 +20,9 @@ from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
 	DomainError, StatError, ArgumentError,
 )
-from argspec import real, list_, matrix, string, list_or_matrix, vectorized, vectorized_real, matrix_vectorized
+from argspec import real, list_, matrix, string, list_or_matrix, vectorized, vectorized_real, matrix_vectorized, any_type
 from decorators import preparse_func, forms_func
-from decorators import vectorized as _vectorized
+from decorators import vectorize
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -101,39 +101,28 @@ def f_part(x: matrix_vectorized):
 def int_(x: matrix_vectorized):
 	return float(math.floor(x))
 
-def _minmax(fn, a, b):
+
+def _minmax(func, a, b):
 	if b is None:
-		return fn(require_list(a))
+		return func(require_list(a))
+	
 	if isinstance(a, TiList) and isinstance(b, TiList):
 		if len(a) != len(b):
 			raise DimMismatchError(f"{fn.__name__}: dim mismatch ({len(a)} vs {len(b)})")
-		return TiList([fn(x, y) for x, y in zip(a, b)])
+		return TiList([func(x, y) for x, y in zip(a, b)])
+		
 	if isinstance(a, Number) and isinstance(b, Number):
-		return fn(a, b)
-	raise DataTypeError(f"{fn.__name__}: both args must be the same type (both numeric or both list)")
+		return func(a, b)
 
-def _minmax_args(fn, args):
-	"""Dispatch min(/max( on arity: one list reduces, two args pair element-wise.
+	raise DataTypeError(f"{func.__name__}: both args must be the same type (both numeric or both list)")
 
-	min/max are irregular (reduce-vs-pairwise overload), so they parse their own
-	argument list rather than declaring a fixed schema."""
-	if len(args) == 1:
-		return _minmax(fn, args[0], None)
-	if len(args) == 2:
-		return _minmax(fn, args[0], args[1])
-	raise ArgumentError(f"{fn.__name__}: expected 1 or 2 arguments, got {len(args)}")
+@preparse_func
+def min(a: any_type, b: any_type = None):
+	return _minmax(builtins.min, a, b)
 
-@forms_func
-def min(a):
-	args = a.parse_args()
-	a.end_func()
-	return _minmax_args(builtins.min, args)
-
-@forms_func
-def max(a):
-	args = a.parse_args()
-	a.end_func()
-	return _minmax_args(builtins.max, args)
+@preparse_func
+def max(a: any_type, b: any_type = None):
+	return _minmax(builtins.max, a, b)
 
 @preparse_func
 def lcm(a: vectorized_real, b: vectorized_real) -> float:
@@ -176,26 +165,20 @@ def angle(x: vectorized):
 def rand_list(n: real):
 	return TiList([random.random() for _ in range(py_int(n))])
 
-@_vectorized
+@vectorize
 def _rand_int_single(low, high):
-	if low > high:
-		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
 	return float(random.randint(py_int(low), py_int(high)))
 
-@forms_func
-def rand_int(a):
-	args = a.parse_args()
-	a.end_func()
-	if not (2 <= len(args) <= 3):
-		raise ArgumentError(f"randInt: expected 2 or 3 arguments, got {len(args)}")
-	low, high = args[0], args[1]
-	n = args[2] if len(args) == 3 else None
-	if n is None:
-		return _rand_int_single(low, high)
-	low = py_int(low)
-	high = py_int(high)
+@preparse_func
+def rand_int(low: real, high: real, n: real = 1.0):
 	if low > high:
 		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
+
+	if n == 1:
+		return _rand_int_single(low, high)
+
+	low = py_int(low)
+	high = py_int(high)
 	n = py_int(n)
 	return TiList([float(random.randint(low, high)) for _ in range(n)])
 

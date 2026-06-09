@@ -1,45 +1,49 @@
-Move to their own file: Variable hierarchy, Thunk (UserList can stay in Environment or moved to Parser)
-Alternatively, could we make some kind of base-level file that also includes StopSignal/ReturnSignal and Token?
-Like utils.py but not utils, because that implies functions.
-Move all the require_* methods into this file too (or somewhere else)
+randInt, min/max edit
 
-move eval method of TiString into Parser to keep tiobjects with no internal dependencies
+rename 'a' (ArgParser name) to args
 
 
-Instead of the type hints for @preparsed functions being annotated args, I think we should use actual types whenever possible and have ArgSpec know how to handle them. For example, we could actually use the Thunk type as a type hint. (We may want to move Thunk since it's in parser.py and doesn't need to be, especially now that Token is an interface and separated from catalog.) Some types would still have to be annotated, though. Like "Real" could be Annotated[float, <???>]. Or maybe it's just an alias for float?
-Here are my proposed ArgSpec types:
+Plan for overhauling preparse:
+First, I want a new file called preparse.py that contains the ArgSpec logic and the @preparse decorator. We can keep decorators.py for now, since it has other decorators that we use, but preparse is the important one.
+Second, instead of the type hints for @preparsed functions being annotated args, I think we should use actual types whenever possible and have ArgSpec know how to handle them. For example, we could actually use the Thunk type as a type hint. (We may want to move Thunk since it's in parser.py and doesn't need to be, especially now that Token is an interface and separated from catalog.)
+Here are my proposed ArgSpec types. I'm using the `type` syntax to create an alias, so this way, each one will be considered a unique object. We can use these objects as keys in a dict that map to parse methods.
 
-[True Types]
-Real: alias for float
-Numeric: alias for float | complex (Could be Number, but I want to exclude int)
-TiList
-TiListReal: alias for TiList (with is_complex not set)
-TiListComplex: alias for TiList (with is_complex set). Is there a case for making TiListComplex an actual subclass? I would think not, but it would make the typing here nicer.
-TiMatrix
-TiString
+type Real = float
+type Complex = complex
+type Numeric = Real | Complex
+# TiList
+type TiListReal = TiList
+type TiListComplex = TiList
+# TiMatrix
+# TiString
+type Vectorized = Numeric
+type VectorizedReal = Real
+type MatrixVectorized = Real
+# Variables...
+type ListVarPrefixOptional = ListVar
+type ENV = Environment
+# Thunk
+type LabelName = str
+type ProgramName = str
 
-[Vectorized]
-Vectorized: At first I figured this should be an alias for TiList | Numeric, but I kind of think it should actually just be Numeric? By the time the function sees the data passed in, it will never actually be a list/matrix. I think this makes sense. Of course, it would have some annotation or simply a different object identity to differentiate it. And of course, its presence enables vectorized invocation.
-VectorizedReal: alias for Real
-MatrixVectorized: alias for Real. Also, MatrixVectorized functions will only ever have one parameter which can be a matrix. So the decorator doesn't have to do a dim mismatch check; it should instead ensure there's only one matrix in the args. Or maybe @preparsed should verify that there's at most one MatrixVectorized parameter. Maybe it should also ensure MatrixVectorized isn't used in conjunction with Vectorized.
+These type aliases will be used to look up the parsing logic. I'd like to remove all the parse-value-and-validate methods from ArgParser and bring back expr() as the general purpose "parse a value" function. I want to basically create equivalent functions somewhere else, but I want to declutter the parser and have this logic located in preparse. For example, Real would essentially map to:
+def parse_real(args: ArgParser):
+	return require_real(args.expr())
+These functions could maybe even be created programatically with some kind of helper: `make_validator(require_real)` or something.
+Side note: is there a case for making TiListReal/TiListComplex actual subclasses? I would think not, but it would make the typing here nicer.
 
-(Not sure whether it makes sense for Vectorized types to rely on annotations to determine their behavior, or whether ArgSpec would just rely on matching their object identity)
+On Vectorization: 
+At first I figured Vectorized should be an alias for TiList | Numeric, but I kind of think it should actually just be Numeric! By the time the function sees the data passed in, it will never actually be a list/matrix. And of course, its presence enables vectorized invocation. My plan is that, all the vectorized types do is make sure to check the type returned by the parser (Vectorized should be float/complex/TiList) and additionally, they signal to @preparsed to wrap the function in @vectorize. That's it. After this change, we can remove the vectorized/matrix fields from ArgSpec and get rid of _make_vectorized, unless you have a reason not to.
+MatrixVectorized functions will only ever have one parameter which can be a matrix. The preparsed logic should instead ensure there's only one MatrixVectorized arg in the args, and also ensure MatrixVectorized isn't used in conjunction with Vectorized. Of course, it also wraps the function in @matrix_vectorized.
 
-[Variables] (These would use the actual class, which makes me think they should be moved out of environment.py. Also I kind of want to shorten their names to "Var". Maybe we could just have type aliases that use Var?)
-NumericVariable
-ListVariable
-MatrixVariable
-StringVariable
-EquationVariable
-Variable (any)
-ListVariablePrefixOptional: alias for ListVariable (better name for this? Again, I'm not sure whether to use annotations or if all these types should just be in a dict that tell the parser what to do)
+On Variables:
+These types would use the actual class, which means they should be moved out of environment.py. Also I kind of want to shorten their names to "Var". (Maybe we could just have type aliases that use Var?)
 
-[Special]
-PassEnv (What do you think of calling this "ENV" just so it stands out and better signals it's not actually a parsed type?)
-Thunk
-LabelName: alias for a python str?
-ProgramName: same?
-
+On Special Types:
+Thunk should be moved out of parser.py.
+That raises the question of what to do with all these types. I want to move out Variables too (UserList can stay in Environment or moved to Parser), Thunk, and maybe move the require_* methods to declutter tiobjects... (I want to move the eval method of TiString into Parser to keep tiobjects with no internal dependencies, too.)
+Could we make some kind of low-level file that also includes StopSignal/ReturnSignal and Token? (Like a generic utils.py but not utils, because that implies functions.) What would we call it? Do you have any better ideas for organization?
+Side note: What do you think of calling the Environment alias "ENV" just so it stands out and better signals it's not actually a parsed type?
 
 
 

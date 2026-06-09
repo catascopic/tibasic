@@ -1,7 +1,7 @@
 import cmath
 import math
 
-from decorators import vectorized
+from decorators import vectorize
 from functools import wraps
 from numbers import Number
 from errors import DataTypeError, DomainError, DivideByZeroError
@@ -9,7 +9,7 @@ from tiobjects import TiMatrix, require_real, require_int, require_num, require_
 
 
 # ── Pure comparison operators ────────────────────────────────────────────────
-# Return 1.0/0.0; @vectorized handles TiList element-wise iteration.
+# Return 1.0/0.0; @vectorize handles TiList element-wise iteration.
 # Type checking is delegated to the operands' magic methods:
 #   - eq/ne: TiMatrix.__eq__ handles mat==mat (returns bool) and mat==other (raises DataTypeError)
 #   - lt/gt/le/ge: TypeError from missing __lt__ etc. is converted to DataTypeError
@@ -22,7 +22,7 @@ def comparison(func):
 			return float(func(a, b))
 		except TypeError:
 			raise DataTypeError(f"'{func.__name__}' not supported between {type(a).__name__} and {type(b).__name__}")
-	return vectorized(apply)
+	return vectorize(apply)
 
 @comparison
 def eq(a, b):
@@ -85,7 +85,7 @@ def logical(func):
 	@wraps(func)
 	def apply(a, b):
 		return float(func(bool(require_real(a)), bool(require_real(b))))
-	return vectorized(apply)
+	return vectorize(apply)
 
 @logical
 def and_(a, b): return a & b
@@ -99,14 +99,14 @@ def xor(a, b):  return a ^ b
 
 # ── Pure combinatorics operators ─────────────────────────────────────────────
 
-@vectorized
+@vectorize
 def ncr(n, r):
 	try:
 		return math.comb(py_int(n), py_int(r))
 	except ValueError:
 		raise DomainError(f"nCr: invalid arguments ({n}, {r})")
 
-@vectorized
+@vectorize
 def npr(n, r):
 	try:
 		return math.perm(py_int(n), py_int(r))
@@ -155,7 +155,7 @@ def transpose(mat):
 	require_matrix(mat)
 	return TiMatrix([[mat.data[r][c] for r in range(mat.rows)] for c in range(mat.cols)])
 
-@vectorized
+@vectorize
 def factorial(n):
 	"""! — factorial (via gamma function for non-negative reals)."""
 	try:

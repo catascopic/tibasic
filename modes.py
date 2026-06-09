@@ -1,6 +1,7 @@
-from __future__ import annotations
 from enum import Enum, auto
-from decorators import forms_func, no_arg_command, no_arg_bunch
+
+from decorators import preparse, no_arg_command, no_arg_bunch
+from argspec import real
 from errors import DomainError
 from tiobjects import py_int
 
@@ -36,7 +37,7 @@ class GraphOrder(Enum):
 
 def _mode(attr, value):
 	@no_arg_command
-	def cmd(env):
+	def cmd(env: 'Environment'):
 		setattr(env, attr, value)
 	return cmd
 
@@ -53,9 +54,9 @@ eng    = _mode('number_mode', NumberMode.ENG)
 # Display precision
 float_ = _mode('fix_digits', None)
 
-@forms_func
-def fix(a):
-	n = py_int(a.expr())
+@preparse
+def fix(n: real):
+	n = py_int(n)
 	if not 0 <= n <= 9:
 		raise DomainError(f"Fix: argument must be 0–9, got {n}")
 	a.env.fix_digits = n
