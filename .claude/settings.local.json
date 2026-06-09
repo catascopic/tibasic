@@ -66,7 +66,8 @@
       "Bash(python pt_test.py)",
       "Bash(python -m pytest test_draw.py test_tibasic.py test_functions.py test_program.py -q)",
       "Bash(python -m pytest test_tibasic.py::TestEquationVars -v)",
-      "Bash(PYTHONIOENCODING=utf-8 python -m pytest test_tibasic.py -q)"
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest test_tibasic.py -q)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest -q)"
     ]
   }
 }

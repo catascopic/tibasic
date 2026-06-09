@@ -2,8 +2,8 @@ import math
 from numbers import Number
 
 import purefunctions as pf
-from argspec import PassEnv, complex_list, real, thunk
-from decorators import no_arg_command, preparse_cmd, preparse_cmd_func
+from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk
+from decorators import no_arg_command
 from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
 from modes import DrawMode
 from screen import Screen
@@ -113,22 +113,22 @@ def _validate(row, col):
 
 
 @preparse_cmd_func
-def pxl_on(env: PassEnv, row: real, col: real) -> None:
+def pxl_on(env: Env, row: Real, col: Real) -> None:
 	env.screen.set(*_validate(row, col))
 
 
 @preparse_cmd_func
-def pxl_off(env: PassEnv, row: real, col: real) -> None:
+def pxl_off(env: Env, row: Real, col: Real) -> None:
 	env.screen.set_off(*_validate(row, col))
 
 
 @preparse_cmd_func
-def pxl_change(env: PassEnv, row: real, col: real) -> None:
+def pxl_change(env: Env, row: Real, col: Real) -> None:
 	env.screen.toggle(*_validate(row, col))
 
 
 @preparse_cmd_func
-def pxl_test(env: PassEnv, row: real, col: real) -> float:
+def pxl_test(env: Env, row: Real, col: Real) -> float:
 	return float(env.screen.get(*_validate(row, col)))
 
 
@@ -153,22 +153,22 @@ def _pt_action(env, x, y, mark, action) -> None:
 
 
 @preparse_cmd_func
-def pt_on(env: PassEnv, x: real, y: real, mark: real = 1.0) -> None:
+def pt_on(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
 	_pt_action(env, x, y, mark, Screen.set)
 
 
 @preparse_cmd_func
-def pt_off(env: PassEnv, x: real, y: real, mark: real = 1.0) -> None:
+def pt_off(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
 	_pt_action(env, x, y, mark, Screen.set_off)
 
 
 @preparse_cmd_func
-def pt_change(env: PassEnv, x: real, y: real, mark: real = 1.0) -> None:
+def pt_change(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
 	_pt_action(env, x, y, mark, Screen.toggle)
 
 
 @preparse_cmd
-def vertical(env: PassEnv, x: real) -> None:
+def vertical(env: Env, x: Real) -> None:
 	"""Vertical X — draw a full-height line at graph x-coordinate X."""
 	col = _x_to_col(env, x)
 	if 0 <= col <= MAX_COL:
@@ -177,7 +177,7 @@ def vertical(env: PassEnv, x: real) -> None:
 
 
 @preparse_cmd
-def horizontal(env: PassEnv, y: real) -> None:
+def horizontal(env: Env, y: Real) -> None:
 	"""Horizontal Y — draw a full-width line at graph y-coordinate Y."""
 	row = _y_to_row(env, y)
 	if 0 <= row <= MAX_ROW:
@@ -186,7 +186,7 @@ def horizontal(env: PassEnv, y: real) -> None:
 
 
 @preparse_cmd_func
-def line(env: PassEnv, x1: real, y1: real, x2: real, y2: real, erase: real = 1) -> None:
+def line(env: Env, x1: Real, y1: Real, x2: Real, y2: Real, erase: Real = 1) -> None:
 	"""Line(X1,Y1,X2,Y2[,erase]) — draw (or erase) a line between two graph points.
 
 	erase=0 turns pixels off; any other value (default 1) turns them on.
@@ -201,7 +201,7 @@ def line(env: PassEnv, x1: real, y1: real, x2: real, y2: real, erase: real = 1) 
 
 
 @preparse_cmd_func
-def circle(env: PassEnv, x: real, y: real, r: real, _fast: complex_list = None) -> None:
+def circle(env: Env, x: Real, y: Real, r: Real, _fast: TiListComplex = None) -> None:
 	"""Circle(X,Y,r[,{i}]) — draw a circle (or ellipse) at graph (X,Y) with graph radius r.
 
 	The optional 4th argument enables the 'fast circle' routine on real hardware
@@ -382,19 +382,19 @@ def _shade_under(env, f, lo: float, hi: float) -> None:
 
 
 @preparse_cmd
-def draw_f(env: PassEnv, formula: thunk) -> None:
+def draw_f(env: Env, formula: Thunk) -> None:
 	"""DrawF expr — graph an expression in X as Y=f(X) (Func mode, regardless of mode)."""
 	_trace_curve(env, _function_sampler(env, formula))
 
 
 @preparse_cmd
-def draw_inv(env: PassEnv, formula: thunk) -> None:
+def draw_inv(env: Env, formula: Thunk) -> None:
 	"""DrawInv expr — graph the inverse of expr: X becomes vertical, Y horizontal."""
 	_trace_curve(env, _function_sampler(env, formula), inv=True)
 
 
 @preparse_cmd_func
-def shade_norm(env: PassEnv, lower: real, upper: real, mu: real = 0, sigma: real = 1) -> None:
+def shade_norm(env: Env, lower: Real, upper: Real, mu: Real = 0, sigma: Real = 1) -> None:
 	"""ShadeNorm(lower,upper[,μ,σ]) — draw the normal curve, shade the interval's area."""
 	f = lambda x: pf.normalpdf(x, mu, sigma)
 	_trace_curve(env, f)
@@ -402,7 +402,7 @@ def shade_norm(env: PassEnv, lower: real, upper: real, mu: real = 0, sigma: real
 
 
 @preparse_cmd_func
-def shade_t(env: PassEnv, lower: real, upper: real, df: real) -> None:
+def shade_t(env: Env, lower: Real, upper: Real, df: Real) -> None:
 	"""Shade_t(lower,upper,df) — draw the Student-t curve, shade the interval's area."""
 	f = lambda x: pf.tpdf(x, df)
 	_trace_curve(env, f)
@@ -410,7 +410,7 @@ def shade_t(env: PassEnv, lower: real, upper: real, df: real) -> None:
 
 
 @preparse_cmd_func
-def shade_chi_sq(env: PassEnv, lower: real, upper: real, df: real) -> None:
+def shade_chi_sq(env: Env, lower: Real, upper: Real, df: Real) -> None:
 	"""Shadeχ²(lower,upper,df) — draw the chi-square curve, shade the interval's area."""
 	f = lambda x: pf.chi_sq_pdf(x, df)
 	_trace_curve(env, f)
@@ -418,7 +418,7 @@ def shade_chi_sq(env: PassEnv, lower: real, upper: real, df: real) -> None:
 
 
 @preparse_cmd_func
-def shade_f(env: PassEnv, lower: real, upper: real, df1: real, df2: real) -> None:
+def shade_f(env: Env, lower: Real, upper: Real, df1: Real, df2: Real) -> None:
 	"""ShadeF(lower,upper,df1,df2) — draw the F curve, shade the interval's area."""
 	f = lambda x: pf.f_pdf(x, df1, df2)
 	_trace_curve(env, f)
@@ -446,9 +446,9 @@ def _shade_pixel(pattern: int, patres: int, row: int, col: int) -> bool:
 
 
 @preparse_cmd_func
-def shade(env: PassEnv, lower: thunk, upper: thunk,
-          xleft: real = None, xright: real = None,
-          pattern: real = 1, patres: real = 1) -> None:
+def shade(env: Env, lower: Thunk, upper: Thunk,
+          xleft: Real = None, xright: Real = None,
+          pattern: Real = 1, patres: Real = 1) -> None:
 	"""Shade(lowerfunc,upperfunc[,Xleft,Xright,pattern,patres]) — shade between two curves.
 
 	Draws both boundary curves on the graph, then fills the region where
@@ -502,7 +502,7 @@ def _numeric_derivative(f, x: float, h: float = 1e-3):
 
 
 @preparse_cmd_func
-def tangent(env: PassEnv, formula: thunk, value: real) -> None:
+def tangent(env: Env, formula: Thunk, value: Real) -> None:
 	"""Tangent(expr,value) — graph expr and draw the line tangent to it at X=value.
 
 	The slope is found numerically (central difference, matching nDeriv), and the

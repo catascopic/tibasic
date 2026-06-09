@@ -1,12 +1,7 @@
 from numbers import Number
 
 import operators
-from tiobjects import (
-	TiList, TiMatrix, TiString, py_int,
-	require_num, require_real, require_list, require_real_list, require_complex_list,
-	require_matrix, require_str, require_list_or_matrix,
-	require_vectorizable, require_vectorizable_real, require_matrix_vectorizable,
-)
+from tiobjects import TiList, TiMatrix, TiString, py_int, require_num, require_real
 from titoken import Token, EOF_TOKEN
 from catalog import (
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
@@ -17,6 +12,7 @@ from catalog import (
 )
 from environment import Environment
 from core import Variable, UserList, Thunk
+from preparse import _Arity
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError
 
 
@@ -611,56 +607,10 @@ class ArgParser:
 
 	@_parse_arg
 	def expr(self):
+		"""Parse one general expression.  The token-boundary type guards live in
+		preparse.py (make_validator), which wraps this; the variable/name/thunk
+		parsers below are token-stream operations and stay here."""
 		return self._parser.parse_expr()
-
-	# ── True-type guarded value parsers ───────────────────────────────────────
-	# Each parses one expression, then asserts its calculator data type with an
-	# O(1) check (see tiobjects guards).  Vectorized variants accept a scalar-or-
-	# aggregate; @preparse maps the core over the aggregate element-wise.
-
-	@_parse_arg
-	def numeric(self):
-		return require_num(self._parser.parse_expr())
-
-	@_parse_arg
-	def real(self):
-		return require_real(self._parser.parse_expr())
-
-	@_parse_arg
-	def list_(self):
-		return require_list(self._parser.parse_expr())
-
-	@_parse_arg
-	def real_list(self):
-		return require_real_list(self._parser.parse_expr())
-
-	@_parse_arg
-	def complex_list(self):
-		return require_complex_list(self._parser.parse_expr())
-
-	@_parse_arg
-	def matrix(self):
-		return require_matrix(self._parser.parse_expr())
-
-	@_parse_arg
-	def string(self):
-		return require_str(self._parser.parse_expr())
-
-	@_parse_arg
-	def list_or_matrix(self):
-		return require_list_or_matrix(self._parser.parse_expr())
-
-	@_parse_arg
-	def vectorized(self):
-		return require_vectorizable(self._parser.parse_expr())
-
-	@_parse_arg
-	def vectorized_real(self):
-		return require_vectorizable_real(self._parser.parse_expr())
-
-	@_parse_arg
-	def matrix_vectorized(self):
-		return require_matrix_vectorizable(self._parser.parse_expr())
 
 	@_parse_arg
 	def thunk(self):
@@ -784,12 +734,12 @@ class ArgParser:
 		return args
 
 	def take(self, *specs) -> list:
-		"""Parse a fixed argument schema (see argspec.py); return values.
+		"""Parse a fixed argument schema (see preparse.py); return values.
 
-		Each spec names an ArgParser parse method.  Because exactly the declared
-		arguments are consumed, the existing trailing-comma machinery reports the
-		right errors with no extra code: a missing required argument raises
-		ArgumentError from the parse method.
+		Each spec carries a `parse(self) -> value` callable (or None for env).
+		Because exactly the declared arguments are consumed, the existing
+		trailing-comma machinery reports the right errors with no extra code: a
+		missing required argument raises ArgumentError from the parse callable.
 
 		Finalization (end_func / end_cmd / end_paren_cmd) is the caller's
 		responsibility; PreparsedFunc.call_with_parser handles it based on the
@@ -801,19 +751,18 @@ class ArgParser:
 		"""
 		out = []
 		for spec in specs:
-			if spec.method == 'env':
-				# Not parsed: inject the environment in this positional slot.
+			if spec.parse is None:
+				# env: inject the environment in this positional slot, no token.
 				out.append(self.env)
 				continue
-			parse = getattr(self, spec.method)
-			if spec.variadic:
+			if spec.arity is _Arity.VARIADIC:
 				while self._next:
-					out.append(parse())
+					out.append(spec.parse(self))
 				break
-			if spec.optional and not self._next:
+			if spec.arity is _Arity.OPTIONAL and not self._next:
 				# Absent optional: omit it (and any following optionals).
 				break
-			out.append(parse())
+			out.append(spec.parse(self))
 		return out
 	
 	def parse_indices(self, count):

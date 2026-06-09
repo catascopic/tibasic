@@ -1,7 +1,7 @@
 from enum import Enum, auto
 
-from decorators import preparse, no_arg_command, no_arg_bunch
-from argspec import real
+from decorators import no_arg_command, no_arg_bunch
+from preparse import preparse_cmd, Real, Env
 from errors import DomainError
 from tiobjects import py_int
 
@@ -54,13 +54,12 @@ eng    = _mode('number_mode', NumberMode.ENG)
 # Display precision
 float_ = _mode('fix_digits', None)
 
-@preparse
-def fix(n: real):
+@preparse_cmd
+def fix(env: Env, n: Real):
 	n = py_int(n)
 	if not 0 <= n <= 9:
 		raise DomainError(f"Fix: argument must be 0–9, got {n}")
-	a.env.fix_digits = n
-	a.end_cmd()
+	env.fix_digits = n
 
 # Graph type
 func  = _mode('graph_mode', GraphMode.FUNC)

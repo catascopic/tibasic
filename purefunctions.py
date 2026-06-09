@@ -20,9 +20,8 @@ from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
 	DomainError, StatError, ArgumentError,
 )
-from argspec import real, list_, matrix, string, list_or_matrix, vectorized, vectorized_real, matrix_vectorized, any_type
-from decorators import preparse_func, forms_func
-from decorators import vectorize
+from preparse import preparse_func, Real, ListOrMatrix, Vectorized, VectorizedReal, MatrixVectorized, AnyValue
+from decorators import forms_func, vectorize
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -36,7 +35,7 @@ def handle_complex(func):
 
 
 @preparse_func
-def not_(x: vectorized_real):
+def not_(x: VectorizedReal):
 	return float(not x)
 
 ##################
@@ -44,11 +43,11 @@ def not_(x: vectorized_real):
 ##################
 
 @preparse_func
-def pow10(x: vectorized):
+def pow10(x: Vectorized):
 	return 10 ** x
 
 @preparse_func
-def exp(x: vectorized):
+def exp(x: Vectorized):
 	return cmath.exp(x) if isinstance(x, complex) else math.exp(x)
 
 ##################
@@ -56,7 +55,7 @@ def exp(x: vectorized):
 ##################
 
 @preparse_func
-def cbrt(x: vectorized):
+def cbrt(x: Vectorized):
 	if isinstance(x, complex):
 		if x == 0:
 			return 0
@@ -64,7 +63,7 @@ def cbrt(x: vectorized):
 	return math.cbrt(x)
 
 @preparse_func
-def abs(x: matrix_vectorized):
+def abs(x: MatrixVectorized):
 	return builtins.abs(x)
 
 def _ti_round(x: float, decimals: int) -> float:
@@ -80,7 +79,7 @@ def _ti_round(x: float, decimals: int) -> float:
 
 
 @preparse_func
-def round(x: matrix_vectorized, decimals: real = 9):
+def round(x: MatrixVectorized, decimals: Real = 9):
 	n = py_int(decimals)
 	if isinstance(x, complex):
 		return complex(_ti_round(x.real, n), _ti_round(x.imag, n))
@@ -88,17 +87,17 @@ def round(x: matrix_vectorized, decimals: real = 9):
 
 @preparse_func
 @handle_complex
-def i_part(x: matrix_vectorized):
+def i_part(x: MatrixVectorized):
 	return float(math.trunc(x))
 
 @preparse_func
 @handle_complex
-def f_part(x: matrix_vectorized):
+def f_part(x: MatrixVectorized):
 	return x - math.trunc(x)
 
 @preparse_func
 @handle_complex
-def int_(x: matrix_vectorized):
+def int_(x: MatrixVectorized):
 	return float(math.floor(x))
 
 
@@ -117,23 +116,23 @@ def _minmax(func, a, b):
 	raise DataTypeError(f"{func.__name__}: both args must be the same type (both numeric or both list)")
 
 @preparse_func
-def min(a: any_type, b: any_type = None):
+def min(a: AnyValue, b: AnyValue = None):
 	return _minmax(builtins.min, a, b)
 
 @preparse_func
-def max(a: any_type, b: any_type = None):
+def max(a: AnyValue, b: AnyValue = None):
 	return _minmax(builtins.max, a, b)
 
 @preparse_func
-def lcm(a: vectorized_real, b: vectorized_real) -> float:
+def lcm(a: VectorizedReal, b: VectorizedReal) -> float:
 	return float(math.lcm(py_int(a), py_int(b)))
 
 @preparse_func
-def gcd(a: vectorized_real, b: vectorized_real) -> float:
+def gcd(a: VectorizedReal, b: VectorizedReal) -> float:
 	return float(math.gcd(py_int(a), py_int(b)))
 
 @preparse_func
-def remainder(a: vectorized_real, b: vectorized_real):
+def remainder(a: VectorizedReal, b: VectorizedReal):
 	a = require_int(a)
 	b = require_int(b)
 	if a < 0:
@@ -143,26 +142,26 @@ def remainder(a: vectorized_real, b: vectorized_real):
 	return a % b
 
 @preparse_func
-def conj(x: vectorized):
+def conj(x: Vectorized):
 	return complex(x.real, -x.imag) if isinstance(x, complex) else x
 
 @preparse_func
-def real_(x: vectorized):
+def real_(x: Vectorized):
 	return x.real if isinstance(x, complex) else x
 
 @preparse_func
-def imag(x: vectorized):
+def imag(x: Vectorized):
 	return x.imag if isinstance(x, complex) else 0
 
 # Technically works on matrices, but since matrices can't store complex numbers, the result is all 0s.
 # TiBasicDev thinks this is basically a bug, so I'm not implementing it in order to discourage it.
 # (If you want a matrix of all 0s, you can just do 0[A].)
 @preparse_func
-def angle(x: vectorized):
+def angle(x: Vectorized):
 	return cmath.phase(x)
 
 @preparse_func
-def rand_list(n: real):
+def rand_list(n: Real):
 	return TiList([random.random() for _ in range(py_int(n))])
 
 @vectorize
@@ -170,7 +169,7 @@ def _rand_int_single(low, high):
 	return float(random.randint(py_int(low), py_int(high)))
 
 @preparse_func
-def rand_int(low: real, high: real, n: real = 1.0):
+def rand_int(low: Real, high: Real, n: Real = 1.0):
 	if low > high:
 		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
 
@@ -183,13 +182,13 @@ def rand_int(low: real, high: real, n: real = 1.0):
 	return TiList([float(random.randint(low, high)) for _ in range(n)])
 
 @preparse_func
-def rand_norm(mu: real, sigma: real, n: real = None):
+def rand_norm(mu: Real, sigma: Real, n: Real = None):
 	if n is None:
 		return random.gauss(mu, sigma)
 	return TiList([random.gauss(mu, sigma) for _ in range(py_int(n))])
 
 @preparse_func
-def rand_bin(n: real, p: real, simulations: real = None):
+def rand_bin(n: Real, p: Real, simulations: Real = None):
 	n = py_int(n)
 	if not (0 <= p <= 1):
 		raise DomainError("randBin: p must be in [0, 1]")
@@ -201,7 +200,7 @@ def rand_bin(n: real, p: real, simulations: real = None):
 	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(simulations)])
 
 @preparse_func
-def rand_int_no_rep(low: real, high: real):
+def rand_int_no_rep(low: Real, high: Real):
 	lst = list(range(py_int(low), py_int(high) + 1))
 	random.shuffle(lst)
 	return TiList(lst)
@@ -211,7 +210,7 @@ def rand_int_no_rep(low: real, high: real):
 ##################
 
 @preparse_func
-def cum_sum(obj: list_or_matrix):
+def cum_sum(obj: ListOrMatrix):
 	if isinstance(obj, TiMatrix):
 		cols = obj.cols
 		rows = obj.rows
@@ -226,11 +225,11 @@ def cum_sum(obj: list_or_matrix):
 	raise DataTypeError(f"Expected list or matrix; got {obj}")
 
 @preparse_func
-def delta_list(lst: list_):
+def delta_list(lst: TiList):
 	return TiList([b - a for a, b in pairwise(lst)])
 
 @preparse_func
-def augment(a: list_or_matrix, b: list_or_matrix):
+def augment(a: ListOrMatrix, b: ListOrMatrix):
 	if isinstance(a, TiList) and isinstance(b, TiList):
 		return TiList(a.data + b.data)
 	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix):
@@ -240,13 +239,13 @@ def augment(a: list_or_matrix, b: list_or_matrix):
 	raise DataTypeError(f"augment: both args must be lists or both must be matrices; got {a}, {b}")
 
 @preparse_func
-def mean(lst: list_, freqlist: list_ = None):
+def mean(lst: TiList, freqlist: TiList = None):
 	if freqlist is None:
 		return builtins.sum(lst) / len(lst)
 	return builtins.sum(x * w for x, w in zip(lst, freqlist)) / builtins.sum(freqlist)
 
 @preparse_func
-def median(lst: list_, freqlist: list_ = None):
+def median(lst: TiList, freqlist: TiList = None):
 	if freqlist is None:
 		sorted_data = sorted(lst)
 		n = len(sorted_data)
@@ -272,7 +271,7 @@ def median(lst: list_, freqlist: list_ = None):
 	return (nth(total // 2 - 1) + nth(total // 2)) / 2
 
 @preparse_func
-def sum(lst: list_, start: real = None, end: real = None):
+def sum(lst: TiList, start: Real = None, end: Real = None):
 	data = lst.data
 	if start is None:
 		return builtins.sum(data)
@@ -285,7 +284,7 @@ def sum(lst: list_, start: real = None, end: real = None):
 	return builtins.sum(data[start - 1 : end])
 
 @preparse_func
-def prod(lst: list_, start: real = None, end: real = None):
+def prod(lst: TiList, start: Real = None, end: Real = None):
 	data = lst.data
 	if start is None:
 		return math.prod(data)
@@ -298,7 +297,7 @@ def prod(lst: list_, start: real = None, end: real = None):
 	return math.prod(data[start - 1 : end])
 
 @preparse_func
-def variance(lst: list_, freqlist: list_ = None):
+def variance(lst: TiList, freqlist: TiList = None):
 	if freqlist is None:
 		n = len(lst)
 		if n < 2:
@@ -316,7 +315,7 @@ def variance(lst: list_, freqlist: list_ = None):
 	return builtins.sum(w * (x - m) ** 2 for x, w in zip(lst, freqlist)) / (total_w - 1)
 
 @preparse_func
-def stddev(lst: list_, freqlist: list_ = None):
+def stddev(lst: TiList, freqlist: TiList = None):
 	return math.sqrt(variance(lst, freqlist))
 
 ####################
@@ -324,7 +323,7 @@ def stddev(lst: list_, freqlist: list_ = None):
 ####################
 
 @preparse_func
-def det(mat: matrix):
+def det(mat: TiMatrix):
 	n = mat.rows
 	if n == 0 or n != mat.cols:
 		raise InvalidDimError(f"det requires a square matrix, got {mat.rows}×{mat.cols}")
@@ -346,12 +345,12 @@ def det(mat: matrix):
 	return sign * math.prod(work[i][i] for i in range(n))
 
 @preparse_func
-def identity(n: real):
+def identity(n: Real):
 	size = py_int(n)
 	return TiMatrix([[float(r == c) for c in range(size)] for r in range(size)])
 
 @preparse_func
-def rand_m(rows: real, cols: real):
+def rand_m(rows: Real, cols: Real):
 	rows = py_int(rows)
 	cols = py_int(cols)
 	if not (1 <= rows <= 99) or not (1 <= cols <= 99):
@@ -364,7 +363,7 @@ def rand_m(rows: real, cols: real):
 def _row_reduce(mat, get_range):
 	require_matrix(mat)
 	if mat.rows > mat.cols:
-		raise InvalidDimError(f"ref/rref: matrix must have at least as many columns as rows")
+		raise InvalidDimError(f"ref/rref: TiMatrix must have at least as many columns as rows")
 	result = [row.copy() for row in mat.data]
 	pivot_row = 0
 	for col in range(mat.cols):
@@ -392,34 +391,34 @@ def _row_reduce(mat, get_range):
 	return TiMatrix(result)
 
 @preparse_func
-def ref(mat: matrix):
+def ref(mat: TiMatrix):
 	return _row_reduce(mat, lambda pivot_row, rows: range(pivot_row + 1, rows))
 
 @preparse_func
-def rref(mat: matrix):
+def rref(mat: TiMatrix):
 	return _row_reduce(mat, lambda pivot_row, rows: range(rows))
 
 @preparse_func
-def row_swap(mat: matrix, row1: real, row2: real):
+def row_swap(mat: TiMatrix, row1: Real, row2: Real):
 	result = mat.copy()
 	result.set_row(row1, mat.get_row(row2))
 	result.set_row(row2, mat.get_row(row1))
 	return result
 
 @preparse_func
-def row_plus(mat: matrix, row1: real, row2: real):
+def row_plus(mat: TiMatrix, row1: Real, row2: Real):
 	result = mat.copy()
 	result.set_row(row2, [a + b for a, b in zip(mat.get_row(row2), mat.get_row(row1))])
 	return result
 
 @preparse_func
-def times_row(factor: real, mat: matrix, row: real):
+def times_row(factor: Real, mat: TiMatrix, row: Real):
 	result = mat.copy()
 	result.set_row(row, [factor * x for x in mat.get_row(row)])
 	return result
 
 @preparse_func
-def times_row_plus(factor: real, mat: matrix, row1: real, row2: real):
+def times_row_plus(factor: Real, mat: TiMatrix, row1: Real, row2: Real):
 	result = mat.copy()
 	result.set_row(row2, [factor * a + b for a, b in zip(mat.get_row(row1), mat.get_row(row2))])
 	return result
@@ -430,11 +429,11 @@ def times_row_plus(factor: real, mat: matrix, row1: real, row2: real):
 ####################
 
 @preparse_func
-def length(string: string):
+def length(string: TiString):
 	return len(string)
 
 @preparse_func
-def in_string(string: string, substring: string, start: real = 1):
+def in_string(string: TiString, substring: TiString, start: Real = 1):
 	v = string.tokens
 	s = substring.tokens
 	start = py_int(start)
@@ -469,7 +468,7 @@ def sub(a):
 ###########
 
 @preparse_func
-def time_cnv(seconds: real):
+def time_cnv(seconds: Real):
 	"""Convert a number of seconds into {days, hours, minutes, seconds}."""
 	seconds = py_int(seconds)
 	sign = -1 if seconds < 0 else 1
@@ -479,7 +478,7 @@ def time_cnv(seconds: real):
 	return sign * TiList([days, hours, minutes, secs])
 
 @preparse_func
-def dayofwk(year: real, month: real, day: real):
+def dayofwk(year: Real, month: Real, day: Real):
 	"""Day of week: 1=Sunday, 2=Monday, …, 7=Saturday."""
 	try:
 		d = date(py_int(year), py_int(month), py_int(day))
@@ -525,7 +524,7 @@ def _parse_dbd_date(d):
 		raise DomainError(f"dbd: invalid date ({year}/{month}/{day})") from e
 
 @preparse_func
-def dbd(date1: vectorized_real, date2: vectorized_real):
+def dbd(date1: VectorizedReal, date2: VectorizedReal):
 	"""Days between two dates in TI Finance format (MM.DDYY or DDMM.YY)."""
 	return (_parse_dbd_date(date2) - _parse_dbd_date(date1)).days
 
@@ -546,7 +545,7 @@ def _expand_cash_flows(cflist, cffreq):
 	return result
 
 @preparse_func
-def npv(rate: real, cf0: real, cflist: list_, cffreq: list_ = None):
+def npv(rate: Real, cf0: Real, cflist: TiList, cffreq: TiList = None):
 	"""Net present value: CF0 + Σ CFj·(1+rate/100)^-j over expanded cash flows."""
 	flows = _expand_cash_flows(cflist, cffreq)
 	if rate == 0:
@@ -555,7 +554,7 @@ def npv(rate: real, cf0: real, cflist: list_, cffreq: list_ = None):
 	return cf0 + builtins.sum(cf * r ** -j for j, cf in enumerate(flows, 1))
 
 @preparse_func
-def irr(cf0: real, cflist: list_, cffreq: list_ = None):
+def irr(cf0: Real, cflist: TiList, cffreq: TiList = None):
 	"""Internal rate of return: the rate (%) at which NPV equals zero."""
 	flows = _expand_cash_flows(cflist, cffreq)
 	all_flows = [cf0] + flows
@@ -587,7 +586,7 @@ def irr(cf0: real, cflist: list_, cffreq: list_ = None):
 	raise DomainError("irr: no positive real solution found (ERR:NO SIGN CHG)")
 
 @preparse_func
-def eff(nom: vectorized_real, cp: vectorized_real):
+def eff(nom: VectorizedReal, cp: VectorizedReal):
 	"""►Eff(: convert nominal interest rate to effective interest rate."""
 	if cp <= 0:
 		raise DomainError("►Eff: compounding periods must be positive")
@@ -598,7 +597,7 @@ def eff(nom: vectorized_real, cp: vectorized_real):
 	return 100 * ((1 + nom / (100 * cp)) ** cp - 1)
 
 @preparse_func
-def nom(eff_rate: vectorized_real, cp: vectorized_real):
+def nom(eff_rate: VectorizedReal, cp: VectorizedReal):
 	"""►Nom(: convert effective interest rate to nominal interest rate."""
 	if cp <= 0:
 		raise DomainError("►Nom: compounding periods must be positive")
@@ -702,14 +701,14 @@ def _inc_beta(a, b, x):
 	return math.exp(a * math.log(x) + b * math.log(1 - x) - lbeta) * h / a
 
 @preparse_func
-def normalpdf(x: real, mu: real = 0, sigma: real = 1):
+def normalpdf(x: Real, mu: Real = 0, sigma: Real = 1):
 	if sigma == 0:
 		raise DomainError("normalpdf: sigma must be non-zero")
 	z = (x - mu) / sigma
 	return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2 * math.pi))
 
 @preparse_func
-def normalcdf(lower: real, upper: real, mu: real = 0, sigma: real = 1):
+def normalcdf(lower: Real, upper: Real, mu: Real = 0, sigma: Real = 1):
 	if sigma == 0:
 		raise DomainError("normalcdf: sigma must be non-zero")
 	def _cdf(z):
@@ -717,7 +716,7 @@ def normalcdf(lower: real, upper: real, mu: real = 0, sigma: real = 1):
 	return _cdf((upper - mu) / sigma) - _cdf((lower - mu) / sigma)
 
 @preparse_func
-def inv_norm(p: real, mu: real = 0, sigma: real = 1):
+def inv_norm(p: Real, mu: Real = 0, sigma: Real = 1):
 	if p <= 0:
 		return -1e99
 	if p >= 1:
@@ -743,7 +742,7 @@ def inv_norm(p: real, mu: real = 0, sigma: real = 1):
 	return mu + sigma * z
 
 @preparse_func
-def inv_t(p: real, df: real):
+def inv_t(p: Real, df: Real):
 	if p <= 0:
 		return -1e99
 	if p >= 1:
@@ -763,12 +762,12 @@ def inv_t(p: real, df: real):
 	return x
 
 @preparse_func
-def tpdf(t: real, df: real):
+def tpdf(t: Real, df: Real):
 	log_coeff = math.lgamma((df + 1) / 2) - 0.5 * math.log(df * math.pi) - math.lgamma(df / 2)
 	return math.exp(log_coeff - (df + 1) / 2 * math.log(1 + t * t / df))
 
 @preparse_func
-def tcdf(lower: real, upper: real, df: real):
+def tcdf(lower: Real, upper: Real, df: Real):
 	def _t_cdf(x, v):
 		if x == 0:
 			return 0.5
@@ -781,14 +780,14 @@ def tcdf(lower: real, upper: real, df: real):
 	return _t_cdf(upper, df) - _t_cdf(lower, df)
 
 @preparse_func
-def chi_sq_pdf(x: real, df: real):
+def chi_sq_pdf(x: Real, df: Real):
 	if x <= 0:
 		return 0.0
 	k = df
 	return math.exp((k / 2 - 1) * math.log(x) - x / 2 - (k / 2) * math.log(2) - math.lgamma(k / 2))
 
 @preparse_func
-def chi_sq_cdf(lower: real, upper: real, df: real):
+def chi_sq_cdf(lower: Real, upper: Real, df: Real):
 	def _cdf(x, k):
 		if x <= 0:
 			return 0.0
@@ -796,7 +795,7 @@ def chi_sq_cdf(lower: real, upper: real, df: real):
 	return _cdf(upper, df) - _cdf(lower, df)
 
 @preparse_func
-def f_pdf(x: real, df1: real, df2: real):
+def f_pdf(x: Real, df1: Real, df2: Real):
 	if x <= 0:
 		return 0.0
 	log_num = (df1 / 2) * math.log(df1 * x) + (df2 / 2) * math.log(df2) - ((df1 + df2) / 2) * math.log(df1 * x + df2)
@@ -804,7 +803,7 @@ def f_pdf(x: real, df1: real, df2: real):
 	return math.exp(log_num - log_den)
 
 @preparse_func
-def fcdf(lower: real, upper: real, df1: real, df2: real):
+def fcdf(lower: Real, upper: Real, df1: Real, df2: Real):
 	def _cdf(x, d1, d2):
 		if x <= 0:
 			return 0.0
@@ -813,7 +812,7 @@ def fcdf(lower: real, upper: real, df1: real, df2: real):
 	return _cdf(upper, df1, df2) - _cdf(lower, df1, df2)
 
 @preparse_func
-def binompdf(n: real, p: real, k: real = None):
+def binompdf(n: Real, p: Real, k: Real = None):
 	n = py_int(n)
 	if k is None:
 		return TiList([math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(n + 1)])
@@ -821,7 +820,7 @@ def binompdf(n: real, p: real, k: real = None):
 	return math.comb(n, k) * p ** k * (1 - p) ** (n - k)
 
 @preparse_func
-def binomcdf(n: real, p: real, k: real = None):
+def binomcdf(n: Real, p: Real, k: Real = None):
 	n = py_int(n)
 	if k is None:
 		acc = 0
@@ -834,22 +833,22 @@ def binomcdf(n: real, p: real, k: real = None):
 	return float(builtins.sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(py_int(k) + 1)))
 
 @preparse_func
-def poissonpdf(lam: real, k: real):
+def poissonpdf(lam: Real, k: Real):
 	k = py_int(k)
 	return math.exp(-lam) * lam ** k / math.factorial(k)
 
 @preparse_func
-def poissoncdf(lam: real, k: real):
+def poissoncdf(lam: Real, k: Real):
 	k = py_int(k)
 	return builtins.sum(math.exp(-lam) * lam ** i / math.factorial(i) for i in range(k + 1))
 
 @preparse_func
-def geometpdf(p: real, n: real):
+def geometpdf(p: Real, n: Real):
 	n = py_int(n)
 	return p * (1 - p) ** (n - 1)
 
 @preparse_func
-def geometcdf(p: real, n: real):
+def geometcdf(p: Real, n: Real):
 	n = py_int(n)
 	return 1 - (1 - p) ** n
 
@@ -858,17 +857,17 @@ def geometcdf(p: real, n: real):
 ###########
 
 @preparse_func
-def sinh(x: vectorized_real):
+def sinh(x: VectorizedReal):
 	return math.sinh(x)
 
 @preparse_func
-def cosh(x: vectorized_real):
+def cosh(x: VectorizedReal):
 	return math.cosh(x)
 
 @preparse_func
-def tanh(x: vectorized_real):
+def tanh(x: VectorizedReal):
 	return math.tanh(x)
 
 @preparse_func
-def asinh(x: vectorized_real):
+def asinh(x: VectorizedReal):
 	return math.asinh(x)

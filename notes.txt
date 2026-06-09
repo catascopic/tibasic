@@ -1,3 +1,7 @@
+Do you think it makes sense to move UserListVar back to Environment?
+
+put environment in core!
+
 randInt, min/max edit
 
 rename 'a' (ArgParser name) to args
