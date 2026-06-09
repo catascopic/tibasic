@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from argspec import expr, thunk, numeric_var, list_var, list_var_prefix_optional, equation_var, string_var, label_name, program_name, any_var, real, PassEnv
+from argspec import thunk, numeric_var, list_var, list_var_prefix_optional, equation_var, string_var, label_name, program_name, any_var, real, string, PassEnv
 from decorators import forms_func, preparse_cmd, preparse_cmd_func, preparse_bunch, no_arg_command
 from errors import DataTypeError, ArgumentError, InvalidDimError, DimMismatchError, TiSyntaxError
 from signals import ReturnSignal, StopSignal
@@ -140,7 +140,7 @@ def equ_to_string(equ_var: equation_var, str_var: string_var) -> None:
 	str_var.value = TiString(equ_var.resolve().tokens)
 
 @preparse_cmd_func
-def string_to_equ(string: expr, equ_var: equation_var) -> None:
+def string_to_equ(string: string, equ_var: equation_var) -> None:
 	"""String►Equ(str_expr, equvar) — parse a string value into an equation variable."""
 	equ_var.value = TiEquation(require_str(string).tokens)
 
@@ -149,7 +149,7 @@ def string_to_equ(string: expr, equ_var: equation_var) -> None:
 ############
 
 @preparse_cmd
-def if_cmd(env: PassEnv, cond: expr):
+def if_cmd(env: PassEnv, cond: real):
 	env.current_program().begin_if(bool(cond))
 
 @forms_func

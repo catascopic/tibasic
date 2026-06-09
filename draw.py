@@ -4,12 +4,12 @@ import math
 from numbers import Number
 
 import purefunctions as pf
-from argspec import PassEnv, expr, integer, real, thunk
+from argspec import PassEnv, complex_list, real, thunk
 from decorators import no_arg_command, preparse_cmd, preparse_cmd_func
 from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
 from modes import DrawMode
 from screen import Screen
-from tiobjects import TiEquation
+from tiobjects import TiEquation, py_int
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
 # rows 0–62 (63 rows) and columns 0–94 (95 columns), inclusive.
@@ -111,26 +111,26 @@ def _validate(row, col):
 	"""Check the Pxl-addressable range, then return Python ints for screen indexing."""
 	if not _in_bounds(row, col):
 		raise DomainError(f"Pixel out of range: row={row}, column={col}")
-	return int(row), int(col)
+	return py_int(row), py_int(col)
 
 
 @preparse_cmd_func
-def pxl_on(env: PassEnv, row: integer, col: integer) -> None:
+def pxl_on(env: PassEnv, row: real, col: real) -> None:
 	env.screen.set(*_validate(row, col))
 
 
 @preparse_cmd_func
-def pxl_off(env: PassEnv, row: integer, col: integer) -> None:
+def pxl_off(env: PassEnv, row: real, col: real) -> None:
 	env.screen.set_off(*_validate(row, col))
 
 
 @preparse_cmd_func
-def pxl_change(env: PassEnv, row: integer, col: integer) -> None:
+def pxl_change(env: PassEnv, row: real, col: real) -> None:
 	env.screen.toggle(*_validate(row, col))
 
 
 @preparse_cmd_func
-def pxl_test(env: PassEnv, row: integer, col: integer) -> float:
+def pxl_test(env: PassEnv, row: real, col: real) -> float:
 	return float(env.screen.get(*_validate(row, col)))
 
 
@@ -203,12 +203,13 @@ def line(env: PassEnv, x1: real, y1: real, x2: real, y2: real, erase: real = 1) 
 
 
 @preparse_cmd_func
-def circle(env: PassEnv, x: real, y: real, r: real, _fast: expr = None) -> None:
+def circle(env: PassEnv, x: real, y: real, r: real, _fast: complex_list = None) -> None:
 	"""Circle(X,Y,r[,{i}]) — draw a circle (or ellipse) at graph (X,Y) with graph radius r.
 
 	The optional 4th argument enables the 'fast circle' routine on real hardware
-	(Bresenham 8-fold symmetry); it is accepted here and silently ignored — we
-	always use the parametric approach, which handles non-square windows correctly.
+	(Bresenham 8-fold symmetry); the calculator requires it to be a complex list
+	(e.g. {i}).  We validate it for fidelity but ignore its value — we always use
+	the parametric approach, which handles non-square windows correctly.
 	Negative radius is treated as its absolute value.  Off-screen pixels are clipped.
 	"""
 	w = env.window
@@ -288,11 +289,21 @@ def _clip_segment(r0, c0, r1, c1):
 					return None
 				u2 = min(u2, t)
 	return (
-		round(r0 + u1 * dr), 
-		round(c0 + u1 * dc), 
-		round(r0 + u2 * dr), 
+		round(r0 + u1 * dr),
+		round(c0 + u1 * dc),
+		round(r0 + u2 * dr),
 		round(c0 + u2 * dc),
 	)
+
+
+def _plot_segment(env, r0: int, c0: int, r1: int, c1: int, on: bool = True) -> None:
+	"""Clip a segment to the screen, then draw the visible portion with Bresenham."""
+	clipped = _clip_segment(r0, c0, r1, c1)
+	if clipped is None:
+		return
+	for r, c in _bresenham(*clipped):
+		if _in_bounds(r, c):
+			env.screen.set(r, c, on)
 
 
 def _trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
@@ -439,7 +450,7 @@ def _shade_pixel(pattern: int, patres: int, row: int, col: int) -> bool:
 @preparse_cmd_func
 def shade(env: PassEnv, lower: thunk, upper: thunk,
           xleft: real = None, xright: real = None,
-          pattern: integer = 1, patres: integer = 1) -> None:
+          pattern: real = 1, patres: real = 1) -> None:
 	"""Shade(lowerfunc,upperfunc[,Xleft,Xright,pattern,patres]) — shade between two curves.
 
 	Draws both boundary curves on the graph, then fills the region where
@@ -458,8 +469,8 @@ def shade(env: PassEnv, lower: thunk, upper: thunk,
 	hi = w.xmax.resolve() if xright is None else xright
 	flo = _function_sampler(env, lower)
 	fhi = _function_sampler(env, upper)
-	pat = max(1, min(4, int(pattern)))
-	res = max(1, int(patres))
+	pat = max(1, min(4, py_int(pattern)))
+	res = max(1, py_int(patres))
 	# Draw both boundary curves.
 	_trace_curve(env, flo)
 	_trace_curve(env, fhi)

@@ -2,7 +2,12 @@ from dataclasses import dataclass
 from numbers import Number
 
 import operators
-from tiobjects import TiList, TiMatrix, TiString, require_num, require_real, py_int
+from tiobjects import (
+	TiList, TiMatrix, TiString, py_int,
+	require_num, require_real, require_list, require_real_list, require_complex_list,
+	require_matrix, require_str, require_list_or_matrix,
+	require_vectorizable, require_vectorizable_real, require_matrix_vectorizable,
+)
 from titoken import Token, EOF_TOKEN
 from catalog import (
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
@@ -621,6 +626,55 @@ class ArgParser:
 	@_parse_arg
 	def expr(self):
 		return self._parser.parse_expr()
+
+	# ── True-type guarded value parsers ───────────────────────────────────────
+	# Each parses one expression, then asserts its calculator data type with an
+	# O(1) check (see tiobjects guards).  Vectorized variants accept a scalar-or-
+	# aggregate; @preparse maps the core over the aggregate element-wise.
+
+	@_parse_arg
+	def numeric(self):
+		return require_num(self._parser.parse_expr())
+
+	@_parse_arg
+	def real(self):
+		return require_real(self._parser.parse_expr())
+
+	@_parse_arg
+	def list_(self):
+		return require_list(self._parser.parse_expr())
+
+	@_parse_arg
+	def real_list(self):
+		return require_real_list(self._parser.parse_expr())
+
+	@_parse_arg
+	def complex_list(self):
+		return require_complex_list(self._parser.parse_expr())
+
+	@_parse_arg
+	def matrix(self):
+		return require_matrix(self._parser.parse_expr())
+
+	@_parse_arg
+	def string(self):
+		return require_str(self._parser.parse_expr())
+
+	@_parse_arg
+	def list_or_matrix(self):
+		return require_list_or_matrix(self._parser.parse_expr())
+
+	@_parse_arg
+	def vectorized(self):
+		return require_vectorizable(self._parser.parse_expr())
+
+	@_parse_arg
+	def vectorized_real(self):
+		return require_vectorizable_real(self._parser.parse_expr())
+
+	@_parse_arg
+	def matrix_vectorized(self):
+		return require_matrix_vectorizable(self._parser.parse_expr())
 
 	@_parse_arg
 	def thunk(self):

@@ -5,7 +5,7 @@ of the vocabulary aliases below.  @preparse reads the signature (see
 `schema_from_signature`) and builds a tuple of ArgSpec values:
 
     @preparse(FUNC)
-    def gcd(a: vectorized[numeric], b: vectorized[numeric]) -> float: ...
+    def gcd(a: vectorized_real, b: vectorized_real) -> float: ...
 
 Optionality and arity fall straight out of the signature:
 
@@ -35,8 +35,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class ArgSpec:
-	method: str                    # name of the ArgParser parse method that extracts the value
-	validate: str = ''             # name of a value validator @preparse applies (real/numeric/integer)
+	method: str                    # name of the ArgParser parse method that extracts (and guards) the value
 	optional: bool = False         # if absent, the slot is omitted from the call
 	variadic: bool = False         # greedily consume the rest; yields a list
 	vectorize: bool = False        # map element-wise over a TiList in this slot
@@ -47,13 +46,12 @@ class ArgSpec:
 			('?', self.optional), ('*', self.variadic),
 			('~', self.vectorize), ('#', self.matrix),
 		) if on)
-		name = f"{self.method}:{self.validate}" if self.validate else self.method
-		return f"{name}{flags}"
+		return f"{self.method}{flags}"
 
 
 def _as_spec(annotation) -> ArgSpec:
 	"""Return the ArgSpec for a schema entry: a bare ArgSpec, or one wrapped in
-	an Annotated alias (e.g. ``expr`` → ``Annotated[Any, ArgSpec('expr')]``)."""
+	an Annotated alias (e.g. ``real`` → ``Annotated[float, ArgSpec('real')]``)."""
 	if isinstance(annotation, ArgSpec):
 		return annotation
 	for meta in get_args(annotation):
@@ -64,16 +62,37 @@ def _as_spec(annotation) -> ArgSpec:
 
 # ── Vocabulary ──────────────────────────────────────────────────────────────
 # Each alias is Annotated[<value type the core receives>, ArgSpec('<method>')].
-# The value types all extract via the `expr` parser method and differ only in the
-# value validator @preparse applies (so a TiList/TiMatrix in a vectorized slot is
-# validated element-wise, not rejected wholesale).
+# The ArgSpec names an ArgParser parse method that both extracts the value and
+# guards its *true* type at the token-stream boundary (an O(1) isinstance check):
+# the calculator has only six runtime data types — Real, Complex, List,
+# ComplexList, Matrix, String — and a spec asserts exactly one shape of those.
+# Value refinements that are NOT true types (e.g. "is this an integer?") are not
+# ArgSpecs; they belong in the function body via require_int.
+#
+# A vectorized slot accepts a scalar-or-list (or, for matrix_vectorized, a
+# matrix) and is mapped element-wise by @preparse (see decorators._make_vectorized),
+# so the core function still receives scalars and its guard is the per-element
+# true type.
 # `env` is special: it is injected from ArgParser.env without consuming a token.
 
-expr    = Annotated[Any,           ArgSpec('expr')]
-numeric = Annotated[Number,        ArgSpec('expr', validate='numeric')]  # require_num per value
-real    = Annotated[float,         ArgSpec('expr', validate='real')]     # require_real per value
-integer = Annotated[float,         ArgSpec('expr', validate='integer')]  # require_int per value; call int() when a Python int is needed
-thunk   = Annotated['Thunk',       ArgSpec('thunk')]
+# Scalars.
+numeric = Annotated[Number, ArgSpec('numeric')]   # real or complex scalar
+real    = Annotated[float,  ArgSpec('real')]       # real scalar (rejects complex, incl. 1+0i)
+
+# Aggregates.
+list_       = Annotated['TiList',   ArgSpec('list_')]          # any list (real or complex)
+real_list    = Annotated['TiList',   ArgSpec('real_list')]     # list with no complex element
+complex_list = Annotated['TiList',   ArgSpec('complex_list')]  # list with at least one complex element
+matrix    = Annotated['TiMatrix', ArgSpec('matrix')]           # matrix (always real)
+string    = Annotated['TiString', ArgSpec('string')]
+list_or_matrix = Annotated[Any,   ArgSpec('list_or_matrix')]   # polymorphic list|matrix shape
+
+# Vectorized slots: scalar-or-aggregate accepted, mapped element-wise.
+vectorized        = Annotated[Any, ArgSpec('vectorized',        vectorize=True)]
+vectorized_real   = Annotated[Any, ArgSpec('vectorized_real',   vectorize=True)]
+matrix_vectorized = Annotated[Any, ArgSpec('matrix_vectorized', vectorize=True, matrix=True)]
+
+thunk   = Annotated['Thunk', ArgSpec('thunk')]
 
 num_var      = Annotated['Variable', ArgSpec('numeric_var')]
 list_var     = Annotated['Variable', ArgSpec('list_var')]
@@ -91,30 +110,6 @@ PassEnv = env  # readable alias for use in new-style annotations
 
 # Back-compat alias: old code imports `numeric_var`.
 numeric_var = num_var
-
-
-def _mark(item, **flags) -> Annotated:
-	"""Return a copy of an alias with extra ArgSpec flags set (vectorize/matrix)."""
-	spec = _as_spec(item)
-	args = get_args(item)
-	base = args[0] if args else Any
-	return Annotated[base, replace(spec, **flags)]
-
-
-class vectorized:
-	"""``vectorized[numeric]`` marks a parameter as a mapped axis: a TiList in
-	that slot is iterated element-wise (zipped with the other vectorized slots),
-	while scalars and unmarked parameters are broadcast unchanged."""
-	def __class_getitem__(cls, item):
-		return _mark(item, vectorize=True)
-
-
-class matrix_vectorized:
-	"""Like ``vectorized``, but the slot also maps element-wise over a TiMatrix
-	via TiMatrix.transform.  At most one matrix_vectorized argument may receive a
-	matrix per call."""
-	def __class_getitem__(cls, item):
-		return _mark(item, vectorize=True, matrix=True)
 
 
 # ── Schema extraction from a function signature ─────────────────────────────

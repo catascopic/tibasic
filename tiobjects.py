@@ -59,11 +59,51 @@ def py_int(value: Any, exc_cls=DomainError) -> int:
 def require_list(value: Any) -> TiList:
 	return _require_type(value, TiList)
 
+def require_real_list(value: Any, exc_cls=DataTypeError) -> TiList:
+	"""A TiList whose elements are all real (rejects a complex list)."""
+	require_list(value)
+	if value.is_complex:
+		raise exc_cls(f"Expected real list, got complex: {value}")
+	return value
+
+def require_complex_list(value: Any, exc_cls=DataTypeError) -> TiList:
+	"""A TiList that holds complex elements (rejects a real list and any scalar)."""
+	require_list(value)
+	if not value.is_complex:
+		raise exc_cls(f"Expected complex list, got real: {value}")
+	return value
+
 def require_matrix(value: Any) -> TiMatrix:
 	return _require_type(value, TiMatrix)
 
 def require_str(value: Any) -> TiString:
 	return _require_type(value, TiString)
+
+def require_list_or_matrix(value: Any, exc_cls=DataTypeError) -> Any:
+	"""A TiList or TiMatrix (the polymorphic shape accepted by cumSum(, augment(...)."""
+	if isinstance(value, (TiList, TiMatrix)):
+		return value
+	raise exc_cls(f"Expected a list or matrix, got {value!r}")
+
+def require_vectorizable(value: Any, exc_cls=DataTypeError) -> Any:
+	"""A numeric scalar or a TiList — a slot that maps element-wise over a list."""
+	if isinstance(value, (Number, TiList)):
+		return value
+	raise exc_cls(f"Expected a number or list, got {value!r}")
+
+def require_vectorizable_real(value: Any, exc_cls=DataTypeError) -> Any:
+	"""A real scalar or a real TiList (rejects complex scalars and complex lists)."""
+	if is_complex_val(value):
+		raise exc_cls(f"Expected real number or list, got complex: {value}")
+	if isinstance(value, (Number, TiList)):
+		return value
+	raise exc_cls(f"Expected a number or list, got {value!r}")
+
+def require_matrix_vectorizable(value: Any, exc_cls=DataTypeError) -> Any:
+	"""A numeric scalar, a TiList, or a TiMatrix — maps over a list or matrix."""
+	if isinstance(value, (Number, TiList, TiMatrix)):
+		return value
+	raise exc_cls(f"Expected a number, list, or matrix, got {value!r}")
 
 
 def _get_dim(value: Any) -> int:

@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 	from parser import ArgParser
 
 import operators
-from argspec import expr as expr_spec, numeric, real, integer, vectorized, thunk, numeric_var, PassEnv
+from argspec import real, string, vectorized, vectorized_real, thunk, numeric_var, PassEnv
 from decorators import preparse_func, forms_func, TiCall
 from environment import Environment
 from errors import (
@@ -16,7 +16,7 @@ from errors import (
 	DataTypeError, IncrementError, UndefinedError,
 )
 from modes import ComplexMode
-from tiobjects import TiList, TiMatrix, require_str
+from tiobjects import TiList, TiMatrix, require_str, py_int
 
 
 def _inv_trig(func, env, x):
@@ -31,31 +31,31 @@ def _inv_trig(func, env, x):
 ##################
 
 @preparse_func
-def sin(env: PassEnv, x: vectorized[real]):
+def sin(env: PassEnv, x: vectorized_real):
 	return math.sin(env.to_rad(x))
 
 @preparse_func
-def cos(env: PassEnv, x: vectorized[real]):
+def cos(env: PassEnv, x: vectorized_real):
 	return math.cos(env.to_rad(x))
 
 @preparse_func
-def tan(env: PassEnv, x: vectorized[real]):
+def tan(env: PassEnv, x: vectorized_real):
 	return math.tan(env.to_rad(x))
 
 @preparse_func
-def asin(env: PassEnv, x: vectorized[real]):
+def asin(env: PassEnv, x: vectorized_real):
 	return _inv_trig(math.asin, env, x)
 
 @preparse_func
-def acos(env: PassEnv, x: vectorized[real]):
+def acos(env: PassEnv, x: vectorized_real):
 	return _inv_trig(math.acos, env, x)
 
 @preparse_func
-def atan(env: PassEnv, x: vectorized[real]):
+def atan(env: PassEnv, x: vectorized_real):
 	return _inv_trig(math.atan, env, x)
 
 @preparse_func
-def sqrt(x: vectorized[numeric]):
+def sqrt(x: vectorized):
 	if isinstance(x, complex):
 		return cmath.sqrt(x)
 	if x >= 0:
@@ -63,7 +63,7 @@ def sqrt(x: vectorized[numeric]):
 	return cmath.sqrt(x)
 
 @preparse_func
-def ln(x: vectorized[numeric]):
+def ln(x: vectorized):
 	if isinstance(x, complex):
 		return cmath.log(x)
 	if x > 0:
@@ -73,7 +73,7 @@ def ln(x: vectorized[numeric]):
 	return cmath.log(x)
 
 @preparse_func
-def log(x: vectorized[numeric]):
+def log(x: vectorized):
 	if isinstance(x, complex):
 		return cmath.log10(x)
 	if x > 0:
@@ -87,7 +87,7 @@ def log(x: vectorized[numeric]):
 ####################
 
 @preparse_func
-def log_base(x: vectorized[numeric], base: vectorized[numeric]):
+def log_base(x: vectorized, base: vectorized):
 	if isinstance(x, complex) or isinstance(base, complex):
 		return cmath.log(x, base)
 	if base <= 0 or base == 1:
@@ -103,19 +103,19 @@ def log_base(x: vectorized[numeric], base: vectorized[numeric]):
 ####################
 
 @preparse_func
-def rect_to_polar_radius(env: PassEnv, x: vectorized[real], y: vectorized[real]):
+def rect_to_polar_radius(env: PassEnv, x: vectorized_real, y: vectorized_real):
 	return math.hypot(x, y)
 
 @preparse_func
-def rect_to_polar_angle(env: PassEnv, x: vectorized[real], y: vectorized[real]):
+def rect_to_polar_angle(env: PassEnv, x: vectorized_real, y: vectorized_real):
 	return env.from_rad(math.atan2(y, x))
 
 @preparse_func
-def polar_to_rect_x(env: PassEnv, r: vectorized[real], theta: vectorized[real]):
+def polar_to_rect_x(env: PassEnv, r: vectorized_real, theta: vectorized_real):
 	return r * math.cos(env.to_rad(theta))
 
 @preparse_func
-def polar_to_rect_y(env: PassEnv, r: vectorized[real], theta: vectorized[real]):
+def polar_to_rect_y(env: PassEnv, r: vectorized_real, theta: vectorized_real):
 	return r * math.sin(env.to_rad(theta))
 
 ############
@@ -138,35 +138,35 @@ def _bal(env, n, roundvalue=None):
 
 
 @preparse_func
-def bal(env: PassEnv, n: integer, roundvalue: integer = None):
+def bal(env: PassEnv, n: real, roundvalue: real = None):
 	"""bal(n[,roundvalue]) — remaining balance after n payments."""
-	n = int(n)
+	n = py_int(n)
 	if n < 0:
 		raise DomainError("bal: n must be non-negative")
 	if roundvalue is not None:
-		roundvalue = int(roundvalue)
+		roundvalue = py_int(roundvalue)
 	return _bal(env, n, roundvalue)
 
 
 @preparse_func
-def sigma_prn(env: PassEnv, n1: integer, n2: integer, roundvalue: integer = None):
+def sigma_prn(env: PassEnv, n1: real, n2: real, roundvalue: real = None):
 	"""ΣPrn(n1,n2[,roundvalue]) — principal paid from payment n1 through n2."""
-	n1 = int(n1)
-	n2 = int(n2)
+	n1 = py_int(n1)
+	n2 = py_int(n2)
 	if roundvalue is not None:
-		roundvalue = int(roundvalue)
+		roundvalue = py_int(roundvalue)
 	if n1 < 1 or n2 < 0:
 		raise DomainError("ΣPrn: payment numbers must be positive")
 	return _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
 
 
 @preparse_func
-def sigma_int(env: PassEnv, n1: integer, n2: integer, roundvalue: integer = None):
+def sigma_int(env: PassEnv, n1: real, n2: real, roundvalue: real = None):
 	"""ΣInt(n1,n2[,roundvalue]) — interest paid from payment n1 through n2."""
-	n1 = int(n1)
-	n2 = int(n2)
+	n1 = py_int(n1)
+	n2 = py_int(n2)
 	if roundvalue is not None:
-		roundvalue = int(roundvalue)
+		roundvalue = py_int(roundvalue)
 	if n1 < 1 or n2 < 0:
 		raise DomainError("ΣInt: payment numbers must be positive")
 	sprn = _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
@@ -178,10 +178,9 @@ def sigma_int(env: PassEnv, n1: integer, n2: integer, roundvalue: integer = None
 ####################
 
 @preparse_func
-def expr(env: PassEnv, string: expr_spec):
+def expr(env: PassEnv, string: string):
 	"""Evaluate a TiString as a TI-BASIC expression."""
 	from parser import Parser
-	require_str(string)
 	with env.nest_guard(expr):
 		p = Parser(string.tokens, env)
 		result = p.parse_expr()
@@ -195,7 +194,7 @@ def expr(env: PassEnv, string: expr_spec):
 ####################
 
 @preparse_func
-def sigma(env: PassEnv, formula: thunk, var: numeric_var, start: expr_spec, end: expr_spec) -> float:
+def sigma(env: PassEnv, formula: thunk, var: numeric_var, start: real, end: real) -> float:
 	total = 0
 	n = start
 	with env.nest_guard(sigma), var.scoped():
@@ -206,7 +205,7 @@ def sigma(env: PassEnv, formula: thunk, var: numeric_var, start: expr_spec, end:
 	return total
 
 @preparse_func
-def n_deriv(env: PassEnv, formula: thunk, var: numeric_var, val: expr_spec, h: expr_spec = 0.001) -> float:
+def n_deriv(env: PassEnv, formula: thunk, var: numeric_var, val: real, h: real = 0.001) -> float:
 	with env.nest_guard(n_deriv, max_depth=1), var.scoped():
 		var.value = val + h
 		fwd = formula.eval()
@@ -255,7 +254,7 @@ def _adaptive_gk15(f, lo, hi, tol, depth=0):
 	)
 
 @preparse_func
-def fn_int(env: PassEnv, formula: thunk, var: numeric_var, lo: expr_spec, hi: expr_spec, tol: expr_spec = 1e-5) -> float:
+def fn_int(env: PassEnv, formula: thunk, var: numeric_var, lo: real, hi: real, tol: real = 1e-5) -> float:
 	with env.nest_guard('fnInt'), var.scoped():
 		def f(x):
 			var.value = x
@@ -337,13 +336,13 @@ def dim(a: ArgParser):
 ###########
 
 @preparse_func
-def acosh(x: vectorized[real]):
+def acosh(x: vectorized_real):
 	if x >= 1:
 		return math.acosh(x)
 	return cmath.acosh(x)
 
 @preparse_func
-def atanh(x: vectorized[real]):
+def atanh(x: vectorized_real):
 	if abs(x) < 1:
 		return math.atanh(x)
 	if abs(x) == 1:
