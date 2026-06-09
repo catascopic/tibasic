@@ -73,7 +73,7 @@ def call_vectorized(func: Callable, args: tuple) -> Any:
 	raise DimMismatchError(f"Dim mismatch: {len_check}")
 
 
-def vectorized(func: Callable) -> Callable:
+def vectorize(func: Callable) -> Callable:
 	@wraps(func)
 	def apply(*args: Any) -> Any:
 		return call_vectorized(func, args)
@@ -168,6 +168,7 @@ class PreparsedFunc(TiCall):
 		# so the core needs no value-validation wrapper — vectorization (if any) is
 		# the only wrapper, mapping a vectorized slot's list/matrix onto the scalar
 		# core element-wise.
+		#
 		vec = frozenset(i for i, s in enumerate(schema) if s.vectorize)
 		mat = frozenset(i for i, s in enumerate(schema) if s.matrix)
 		func = _make_vectorized(core, vec, mat) if vec else core

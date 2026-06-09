@@ -21,6 +21,7 @@ This module imports nothing from the project at runtime (only stdlib), so the
 heavyweight parser/forms modules can import the vocabulary with no circular-import
 risk.  The base types live behind TYPE_CHECKING purely for static tooling.
 """
+# TODO: Remove after moving Thunk, Variable
 from __future__ import annotations
 
 import inspect
@@ -86,6 +87,7 @@ complex_list = Annotated['TiList',   ArgSpec('complex_list')]  # list with at le
 matrix    = Annotated['TiMatrix', ArgSpec('matrix')]           # matrix (always real)
 string    = Annotated['TiString', ArgSpec('string')]
 list_or_matrix = Annotated[Any,   ArgSpec('list_or_matrix')]   # polymorphic list|matrix shape
+any_type = Annotated[Any,   ArgSpec('expr')]
 
 # Vectorized slots: scalar-or-aggregate accepted, mapped element-wise.
 vectorized        = Annotated[Any, ArgSpec('vectorized',        vectorize=True)]

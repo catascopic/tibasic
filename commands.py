@@ -152,7 +152,7 @@ def string_to_equ(string: string, equ_var: equation_var) -> None:
 def if_cmd(env: PassEnv, cond: real):
 	env.current_program().begin_if(bool(cond))
 
-@forms_func
+@no_arg_command
 def then_cmd(a: ArgParser):
 	"""Then without a preceding If: always a syntax error."""
 	raise TiSyntaxError("Then without If")

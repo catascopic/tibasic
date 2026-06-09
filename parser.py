@@ -823,11 +823,11 @@ class ArgParser:
 			if spec.variadic:
 				while self._next:
 					out.append(parse())
-			elif spec.optional and not self._next:
+				break
+			if spec.optional and not self._next:
 				# Absent optional: omit it (and any following optionals).
 				break
-			else:
-				out.append(parse())
+			out.append(parse())
 		return out
 	
 	def parse_indices(self, count):
