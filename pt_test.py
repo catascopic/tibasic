@@ -10,6 +10,7 @@ Commands:
   ClrDraw     Circle      Line
   Vertical    Horizontal
   DrawF       DrawInv
+  Shade       Tangent
   ShadeNorm   Shade_t     Shadeχ² (match: shadechi)   ShadeF
 """
 import re
@@ -40,10 +41,12 @@ _COMMANDS = [
 	('horizontal', 'Horizontal', 'Horizontal ',    True),
 	('drawf',      'DrawF',      'DrawF ',         True),
 	('drawinv',    'DrawInv',    'DrawInv ',       True),
-	('shadenorm',  'ShadeNorm',  'ShadeNorm( ',    True),
-	('shadet',     'Shade_t',    'Shade_t( ',      True),
-	('shadechi',   'Shadeχ²',    'Shadeχ²( ',      True),
-	('shadef',     'ShadeF',     'ShadeF( ',       True),
+	('shade',      'Shade',      'Shade( ',         True),
+	('tangent',    'Tangent',    'Tangent( ',       True),
+	('shadenorm',  'ShadeNorm',  'ShadeNorm( ',     True),
+	('shadet',     'Shade_t',    'Shade_t( ',       True),
+	('shadechi',   'Shadeχ²',    'Shadeχ²( ',       True),
+	('shadef',     'ShadeF',     'ShadeF( ',        True),
 ]
 
 _CMD_LOOKUP = {key: (display, prefix, has_args) for key, display, prefix, has_args in _COMMANDS}

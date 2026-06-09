@@ -414,3 +414,100 @@ def shade_f(env: PassEnv, lower: real, upper: real, df1: real, df2: real) -> Non
 	f = lambda x: pf.f_pdf(x, df1, df2)
 	_trace_curve(env, f)
 	_shade_under(env, f, lower, upper)
+
+
+def _shade_pixel(pattern: int, patres: int, row: int, col: int) -> bool:
+	"""Return True if (row, col) falls on a shading line for the given pattern/resolution.
+
+	pattern 1 — vertical lines:            col % patres == 0
+	pattern 2 — horizontal lines:          row % patres == 0
+	pattern 3 — negative-slope 45° lines:  (row - col) % patres == 0
+	pattern 4 — positive-slope 45° lines:  (row + col) % patres == 0
+
+	patres=1 makes every pixel eligible → solid fill for all patterns.
+	"""
+	if pattern == 2:
+		return row % patres == 0
+	elif pattern == 3:
+		return (row - col) % patres == 0
+	elif pattern == 4:
+		return (row + col) % patres == 0
+	else:                          # pattern 1 (default) or out-of-range
+		return col % patres == 0
+
+
+@preparse_cmd_func
+def shade(env: PassEnv, lower: thunk, upper: thunk,
+          xleft: real = None, xright: real = None,
+          pattern: integer = 1, patres: integer = 1) -> None:
+	"""Shade(lowerfunc,upperfunc[,Xleft,Xright,pattern,patres]) — shade between two curves.
+
+	Draws both boundary curves on the graph, then fills the region where
+	lowerfunc(X) < upperfunc(X), restricted to Xleft ≤ X ≤ Xright (defaulting to
+	the window's Xmin/Xmax).
+
+	pattern (1–4) selects the shading line direction:
+	  1 = vertical (default)   2 = horizontal
+	  3 = negative-slope 45°   4 = positive-slope 45°
+
+	patres (1–8) is the spacing between shading lines: 1 fills every pixel
+	(solid), 2 every second, … 8 every eighth.
+	"""
+	w = env.window
+	lo = w.xmin.resolve() if xleft is None else xleft
+	hi = w.xmax.resolve() if xright is None else xright
+	flo = _function_sampler(env, lower)
+	fhi = _function_sampler(env, upper)
+	pat = max(1, min(4, int(pattern)))
+	res = max(1, int(patres))
+	# Draw both boundary curves.
+	_trace_curve(env, flo)
+	_trace_curve(env, fhi)
+	# Fill the region between them.
+	for col in range(0, MAX_COL + 1):
+		x = _col_to_x(env, col)
+		if x < lo or x > hi:
+			continue
+		ylo = flo(x)
+		yhi = fhi(x)
+		if ylo is None or yhi is None or ylo > yhi:
+			continue
+		top = _y_to_row(env, yhi)   # upper function → smaller row number
+		bot = _y_to_row(env, ylo)   # lower function → larger row number
+		for row in range(max(top, 0), min(bot, MAX_ROW) + 1):
+			if _shade_pixel(pat, res, row, col):
+				env.screen.set(row, col, True)
+
+
+def _numeric_derivative(f, x: float, h: float = 1e-3):
+	"""Central-difference slope of f at x, or None if either sample is undefined.
+
+	Uses h=0.001 to match the calculator's nDeriv default tolerance, which is the
+	same routine Tangent( uses to find the slope of the tangent line.
+	"""
+	fp = f(x + h)
+	fm = f(x - h)
+	if fp is None or fm is None:
+		return None
+	return (fp - fm) / (2 * h)
+
+
+@preparse_cmd_func
+def tangent(env: PassEnv, formula: thunk, value: real) -> None:
+	"""Tangent(expr,value) — graph expr and draw the line tangent to it at X=value.
+
+	The slope is found numerically (central difference, matching nDeriv), and the
+	tangent line is drawn across the full window from Xmin to Xmax.
+	"""
+	f = _function_sampler(env, formula)
+	_trace_curve(env, f)
+	m = _numeric_derivative(f, value)
+	y0 = f(value)                 # evaluated last so X/Y exit holding the tangent point
+	if m is None or y0 is None:
+		return
+	w = env.window
+	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
+	tan = lambda x: y0 + m * (x - value)
+	r0, c0 = _graph_to_pixel(env, xmin, tan(xmin))
+	r1, c1 = _graph_to_pixel(env, xmax, tan(xmax))
+	_plot_segment(env, r0, c0, r1, c1, True)
