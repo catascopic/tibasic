@@ -7,53 +7,6 @@ randInt, min/max edit
 rename 'a' (ArgParser name) to args
 
 
-Plan for overhauling preparse:
-First, I want a new file called preparse.py that contains the ArgSpec logic and the @preparse decorator. We can keep decorators.py for now, since it has other decorators that we use, but preparse is the important one.
-Second, instead of the type hints for @preparsed functions being annotated args, I think we should use actual types whenever possible and have ArgSpec know how to handle them. For example, we could actually use the Thunk type as a type hint. (We may want to move Thunk since it's in parser.py and doesn't need to be, especially now that Token is an interface and separated from catalog.)
-Here are my proposed ArgSpec types. I'm using the `type` syntax to create an alias, so this way, each one will be considered a unique object. We can use these objects as keys in a dict that map to parse methods.
-
-type Real = float
-type Complex = complex
-type Numeric = Real | Complex
-# TiList
-type TiListReal = TiList
-type TiListComplex = TiList
-# TiMatrix
-# TiString
-type Vectorized = Numeric
-type VectorizedReal = Real
-type MatrixVectorized = Real
-# Variables...
-type ListVarPrefixOptional = ListVar
-type ENV = Environment
-# Thunk
-type LabelName = str
-type ProgramName = str
-
-These type aliases will be used to look up the parsing logic. I'd like to remove all the parse-value-and-validate methods from ArgParser and bring back expr() as the general purpose "parse a value" function. I want to basically create equivalent functions somewhere else, but I want to declutter the parser and have this logic located in preparse. For example, Real would essentially map to:
-def parse_real(args: ArgParser):
-	return require_real(args.expr())
-These functions could maybe even be created programatically with some kind of helper: `make_validator(require_real)` or something.
-Side note: is there a case for making TiListReal/TiListComplex actual subclasses? I would think not, but it would make the typing here nicer.
-
-On Vectorization: 
-At first I figured Vectorized should be an alias for TiList | Numeric, but I kind of think it should actually just be Numeric! By the time the function sees the data passed in, it will never actually be a list/matrix. And of course, its presence enables vectorized invocation. My plan is that, all the vectorized types do is make sure to check the type returned by the parser (Vectorized should be float/complex/TiList) and additionally, they signal to @preparsed to wrap the function in @vectorize. That's it. After this change, we can remove the vectorized/matrix fields from ArgSpec and get rid of _make_vectorized, unless you have a reason not to.
-MatrixVectorized functions will only ever have one parameter which can be a matrix. The preparsed logic should instead ensure there's only one MatrixVectorized arg in the args, and also ensure MatrixVectorized isn't used in conjunction with Vectorized. Of course, it also wraps the function in @matrix_vectorized.
-
-On Variables:
-These types would use the actual class, which means they should be moved out of environment.py. Also I kind of want to shorten their names to "Var". (Maybe we could just have type aliases that use Var?)
-
-On Special Types:
-Thunk should be moved out of parser.py.
-That raises the question of what to do with all these types. I want to move out Variables too (UserList can stay in Environment or moved to Parser), Thunk, and maybe move the require_* methods to declutter tiobjects... (I want to move the eval method of TiString into Parser to keep tiobjects with no internal dependencies, too.)
-Could we make some kind of low-level file that also includes StopSignal/ReturnSignal and Token? (Like a generic utils.py but not utils, because that implies functions.) What would we call it? Do you have any better ideas for organization?
-Side note: What do you think of calling the Environment alias "ENV" just so it stands out and better signals it's not actually a parsed type?
-
-
-
-
-
-
 
 Revisit transform_to_domain_error decorator
 
@@ -103,6 +56,49 @@ I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 Okay, let's do Text(. Text can either do 3x5 or 5x7 if the alternate flag is set. Let's start with the alternate mode, because it's actually easier. You can find the data for the character in gl
 
 ********
+
+Plan for overhauling preparse:
+First, I want a new file called preparse.py that contains the ArgSpec logic and the @preparse decorator. We can keep decorators.py for now, since it has other decorators that we use, but preparse is the important one.
+Second, instead of the type hints for @preparsed functions being annotated args, I think we should use actual types whenever possible and have ArgSpec know how to handle them. For example, we could actually use the Thunk type as a type hint. (We may want to move Thunk since it's in parser.py and doesn't need to be, especially now that Token is an interface and separated from catalog.)
+Here are my proposed ArgSpec types. I'm using the `type` syntax to create an alias, so this way, each one will be considered a unique object. We can use these objects as keys in a dict that map to parse methods.
+
+type Real = float
+type Complex = complex
+type Numeric = Real | Complex
+# TiList
+type TiListReal = TiList
+type TiListComplex = TiList
+# TiMatrix
+# TiString
+type Vectorized = Numeric
+type VectorizedReal = Real
+type MatrixVectorized = Real
+# Variables...
+type ListVarPrefixOptional = ListVar
+type ENV = Environment
+# Thunk
+type LabelName = str
+type ProgramName = str
+
+These type aliases will be used to look up the parsing logic. I'd like to remove all the parse-value-and-validate methods from ArgParser and bring back expr() as the general purpose "parse a value" function. I want to basically create equivalent functions somewhere else, but I want to declutter the parser and have this logic located in preparse. For example, Real would essentially map to:
+def parse_real(args: ArgParser):
+	return require_real(args.expr())
+These functions could maybe even be created programatically with some kind of helper: `make_validator(require_real)` or something.
+Side note: is there a case for making TiListReal/TiListComplex actual subclasses? I would think not, but it would make the typing here nicer.
+
+On Vectorization: 
+At first I figured Vectorized should be an alias for TiList | Numeric, but I kind of think it should actually just be Numeric! By the time the function sees the data passed in, it will never actually be a list/matrix. And of course, its presence enables vectorized invocation. My plan is that, all the vectorized types do is make sure to check the type returned by the parser (Vectorized should be float/complex/TiList) and additionally, they signal to @preparsed to wrap the function in @vectorize. That's it. After this change, we can remove the vectorized/matrix fields from ArgSpec and get rid of _make_vectorized, unless you have a reason not to.
+MatrixVectorized functions will only ever have one parameter which can be a matrix. The preparsed logic should instead ensure there's only one MatrixVectorized arg in the args, and also ensure MatrixVectorized isn't used in conjunction with Vectorized. Of course, it also wraps the function in @matrix_vectorized.
+
+On Variables:
+These types would use the actual class, which means they should be moved out of environment.py. Also I kind of want to shorten their names to "Var". (Maybe we could just have type aliases that use Var?)
+
+On Special Types:
+Thunk should be moved out of parser.py.
+That raises the question of what to do with all these types. I want to move out Variables too (UserList can stay in Environment or moved to Parser), Thunk, and maybe move the require_* methods to declutter tiobjects... (I want to move the eval method of TiString into Parser to keep tiobjects with no internal dependencies, too.)
+Could we make some kind of low-level file that also includes StopSignal/ReturnSignal and Token? (Like a generic utils.py but not utils, because that implies functions.) What would we call it? Do you have any better ideas for organization?
+Side note: What do you think of calling the Environment alias "ENV" just so it stands out and better signals it's not actually a parsed type?
+
 
 Fixing up the @preparsed system:
 These are the calculator's "true" types: Real, Complex, List, ComplexList, Matrix, String, Equation.

@@ -80,7 +80,7 @@ type MatrixVar = Variable
 type StringVar = Variable
 type EquationVar = Variable
 type AnyVar = Variable
-type ListVarPrefixOptional = ListVar
+type ListVarPrefixOptional = Variable
 
 # Names and environment.
 type LabelName = str
@@ -122,7 +122,7 @@ parse_program_name   = methodcaller('program_name')
 
 # ── Kind and Arity enums ──────────────────────────────────────────────────────
 
-class _Kind(Enum):
+class _Role(Enum):
 	"""Drives vectorization wrapping in PreparsedFunc (see _REGISTRY)."""
 	VALUE  = auto()   # plain value: no wrapping
 	ENV    = auto()   # inject ArgParser.env; no token consumed
@@ -142,29 +142,29 @@ class _Arity(Enum):
 # for vectorization.  env injects with no parse function (None).
 
 _REGISTRY = {
-	Numeric:               (parse_numeric, _Kind.VALUE),
-	Real:                  (parse_real, _Kind.VALUE),
-	TiList:                (parse_list, _Kind.VALUE),
-	TiListReal:            (parse_real_list, _Kind.VALUE),
-	TiListComplex:         (parse_complex_list, _Kind.VALUE),
-	TiMatrix:              (parse_matrix, _Kind.VALUE),
-	TiString:              (parse_string, _Kind.VALUE),
-	ListOrMatrix:          (parse_list_or_matrix, _Kind.VALUE),
-	AnyValue:              (parse_value, _Kind.VALUE),
-	Vectorized:            (parse_vectorized, _Kind.VEC),
-	VectorizedReal:        (parse_vectorized_real, _Kind.VEC),
-	MatrixVectorized:      (parse_matrix_vectorized, _Kind.MATVEC),
-	Thunk:                 (parse_thunk, _Kind.VALUE),
-	NumericVar:            (parse_numeric_var, _Kind.VALUE),
-	ListVar:               (parse_list_var, _Kind.VALUE),
-	MatrixVar:             (parse_matrix_var, _Kind.VALUE),
-	StringVar:             (parse_string_var, _Kind.VALUE),
-	EquationVar:           (parse_equation_var, _Kind.VALUE),
-	AnyVar:                (parse_any_var, _Kind.VALUE),
-	ListVarPrefixOptional: (parse_list_var_prefix_optional, _Kind.VALUE),
-	LabelName:             (parse_label_name, _Kind.VALUE),
-	ProgramName:           (parse_program_name, _Kind.VALUE),
-	Env:                   (None, _Kind.ENV),
+	Numeric:               (parse_numeric, _Role.VALUE),
+	Real:                  (parse_real, _Role.VALUE),
+	TiList:                (parse_list, _Role.VALUE),
+	TiListReal:            (parse_real_list, _Role.VALUE),
+	TiListComplex:         (parse_complex_list, _Role.VALUE),
+	TiMatrix:              (parse_matrix, _Role.VALUE),
+	TiString:              (parse_string, _Role.VALUE),
+	ListOrMatrix:          (parse_list_or_matrix, _Role.VALUE),
+	AnyValue:              (parse_value, _Role.VALUE),
+	Vectorized:            (parse_vectorized, _Role.VEC),
+	VectorizedReal:        (parse_vectorized_real, _Role.VEC),
+	MatrixVectorized:      (parse_matrix_vectorized, _Role.MATVEC),
+	Thunk:                 (parse_thunk, _Role.VALUE),
+	NumericVar:            (parse_numeric_var, _Role.VALUE),
+	ListVar:               (parse_list_var, _Role.VALUE),
+	MatrixVar:             (parse_matrix_var, _Role.VALUE),
+	StringVar:             (parse_string_var, _Role.VALUE),
+	EquationVar:           (parse_equation_var, _Role.VALUE),
+	AnyVar:                (parse_any_var, _Role.VALUE),
+	ListVarPrefixOptional: (parse_list_var_prefix_optional, _Role.VALUE),
+	LabelName:             (parse_label_name, _Role.VALUE),
+	ProgramName:           (parse_program_name, _Role.VALUE),
+	Env:                   (None, _Role.ENV),
 }
 
 
@@ -174,7 +174,7 @@ _REGISTRY = {
 class ArgSpec:
 	"""One parsed parameter: how to read its value, plus arity/kind metadata."""
 	parse: Any                      # Callable[[ArgParser], value]; None ⇒ inject env
-	kind: _Kind = _Kind.VALUE       # drives vectorization wrapping (see PreparsedFunc)
+	role: _Role = _Role.VALUE       # drives vectorization wrapping (see PreparsedFunc)
 	arity: _Arity = _Arity.NORMAL   # NORMAL / OPTIONAL / VARIADIC
 
 	def __repr__(self):
@@ -201,7 +201,7 @@ def schema_from_signature(func) -> tuple:
 			raise TypeError(f"@preparse: {func.__name__}: parameter {name!r} has no annotation")
 		ann = annotations[name]
 		try:
-			parse, kind = _REGISTRY[ann]
+			parse, role = _REGISTRY[ann]
 		except (KeyError, TypeError):
 			raise TypeError(
 				f"@preparse: {func.__name__}: parameter {name!r} has unknown arg type {ann!r}"
@@ -212,7 +212,7 @@ def schema_from_signature(func) -> tuple:
 			arity = _Arity.OPTIONAL
 		else:
 			arity = _Arity.NORMAL
-		schema.append(ArgSpec(parse, kind, arity))
+		schema.append(ArgSpec(parse, role, arity))
 	return tuple(schema)
 
 
@@ -260,14 +260,14 @@ class PreparsedFunc(TiCall):
 	"""
 	def __init__(self, core: Callable, end: Finalize = Finalize.FUNC) -> None:
 		schema = schema_from_signature(core)
-		kinds = [s.kind for s in schema]
-		if _Kind.MATVEC in kinds:
-			if kinds.count(_Kind.MATVEC) > 1:
+		roles = [s.role for s in schema]
+		if _Role.MATVEC in roles:
+			if roles.count(_Role.MATVEC) > 1:
 				raise TypeError(f"{core.__name__}: at most one matrix-vectorized parameter allowed")
-			if _Kind.VEC in kinds:
+			if _Role.VEC in roles:
 				raise TypeError(f"{core.__name__}: cannot mix matrix-vectorized and vectorized parameters")
 			func = matrix_vectorize(core)
-		elif _Kind.VEC in kinds:
+		elif _Role.VEC in roles:
 			func = vectorize(core)
 		else:
 			func = core

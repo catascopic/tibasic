@@ -107,7 +107,7 @@ def _minmax(func, a, b):
 	
 	if isinstance(a, TiList) and isinstance(b, TiList):
 		if len(a) != len(b):
-			raise DimMismatchError(f"{fn.__name__}: dim mismatch ({len(a)} vs {len(b)})")
+			raise DimMismatchError(f"{func.__name__}: dim mismatch ({len(a)} vs {len(b)})")
 		return TiList([func(x, y) for x, y in zip(a, b)])
 		
 	if isinstance(a, Number) and isinstance(b, Number):
@@ -169,13 +169,17 @@ def _rand_int_single(low, high):
 	return float(random.randint(py_int(low), py_int(high)))
 
 @preparse_func
-def rand_int(low: Real, high: Real, n: Real = 1.0):
+def rand_int(low: AnyValue, high: AnyValue, n: Real = 1.0):
+	if isinstance(low, TiList) or isinstance(high, TiList):
+		if n != 1.0:
+			raise DataTypeError("randInt: list arguments cannot be combined with n > 1")
+		return _rand_int_single(low, high)
+	require_real(low)
+	require_real(high)
 	if low > high:
 		raise DomainError(f"randInt: low must be ≤ high, got {low} > {high}")
-
 	if n == 1:
 		return _rand_int_single(low, high)
-
 	low = py_int(low)
 	high = py_int(high)
 	n = py_int(n)
