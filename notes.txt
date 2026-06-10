@@ -1,22 +1,13 @@
+Still don't love the nonreal answer check
 
 put environment in core!
-
-
-
-
 
 Revisit transform_to_domain_error decorator
 
 @nullary_command -> @preparse(env, end=CMD)
 one_or_more/zero_or_more
 
-add to ArgSpec: number, real, integer, etc. Still have to work around vectorized, but could make special handler for this (vectorized_num?)
-
-I want to revisit making parse
-
 peek/next/match/match_separator
-
-Still don't love the nonreal answer check
 
 test fractional powers
 
