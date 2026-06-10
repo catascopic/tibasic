@@ -428,21 +428,23 @@ def shade_f(env: Env, lower: Real, upper: Real, df1: Real, df2: Real) -> None:
 def _shade_pixel(pattern: int, patres: int, row: int, col: int) -> bool:
 	"""Return True if (row, col) falls on a shading line for the given pattern/resolution.
 
-	pattern 1 — vertical lines:            col % patres == 0
-	pattern 2 — horizontal lines:          row % patres == 0
-	pattern 3 — negative-slope 45° lines:  (row - col) % patres == 0
-	pattern 4 — positive-slope 45° lines:  (row + col) % patres == 0
+	pattern 1 — vertical lines:            col % (patres + 1) == 0
+	pattern 2 — horizontal lines:          row % (patres + 1) == 0
+	pattern 3 — negative-slope 45° lines:  (row - col) % (patres + 1) == 0
+	pattern 4 — positive-slope 45° lines:  (row + col) % (patres + 1) == 0
 
-	patres=1 makes every pixel eligible → solid fill for all patterns.
+	patres is the number of blank pixels between shading lines; patres=1 leaves
+	one blank pixel between each bar, patres=8 leaves eight.
 	"""
+	step = patres + 1
 	if pattern == 2:
-		return row % patres == 0
+		return row % step == 0
 	elif pattern == 3:
-		return (row - col) % patres == 0
+		return (row - col) % step == 0
 	elif pattern == 4:
-		return (row + col) % patres == 0
+		return (row + col) % step == 0
 	else:                          # pattern 1 (default) or out-of-range
-		return col % patres == 0
+		return col % step == 0
 
 
 @preparse_cmd_func
@@ -459,8 +461,8 @@ def shade(env: Env, lower: Thunk, upper: Thunk,
 	  1 = vertical (default)   2 = horizontal
 	  3 = negative-slope 45°   4 = positive-slope 45°
 
-	patres (1–8) is the spacing between shading lines: 1 fills every pixel
-	(solid), 2 every second, … 8 every eighth.
+	patres (1–8) is the number of blank pixels between shading lines: 1 leaves
+	one blank pixel between each bar, 8 leaves eight.
 	"""
 	w = env.window
 	lo = w.xmin.resolve() if xleft is None else xleft

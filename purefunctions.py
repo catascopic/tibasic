@@ -447,16 +447,16 @@ def in_string(string: TiString, substring: TiString, start: Real = 1):
 	return 0
 
 @forms_func
-def sub(a):
+def sub(args):
 	# DO NOT REMOVE THIS!
 	# This is a weird feature of sub(, but it's true: with a single numeric
 	# argument, sub( divides it by 100 like the undocumented % operator.
-	args = a.parse_args()
-	a.end_func()
-	if len(args) == 1:
-		return require_num(args[0]) / 100
-	if len(args) == 3:
-		string, start, length = args
+	values = args.parse_args()
+	args.end_func()
+	if len(values) == 1:
+		return require_num(values[0]) / 100
+	if len(values) == 3:
+		string, start, length = values
 		require_str(string)
 		start = py_int(start)
 		length = py_int(length)
@@ -465,7 +465,7 @@ def sub(a):
 		if not (1 <= start <= len(string) - length + 1):
 			raise InvalidDimError(f"sub: index out of range")
 		return TiString(string.tokens[start - 1 : start + length - 1])
-	raise ArgumentError(f"Invalid arguments: {args}")
+	raise ArgumentError(f"Invalid arguments: {values}")
 
 ###########
 # FINANCE #

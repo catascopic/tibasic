@@ -1,10 +1,7 @@
-Do you think it makes sense to move UserListVar back to Environment?
 
 put environment in core!
 
-randInt, min/max edit
 
-rename 'a' (ArgParser name) to args
 
 
 
@@ -56,6 +53,9 @@ I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 Okay, let's do Text(. Text can either do 3x5 or 5x7 if the alternate flag is set. Let's start with the alternate mode, because it's actually easier. You can find the data for the character in gl
 
 ********
+
+Do you think it makes sense to move UserListVar back to Environment?
+randInt, min/max edit
 
 Plan for overhauling preparse:
 First, I want a new file called preparse.py that contains the ArgSpec logic and the @preparse decorator. We can keep decorators.py for now, since it has other decorators that we use, but preparse is the important one.

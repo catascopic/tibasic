@@ -46,54 +46,54 @@ def sort_d(main_var: ListVar, *dep_vars: ListVar):
 	_sort(main_var, dep_vars, True)
 
 @forms_func
-def fill(a: ArgParser):
-	fill_value = require_real(a.expr())
-	if a.peek().is_matrix_var():
-		lst = a.matrix_var().resolve()
-		a.end_paren_cmd()
+def fill(args: ArgParser):
+	fill_value = require_real(args.expr())
+	if args.peek().is_matrix_var():
+		lst = args.matrix_var().resolve()
+		args.end_paren_cmd()
 		for row in lst.data:
 			for i in range(len(row)):
 				row[i] = fill_value
-	elif a.peek().is_list_start():
-		lst = a.list_var().resolve()
-		a.end_paren_cmd()
+	elif args.peek().is_list_start():
+		lst = args.list_var().resolve()
+		args.end_paren_cmd()
 		for i in range(len(lst.data)):
 			lst.data[i] = fill_value
 	else:
 		raise DataTypeError("Fill(: expected a list or matrix variable")
 
 @forms_func
-def list_to_matr(a: ArgParser) -> None:
+def list_to_matr(args: ArgParser) -> None:
 	list_vals = []
 	while True:
-		list_vals.append(require_list(a.expr()))
-		if not a.has_next:
+		list_vals.append(require_list(args.expr()))
+		if not args.has_next:
 			raise ArgumentError("List►matr: expected matrix variable as last argument")
-		if a.peek().is_matrix_var():
-			mat_var = a.matrix_var()
+		if args.peek().is_matrix_var():
+			mat_var = args.matrix_var()
 			break
 	mat_var.value = TiMatrix([list(row) for row in zip_longest(*(lst.data for lst in list_vals), fillvalue=0.0)])
-	a.end_paren_cmd()
+	args.end_paren_cmd()
 
 @forms_func
-def matr_to_list(a: ArgParser) -> None:
-	mat = a.expr()
+def matr_to_list(args: ArgParser) -> None:
+	mat = args.expr()
 	if not isinstance(mat, TiMatrix):
 		raise DataTypeError("Matr►list: first argument must be a matrix")
-	if a.peek().is_list_start():
-		list_vars = [a.list_var()]
-		while a.has_next:
-			list_vars.append(a.list_var())
+	if args.peek().is_list_start():
+		list_vars = [args.list_var()]
+		while args.has_next:
+			list_vars.append(args.list_var())
 		for var, col_data in zip(list_vars, zip(*mat.data)):
 			var.value = TiList(list(col_data))
 	else:
-		col = py_int(a.expr()) - 1
+		col = py_int(args.expr()) - 1
 		if not (0 <= col < mat.cols):
 			raise InvalidDimError(
 				f"Matr►list: column {col + 1} out of range for {mat.rows}×{mat.cols} matrix"
 			)
-		a.list_var().value = TiList([mat.data[r][col] for r in range(mat.rows)])
-	a.end_paren_cmd()
+		args.list_var().value = TiList([mat.data[r][col] for r in range(mat.rows)])
+	args.end_paren_cmd()
 
 
 ##############
@@ -225,12 +225,12 @@ def del_var(var: AnyVar):
 	var.value = None
 
 @forms_func
-def disp(a: ArgParser):
-	if a.has_next:
+def disp(args: ArgParser):
+	if args.has_next:
 		while True:
-			print(a.expr())
-			if not a.has_next:
+			print(args.expr())
+			if not args.has_next:
 				break
 	else:
-		pass  # a.env.focus_home()
-	a.end_cmd()
+		pass  # args.env.focus_home()
+	args.end_cmd()

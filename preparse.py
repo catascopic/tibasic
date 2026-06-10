@@ -233,12 +233,14 @@ class Finalize(Enum):
 	NONE = auto()
 
 
-# Maps each Finalize mode to the ArgParser end method name (None = no call).
+# Maps each Finalize mode to a callable f(parser) that finalizes the argument list.
+def _noop(_): pass
+
 _END_METHOD = {
-	Finalize.FUNC: 'end_func',
-	Finalize.CMD: 'end_cmd',
-	Finalize.CMD_FUNC: 'end_paren_cmd',
-	Finalize.NONE: None,
+	Finalize.FUNC:     methodcaller('end_func'),
+	Finalize.CMD:      methodcaller('end_cmd'),
+	Finalize.CMD_FUNC: methodcaller('end_paren_cmd'),
+	Finalize.NONE:     _noop,
 }
 
 
@@ -276,14 +278,13 @@ class PreparsedFunc(TiCall):
 		self.schema = schema
 		self.end_method = _END_METHOD[end]
 
-	def call_with_parser(self, a: ArgParser):
-		args = a.take(*self.schema)
-		if self.end_method is not None:
-			getattr(a, self.end_method)()
-		return a.env.guard_real(args, self.func(*args))
+	def call_with_parser(self, args: ArgParser):
+		values = args.take(*self.schema)
+		self.end_method(args)
+		return args.env.guard_real(values, self.func(*values))
 
 
-def preparse(end: Finalize | None = None):
+def preparse(end: Finalize):
 	"""Return a decorator that wraps a core function as a PreparsedFunc.
 
 	Prefer the named aliases below over calling this directly:
@@ -294,10 +295,9 @@ def preparse(end: Finalize | None = None):
 
 	Use this directly only when you need to select a Finalize mode dynamically.
 	"""
-	final_end = Finalize.FUNC if end is None else end
 
 	def decorator(core: Callable) -> PreparsedFunc:
-		return PreparsedFunc(core, end=final_end)
+		return PreparsedFunc(core, end)
 	return decorator
 
 

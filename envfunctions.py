@@ -293,15 +293,15 @@ def seq(env: Env, formula: Thunk, var: NumericVar, start: Real, end: Real, step:
 ####################
 
 @forms_func
-def ans_index_or_mul(a: ArgParser):
-	ans = a.env.ans
+def ans_index_or_mul(args: ArgParser):
+	ans = args.env.ans
 	if isinstance(ans, TiList):
-		(index,) = a.parse_indices(1)
+		(index,) = args.parse_indices(1)
 		return ans[index]
 	if isinstance(ans, TiMatrix):
-		return ans[a.parse_indices(2)]
-	b = a.expr()
-	a.end_func()
+		return ans[args.parse_indices(2)]
+	b = args.expr()
+	args.end_func()
 	return operators.mul(ans, b)
 
 # You'd think dim could be a pure function, right? For a while, it was.
@@ -312,17 +312,17 @@ def ans_index_or_mul(a: ArgParser):
 # the calculator, where dim( works on both sides of → for the same reason.
 
 @forms_func
-def dim(a: ArgParser):
-	if a.peek().is_list_start():
-		var = a.list_var()
+def dim(args: ArgParser):
+	if args.peek().is_list_start():
+		var = args.list_var()
 		val = var.value
 		if val is None:
 			raise UndefinedError(f"Undefined list variable")
-		a.end_func()
+		args.end_func()
 		return len(val)
 
-	value = a.expr()
-	a.end_func()
+	value = args.expr()
+	args.end_func()
 	if isinstance(value, TiList):
 		return len(value)
 	# Don't need direct matrix variable access because empty matrices aren't possible
@@ -351,10 +351,10 @@ def atanh(x: VectorizedReal):
 
 
 class set_time_wrapper(TiCall):
-	def call_with_parser(self, a: ArgParser):
-		args = a.parse_args()
-		a.end_paren_cmd()
-		return self(a.env, *args)
+	def call_with_parser(self, args: ArgParser):
+		values = args.parse_args()
+		args.end_paren_cmd()
+		return self(args.env, *values)
 
 
 set_date   = set_time_wrapper(Environment.set_date)
