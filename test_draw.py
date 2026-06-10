@@ -637,7 +637,7 @@ class TestShadeDistributions:
 		env = Environment()
 		env.window.xmin.value, env.window.xmax.value = 0, 5
 		env.window.ymin.value, env.window.ymax.value = 0, 1
-		run('ShadeF( 0,2,3,10', env)
+		run('Shade𝐅( 0,2,3,10', env)
 		assert total_pixels(env.screen) > 0
 		inside = _col_count(env, _x_col(env, 1))
 		outside = _col_count(env, _x_col(env, 4))

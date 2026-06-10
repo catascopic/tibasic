@@ -11,7 +11,7 @@ Commands:
   Vertical    Horizontal
   DrawF       DrawInv
   Shade       Tangent
-  ShadeNorm   Shade_t     Shadeχ² (match: shadechi)   ShadeF
+  ShadeNorm   Shade_t     Shadeχ² (match: shadechi)   Shade𝐅
 """
 import re
 import sys
@@ -46,7 +46,7 @@ _COMMANDS = [
 	('shadenorm',  'ShadeNorm',  'ShadeNorm( ',     True),
 	('shadet',     'Shade_t',    'Shade_t( ',       True),
 	('shadechi',   'Shadeχ²',    'Shadeχ²( ',       True),
-	('shadef',     'ShadeF',     'ShadeF( ',        True),
+	('shadef',     'Shade𝐅',     'Shade𝐅( ',        True),
 ]
 
 _CMD_LOOKUP = {key: (display, prefix, has_args) for key, display, prefix, has_args in _COMMANDS}

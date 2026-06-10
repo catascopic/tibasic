@@ -1,3 +1,12 @@
+Text(:
+Look
+
+Which is the better system for mapping characters?
+
+Rename screen "graph"
+Make home screen
+
+
 Still don't love the nonreal answer check
 
 put environment in core!
@@ -32,8 +41,6 @@ Add aliases to any token that has a character that can't be typed on the keyboar
 TODO:
 
 Commands: solve( fMin( fMax(
-Drawing: Line( Vertical Pt-On( Pt-Off( Pt-Change( Shade( Circle( Horizontal Tangent DrawInv DrawF ShadeNorm( Shade_t( Shadeχ²( ShadeF(
-Pixel: pxl-Test( Pxl-On( Pxl-Off( Pxl-Change(
 Text(  #!!!
 StorePic RecallPic StoreGDB RecallGDB
 Modes: Horiz Full IndpntAuto IndpntAsk DependAuto DependAsk Time Web
@@ -44,6 +51,9 @@ I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 Okay, let's do Text(. Text can either do 3x5 or 5x7 if the alternate flag is set. Let's start with the alternate mode, because it's actually easier. You can find the data for the character in gl
 
 ********
+
+Drawing: Line( Vertical Pt-On( Pt-Off( Pt-Change( Shade( Circle( Horizontal Tangent DrawInv DrawF ShadeNorm( Shade_t( Shadeχ²( ShadeF(
+Pixel: pxl-Test( Pxl-On( Pxl-Off( Pxl-Change(
 
 Do you think it makes sense to move UserListVar back to Environment?
 randInt, min/max edit

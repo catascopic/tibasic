@@ -419,7 +419,7 @@ def shade_chi_sq(env: Env, lower: Real, upper: Real, df: Real) -> None:
 
 @preparse_cmd_func
 def shade_f(env: Env, lower: Real, upper: Real, df1: Real, df2: Real) -> None:
-	"""ShadeF(lower,upper,df1,df2) — draw the F curve, shade the interval's area."""
+	"""Shade𝐅(lower,upper,df1,df2) — draw the F curve, shade the interval's area."""
 	f = lambda x: pf.f_pdf(x, df1, df2)
 	_trace_curve(env, f)
 	_shade_under(env, f, lower, upper)
