@@ -534,12 +534,11 @@ def _num_to_display_bytes(value: float) -> bytes:
 	if value.is_integer() and abs(value) < 1e10:
 		s = str(int(abs(value)))
 	else:
-		s = f'{abs(value):e.10g}'
+		s = f'{abs(value):.10g}'
 	result = bytearray()
 	if value < 0:
 		result.append(0x1A)        # ⁻ (negation glyph)
 	i = 0
-	s.partition(
 	while i < len(s):
 		ch = s[i]
 		if ch in 'eE':
@@ -598,8 +597,7 @@ def text(args):
 	"""Text(row,col,val[,val...]) — draw values on the graph screen in small font.
 
 	Text(-1,row,col,val[,val...]) uses the large font instead.
-	"""
-	screen = args.env.screen
+	"""	
 	first = args.expr()
 
 	if first == -1.0:
@@ -615,6 +613,7 @@ def text(args):
 		row    = py_int(first)
 		col    = py_int(args.expr())
 
+	screen = args.env.screen
 	cur_col = col
 	while args.has_next:
 		for b in _value_to_display_bytes(args.expr()):

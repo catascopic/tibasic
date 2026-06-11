@@ -1,3 +1,6 @@
+token(0xBBAD, b'\xd8', typeable=True)  # Is this different than 6228?
+
+
 Function/Command Reorganization plan:
 tilist: list functions, also move TiList definition here
 matrix: matrix functions, also move TiMatrix definition here
@@ -22,7 +25,7 @@ Tmin, Tmax, Tstep — determine the values at which T is evaluated in Parametric
 θmin, θmax, θstep — the same idea, but for the θ variable in Polar graphing.
 nMin, nMax — bounds for the n variable to evaluate (the step is always 1; also, these must be integers).
 u(nMin), v(nMin), w(nMin) - override the value of u, v, and w at nMin, for the purposes of recursively defining them.
-XFact, YFact — the scaling factors for Zoom In and Zoom Out. Default 1, user-settable.
+XFact, YFact — the scaling factors for Zoom In and Zoom Out. Default 4, user-settable. Storing a value less than 1 is a DomainError.
 
 Imporant: All of the above have a Z equivalent (ZXmin, Zθstep, etc.) that's used by ZoomSto and ZoomRcl. These are system variables and not visible to the user, so I don't think they have to be implemented as variables. If possible, these should be implemented as a second Window object that can be set/restored.
 
