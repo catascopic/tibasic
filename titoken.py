@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from collections.abc import Callable
 
 
-# _CHARSET: TI-83+ large-font byte -> Unicode character (None = undefined slot).
+# _CHARSET: TI-83+ byte -> Unicode character (None = undefined slot).
 #
 # This is the private source of truth for decoding a token's display bytes into a
 # human-readable string (Token.text), used purely for debugging/printing.  The
@@ -47,14 +47,12 @@ class Token:
 	command:   Callable | None = None  # (ArgParser) -> None for command tokens
 	nullary:   Callable | None = None  # (env) -> value for read-only computed constants
 	converter: Callable | None = None  # (value) -> value for ►DMS, ►Dec, ►Frac and others
-	variable:  Callable | None = None  # Variable flyweight for storable typed variables
+	variable:  Callable | None = None  # (env) -> Variable for variable tokens
 
 	@property
 	def text(self) -> str:
 		"""Human-readable rendering of the display bytes (debugging/printing only)."""
 		return decode(self.display)
-
-	# ── Token type predicates ──────────────────────────────────────────────────
 
 	def is_digit(self) -> bool:
 		return 0x30 <= self.code[0] <= 0x39

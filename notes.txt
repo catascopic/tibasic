@@ -1,5 +1,7 @@
 token(0xBBAD, b'\xd8', typeable=True)  # Is this different than 6228?
 
+Put tests in one place, command files in one place? How to organize?
+
 
 Function/Command Reorganization plan:
 tilist: list functions, also move TiList definition here

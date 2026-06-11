@@ -1,7 +1,8 @@
+import math
+from operator import attrgetter
 from collections.abc import Callable, Sequence
 from io import BytesIO
 from typing import Any
-import math, itertools
 from titoken import Token
 from environment import Environment
 import purefunctions as pf
@@ -93,7 +94,7 @@ token(0x02, b'\x05Dec')  # ►Dec
 token(0x03, b'\x05Frac')  # ►Frac
 STORE = token(0x04, b'\x1c')  # →
 token(0x05, b'Boxplot')
-L_BRACKET = token(0x06, b'\xc1',        typeable=True)  # [
+L_BRACKET = token(0x06, b'\xc1',        typeable=True)  # The '[' symbol (θ steals this place in the charset)
 R_BRACKET = token(0x07, b']',           typeable=True)
 L_BRACE   = token(0x08, b'{',           typeable=True)
 R_BRACE   = token(0x09, b'}',           typeable=True)
@@ -246,7 +247,7 @@ token(0x621D, b'x\x83')     # x₃
 token(0x621E, b'y\x81')     # y₁
 token(0x621F, b'y\x82')     # y₂
 token(0x6220, b'y\x83')     # y₃
-REC_N = token(0x6221, b'\x01',          var=ops.attrgetter('n'))  # 𝑛
+REC_N = token(0x6221, b'\x01',          var=attrgetter('n'))  # 𝑛
 token(0x6222, b'p')
 token(0x6223, b'z')
 token(0x6224, b't')
@@ -301,13 +302,13 @@ token(0x6328, b'XFact',                 var=_window_getter('x_fact'))
 token(0x6329, b'YFact',                 var=_window_getter('y_fact'))
 token(0x6334, b'PlotStep',              var=_window_getter('plot_step'))
 token(0x6336, b'Xres',                  var=_window_getter('xres'))
-token(0x632B, b'\xdd',                  var=ops.attrgetter('n_tvm'))  # 𝐍
-token(0x632C, b'I%',                    var=ops.attrgetter('i_pct'))
-token(0x632D, b'PV',                    var=ops.attrgetter('pv'))
-token(0x632E, b'PMT',                   var=ops.attrgetter('pmt'))
-token(0x632F, b'FV',                    var=ops.attrgetter('fv'))
-token(0x6330, b'P/Y',                   var=ops.attrgetter('py'))
-token(0x6331, b'C/Y',                   var=ops.attrgetter('cy'))
+token(0x632B, b'\xdd',                  var=attrgetter('n_tvm'))  # 𝐍
+token(0x632C, b'I%',                    var=attrgetter('i_pct'))
+token(0x632D, b'PV',                    var=attrgetter('pv'))
+token(0x632E, b'PMT',                   var=attrgetter('pmt'))
+token(0x632F, b'FV',                    var=attrgetter('fv'))
+token(0x6330, b'P/Y',                   var=attrgetter('py'))
+token(0x6331, b'C/Y',                   var=attrgetter('cy'))
 
 token(0x64, b'Radian',                  cmd=modes.radian)
 token(0x65, b'Degree',                  cmd=modes.degree)
