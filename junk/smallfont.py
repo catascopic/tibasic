@@ -3,7 +3,7 @@
 # Each bytes object encodes one column per byte; each byte uses 6 bits,
 # where bit 5 is the top row and bit 0 is the bottom row.
 # None = no glyph defined for this display byte.
-_SMALLFONT: list[bytes | None] = [
+SMALL_FONT: list[bytes | None] = [
 	None,              # 00 (undefined)
 	b'\x09\x06\x08\x09\x06\x00',  # 01 𝑛
 	b'\x0f\x01\x0f\x00',  # 02 𝑢

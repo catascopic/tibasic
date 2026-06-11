@@ -8,8 +8,7 @@ from errors import ArgumentError, DomainError
 from modes import DrawMode
 from test_tibasic import calc, run, toks, var
 from test_program import run as run_program
-from largefont import _LARGEFONT
-from smallfont import _SMALLFONT
+from fonts import SMALL_FONT, LARGE_FONT
 
 
 def _col_count(env, col):
@@ -703,69 +702,69 @@ class TestText:
 
 	def test_small_single_char_pixel_count(self):
 		env = run('Text( 0,0,"A"')
-		assert _screen_pixel_count(env) == _glyph_pixels(_SMALLFONT, 0x41)
+		assert _screen_pixel_count(env) == _glyph_pixels(SMALL_FONT, 0x41)
 
 	def test_small_single_char_bitmap(self):
 		# Pixels drawn on-screen must match the small-font glyph column data exactly
 		env = run('Text( 0,0,"A"')
-		glyph = _SMALLFONT[0x41]
+		glyph = SMALL_FONT[0x41]
 		grid = _read_rect(env.screen, 0, 0, 6, len(glyph))
 		assert _col_major(grid) == list(glyph)
 
 	def test_small_spacing_built_in(self):
 		# 'H' small font = 1f 04 1f 00; trailing byte 0x00 is the spacing column
 		env = run('Text( 0,0,"H"')
-		glyph = _SMALLFONT[0x48]
+		glyph = SMALL_FONT[0x48]
 		assert glyph[-1] == 0x00
 		assert not env.screen.get(0, len(glyph) - 1)
 
 	def test_small_two_chars_no_extra_gap(self):
 		# Second character starts immediately after first (no added gap)
 		env = run('Text( 0,0,"AB"')
-		glyph_a = _SMALLFONT[0x41]
-		glyph_b = _SMALLFONT[0x42]
+		glyph_a = SMALL_FONT[0x41]
+		glyph_b = SMALL_FONT[0x42]
 		grid_b = _read_rect(env.screen, 0, len(glyph_a), 6, len(glyph_b))
 		assert _col_major(grid_b) == list(glyph_b)
 
 	def test_small_total_pixels_two_chars(self):
 		env = run('Text( 0,0,"AB"')
-		expected = _glyph_pixels(_SMALLFONT, 0x41) + _glyph_pixels(_SMALLFONT, 0x42)
+		expected = _glyph_pixels(SMALL_FONT, 0x41) + _glyph_pixels(SMALL_FONT, 0x42)
 		assert _screen_pixel_count(env) == expected
 
 	def test_small_row_offset(self):
 		env = run('Text( 10,0,"A"')
 		assert all(not env.screen.get(r, c) for r in range(10) for c in range(96))
-		assert _screen_pixel_count(env) == _glyph_pixels(_SMALLFONT, 0x41)
+		assert _screen_pixel_count(env) == _glyph_pixels(SMALL_FONT, 0x41)
 
 	def test_small_number_integer(self):
 		# 42 → '4' (0x34) then '2' (0x32)
 		env = run('Text( 0,0,42')
-		expected = _glyph_pixels(_SMALLFONT, 0x34) + _glyph_pixels(_SMALLFONT, 0x32)
+		expected = _glyph_pixels(SMALL_FONT, 0x34) + _glyph_pixels(SMALL_FONT, 0x32)
 		assert _screen_pixel_count(env) == expected
 
 	def test_small_number_negative(self):
 		# ~3 → negation glyph (0x1A) then '3' (0x33)
 		env = run('Text( 0,0,~3')
-		expected = _glyph_pixels(_SMALLFONT, 0x1A) + _glyph_pixels(_SMALLFONT, 0x33)
+		expected = _glyph_pixels(SMALL_FONT, 0x1A) + _glyph_pixels(SMALL_FONT, 0x33)
 		assert _screen_pixel_count(env) == expected
 
 	def test_small_number_decimal(self):
 		# 1.5 → '1' (0x31), '.' (0x2E), '5' (0x35)
 		env = run('Text( 0,0,1.5')
-		expected = sum(_glyph_pixels(_SMALLFONT, b) for b in [0x31, 0x2E, 0x35])
+		expected = sum(_glyph_pixels(SMALL_FONT, b) for b in [0x31, 0x2E, 0x35])
 		assert _screen_pixel_count(env) == expected
 
 	def test_small_multiple_values(self):
 		# Text(0,0,"A",42) concatenates 'A', '4', '2'
 		env = run('Text( 0,0,"A",42')
-		expected = sum(_glyph_pixels(_SMALLFONT, b) for b in [0x41, 0x34, 0x32])
+		expected = sum(_glyph_pixels(SMALL_FONT, b) for b in [0x41, 0x34, 0x32])
 		assert _screen_pixel_count(env) == expected
 
 	def test_small_overwrites_pixels(self):
 		# A pixel inside the glyph bounding box that is OFF in the sprite must be cleared
 		env = run('Text( 0,0,"A"')
 		# Top-left corner of 'A' small font glyph is a 0-bit — it must be off
-		glyph = _SMALLFONT[0x41]
+		glyph = SMALL_FONT[0x41]
 		top_left_on = bool((glyph[0] >> 5) & 1)
 		assert not top_left_on, "test assumption: top-left of small 'A' is blank"
 		# Pre-light that pixel then overdraw — it must be cleared
@@ -784,11 +783,11 @@ class TestText:
 
 	def test_large_single_char_pixel_count(self):
 		env = run('Text( ~1,0,0,"A"')
-		assert _screen_pixel_count(env) == _glyph_pixels(_LARGEFONT, 0x41)
+		assert _screen_pixel_count(env) == _glyph_pixels(LARGE_FONT, 0x41)
 
 	def test_large_single_char_bitmap(self):
 		env = run('Text( ~1,0,0,"A"')
-		glyph = _LARGEFONT[0x41]
+		glyph = LARGE_FONT[0x41]
 		grid = _read_rect(env.screen, 0, 0, 7, 5)
 		assert _col_major(grid) == list(glyph)
 
@@ -796,7 +795,7 @@ class TestText:
 		# 'AB': A in cols 0-4, gap in col 5, B starts at col 6
 		env = run('Text( ~1,0,0,"AB"')
 		assert all(not env.screen.get(r, 5) for r in range(7))
-		glyph_b = _LARGEFONT[0x42]
+		glyph_b = LARGE_FONT[0x42]
 		grid_b = _read_rect(env.screen, 0, 6, 7, 5)
 		assert _col_major(grid_b) == list(glyph_b)
 
@@ -821,7 +820,7 @@ class TestText:
 
 	def test_large_overwrites_pixels(self):
 		# A 0-bit inside a large-font glyph must clear a pre-lit pixel
-		glyph = _LARGEFONT[0x41]
+		glyph = LARGE_FONT[0x41]
 		top_left_on = bool((glyph[0] >> 6) & 1)
 		assert not top_left_on, "test assumption: top-left of large 'A' is blank"
 		env = Environment()
@@ -831,32 +830,32 @@ class TestText:
 
 	def test_large_total_pixels_two_chars(self):
 		env = run('Text( ~1,0,0,"AB"')
-		expected = _glyph_pixels(_LARGEFONT, 0x41) + _glyph_pixels(_LARGEFONT, 0x42)
+		expected = _glyph_pixels(LARGE_FONT, 0x41) + _glyph_pixels(LARGE_FONT, 0x42)
 		assert _screen_pixel_count(env) == expected
 
 	def test_large_row_offset(self):
 		env = run('Text( ~1,10,0,"A"')
 		assert all(not env.screen.get(r, c) for r in range(10) for c in range(96))
-		assert _screen_pixel_count(env) == _glyph_pixels(_LARGEFONT, 0x41)
+		assert _screen_pixel_count(env) == _glyph_pixels(LARGE_FONT, 0x41)
 
 	def test_large_number_integer(self):
 		env = run('Text( ~1,0,0,42')
-		expected = _glyph_pixels(_LARGEFONT, 0x34) + _glyph_pixels(_LARGEFONT, 0x32)
+		expected = _glyph_pixels(LARGE_FONT, 0x34) + _glyph_pixels(LARGE_FONT, 0x32)
 		assert _screen_pixel_count(env) == expected
 
 	def test_large_number_negative(self):
 		env = run('Text( ~1,0,0,~3')
-		expected = _glyph_pixels(_LARGEFONT, 0x1A) + _glyph_pixels(_LARGEFONT, 0x33)
+		expected = _glyph_pixels(LARGE_FONT, 0x1A) + _glyph_pixels(LARGE_FONT, 0x33)
 		assert _screen_pixel_count(env) == expected
 
 	def test_large_number_decimal(self):
 		env = run('Text( ~1,0,0,1.5')
-		expected = sum(_glyph_pixels(_LARGEFONT, b) for b in [0x31, 0x2E, 0x35])
+		expected = sum(_glyph_pixels(LARGE_FONT, b) for b in [0x31, 0x2E, 0x35])
 		assert _screen_pixel_count(env) == expected
 
 	def test_large_multiple_values(self):
 		env = run('Text( ~1,0,0,"A",42')
-		expected = sum(_glyph_pixels(_LARGEFONT, b) for b in [0x41, 0x34, 0x32])
+		expected = sum(_glyph_pixels(LARGE_FONT, b) for b in [0x41, 0x34, 0x32])
 		assert _screen_pixel_count(env) == expected
 
 	# ── Clipping ──────────────────────────────────────────────────────────────

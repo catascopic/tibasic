@@ -5,10 +5,9 @@ import purefunctions as pf
 from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk
 from decorators import forms_func, no_arg_command
 from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
-from largefont import _LARGEFONT
 from modes import DrawMode
 from screen import Screen
-from smallfont import _SMALLFONT
+from fonts import SMALL_FONT, LARGE_FONT
 from tiobjects import TiEquation, TiString, py_int
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
@@ -535,11 +534,12 @@ def _num_to_display_bytes(value: float) -> bytes:
 	if value.is_integer() and abs(value) < 1e10:
 		s = str(int(abs(value)))
 	else:
-		s = f'{abs(value):.10g}'
+		s = f'{abs(value):e.10g}'
 	result = bytearray()
 	if value < 0:
 		result.append(0x1A)        # ⁻ (negation glyph)
 	i = 0
+	s.partition(
 	while i < len(s):
 		ch = s[i]
 		if ch in 'eE':
@@ -599,17 +599,17 @@ def text(args):
 
 	Text(-1,row,col,val[,val...]) uses the large font instead.
 	"""
-	env = args.env
+	screen = args.env.screen
 	first = args.expr()
 
 	if first == -1.0:
-		font   = _LARGEFONT
+		font   = LARGE_FONT
 		height = 7
 		gap    = 1    # large font cells have a 1-pixel separator on the right and below
 		row    = py_int(args.expr())
 		col    = py_int(args.expr())
 	else:
-		font   = _SMALLFONT
+		font   = SMALL_FONT
 		height = 6
 		gap    = 0    # small font glyphs have their own trailing spacing column
 		row    = py_int(first)
@@ -622,6 +622,6 @@ def text(args):
 				break
 			glyph = font[b]
 			if glyph is not None:
-				cur_col = _blit_char(env.screen, row, cur_col, glyph, height, gap)
+				cur_col = _blit_char(screen, row, cur_col, glyph, height, gap)
 
 	args.end_paren_cmd()

@@ -2,6 +2,13 @@ Text:
 Nice formatting logic! Probably should be moved elsewhere
 
 
+2^2^2^2^2: power should be left to right, not right to left
+
+Text: collect all arguments first before printing anything?
+
+Should we be using Decimal everywhere?
+
+
 Which is the better system for mapping characters?
 
 Rename screen "graph"
