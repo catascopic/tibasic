@@ -10,41 +10,26 @@ from collections.abc import Callable
 # faithful Unicode equivalent (𝐅, 𝟑, ẍ, ṕ, ...) and a couple of font glyphs are
 # duplicated.  Byte D6 decodes to '\n' (the newline token) rather than its ↵ glyph
 # so program text round-trips with real line breaks.
-_CHARSET: list[str | None] = [
-	None, '𝑛', '𝑢', '𝑣', '𝑤', '►', '🡅', '🡇',		# 00
-	'∫', '×', '▫', '﹢', '·', 'ₜ', '𝟑', '𝟊',			# 08
-	'√', '¹', '²', '∠', '°', 'ʳ', 'ᵀ', '≤',			# 10
-	'≠', '≥', '⁻', 'ᴇ', '→', '⑽', '↑', '↓',			# 18
-	' ', '!', '"', '#', '⁴', '%', '&', "'",			# 20
-	'(', ')', '*', '+', ',', '-', '.', '/',			# 28
-	'0', '1', '2', '3', '4', '5', '6', '7', 		# 30
-	'8', '9', ':', ';', '<', '=', '>', '?',			# 38
-	'@', 'A', 'B', 'C', 'D', 'E', 'F', 'G',			# 40
-	'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',			# 48
-	'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',			# 50
-	'X', 'Y', 'Z', 'θ', '\\', ']', '^', '_',		# 58
-	'`', 'a', 'b', 'c', 'd', 'e', 'f', 'g',			# 60
-	'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',			# 68
-	'p', 'q', 'r', 's', 't', 'u', 'v', 'w',			# 70
-	'x', 'y', 'z', '{', '|', '}', '~', '≛',			# 78
-	'₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇',				# 80
-	'₈', '₉', 'Á', 'À', 'Â', 'Ä', 'á', 'à',			# 88
-	'â', 'ä', 'É', 'È', 'Ê', 'Ë', 'é', 'è',			# 90
-	'ê', 'ë', 'Í', 'Ì', 'Î', 'Ï', 'í', 'ì',			# 98
-	'î', 'ï', 'Ó', 'Ò', 'Ô', 'Ö', 'ó', 'ò',			# A0
-	'ô', 'ö', 'Ú', 'Ù', 'Û', 'Ü', 'ú', 'ù',			# A8
-	'û', 'ü', 'Ç', 'ç', 'Ñ', 'ñ', '´', 'ˋ',			# B0
-	'¨', '¿', '¡', 'α', 'β', 'γ', 'Δ', 'δ',			# B8
-	'ε', '[', 'λ', 'μ', 'π', 'ρ', 'Σ', 'σ',			# C0
-	'τ', 'φ', 'Ω', 'ẍ', 'ȳ', 'ˣ', '…', '◄',			# C8
-	None, None, None, None, None, '³', '\n', '𝑖',	# D0
-	'ṕ', 'χ', '𝐅', '𝑒', 'ᴸ', '𝐍', '⸩', '🡆',			# D8
-	None, None, None, None, None, None, None, None,	# E0
-	None, None, None, None, None, None, None, None,	# E8
-	None, None, '$', None, 'ß', None, None, None,	# F0
-	None, None, None, None, None, None, None, None,	# F8
-]
 
+_CHARSET: list[str | None] = [
+#	0		1		2		3		4		5		6		7		8		9		A		B		C		D		E		F
+	None,	'𝑛',	'𝑢',	'𝑣',	'𝑤',	'►',	'🡅',	'🡇',	'∫',	'×',	'▫',	'﹢',	'·',	'ₜ',		'𝟑',	'𝟊',	# 0
+	'√',	'¹',	'²',	'∠',	'°',	'ʳ',	'ᵀ',	'≤',	'≠',	'≥',	'⁻',		'ᴇ',	'→',	'⑽',	'↑',	'↓',	# 1
+	' ',	'!',	'"',	'#',	'⁴',		'%',	'&',	"'",	'(',	')',	'*',	'+',	',',	'-',	'.',	'/',	# 2
+	'0',	'1',	'2',	'3',	'4',	'5',	'6',	'7',	'8',	'9',	':',	';',	'<',	'=',	'>',	'?',	# 3
+	'@',	'A',	'B',	'C',	'D',	'E',	'F',	'G',	'H',	'I',	'J',	'K',	'L',	'M',	'N',	'O',	# 4
+	'P',	'Q',	'R',	'S',	'T',	'U',	'V',	'W',	'X',	'Y',	'Z',	'θ',	'\\',	']',	'^',	'_',	# 5
+	'`',	'a',	'b',	'c',	'd',	'e',	'f',	'g',	'h',	'i',	'j',	'k',	'l',	'm',	'n',	'o',	# 6
+	'p',	'q',	'r',	's',	't',	'u',	'v',	'w',	'x',	'y',	'z',	'{',	'|',	'}',	'~',	'≛',	# 7
+	'₀',		'₁',		'₂',		'₃',		'₄',		'₅',		'₆',		'₇',		'₈',		'₉',		'Á',	'À',	'Â',	'Ä',	'á',	'à',	# 8
+	'â',	'ä',	'É',	'È',	'Ê',	'Ë',	'é',	'è',	'ê',	'ë',	'Í',	'Ì',	'Î',	'Ï',	'í',	'ì',	# 9
+	'î',	'ï',	'Ó',	'Ò',	'Ô',	'Ö',	'ó',	'ò',	'ô',	'ö',	'Ú',	'Ù',	'Û',	'Ü',	'ú',	'ù',	# A
+	'û',	'ü',	'Ç',	'ç',	'Ñ',	'ñ',	'´',	'ˋ',	'¨',	'¿',	'¡',	'α',	'β',	'γ',	'Δ',	'δ',	# B
+	'ε',	'[',	'λ',	'μ',	'π',	'ρ',	'Σ',	'σ',	'τ',	'φ',	'Ω',	'ẍ',	'ȳ',	'ˣ',	'…',	'◄',	# C
+	None,	None,	None,	None,	None,	'³',	'\n',	'𝑖',		'ṕ',	'χ',	'𝐅',	'𝑒',	'ᴸ',	'𝐍',	'⸩',		'🡆',	# D
+	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	# E
+	None,	None,	'$',	None,	'ß',	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	# F
+]
 
 def decode(display: bytes) -> str:
 	"""Render display bytes as a human-readable string (undefined bytes as \\xNN)."""
@@ -105,7 +90,7 @@ class Token:
 		return f'0x{int.from_bytes(self.code):0{2 * len(self.code)}X}:{self.text!r}'
 
 
-class EofToken:
+class _EofToken:
 	"""Sentinel returned by Parser.peek() at end of input.
 
 	All type predicates return False; all callable/variable fields are None.
@@ -137,4 +122,4 @@ class EofToken:
 	def __repr__(self) -> str:         return '<EOF>'
 
 
-EOF_TOKEN = EofToken()
+EOF_TOKEN = _EofToken()
