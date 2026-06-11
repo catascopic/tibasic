@@ -1,6 +1,44 @@
+Function/Command Reorganization plan:
+tilist: list functions, also move TiList definition here
+matrix: matrix functions, also move TiMatrix definition here
+tistring: string functions, also move TiString here
+Get rid of tiobjects, but what to do with require_* statements?
+timath: functions with dedicated buttons, plus the math menu (math/num/cpx/prb), plus maybe the hyperbolic trig functions?
+program: put program functions in program.py. This would currently cause a circular import because program uses catalog. Not sure how to handle that.
+distributions: distr functions
+draw: good as is, although shade_norm, shade_t, shade_chi_sq, shade_f are actually distr/draw functions, so maybe they should be in distributions
+finance: finance functions. Note that dbd is a finance function, but none of the other datetime functions are.
+settings: zoom/graph/function/plot commands. These are mostly not implemented.
+catalog: everything else, like datetime functions. Of course, we can't call it catalog! Maybe we can see what functions are left, promote some of them to other files (like the hyperbolic trig functions), and make this a dedicated datetime function group.
+angle: there are very few angle functions, maybe don't deserve their own file.
+
+
+
+Xmin, Xmax, Ymin, Ymax — determine the lower and upper X and Y bounds of the graph screen itself.
+ΔX, ΔY — defined to be (Xmax-Xmin)/94 and (Ymax-Ymin)/62 respectively; storing to them will change Xmax and Ymax to arrange this.
+Xscl, Yscl — determine how wide the marks on the axes (and, with GridOn, the grid marks) are spaced.
+Xres — determines the quality of Function graphing (how many pixels apart points are calculated), and must be an integer 1-8.
+Tmin, Tmax, Tstep — determine the values at which T is evaluated in Parametric graphing (as though it were a For( loop).
+θmin, θmax, θstep — the same idea, but for the θ variable in Polar graphing.
+nMin, nMax — bounds for the n variable to evaluate (the step is always 1; also, these must be integers).
+u(nMin), v(nMin), w(nMin) - override the value of u, v, and w at nMin, for the purposes of recursively defining them.
+XFact, YFact — the scaling factors for Zoom In and Zoom Out. Default 1, user-settable.
+
+Imporant: All of the above have a Z equivalent (ZXmin, Zθstep, etc.) that's used by ZoomSto and ZoomRcl. These are system variables and not visible to the user, so I don't think they have to be implemented as variables. If possible, these should be implemented as a second Window object that can be set/restored.
+
+These dependent variables can be implemented by giving them special store() methods... but they'd also need access to the environment! This would have worked under the previous system, where variables were flyweight accessors, but now we either need to make the Window vars special vars that do have environment access somehow, or consider going back to the previous system.
+
+
+Stat plot vars:
+PlotStart, PlotStep — actually have nothing to do with plots, but determine which values of n are graphed.
+TblStart, ΔTbl — the starting value and step for the independent variable in the table screen.
+TblInput — a 7-element list of the values of a variable in the table.
+
+
+
+
 Text:
 Nice formatting logic! Probably should be moved elsewhere
-
 
 2^2^2^2^2: power should be left to right, not right to left
 
