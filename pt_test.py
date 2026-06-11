@@ -12,6 +12,7 @@ Commands:
   DrawF       DrawInv
   Shade       Tangent
   ShadeNorm   Shade_t     Shadeχ² (match: shadechi)   Shade𝐅
+  Text
 """
 import re
 import sys
@@ -47,6 +48,7 @@ _COMMANDS = [
 	('shadet',     'Shade_t',    'Shade_t( ',       True),
 	('shadechi',   'Shadeχ²',    'Shadeχ²( ',       True),
 	('shadef',     'Shade𝐅',     'Shade𝐅( ',        True),
+	('text',       'Text',       'Text( ',           True),
 ]
 
 _CMD_LOOKUP = {key: (display, prefix, has_args) for key, display, prefix, has_args in _COMMANDS}

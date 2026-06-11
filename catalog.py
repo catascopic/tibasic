@@ -376,7 +376,7 @@ token(0x8F, b'ZoomStat')
 token(0x90, b'ZoomRcl')
 token(0x91, b'PrintScreen')
 token(0x92, b'ZoomSto')
-token(0x93, b'Text(')
+token(0x93, b'Text(', cmd=draw.text)
 
 NPR = token(0x94, b'nPr',     bp=(60, 61), op=ops.npr)
 NCR = token(0x95, b'nCr',     bp=(60, 61), op=ops.ncr)

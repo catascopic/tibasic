@@ -3,11 +3,13 @@ from numbers import Number
 
 import purefunctions as pf
 from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk
-from decorators import no_arg_command
+from decorators import forms_func, no_arg_command
 from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
+from largefont import _LARGEFONT
 from modes import DrawMode
 from screen import Screen
-from tiobjects import TiEquation, py_int
+from smallfont import _SMALLFONT
+from tiobjects import TiEquation, TiString, py_int
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
 # rows 0–62 (63 rows) and columns 0–94 (95 columns), inclusive.
@@ -470,7 +472,7 @@ def shade(env: Env, lower: Thunk, upper: Thunk,
 	flo = _function_sampler(env, lower)
 	fhi = _function_sampler(env, upper)
 	pat = max(1, min(4, py_int(pattern)))
-	res = max(1, py_int(patres))
+	res = max(0, py_int(patres))
 	# Draw both boundary curves.
 	_trace_curve(env, flo)
 	_trace_curve(env, fhi)
@@ -522,3 +524,104 @@ def tangent(env: Env, formula: Thunk, value: Real) -> None:
 	r0, c0 = _graph_to_pixel(env, xmin, tan(xmin))
 	r1, c1 = _graph_to_pixel(env, xmax, tan(xmax))
 	_plot_segment(env, r0, c0, r1, c1, True)
+
+
+# ── Text( ────────────────────────────────────────────────────────────────────
+
+def _num_to_display_bytes(value: float) -> bytes:
+	"""Format a real number as TI display bytes."""
+	if value.is_integer() and abs(value) < 1e10:
+		s = str(int(abs(value)))
+	else:
+		s = f'{abs(value):.10g}'
+	result = bytearray()
+	if value < 0:
+		result.append(0x1A)        # ⁻ (negation glyph)
+	i = 0
+	while i < len(s):
+		ch = s[i]
+		if ch in 'eE':
+			result.append(0x1B)    # ᴇ
+			i += 1
+			if i < len(s) and s[i] == '+':
+				i += 1             # skip '+' in exponent — TI omits it
+			elif i < len(s) and s[i] == '-':
+				result.append(0x1A)  # ⁻ before negative exponent digits
+				i += 1
+		else:
+			result.append(ord(ch)) # digits and '.' are the same bytes as ASCII
+			i += 1
+	return bytes(result)
+
+
+def _value_to_display_bytes(value) -> bytes:
+	"""Convert a real number or TiString to its display byte sequence.
+
+	Complex, list, and matrix values are rejected (ERR:DATA TYPE on the calculator).
+	"""
+	if isinstance(value, TiString):
+		return b''.join(t.display for t in value.tokens)
+	if isinstance(value, complex):
+		raise DataTypeError("Text(: complex numbers are not allowed")
+	if isinstance(value, float):
+		return _num_to_display_bytes(value)
+	raise DataTypeError(f"Text(: expected a real number or string, got {type(value).__name__}")
+
+
+def _draw_glyph(screen, row: int, col: int, col_data: bytes, height: int) -> None:
+	"""Render one glyph's column bitmap onto the screen, clipping at screen edges.
+
+	Both set and clear pixels according to the bitmap (overwrite mode).
+	"""
+	for dc, col_byte in enumerate(col_data):
+		c = col + dc
+		if c > MAX_COL:
+			return
+		for dr in range(height):
+			r = row + dr
+			if r > MAX_ROW:
+				break
+			screen.set(r, c, bool((col_byte >> (height - 1 - dr)) & 1))
+
+
+@forms_func
+def text(args):
+	"""Text(row,col,val[,val...]) — draw values on the graph screen in small font.
+
+	Text(-1,row,col,val[,val...]) uses the large font instead.
+	"""
+	env = args.env
+	first = args.expr()
+
+	if first == -1.0:
+		font   = _LARGEFONT
+		height = 7
+		gap    = 1    # large font characters are separated by one blank column
+		row    = py_int(args.expr())
+		col    = py_int(args.expr())
+	else:
+		font   = _SMALLFONT
+		height = 6
+		gap    = 0    # small font glyphs have their own trailing spacing column
+		row    = py_int(first)
+		col    = py_int(args.expr())
+
+	cur_col = col
+	while args.has_next:
+		display_bytes = _value_to_display_bytes(args.expr())
+		for b in display_bytes:
+			if cur_col > MAX_COL:
+				break
+			glyph = font[b]
+			if glyph is not None:
+				_draw_glyph(env.screen, row, cur_col, glyph, height)
+				cur_col += len(glyph)
+				if gap and cur_col <= MAX_COL:
+					for dr in range(height):
+						r = row + dr
+						if r > MAX_ROW:
+							break
+						env.screen.set(r, cur_col, False)
+					cur_col += 1
+
+	args.end_paren_cmd()
