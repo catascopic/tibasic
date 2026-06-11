@@ -808,6 +808,17 @@ class TestText:
 		run('Text( ~1,0,0,"AB"', env)
 		assert all(not env.screen.get(r, 5) for r in range(7))
 
+	def test_large_bottom_padding_row(self):
+		# Large font clears one blank row below the 7-pixel glyph
+		env = Environment()
+		for c in range(6):   # pre-light the row that should be cleared (row 7, full cell)
+			env.screen.set(7, c)
+		run('Text( ~1,0,0,"A"', env)
+		# Row 7 (= row + height) across the full cell (glyph cols 0-4 + gap col 5) is cleared
+		assert all(not env.screen.get(7, c) for c in range(6))
+		# Row 8 and beyond must not be touched
+		assert all(not env.screen.get(8, c) for c in range(6))
+
 	def test_large_overwrites_pixels(self):
 		# A 0-bit inside a large-font glyph must clear a pre-lit pixel
 		glyph = _LARGEFONT[0x41]

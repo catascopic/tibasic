@@ -472,7 +472,9 @@ def shade(env: Env, lower: Thunk, upper: Thunk,
 	flo = _function_sampler(env, lower)
 	fhi = _function_sampler(env, upper)
 	pat = max(1, min(4, py_int(pattern)))
-	res = max(0, py_int(patres))
+	res = py_int(patres)
+	if res < 0:
+		raise DomainError(f"Shade(: patres must be ≥ 0, got {res}")
 	# Draw both boundary curves.
 	_trace_curve(env, flo)
 	_trace_curve(env, fhi)
@@ -614,14 +616,21 @@ def text(args):
 				break
 			glyph = font[b]
 			if glyph is not None:
+				char_start = cur_col
 				_draw_glyph(env.screen, row, cur_col, glyph, height)
 				cur_col += len(glyph)
-				if gap and cur_col <= MAX_COL:
-					for dr in range(height):
-						r = row + dr
-						if r > MAX_ROW:
-							break
-						env.screen.set(r, cur_col, False)
-					cur_col += 1
+				if gap:
+					if cur_col <= MAX_COL:
+						for dr in range(height):
+							r = row + dr
+							if r > MAX_ROW:
+								break
+							env.screen.set(r, cur_col, False)
+						cur_col += 1
+					# Clear the bottom padding row across the full cell (glyph + gap)
+					r_pad = row + height
+					if r_pad <= MAX_ROW:
+						for c in range(char_start, min(cur_col, MAX_COL + 1)):
+							env.screen.set(r_pad, c, False)
 
 	args.end_paren_cmd()
