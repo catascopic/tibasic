@@ -34,6 +34,7 @@ lookup['@'] = catalog.STORE
 lookup['e'] = catalog.SCI_E
 lookup['$'] = catalog.LIST_PREFIX
 lookup['i'] = catalog.IMAG_I
+lookup['_'] = catalog.SPACE
 for i, _tok in enumerate(catalog.LISTS, start=1):
 	lookup[f"L{i}"] = _tok
 for i, _tok in enumerate(catalog.FUNCTION, start=1):

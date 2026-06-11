@@ -131,7 +131,7 @@ token(0x24, b'fnInt(',       func=ef.fn_int)
 token(0x25, b'nDeriv(',      func=ef.n_deriv)
 token(0x27, b'fMin(')
 token(0x28, b'fMax(')
-token(0x29, b' ', typeable=True)
+SPACE = token(0x29, b' ', typeable=True)
 
 QUOTE  = token(0x2A, b'"', typeable=True)
 COMMA  = token(0x2B, b',', typeable=True)

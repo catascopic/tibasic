@@ -1,6 +1,5 @@
-Text(:
-figure out small font
-reformat large font
+Text:
+Nice formatting logic! Probably should be moved elsewhere
 
 
 Which is the better system for mapping characters?
