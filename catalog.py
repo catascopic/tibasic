@@ -16,7 +16,13 @@ import draw
 _TABLE: list[Token | list[Token | None] | None] = [None] * 256
 
 ALL_TOKENS: list[Token] = []
-CHARS = {}
+
+# TEXT_INPUT: characters accepted when converting a Python string into tokens
+# (TiString.from_str).  Populated at definition time for tokens marked
+# `typeable=True` — these are the tokens whose display character is a legitimate,
+# directly-typeable equivalent (letters, digits, punctuation, Greek, ...).  Keyed
+# by the token's decoded text.
+TEXT_INPUT: dict[str, Token] = {}
 
 def get_token(code: int | Sequence[int]) -> Token:
 	if isinstance(code, int):
@@ -62,9 +68,9 @@ def _make_accessor(table: str, index: int):
 
 def token(
 	code: int,
-	text: str = None,
-	char: str = None,
+	display: bytes,
 	*,
+	typeable: bool = False,
 	bp:   tuple[int, int] | None = None,
 	op:   Callable | None = None,
 	post: Callable | None = None,
@@ -74,707 +80,706 @@ def token(
 	cnv:  Callable | None = None,
 	var:  Callable | None = None,
 ) -> Token:
-	text = text or char
-	t = Token(code.to_bytes(1 + (code > 0xFF)), char, text, bp, op, post, func, cmd, res, cnv, var)
+	t = Token(code.to_bytes(1 + (code > 0xFF)), display, bp, op, post, func, cmd, res, cnv, var)
 	_set_token(t)
 	ALL_TOKENS.append(t)
-	if char:
-		CHARS[char] = t
+	if typeable:
+		TEXT_INPUT[t.text] = t
 	return t
 
 
-token(0x01, '►DMS')
-token(0x02, '►Dec')
-token(0x03, '►Frac')
+token(0x01, b'\x05DMS')  # ►DMS
+token(0x02, b'\x05Dec')  # ►Dec
+token(0x03, b'\x05Frac')  # ►Frac
 
-STORE = token(0x04, '→')
+STORE = token(0x04, b'\x1c')  # →
 
-token(0x05, 'Boxplot')
+token(0x05, b'Boxplot')
 
-L_BRACKET = token(0x06, char='[')
-R_BRACKET = token(0x07, char=']')
-L_BRACE   = token(0x08, char='{')
-R_BRACE   = token(0x09, char='}')
-RAD       = token(0x0A, 'ʳ')       # post needs env, handled specially
-DEG       = token(0x0B, char='°')  # ditto
-INV       = token(0x0C, '¹',       post=ops.inv)
-SQ        = token(0x0D, char='²',  post=lambda x: x**2)
-TRANSPOSE = token(0x0E, 'ᵀ',       post=ops.transpose)
-CUBE      = token(0x0F, char='³',  post=lambda x: x**3)
-L_PAREN   = token(0x10, char='(')
-R_PAREN   = token(0x11, char=')')
+L_BRACKET = token(0x06, b'\xc1', typeable=True)  # [
+R_BRACKET = token(0x07, b']', typeable=True)
+L_BRACE   = token(0x08, b'{', typeable=True)
+R_BRACE   = token(0x09, b'}', typeable=True)
+RAD       = token(0x0A, b'\x15')       # post needs env, handled specially
+DEG       = token(0x0B, b'\x14', typeable=True)  # ditto
+INV       = token(0x0C, b'\x11',       post=ops.inv)  # ¹
+SQ        = token(0x0D, b'\x12',  post=lambda x: x**2, typeable=True)  # ²
+TRANSPOSE = token(0x0E, b'\x16',       post=ops.transpose)  # ᵀ
+CUBE      = token(0x0F, b'\xd5',  post=lambda x: x**3, typeable=True)  # ³
+L_PAREN   = token(0x10, b'(', typeable=True)
+R_PAREN   = token(0x11, b')', typeable=True)
 
-token(0x12, 'round(',       func=pf.round)
-token(0x13, 'pxl-Test(', func=draw.pxl_test)
-token(0x14, 'augment(',     func=pf.augment)
-token(0x15, 'rowSwap(',     func=pf.row_swap)
-token(0x16, 'row+(',        func=pf.row_plus)
-token(0x17, '*row(',        func=pf.times_row)
-token(0x18, '*row+(',       func=pf.times_row_plus)
-token(0x19, 'max(',         func=pf.max)
-token(0x1A, 'min(',         func=pf.min)
-token(0x1B, 'R►Pr(',        func=ef.rect_to_polar_radius)
-token(0x1C, 'R►Pθ(',        func=ef.rect_to_polar_angle)
-token(0x1D, 'P►Rx(',        func=ef.polar_to_rect_x)
-token(0x1E, 'P►Ry(',        func=ef.polar_to_rect_y)
-token(0x1F, 'median(',      func=pf.median)
-token(0x20, 'randM(',       func=pf.rand_m)
-token(0x21, 'mean(',        func=pf.mean)
-token(0x22, 'solve(')
-token(0x23, 'seq(',         func=ef.seq)
-token(0x24, 'fnInt(',       func=ef.fn_int)
-token(0x25, 'nDeriv(',      func=ef.n_deriv)
-token(0x27, 'fMin(')
-token(0x28, 'fMax(')
-token(0x29, char=' ')
+token(0x12, b'round(',       func=pf.round)
+token(0x13, b'pxl-Test(', func=draw.pxl_test)
+token(0x14, b'augment(',     func=pf.augment)
+token(0x15, b'rowSwap(',     func=pf.row_swap)
+token(0x16, b'row+(',        func=pf.row_plus)
+token(0x17, b'*row(',        func=pf.times_row)
+token(0x18, b'*row+(',       func=pf.times_row_plus)
+token(0x19, b'max(',         func=pf.max)
+token(0x1A, b'min(',         func=pf.min)
+token(0x1B, b'R\x05Pr(',        func=ef.rect_to_polar_radius)  # R►Pr(
+token(0x1C, b'R\x05P[(',        func=ef.rect_to_polar_angle)  # R►Pθ(
+token(0x1D, b'P\x05Rx(',        func=ef.polar_to_rect_x)  # P►Rx(
+token(0x1E, b'P\x05Ry(',        func=ef.polar_to_rect_y)  # P►Ry(
+token(0x1F, b'median(',      func=pf.median)
+token(0x20, b'randM(',       func=pf.rand_m)
+token(0x21, b'mean(',        func=pf.mean)
+token(0x22, b'solve(')
+token(0x23, b'seq(',         func=ef.seq)
+token(0x24, b'fnInt(',       func=ef.fn_int)
+token(0x25, b'nDeriv(',      func=ef.n_deriv)
+token(0x27, b'fMin(')
+token(0x28, b'fMax(')
+token(0x29, b' ', typeable=True)
 
-QUOTE  = token(0x2A, char='"')
-COMMA  = token(0x2B, char=',')
-IMAG_I = token(0x2C, char='𝑖', res=lambda env: 1j)
-FACT   = token(0x2D, char='!',      post=ops.factorial)
+QUOTE  = token(0x2A, b'"', typeable=True)
+COMMA  = token(0x2B, b',', typeable=True)
+IMAG_I = token(0x2C, b'\xd7', res=lambda env: 1j, typeable=True)  # 𝑖
+FACT   = token(0x2D, b'!',      post=ops.factorial, typeable=True)
 
-token(0x2E, 'CubicReg ')
-token(0x2F, 'QuartReg ')
+token(0x2E, b'CubicReg ')
+token(0x2F, b'QuartReg ')
 
-DIGITS = tuple(token(0x30 + i, char=chr(0x30 + i)) for i in range(10))
+DIGITS = tuple(token(0x30 + i, bytes([0x30 + i]), typeable=True) for i in range(10))
 
-DOT       = token(0x3A, char='.')
-SCI_E     = token(0x3B, 'ᴇ')
+DOT       = token(0x3A, b'.', typeable=True)
+SCI_E     = token(0x3B, b'\x1b')  # ᴇ
 
-token(0x3C, ' or ',    bp=(20, 21), op=ops.or_)
-token(0x3D, ' xor ',   bp=(20, 21), op=ops.xor)
+token(0x3C, b' or ',    bp=(20, 21), op=ops.or_)
+token(0x3D, b' xor ',   bp=(20, 21), op=ops.xor)
 
-COLON     = token(0x3E, char=':')
-NEWLINE   = token(0x3F, char='\n')
+COLON     = token(0x3E, b':', typeable=True)
+NEWLINE   = token(0x3F, b'\xd6', typeable=True)  # newline
 
-token(0x40, ' and ',   bp=(30, 31), op=ops.and_)
+token(0x40, b' and ',   bp=(30, 31), op=ops.and_)
 
 LETTERS = tuple([
-	*(token(0x41 + i, char=chr(0x41 + i), var=_make_accessor('numerics', i)) for i in range(26)),
-	token(0x5B, char='θ', var=_make_accessor('numerics', 26)),
+	*(token(0x41 + i, bytes([0x41 + i]), var=_make_accessor('numerics', i), typeable=True) for i in range(26)),
+	token(0x5B, b'[', var=_make_accessor('numerics', 26), typeable=True),  # θ
 ])
 
 # ── 0x5C xx: matrix variables ([A]–[J]) ──────────────────────────────────────
 
-MATRICES = tuple(token(0x5C00 | i, f'[{chr(0x41 + i)}]', var=_make_accessor('matrices', i)) for i in range(10))
+MATRICES = tuple(token(0x5C00 | i, bytes([0xC1, 0x41 + i, 0x5D]), var=_make_accessor('matrices', i)) for i in range(10))  # [A]–[J]
 
 # ── 0x5D xx: list variables (L1–L6) ──────────────────────────────────────────
 
-LISTS = tuple(token(0x5D00 | i, f'L{chr(0x2081 + i)}', var=_make_accessor('lists', i)) for i in range(6))
+LISTS = tuple(token(0x5D00 | i, bytes([0x4C, 0x81 + i]), var=_make_accessor('lists', i)) for i in range(6))  # L₁–L₆
 
 # ── 0x5E xx: equation and sequence variables ──────────────────────────────────
 
 FUNCTION   = tuple(token(
 	0x5E10 + i,
-	f'Y{chr(0x2080 + (i + 1) % 10)}', 
+	bytes([0x59, 0x80 + (i + 1) % 10]),   # Y₁–Y₀
 	var=_make_accessor('function', i)
 ) for i in range(10))
 
 PARAMETRIC = tuple(token(
-	0x5E20 + i, 
-	f'{'XY'[i % 2]}{chr(0x2081 + i // 2)}ₜ', 
+	0x5E20 + i,
+	bytes([0x58 + i % 2, 0x81 + i // 2, 0x0D]),   # X₁ₜ/Y₁ₜ … X₆ₜ/Y₆ₜ
 	var=_make_accessor('parametric', i)
 ) for i in range(12))
 
 POLAR      = tuple(token(
-	0x5E40 + i, 
-	f'r{chr(0x2081 + i)}', 
+	0x5E40 + i,
+	bytes([0x72, 0x81 + i]),   # r₁–r₆
 	var=_make_accessor('polar', i)
 ) for i in range(6))
 
 SEQUENCE   = tuple(token(
-	0x5E80 + i, 
-	chr(0x1D462 + i), 
+	0x5E80 + i,
+	bytes([0x02 + i]),   # 𝑢 𝑣 𝑤
 	var=_make_accessor('sequence', i)
 ) for i in range(3))
 
-PRGM = token(0x5F, 'prgm', cmd=cmds.prgm)
+PRGM = token(0x5F, b'prgm', cmd=cmds.prgm)
 
 # ── 0x60 xx: picture variables (Pic1–Pic0) ───────────────────────────────────
 
-PICTURES = tuple(token(0x6000 + i, f'Pic{(i + 1) % 10}') for i in range(10))
+PICTURES = tuple(token(0x6000 + i, b'Pic' + bytes([0x30 + (i + 1) % 10])) for i in range(10))
 
 # ── 0x61 xx: graph database variables (GDB1–GDB0) ────────────────────────────
 
-GDBS = tuple(token(0x6100 | i, f'GDB{(i + 1) % 10}') for i in range(10))
+GDBS = tuple(token(0x6100 | i, b'GDB' + bytes([0x30 + (i + 1) % 10])) for i in range(10))
 
 # ── 0x62 xx: statistical result variables ─────────────────────────────────────
 
-token(0x6201, 'RegEq')
-token(0x6202, 'n')
-token(0x6203, 'ẍ')
-token(0x6204, 'Σx')
-token(0x6205, 'Σx²')
-token(0x6206, 'Sx')
-token(0x6207, 'σx')
-token(0x6208, 'minX')
-token(0x6209, 'maxX')
-token(0x620A, 'minY')
-token(0x620B, 'maxY')
-token(0x620C, 'ȳ')
-token(0x620D, 'Σy')
-token(0x620E, 'Σy²')
-token(0x620F, 'Sy')
-token(0x6210, 'σy')
-token(0x6211, 'Σxy')
-token(0x6212, 'r')
-token(0x6213, 'Med')
-token(0x6214, 'Q1')
-token(0x6215, 'Q3')
-token(0x6216, 'a')
-token(0x6217, 'b')
-token(0x6218, 'c')
-token(0x6219, 'd')
-token(0x621A, 'e')
-token(0x621B, 'x₁')
-token(0x621C, 'x₂')
-token(0x621D, 'x₃')
-token(0x621E, 'y₁')
-token(0x621F, 'y₂')
-token(0x6220, 'y₃')
-REC_N = token(0x6221, '𝑛', var=lambda env: env.n)
-token(0x6222, 'p')
-token(0x6223, 'z')
-token(0x6224, 't')
-token(0x6225, 'χ²')
-token(0x6226, '𝐅')  # Mathematical Bold Capital F, known as "Stat F" in the tibasicdev docs
-token(0x6227, 'df')
-token(0x6228, 'ṕ')
-token(0x6229, 'ṕ₁')
-token(0x622A, 'ṕ₂')
-token(0x622B, 'ẍ₁')
-token(0x622C, 'Sx₁')
-token(0x622D, 'n₁')
-token(0x622E, 'ẍ₂')
-token(0x622F, 'Sx₂')
-token(0x6230, 'n₂')
-token(0x6231, 'Sxp')
-token(0x6232, 'lower')
-token(0x6233, 'upper')
-token(0x6234, 's')
-token(0x6235, 'r²')
-token(0x6236, 'R²')
-token(0x6237, 'Factor df')
-token(0x6238, 'Factor SS')
-token(0x6239, 'Factor MS')
-token(0x623A, 'Error df')
-token(0x623B, 'Error SS')
-token(0x623C, 'Error MS')
+token(0x6201, b'RegEq')
+token(0x6202, b'n')
+token(0x6203, b'\xcb')  # ẍ
+token(0x6204, b'\xc6x')  # Σx
+token(0x6205, b'\xc6x\x12')  # Σx²
+token(0x6206, b'Sx')
+token(0x6207, b'\xc7x')  # σx
+token(0x6208, b'minX')
+token(0x6209, b'maxX')
+token(0x620A, b'minY')
+token(0x620B, b'maxY')
+token(0x620C, b'\xcc')  # ȳ
+token(0x620D, b'\xc6y')  # Σy
+token(0x620E, b'\xc6y\x12')  # Σy²
+token(0x620F, b'Sy')
+token(0x6210, b'\xc7y')  # σy
+token(0x6211, b'\xc6xy')  # Σxy
+token(0x6212, b'r')
+token(0x6213, b'Med')
+token(0x6214, b'Q1')
+token(0x6215, b'Q3')
+token(0x6216, b'a')
+token(0x6217, b'b')
+token(0x6218, b'c')
+token(0x6219, b'd')
+token(0x621A, b'e')
+token(0x621B, b'x\x81')  # x₁
+token(0x621C, b'x\x82')  # x₂
+token(0x621D, b'x\x83')  # x₃
+token(0x621E, b'y\x81')  # y₁
+token(0x621F, b'y\x82')  # y₂
+token(0x6220, b'y\x83')  # y₃
+REC_N = token(0x6221, b'\x01', var=lambda env: env.n)  # 𝑛
+token(0x6222, b'p')
+token(0x6223, b'z')
+token(0x6224, b't')
+token(0x6225, b'\xd9\x12')  # χ²
+token(0x6226, b'\xda')  # Mathematical Bold Capital F, known as "Stat F" in the tibasicdev docs
+token(0x6227, b'df')
+token(0x6228, b'\xd8')  # ṕ
+token(0x6229, b'\xd8\x81')  # ṕ₁
+token(0x622A, b'\xd8\x82')  # ṕ₂
+token(0x622B, b'\xcb\x81')  # ẍ₁
+token(0x622C, b'Sx\x81')  # Sx₁
+token(0x622D, b'n\x81')  # n₁
+token(0x622E, b'\xcb\x82')  # ẍ₂
+token(0x622F, b'Sx\x82')  # Sx₂
+token(0x6230, b'n\x82')  # n₂
+token(0x6231, b'Sxp')
+token(0x6232, b'lower')
+token(0x6233, b'upper')
+token(0x6234, b's')
+token(0x6235, b'r\x12')  # r²
+token(0x6236, b'R\x12')  # R²
+token(0x6237, b'Factor df')
+token(0x6238, b'Factor SS')
+token(0x6239, b'Factor MS')
+token(0x623A, b'Error df')
+token(0x623B, b'Error SS')
+token(0x623C, b'Error MS')
 
 # ── 0x63 xx: window and finance variables ─────────────────────────────────────
 
 def _window_accessor(attr: str):
 	return lambda env: getattr(env.window, attr)
 
-token(0x6302, 'Xscl',      var=_window_accessor('xscl'))
-token(0x6303, 'Yscl',      var=_window_accessor('yscl'))
-token(0x630A, 'Xmin',      var=_window_accessor('xmin'))
-token(0x630B, 'Xmax',      var=_window_accessor('xmax'))
-token(0x630C, 'Ymin',      var=_window_accessor('ymin'))
-token(0x630D, 'Ymax',      var=_window_accessor('ymax'))
-token(0x630E, 'Tmin',      var=_window_accessor('tmin'))
-token(0x630F, 'Tmax',      var=_window_accessor('tmax'))
-token(0x6310, 'θmin',      var=_window_accessor('theta_min'))
-token(0x6311, 'θmax',      var=_window_accessor('theta_max'))
-token(0x631A, 'TblStart',  var=_window_accessor('tbl_start'))
-token(0x631B, 'PlotStart', var=_window_accessor('plot_start'))
-token(0x631D, 'nMax',      var=_window_accessor('n_max'))
-token(0x631F, 'nMin',      var=_window_accessor('n_min'))
-token(0x6321, 'ΔTbl',      var=_window_accessor('delta_tbl'))
-token(0x6322, 'Tstep',     var=_window_accessor('tstep'))
-token(0x6323, 'θstep',     var=_window_accessor('theta_step'))
-token(0x6326, 'ΔX',        var=_window_accessor('delta_x'))
-token(0x6327, 'ΔY',        var=_window_accessor('delta_y'))
-token(0x6328, 'XFact',     var=_window_accessor('x_fact'))
-token(0x6329, 'YFact',     var=_window_accessor('y_fact'))
-token(0x6334, 'PlotStep',  var=_window_accessor('plot_step'))
-token(0x6336, 'Xres',      var=_window_accessor('xres'))
-token(0x632B, '𝐍',   var=lambda env: env.n_tvm)
-token(0x632C, 'I%',  var=lambda env: env.i_pct)
-token(0x632D, 'PV',  var=lambda env: env.pv)
-token(0x632E, 'PMT', var=lambda env: env.pmt)
-token(0x632F, 'FV',  var=lambda env: env.fv)
-token(0x6330, 'P/Y', var=lambda env: env.py)
-token(0x6331, 'C/Y', var=lambda env: env.cy)
+token(0x6302, b'Xscl',      var=_window_accessor('xscl'))
+token(0x6303, b'Yscl',      var=_window_accessor('yscl'))
+token(0x630A, b'Xmin',      var=_window_accessor('xmin'))
+token(0x630B, b'Xmax',      var=_window_accessor('xmax'))
+token(0x630C, b'Ymin',      var=_window_accessor('ymin'))
+token(0x630D, b'Ymax',      var=_window_accessor('ymax'))
+token(0x630E, b'Tmin',      var=_window_accessor('tmin'))
+token(0x630F, b'Tmax',      var=_window_accessor('tmax'))
+token(0x6310, b'[min',      var=_window_accessor('theta_min'))  # θmin
+token(0x6311, b'[max',      var=_window_accessor('theta_max'))  # θmax
+token(0x631A, b'TblStart',  var=_window_accessor('tbl_start'))
+token(0x631B, b'PlotStart', var=_window_accessor('plot_start'))
+token(0x631D, b'nMax',      var=_window_accessor('n_max'))
+token(0x631F, b'nMin',      var=_window_accessor('n_min'))
+token(0x6321, b'\xbeTbl',      var=_window_accessor('delta_tbl'))  # ΔTbl
+token(0x6322, b'Tstep',     var=_window_accessor('tstep'))
+token(0x6323, b'[step',     var=_window_accessor('theta_step'))  # θstep
+token(0x6326, b'\xbeX',        var=_window_accessor('delta_x'))  # ΔX
+token(0x6327, b'\xbeY',        var=_window_accessor('delta_y'))  # ΔY
+token(0x6328, b'XFact',     var=_window_accessor('x_fact'))
+token(0x6329, b'YFact',     var=_window_accessor('y_fact'))
+token(0x6334, b'PlotStep',  var=_window_accessor('plot_step'))
+token(0x6336, b'Xres',      var=_window_accessor('xres'))
+token(0x632B, b'\xdd',   var=lambda env: env.n_tvm)  # 𝐍
+token(0x632C, b'I%',  var=lambda env: env.i_pct)
+token(0x632D, b'PV',  var=lambda env: env.pv)
+token(0x632E, b'PMT', var=lambda env: env.pmt)
+token(0x632F, b'FV',  var=lambda env: env.fv)
+token(0x6330, b'P/Y', var=lambda env: env.py)
+token(0x6331, b'C/Y', var=lambda env: env.cy)
 
 
-token(0x64, 'Radian', cmd=modes.radian)
-token(0x65, 'Degree', cmd=modes.degree)
-token(0x66, 'Normal', cmd=modes.normal)
-token(0x67, 'Sci',    cmd=modes.sci)
-token(0x68, 'Eng',    cmd=modes.eng)
-token(0x69, 'Float',  cmd=modes.float_)
+token(0x64, b'Radian', cmd=modes.radian)
+token(0x65, b'Degree', cmd=modes.degree)
+token(0x66, b'Normal', cmd=modes.normal)
+token(0x67, b'Sci',    cmd=modes.sci)
+token(0x68, b'Eng',    cmd=modes.eng)
+token(0x69, b'Float',  cmd=modes.float_)
 
-EQ  = token(0x6A, char='=', bp=(40, 41), op=ops.eq)
-LT  = token(0x6B, char='<', bp=(40, 41), op=ops.lt)
-GT  = token(0x6C, char='>', bp=(40, 41), op=ops.gt)
-LE  = token(0x6D, char='≤', bp=(40, 41), op=ops.le)
-GE  = token(0x6E, char='≥', bp=(40, 41), op=ops.ge)
-NE  = token(0x6F, char='≠', bp=(40, 41), op=ops.ne)
-ADD = token(0x70, char='+', bp=(50, 51), op=ops.add)
-SUB = token(0x71, char='-', bp=(50, 51), op=ops.sub)
-ANS = token(0x72, 'Ans',  res=Environment.get_ans, func=ef.ans_index_or_mul)
+EQ  = token(0x6A, b'=', bp=(40, 41), op=ops.eq, typeable=True)
+LT  = token(0x6B, b'<', bp=(40, 41), op=ops.lt, typeable=True)
+GT  = token(0x6C, b'>', bp=(40, 41), op=ops.gt, typeable=True)
+LE  = token(0x6D, b'\x17', bp=(40, 41), op=ops.le, typeable=True)  # ≤
+GE  = token(0x6E, b'\x19', bp=(40, 41), op=ops.ge, typeable=True)  # ≥
+NE  = token(0x6F, b'\x18', bp=(40, 41), op=ops.ne, typeable=True)  # ≠
+ADD = token(0x70, b'+', bp=(50, 51), op=ops.add, typeable=True)
+SUB = token(0x71, b'-', bp=(50, 51), op=ops.sub, typeable=True)
+ANS = token(0x72, b'Ans',  res=Environment.get_ans, func=ef.ans_index_or_mul)
 
-token(0x73, 'Fix',   cmd=modes.fix)
-token(0x74, 'Horiz')
-token(0x75, 'Full')
-token(0x76, 'Func',  cmd=modes.func)
-token(0x77, 'Param', cmd=modes.param)
-token(0x78, 'Polar', cmd=modes.polar)
-token(0x79, 'Seq',   cmd=modes.seq)
-token(0x7A, 'IndpntAuto')
-token(0x7B, 'IndpntAsk')
-token(0x7C, 'DependAuto')
-token(0x7D, 'DependAsk')
+token(0x73, b'Fix',   cmd=modes.fix)
+token(0x74, b'Horiz')
+token(0x75, b'Full')
+token(0x76, b'Func',  cmd=modes.func)
+token(0x77, b'Param', cmd=modes.param)
+token(0x78, b'Polar', cmd=modes.polar)
+token(0x79, b'Seq',   cmd=modes.seq)
+token(0x7A, b'IndpntAuto')
+token(0x7B, b'IndpntAsk')
+token(0x7C, b'DependAuto')
+token(0x7D, b'DependAsk')
 
 # ── 0x7E xx: graph format settings ───────────────────────────────────────────
 
-token(0x7E00, 'Sequential', cmd=modes.sequential)
-token(0x7E01, 'Simul',      cmd=modes.simul)
-token(0x7E02, 'PolarGC',    cmd=modes.polar_gc)
-token(0x7E03, 'RectGC',     cmd=modes.rect_gc)
-token(0x7E04, 'CoordOn',    cmd=modes.coord_on)
-token(0x7E05, 'CoordOff',   cmd=modes.coord_off)
-token(0x7E06, 'Connected',  cmd=modes.connected)
-token(0x7E07, 'Dot',        cmd=modes.dot)
-token(0x7E08, 'AxesOn',     cmd=modes.axes_on)
-token(0x7E09, 'AxesOff',    cmd=modes.axes_off)
-token(0x7E0A, 'GridOn',     cmd=modes.grid_on)
-token(0x7E0B, 'GridOff',    cmd=modes.grid_off)
-token(0x7E0C, 'LabelOn',    cmd=modes.label_on)
-token(0x7E0D, 'LabelOff',   cmd=modes.label_off)
-token(0x7E0E, 'Web')
-token(0x7E0F, 'Time')
-token(0x7E10, 'uvAxes')
-token(0x7E11, 'vwAxes')
-token(0x7E12, 'uwAxes')
+token(0x7E00, b'Sequential', cmd=modes.sequential)
+token(0x7E01, b'Simul',      cmd=modes.simul)
+token(0x7E02, b'PolarGC',    cmd=modes.polar_gc)
+token(0x7E03, b'RectGC',     cmd=modes.rect_gc)
+token(0x7E04, b'CoordOn',    cmd=modes.coord_on)
+token(0x7E05, b'CoordOff',   cmd=modes.coord_off)
+token(0x7E06, b'Connected',  cmd=modes.connected)
+token(0x7E07, b'Dot',        cmd=modes.dot)
+token(0x7E08, b'AxesOn',     cmd=modes.axes_on)
+token(0x7E09, b'AxesOff',    cmd=modes.axes_off)
+token(0x7E0A, b'GridOn',     cmd=modes.grid_on)
+token(0x7E0B, b'GridOff',    cmd=modes.grid_off)
+token(0x7E0C, b'LabelOn',    cmd=modes.label_on)
+token(0x7E0D, b'LabelOff',   cmd=modes.label_off)
+token(0x7E0E, b'Web')
+token(0x7E0F, b'Time')
+token(0x7E10, b'uvAxes')
+token(0x7E11, b'vwAxes')
+token(0x7E12, b'uwAxes')
 
-token(0x7F, '▫')
-token(0x80, '﹢')
-token(0x81, '·')
+token(0x7F, b'\n')  # ▫
+token(0x80, b'\x0b')  # ﹢
+token(0x81, b'\x0c')  # ·
 
-MUL = token(0x82, char='*', bp=(60, 61), op=ops.mul)
-DIV = token(0x83, char='/', bp=(60, 61), op=ops.div)
+MUL = token(0x82, b'*', bp=(60, 61), op=ops.mul, typeable=True)
+DIV = token(0x83, b'/', bp=(60, 61), op=ops.div, typeable=True)
 
-token(0x84, 'Trace')
-token(0x85, 'ClrDraw', cmd=draw.clr_draw)
-token(0x86, 'ZStandard')
-token(0x87, 'ZTrig')
-token(0x88, 'ZBox')
-token(0x89, 'Zoom In')
-token(0x8A, 'Zoom Out')
-token(0x8B, 'ZSquare')
-token(0x8C, 'ZInteger')
-token(0x8D, 'ZPrevious')
-token(0x8E, 'ZDecimal')
-token(0x8F, 'ZoomStat')
-token(0x90, 'ZoomRcl')
-token(0x91, 'PrintScreen')
-token(0x92, 'ZoomSto')
-token(0x93, 'Text(')
+token(0x84, b'Trace')
+token(0x85, b'ClrDraw', cmd=draw.clr_draw)
+token(0x86, b'ZStandard')
+token(0x87, b'ZTrig')
+token(0x88, b'ZBox')
+token(0x89, b'Zoom In')
+token(0x8A, b'Zoom Out')
+token(0x8B, b'ZSquare')
+token(0x8C, b'ZInteger')
+token(0x8D, b'ZPrevious')
+token(0x8E, b'ZDecimal')
+token(0x8F, b'ZoomStat')
+token(0x90, b'ZoomRcl')
+token(0x91, b'PrintScreen')
+token(0x92, b'ZoomSto')
+token(0x93, b'Text(')
 
-NPR = token(0x94, 'nPr',     bp=(60, 61), op=ops.npr)
-NCR = token(0x95, 'nCr',     bp=(60, 61), op=ops.ncr)
+NPR = token(0x94, b'nPr',     bp=(60, 61), op=ops.npr)
+NCR = token(0x95, b'nCr',     bp=(60, 61), op=ops.ncr)
 
-token(0x96, 'FnOn ')
-token(0x97, 'FnOff ')
-token(0x98, 'StorePic ')
-token(0x99, 'RecallPic ')
-token(0x9A, 'StoreGDB ')
-token(0x9B, 'RecallGDB ')
-token(0x9C, 'Line(',      cmd=draw.line)
-token(0x9D, 'Vertical ', cmd=draw.vertical)
-token(0x9E, 'Pt-On(', cmd=draw.pt_on)
-token(0x9F, 'Pt-Off(',    cmd=draw.pt_off)
-token(0xA0, 'Pt-Change(', cmd=draw.pt_change)
-token(0xA1, 'Pxl-On(',     cmd=draw.pxl_on)
-token(0xA2, 'Pxl-Off(',    cmd=draw.pxl_off)
-token(0xA3, 'Pxl-Change(', cmd=draw.pxl_change)
-token(0xA4, 'Shade(',     cmd=draw.shade)
-token(0xA5, 'Circle(',    cmd=draw.circle)
-token(0xA6, 'Horizontal ', cmd=draw.horizontal)
-token(0xA7, 'Tangent(',   cmd=draw.tangent)
-token(0xA8, 'DrawInv ',   cmd=draw.draw_inv)
-token(0xA9, 'DrawF ',     cmd=draw.draw_f)
+token(0x96, b'FnOn ')
+token(0x97, b'FnOff ')
+token(0x98, b'StorePic ')
+token(0x99, b'RecallPic ')
+token(0x9A, b'StoreGDB ')
+token(0x9B, b'RecallGDB ')
+token(0x9C, b'Line(',      cmd=draw.line)
+token(0x9D, b'Vertical ', cmd=draw.vertical)
+token(0x9E, b'Pt-On(', cmd=draw.pt_on)
+token(0x9F, b'Pt-Off(',    cmd=draw.pt_off)
+token(0xA0, b'Pt-Change(', cmd=draw.pt_change)
+token(0xA1, b'Pxl-On(',     cmd=draw.pxl_on)
+token(0xA2, b'Pxl-Off(',    cmd=draw.pxl_off)
+token(0xA3, b'Pxl-Change(', cmd=draw.pxl_change)
+token(0xA4, b'Shade(',     cmd=draw.shade)
+token(0xA5, b'Circle(',    cmd=draw.circle)
+token(0xA6, b'Horizontal ', cmd=draw.horizontal)
+token(0xA7, b'Tangent(',   cmd=draw.tangent)
+token(0xA8, b'DrawInv ',   cmd=draw.draw_inv)
+token(0xA9, b'DrawF ',     cmd=draw.draw_f)
 
 # ── 0xAA xx: string variables (Str1–Str0) ────────────────────────────────────
 
-STRINGS = tuple(token(0xAA00 | i, f'Str{(i + 1) % 10}', var=_make_accessor('strings', i)) for i in range(10))
+STRINGS = tuple(token(0xAA00 | i, b'Str' + bytes([0x30 + (i + 1) % 10]), var=_make_accessor('strings', i)) for i in range(10))
 
-RAND = token(0xAB, 'rand', res=Environment.rand, func=pf.rand_list)
-token(0xAC, char='π', res=lambda env: math.pi)
-token(0xAD, 'getKey', res=Environment.get_key)
-APOS = token(0xAE, char="'")
-token(0xAF, char='?')
-NEG = token(0xB0, '⁻')
+RAND = token(0xAB, b'rand', res=Environment.rand, func=pf.rand_list)
+token(0xAC, b'\xc4', res=lambda env: math.pi, typeable=True)  # π
+token(0xAD, b'getKey', res=Environment.get_key)
+APOS = token(0xAE, b"'", typeable=True)
+token(0xAF, b'?', typeable=True)
+NEG = token(0xB0, b'\x1a')  # ⁻
 
-token(0xB1, 'int(', func=pf.int_)
-token(0xB2, 'abs(', func=pf.abs)
-token(0xB3, 'det(', func=pf.det)
-token(0xB4, 'identity(', func=pf.identity)
+token(0xB1, b'int(', func=pf.int_)
+token(0xB2, b'abs(', func=pf.abs)
+token(0xB3, b'det(', func=pf.det)
+token(0xB4, b'identity(', func=pf.identity)
 
-DIM = token(0xB5, 'dim(', func=ef.dim)
+DIM = token(0xB5, b'dim(', func=ef.dim)
 
-token(0xB6, 'sum(', func=pf.sum)
-token(0xB7, 'prod(', func=pf.prod)
-token(0xB8, 'not(', func=pf.not_)
-token(0xB9, 'iPart(', func=pf.i_part)
-token(0xBA, 'fPart(', func=pf.f_part)
+token(0xB6, b'sum(', func=pf.sum)
+token(0xB7, b'prod(', func=pf.prod)
+token(0xB8, b'not(', func=pf.not_)
+token(0xB9, b'iPart(', func=pf.i_part)
+token(0xBA, b'fPart(', func=pf.f_part)
 
 # ── 0xBB xx: extended tokens ──────────────────────────────────────────────────
 
-token(0xBB00, 'npv(',  			func=pf.npv)
-token(0xBB01, 'irr(',  			func=pf.irr)
-token(0xBB02, 'bal(',  			func=ef.bal)
-token(0xBB03, 'Σprn(', 			func=ef.sigma_prn)
-token(0xBB04, 'ΣInt(', 			func=ef.sigma_int)
-token(0xBB05, '►Nom(', 			func=pf.nom)
-token(0xBB06, '►Eff(', 			func=pf.eff)
-token(0xBB07, 'dbd(',           func=pf.dbd)
-token(0xBB08, 'lcm(',           func=pf.lcm)
-token(0xBB09, 'gcd(',           func=pf.gcd)
-token(0xBB0A, 'randInt(',       func=pf.rand_int)
-token(0xBB0B, 'randBin(',       func=pf.rand_bin)
-token(0xBB0C, 'sub(',           func=pf.sub)
-token(0xBB0D, 'stdDev(',        func=pf.stddev)
-token(0xBB0E, 'variance(',      func=pf.variance)
-token(0xBB0F, 'inString(',      func=pf.in_string)
-token(0xBB10, 'normalcdf(',     func=pf.normalcdf)
-token(0xBB11, 'invNorm(',       func=pf.inv_norm)
-token(0xBB12, 'tcdf(',          func=pf.tcdf)
-token(0xBB13, 'χ²cdf(',         func=pf.chi_sq_cdf)
-token(0xBB14, 'Fcdf(',          func=pf.fcdf)
-token(0xBB15, 'binompdf(',      func=pf.binompdf)
-token(0xBB16, 'binomcdf(',      func=pf.binomcdf)
-token(0xBB17, 'poissonpdf(',    func=pf.poissonpdf)
-token(0xBB18, 'poissoncdf(',    func=pf.poissoncdf)
-token(0xBB19, 'geometpdf(',     func=pf.geometpdf)
-token(0xBB1A, 'geometcdf(',     func=pf.geometcdf)
-token(0xBB1B, 'normalpdf(',     func=pf.normalpdf)
-token(0xBB1C, 'tpdf(',          func=pf.tpdf)
-token(0xBB1D, 'χ²pdf(',         func=pf.chi_sq_pdf)
-token(0xBB1E, 'Fpdf(',          func=pf.f_pdf)
-token(0xBB1F, 'randNorm(',      func=pf.rand_norm)
-token(0xBB20, 'tvm_Pmt')
-token(0xBB21, 'tvm_I%')
-token(0xBB22, 'tvm_PV')
-token(0xBB23, 'tvm_N')
-token(0xBB24, 'tvm_FV')
-token(0xBB25, 'conj(',          func=pf.conj)
-token(0xBB26, 'real(',          func=pf.real_)
-token(0xBB27, 'imag(',          func=pf.imag)
-token(0xBB28, 'angle(',         func=pf.angle)
-token(0xBB29, 'cumSum(',        func=pf.cum_sum)
-token(0xBB2A, 'expr(',          func=ef.expr)
-token(0xBB2B, 'length(',        func=pf.length)
-token(0xBB2C, 'ΔList(',         func=pf.delta_list)
-token(0xBB2D, 'ref(',           func=pf.ref)
-token(0xBB2E, 'rref(',          func=pf.rref)
-token(0xBB2F, '►Rect')
-token(0xBB30, '►Polar')
-token(0xBB31, char='𝑒', res=lambda env: math.e)
-token(0xBB32, 'SinReg ')
-token(0xBB33, 'Logistic ')
-token(0xBB34, 'LinRegTTest ')
-token(0xBB35, 'ShadeNorm(',   cmd=draw.shade_norm)
-token(0xBB36, 'Shade_t(',     cmd=draw.shade_t)
-token(0xBB37, 'Shadeχ²(',     cmd=draw.shade_chi_sq)
-token(0xBB38, 'Shade𝐅(',      cmd=draw.shade_f)
-token(0xBB39, 'Matr►list(', cmd=cmds.matr_to_list)
-token(0xBB3A, 'List►matr(', cmd=cmds.list_to_matr)
-token(0xBB3B, 'Z-Test(')
-token(0xBB3C, 'T-Test')
-token(0xBB3D, '2-SampZTest(')
-token(0xBB3E, '1-PropZTest(')
-token(0xBB3F, '2-PropZTest(')
-token(0xBB40, 'χ²-Test(')
-token(0xBB41, 'ZInterval ')
-token(0xBB42, '2-SampZInt(')
-token(0xBB43, '1-PropZInt(')
-token(0xBB44, '2-PropZInt(')
-token(0xBB45, 'GraphStyle(')
-token(0xBB46, '2-SampTTest ')
-token(0xBB47, '2-SampFTest ')
-token(0xBB48, 'TInterval ')
-token(0xBB49, '2-SampTInt ')
-token(0xBB4A, 'SetUpEditor ', cmd=cmds.set_up_editor)
-token(0xBB4B, 'Pmt_End')
-token(0xBB4C, 'Pmt_Bgn')
-token(0xBB4D, 'Real',   cmd=modes.real)
-token(0xBB4E, 're^θi',  cmd=modes.re_theta_i)
-token(0xBB4F, 'a+bi',   cmd=modes.a_plus_bi)
-token(0xBB50, 'ExprOn',  cmd=modes.expr_on)
-token(0xBB51, 'ExprOff', cmd=modes.expr_off)
-token(0xBB52, 'ClrAllLists', cmd=cmds.clr_all_lists)
-token(0xBB53, 'GetCalc(')
-token(0xBB54, 'DelVar ', cmd=cmds.del_var)
-token(0xBB55, 'Equ►String(', cmd=cmds.equ_to_string)
-token(0xBB56, 'String►Equ(', cmd=cmds.string_to_equ)
-token(0xBB57, 'Clear Entries')
-token(0xBB58, 'Select(')
-token(0xBB59, 'ANOVA(')
-token(0xBB5A, 'ModBoxplot')
-token(0xBB5B, 'NormProbPlot')
-token(0xBB64, 'G-T')
-token(0xBB65, 'ZoomFit')
-token(0xBB66, 'DiagnosticOn',  cmd=modes.diagnostic_on)
-token(0xBB67, 'DiagnosticOff', cmd=modes.diagnostic_off)
-token(0xBB68, 'Archive ')
-token(0xBB69, 'UnArchive ')
-token(0xBB6A, 'Asm(')
-token(0xBB6B, 'AsmComp(')
-token(0xBB6C, 'AsmPrgm')
-token(0xBB6D, 'compiled asm')
-token(0xBB6E, char='Á')
-token(0xBB6F, char='À')
-token(0xBB70, char='Â')
-token(0xBB71, char='Ä')
-token(0xBB72, char='á')
-token(0xBB73, char='à')
-token(0xBB74, char='â')
-token(0xBB75, char='ä')
-token(0xBB76, char='É')
-token(0xBB77, char='È')
-token(0xBB78, char='Ê')
-token(0xBB79, char='Ë')
-token(0xBB7A, char='é')
-token(0xBB7B, char='è')
-token(0xBB7C, char='ê')
-token(0xBB7D, char='ë')
-token(0xBB7F, char='Ì')
-token(0xBB80, char='Î')
-token(0xBB81, char='Ï')
-token(0xBB82, char='í')
-token(0xBB83, char='ì')
-token(0xBB84, char='î')
-token(0xBB85, char='ï')
-token(0xBB86, char='Ó')
-token(0xBB87, char='Ò')
-token(0xBB88, char='Ô')
-token(0xBB89, char='Ö')
-token(0xBB8A, char='ó')
-token(0xBB8B, char='ò')
-token(0xBB8C, char='ô')
-token(0xBB8D, char='ö')
-token(0xBB8E, char='Ú')
-token(0xBB8F, char='Ù')
-token(0xBB90, char='Û')
-token(0xBB91, char='Ü')
-token(0xBB92, char='ú')
-token(0xBB93, char='ù')
-token(0xBB94, char='û')
-token(0xBB95, char='ü')
-token(0xBB96, char='Ç')
-token(0xBB97, char='ç')
-token(0xBB98, char='Ñ')
-token(0xBB99, char='ñ')
-token(0xBB9A, '´')
-token(0xBB9B, 'ˋ')  # Modifier Letter Grave Accent (differentiates from backtick)
-token(0xBB9C, '¨')
-token(0xBB9D, char='¿')
-token(0xBB9E, char='¡')
-token(0xBB9F, char='α')
-token(0xBBA0, char='β')
-token(0xBBA1, char='γ')
-token(0xBBA2, char='Δ')
-token(0xBBA3, char='δ')
-token(0xBBA4, char='ε')
-token(0xBBA5, char='λ')
-token(0xBBA6, char='μ')
-token(0xBBA7, 'π')  # alternate pi
-token(0xBBA8, char='ρ')
-token(0xBBA9, char='Σ')
-token(0xBBAB, char='φ')
-token(0xBBAC, char='Ω')
-token(0xBBAD, char='ṕ')  # Is this different than 6228?
-token(0xBBAE, char='χ')
-token(0xBBAF, '𝟊')  # Mathematical Bold Capital Digamma, known as "Hexadecimal F" in the tibasicdev docs
-token(0xBBB0, char='a')
-token(0xBBB1, char='b')
-token(0xBBB2, char='c')
-token(0xBBB3, char='d')
-token(0xBBB4, char='e')
-token(0xBBB5, char='f')
-token(0xBBB6, char='g')
-token(0xBBB7, char='h')
-token(0xBBB8, char='i')
-token(0xBBB9, char='j')
-token(0xBBBA, char='k')
-token(0xBBBC, char='l')
-token(0xBBBD, char='m')
-token(0xBBBE, char='n')
-token(0xBBBF, char='o')
-token(0xBBC0, char='p')
-token(0xBBC1, char='q')
-token(0xBBC2, char='r')
-token(0xBBC3, char='s')
-token(0xBBC4, char='t')
-token(0xBBC5, char='u')
-token(0xBBC6, char='v')
-token(0xBBC7, char='w')
-token(0xBBC8, char='x')
-token(0xBBC9, char='y')
-token(0xBBCA, char='z')
-token(0xBBCB, char='σ')
-token(0xBBCC, char='τ')
-token(0xBBCD, char='Í')
-token(0xBBCE, 'GarbageCollect')
-token(0xBBCF, char='~')
-token(0xBBD1, char='@')
-token(0xBBD2, char='#')
-token(0xBBD3, char='$')
-token(0xBBD4, char='&')
-token(0xBBD5, char='`')  # Backtick (confusing because the symbol is officially called Grave Accent)
-token(0xBBD6, char=';')
-token(0xBBD7, char='\\')
-token(0xBBD8, char='|')
-token(0xBBD9, char='_')
-token(0xBBDA, char='%', post=lambda x: x / 100)
-token(0xBBDB, char='…')
-token(0xBBDC, char='∠')
-token(0xBBDD, char='ß')
-token(0xBBDE, 'ˣ')
-token(0xBBDF, 'ₜ')
-token(0xBBE0, '₀')
-token(0xBBE1, '₁')
-token(0xBBE2, '₂')
-token(0xBBE3, '₃')
-token(0xBBE4, '₄')
-token(0xBBE5, '₅')
-token(0xBBE6, '₆')
-token(0xBBE7, '₇')
-token(0xBBE8, '₈')
-token(0xBBE9, '₉')
-token(0xBBEA, '⑽')
-token(0xBBEB, '◄')
-token(0xBBEC, '🡆')
-token(0xBBED, '↑')
-token(0xBBEE, '↓')
-token(0xBBF0, 'x')  # Alternate X
-token(0xBBF1, char='∫')
-token(0xBBF2, '🡅')
-token(0xBBF3, '🡇')
-token(0xBBF4, '√')
-token(0xBBF5, '≛')
-SQRT = token(0xBC, '√(', func=ef.sqrt)
-CBRT = token(0xBD, '𝟑√(', func=pf.cbrt)
-token(0xBE, 'ln(',		func=ef.ln)
-token(0xBF, '𝑒^(',		func=pf.exp)
-token(0xC0, 'log(',		func=ef.log)
-token(0xC1, '⑽^(',		func=pf.pow10)
-token(0xC2, 'sin(',		func=ef.sin)
-token(0xC3, 'sin¹(',	func=ef.asin)
-token(0xC4, 'cos(',		func=ef.cos)
-token(0xC5, 'cos¹(',	func=ef.acos)
-token(0xC6, 'tan(',		func=ef.tan)
-token(0xC7, 'tan¹(',	func=ef.atan)
-token(0xC8, 'sinh(',	func=pf.sinh)
-token(0xC9, 'sinh¹(',	func=pf.asinh)
-token(0xCA, 'cosh(',	func=pf.cosh)
-token(0xCB, 'cosh¹(',	func=ef.acosh)
-token(0xCC, 'tanh(',	func=pf.tanh)
-token(0xCD, 'tanh¹(',	func=ef.atanh)
-IF     = token(0xCE, 'If ', cmd=cmds.if_cmd)
-THEN   = token(0xCF, 'Then', cmd=cmds.then_cmd)
-ELSE   = token(0xD0, 'Else', cmd=cmds.else_cmd)
-WHILE  = token(0xD1, 'While ', cmd=cmds.while_cmd)
-REPEAT = token(0xD2, 'Repeat ', cmd=cmds.repeat_cmd)
-FOR    = token(0xD3, 'For(', cmd=cmds.for_cmd)
-END    = token(0xD4, 'End', cmd=cmds.end_cmd)
-token(0xD5, 'Return', cmd=cmds.return_cmd)
-LBL    = token(0xD6, 'Lbl ', cmd=cmds.lbl_cmd)
-token(0xD7, 'Goto ', cmd=cmds.goto_cmd)
-token(0xD8, 'Pause ')
-token(0xD9, 'Stop', cmd=cmds.stop_cmd)
-token(0xDA, 'IS>(', cmd=cmds.is_gt_cmd)
-token(0xDB, 'DS<(', cmd=cmds.ds_lt_cmd)
-token(0xDC, 'Input ')
-token(0xDD, 'Prompt ')
-token(0xDE, 'Disp ', cmd=cmds.disp)
-token(0xDF, 'DispGraph')
-token(0xE0, 'Output(')
-token(0xE1, 'ClrHome')
-token(0xE2, 'Fill(', cmd=cmds.fill)
-token(0xE3, 'SortA(', cmd=cmds.sort_a)
-token(0xE4, 'SortD(', cmd=cmds.sort_d)
-token(0xE5, 'DispTable')
-token(0xE6, 'Menu(')
-token(0xE7, 'Send(')
-token(0xE8, 'Get(')
-token(0xE9, 'PlotsOn')
-token(0xEA, 'PlotsOff')
-LIST_PREFIX = token(0xEB, 'ᴸ')
-token(0xEC, 'Plot1(')
-token(0xED, 'Plot2(')
-token(0xEE, 'Plot3(')
+token(0xBB00, b'npv(',  			func=pf.npv)
+token(0xBB01, b'irr(',  			func=pf.irr)
+token(0xBB02, b'bal(',  			func=ef.bal)
+token(0xBB03, b'\xc6prn(', 			func=ef.sigma_prn)  # Σprn(
+token(0xBB04, b'\xc6Int(', 			func=ef.sigma_int)  # ΣInt(
+token(0xBB05, b'\x05Nom(', 			func=pf.nom)  # ►Nom(
+token(0xBB06, b'\x05Eff(', 			func=pf.eff)  # ►Eff(
+token(0xBB07, b'dbd(',           func=pf.dbd)
+token(0xBB08, b'lcm(',           func=pf.lcm)
+token(0xBB09, b'gcd(',           func=pf.gcd)
+token(0xBB0A, b'randInt(',       func=pf.rand_int)
+token(0xBB0B, b'randBin(',       func=pf.rand_bin)
+token(0xBB0C, b'sub(',           func=pf.sub)
+token(0xBB0D, b'stdDev(',        func=pf.stddev)
+token(0xBB0E, b'variance(',      func=pf.variance)
+token(0xBB0F, b'inString(',      func=pf.in_string)
+token(0xBB10, b'normalcdf(',     func=pf.normalcdf)
+token(0xBB11, b'invNorm(',       func=pf.inv_norm)
+token(0xBB12, b'tcdf(',          func=pf.tcdf)
+token(0xBB13, b'\xd9\x12cdf(',         func=pf.chi_sq_cdf)  # χ²cdf(
+token(0xBB14, b'Fcdf(',          func=pf.fcdf)
+token(0xBB15, b'binompdf(',      func=pf.binompdf)
+token(0xBB16, b'binomcdf(',      func=pf.binomcdf)
+token(0xBB17, b'poissonpdf(',    func=pf.poissonpdf)
+token(0xBB18, b'poissoncdf(',    func=pf.poissoncdf)
+token(0xBB19, b'geometpdf(',     func=pf.geometpdf)
+token(0xBB1A, b'geometcdf(',     func=pf.geometcdf)
+token(0xBB1B, b'normalpdf(',     func=pf.normalpdf)
+token(0xBB1C, b'tpdf(',          func=pf.tpdf)
+token(0xBB1D, b'\xd9\x12pdf(',         func=pf.chi_sq_pdf)  # χ²pdf(
+token(0xBB1E, b'Fpdf(',          func=pf.f_pdf)
+token(0xBB1F, b'randNorm(',      func=pf.rand_norm)
+token(0xBB20, b'tvm_Pmt')
+token(0xBB21, b'tvm_I%')
+token(0xBB22, b'tvm_PV')
+token(0xBB23, b'tvm_N')
+token(0xBB24, b'tvm_FV')
+token(0xBB25, b'conj(',          func=pf.conj)
+token(0xBB26, b'real(',          func=pf.real_)
+token(0xBB27, b'imag(',          func=pf.imag)
+token(0xBB28, b'angle(',         func=pf.angle)
+token(0xBB29, b'cumSum(',        func=pf.cum_sum)
+token(0xBB2A, b'expr(',          func=ef.expr)
+token(0xBB2B, b'length(',        func=pf.length)
+token(0xBB2C, b'\xbeList(',         func=pf.delta_list)  # ΔList(
+token(0xBB2D, b'ref(',           func=pf.ref)
+token(0xBB2E, b'rref(',          func=pf.rref)
+token(0xBB2F, b'\x05Rect')  # ►Rect
+token(0xBB30, b'\x05Polar')  # ►Polar
+token(0xBB31, b'\xdb', res=lambda env: math.e, typeable=True)  # 𝑒
+token(0xBB32, b'SinReg ')
+token(0xBB33, b'Logistic ')
+token(0xBB34, b'LinRegTTest ')
+token(0xBB35, b'ShadeNorm(',   cmd=draw.shade_norm)
+token(0xBB36, b'Shade_t(',     cmd=draw.shade_t)
+token(0xBB37, b'Shade\xd9\x12(',     cmd=draw.shade_chi_sq)  # Shadeχ²(
+token(0xBB38, b'Shade\xda(',      cmd=draw.shade_f)  # Shade𝐅(
+token(0xBB39, b'Matr\x05list(', cmd=cmds.matr_to_list)  # Matr►list(
+token(0xBB3A, b'List\x05matr(', cmd=cmds.list_to_matr)  # List►matr(
+token(0xBB3B, b'Z-Test(')
+token(0xBB3C, b'T-Test')
+token(0xBB3D, b'2-SampZTest(')
+token(0xBB3E, b'1-PropZTest(')
+token(0xBB3F, b'2-PropZTest(')
+token(0xBB40, b'\xd9\x12-Test(')  # χ²-Test(
+token(0xBB41, b'ZInterval ')
+token(0xBB42, b'2-SampZInt(')
+token(0xBB43, b'1-PropZInt(')
+token(0xBB44, b'2-PropZInt(')
+token(0xBB45, b'GraphStyle(')
+token(0xBB46, b'2-SampTTest ')
+token(0xBB47, b'2-SampFTest ')
+token(0xBB48, b'TInterval ')
+token(0xBB49, b'2-SampTInt ')
+token(0xBB4A, b'SetUpEditor ', cmd=cmds.set_up_editor)
+token(0xBB4B, b'Pmt_End')
+token(0xBB4C, b'Pmt_Bgn')
+token(0xBB4D, b'Real',   cmd=modes.real)
+token(0xBB4E, b're^[i',  cmd=modes.re_theta_i)  # re^θi
+token(0xBB4F, b'a+bi',   cmd=modes.a_plus_bi)
+token(0xBB50, b'ExprOn',  cmd=modes.expr_on)
+token(0xBB51, b'ExprOff', cmd=modes.expr_off)
+token(0xBB52, b'ClrAllLists', cmd=cmds.clr_all_lists)
+token(0xBB53, b'GetCalc(')
+token(0xBB54, b'DelVar ', cmd=cmds.del_var)
+token(0xBB55, b'Equ\x05String(', cmd=cmds.equ_to_string)  # Equ►String(
+token(0xBB56, b'String\x05Equ(', cmd=cmds.string_to_equ)  # String►Equ(
+token(0xBB57, b'Clear Entries')
+token(0xBB58, b'Select(')
+token(0xBB59, b'ANOVA(')
+token(0xBB5A, b'ModBoxplot')
+token(0xBB5B, b'NormProbPlot')
+token(0xBB64, b'G-T')
+token(0xBB65, b'ZoomFit')
+token(0xBB66, b'DiagnosticOn',  cmd=modes.diagnostic_on)
+token(0xBB67, b'DiagnosticOff', cmd=modes.diagnostic_off)
+token(0xBB68, b'Archive ')
+token(0xBB69, b'UnArchive ')
+token(0xBB6A, b'Asm(')
+token(0xBB6B, b'AsmComp(')
+token(0xBB6C, b'AsmPrgm')
+token(0xBB6D, b'compiled asm')
+token(0xBB6E, b'\x8a', typeable=True)  # Á
+token(0xBB6F, b'\x8b', typeable=True)  # À
+token(0xBB70, b'\x8c', typeable=True)  # Â
+token(0xBB71, b'\x8d', typeable=True)  # Ä
+token(0xBB72, b'\x8e', typeable=True)  # á
+token(0xBB73, b'\x8f', typeable=True)  # à
+token(0xBB74, b'\x90', typeable=True)  # â
+token(0xBB75, b'\x91', typeable=True)  # ä
+token(0xBB76, b'\x92', typeable=True)  # É
+token(0xBB77, b'\x93', typeable=True)  # È
+token(0xBB78, b'\x94', typeable=True)  # Ê
+token(0xBB79, b'\x95', typeable=True)  # Ë
+token(0xBB7A, b'\x96', typeable=True)  # é
+token(0xBB7B, b'\x97', typeable=True)  # è
+token(0xBB7C, b'\x98', typeable=True)  # ê
+token(0xBB7D, b'\x99', typeable=True)  # ë
+token(0xBB7F, b'\x9b', typeable=True)  # Ì
+token(0xBB80, b'\x9c', typeable=True)  # Î
+token(0xBB81, b'\x9d', typeable=True)  # Ï
+token(0xBB82, b'\x9e', typeable=True)  # í
+token(0xBB83, b'\x9f', typeable=True)  # ì
+token(0xBB84, b'\xa0', typeable=True)  # î
+token(0xBB85, b'\xa1', typeable=True)  # ï
+token(0xBB86, b'\xa2', typeable=True)  # Ó
+token(0xBB87, b'\xa3', typeable=True)  # Ò
+token(0xBB88, b'\xa4', typeable=True)  # Ô
+token(0xBB89, b'\xa5', typeable=True)  # Ö
+token(0xBB8A, b'\xa6', typeable=True)  # ó
+token(0xBB8B, b'\xa7', typeable=True)  # ò
+token(0xBB8C, b'\xa8', typeable=True)  # ô
+token(0xBB8D, b'\xa9', typeable=True)  # ö
+token(0xBB8E, b'\xaa', typeable=True)  # Ú
+token(0xBB8F, b'\xab', typeable=True)  # Ù
+token(0xBB90, b'\xac', typeable=True)  # Û
+token(0xBB91, b'\xad', typeable=True)  # Ü
+token(0xBB92, b'\xae', typeable=True)  # ú
+token(0xBB93, b'\xaf', typeable=True)  # ù
+token(0xBB94, b'\xb0', typeable=True)  # û
+token(0xBB95, b'\xb1', typeable=True)  # ü
+token(0xBB96, b'\xb2', typeable=True)  # Ç
+token(0xBB97, b'\xb3', typeable=True)  # ç
+token(0xBB98, b'\xb4', typeable=True)  # Ñ
+token(0xBB99, b'\xb5', typeable=True)  # ñ
+token(0xBB9A, b'\xb6')  # ´
+token(0xBB9B, b'\xb7')  # Modifier Letter Grave Accent (differentiates from backtick)
+token(0xBB9C, b'\xb8')  # ¨
+token(0xBB9D, b'\xb9', typeable=True)  # ¿
+token(0xBB9E, b'\xba', typeable=True)  # ¡
+token(0xBB9F, b'\xbb', typeable=True)  # α
+token(0xBBA0, b'\xbc', typeable=True)  # β
+token(0xBBA1, b'\xbd', typeable=True)  # γ
+token(0xBBA2, b'\xbe', typeable=True)  # Δ
+token(0xBBA3, b'\xbf', typeable=True)  # δ
+token(0xBBA4, b'\xc0', typeable=True)  # ε
+token(0xBBA5, b'\xc2', typeable=True)  # λ
+token(0xBBA6, b'\xc3', typeable=True)  # μ
+token(0xBBA7, b'\xc4')  # alternate pi
+token(0xBBA8, b'\xc5', typeable=True)  # ρ
+token(0xBBA9, b'\xc6', typeable=True)  # Σ
+token(0xBBAB, b'\xc9', typeable=True)  # φ
+token(0xBBAC, b'\xca', typeable=True)  # Ω
+token(0xBBAD, b'\xd8', typeable=True)  # Is this different than 6228?
+token(0xBBAE, b'\xd9', typeable=True)  # χ
+token(0xBBAF, b'\x0f')  # Mathematical Bold Capital Digamma, known as "Hexadecimal F" in the tibasicdev docs
+token(0xBBB0, b'a', typeable=True)
+token(0xBBB1, b'b', typeable=True)
+token(0xBBB2, b'c', typeable=True)
+token(0xBBB3, b'd', typeable=True)
+token(0xBBB4, b'e', typeable=True)
+token(0xBBB5, b'f', typeable=True)
+token(0xBBB6, b'g', typeable=True)
+token(0xBBB7, b'h', typeable=True)
+token(0xBBB8, b'i', typeable=True)
+token(0xBBB9, b'j', typeable=True)
+token(0xBBBA, b'k', typeable=True)
+token(0xBBBC, b'l', typeable=True)
+token(0xBBBD, b'm', typeable=True)
+token(0xBBBE, b'n', typeable=True)
+token(0xBBBF, b'o', typeable=True)
+token(0xBBC0, b'p', typeable=True)
+token(0xBBC1, b'q', typeable=True)
+token(0xBBC2, b'r', typeable=True)
+token(0xBBC3, b's', typeable=True)
+token(0xBBC4, b't', typeable=True)
+token(0xBBC5, b'u', typeable=True)
+token(0xBBC6, b'v', typeable=True)
+token(0xBBC7, b'w', typeable=True)
+token(0xBBC8, b'x', typeable=True)
+token(0xBBC9, b'y', typeable=True)
+token(0xBBCA, b'z', typeable=True)
+token(0xBBCB, b'\xc7', typeable=True)  # σ
+token(0xBBCC, b'\xc8', typeable=True)  # τ
+token(0xBBCD, b'\x9a', typeable=True)  # Í
+token(0xBBCE, b'GarbageCollect')
+token(0xBBCF, b'~', typeable=True)
+token(0xBBD1, b'@', typeable=True)
+token(0xBBD2, b'#', typeable=True)
+token(0xBBD3, b'\xf2', typeable=True)  # $
+token(0xBBD4, b'&', typeable=True)
+token(0xBBD5, b'`', typeable=True)  # Backtick (confusing because the symbol is officially called Grave Accent)
+token(0xBBD6, b';', typeable=True)
+token(0xBBD7, b'\\', typeable=True)
+token(0xBBD8, b'|', typeable=True)
+token(0xBBD9, b'_', typeable=True)
+token(0xBBDA, b'%', post=lambda x: x / 100, typeable=True)
+token(0xBBDB, b'\xce', typeable=True)  # …
+token(0xBBDC, b'\x13', typeable=True)  # ∠
+token(0xBBDD, b'\xf4', typeable=True)  # ß
+token(0xBBDE, b'\xcd')  # ˣ
+token(0xBBDF, b'\r')  # ₜ
+token(0xBBE0, b'\x80')  # ₀
+token(0xBBE1, b'\x81')  # ₁
+token(0xBBE2, b'\x82')  # ₂
+token(0xBBE3, b'\x83')  # ₃
+token(0xBBE4, b'\x84')  # ₄
+token(0xBBE5, b'\x85')  # ₅
+token(0xBBE6, b'\x86')  # ₆
+token(0xBBE7, b'\x87')  # ₇
+token(0xBBE8, b'\x88')  # ₈
+token(0xBBE9, b'\x89')  # ₉
+token(0xBBEA, b'\x1d')  # ⑽
+token(0xBBEB, b'\xcf')  # ◄
+token(0xBBEC, b'\xdf')  # 🡆
+token(0xBBED, b'\x1e')  # ↑
+token(0xBBEE, b'\x1f')  # ↓
+token(0xBBF0, b'x')  # Alternate X
+token(0xBBF1, b'\x08', typeable=True)  # ∫
+token(0xBBF2, b'\x06')  # 🡅
+token(0xBBF3, b'\x07')  # 🡇
+token(0xBBF4, b'\x10')  # √
+token(0xBBF5, b'\x7f')  # ≛
+SQRT = token(0xBC, b'\x10(', func=ef.sqrt)  # √(
+CBRT = token(0xBD, b'\x0e\x10(', func=pf.cbrt)  # 𝟑√(
+token(0xBE, b'ln(',		func=ef.ln)
+token(0xBF, b'\xdb^(',		func=pf.exp)  # 𝑒^(
+token(0xC0, b'log(',		func=ef.log)
+token(0xC1, b'\x1d^(',		func=pf.pow10)  # ⑽^(
+token(0xC2, b'sin(',		func=ef.sin)
+token(0xC3, b'sin\x11(',	func=ef.asin)  # sin¹(
+token(0xC4, b'cos(',		func=ef.cos)
+token(0xC5, b'cos\x11(',	func=ef.acos)  # cos¹(
+token(0xC6, b'tan(',		func=ef.tan)
+token(0xC7, b'tan\x11(',	func=ef.atan)  # tan¹(
+token(0xC8, b'sinh(',	func=pf.sinh)
+token(0xC9, b'sinh\x11(',	func=pf.asinh)  # sinh¹(
+token(0xCA, b'cosh(',	func=pf.cosh)
+token(0xCB, b'cosh\x11(',	func=ef.acosh)  # cosh¹(
+token(0xCC, b'tanh(',	func=pf.tanh)
+token(0xCD, b'tanh\x11(',	func=ef.atanh)  # tanh¹(
+IF     = token(0xCE, b'If ', cmd=cmds.if_cmd)
+THEN   = token(0xCF, b'Then', cmd=cmds.then_cmd)
+ELSE   = token(0xD0, b'Else', cmd=cmds.else_cmd)
+WHILE  = token(0xD1, b'While ', cmd=cmds.while_cmd)
+REPEAT = token(0xD2, b'Repeat ', cmd=cmds.repeat_cmd)
+FOR    = token(0xD3, b'For(', cmd=cmds.for_cmd)
+END    = token(0xD4, b'End', cmd=cmds.end_cmd)
+token(0xD5, b'Return', cmd=cmds.return_cmd)
+LBL    = token(0xD6, b'Lbl ', cmd=cmds.lbl_cmd)
+token(0xD7, b'Goto ', cmd=cmds.goto_cmd)
+token(0xD8, b'Pause ')
+token(0xD9, b'Stop', cmd=cmds.stop_cmd)
+token(0xDA, b'IS>(', cmd=cmds.is_gt_cmd)
+token(0xDB, b'DS<(', cmd=cmds.ds_lt_cmd)
+token(0xDC, b'Input ')
+token(0xDD, b'Prompt ')
+token(0xDE, b'Disp ', cmd=cmds.disp)
+token(0xDF, b'DispGraph')
+token(0xE0, b'Output(')
+token(0xE1, b'ClrHome')
+token(0xE2, b'Fill(', cmd=cmds.fill)
+token(0xE3, b'SortA(', cmd=cmds.sort_a)
+token(0xE4, b'SortD(', cmd=cmds.sort_d)
+token(0xE5, b'DispTable')
+token(0xE6, b'Menu(')
+token(0xE7, b'Send(')
+token(0xE8, b'Get(')
+token(0xE9, b'PlotsOn')
+token(0xEA, b'PlotsOff')
+LIST_PREFIX = token(0xEB, b'\xdc')  # ᴸ
+token(0xEC, b'Plot1(')
+token(0xED, b'Plot2(')
+token(0xEE, b'Plot3(')
 
 # ── 0xEF xx: TI-84+ extended tokens ──────────────────────────────────────────
 
-token(0xEF00, 'setDate(',    cmd=ef.set_date)
-token(0xEF01, 'setTime(',    cmd=ef.set_time)
-token(0xEF02, 'checkTmr(',   func=ef.check_tmr)
-token(0xEF03, 'setDtFmt(',   cmd=ef.set_dt_fmt)
-token(0xEF04, 'setTmFmt(',   cmd=ef.set_tm_fmt)
-token(0xEF05, 'timeCnv(',    func=pf.time_cnv)
-token(0xEF06, 'dayOfWk(',    func=pf.dayofwk)
-token(0xEF07, 'getDtStr(',   func=ef.get_dt_str)
-token(0xEF08, 'getTmStr(',   func=ef.get_tm_str)
-token(0xEF09, 'getDate',     res=Environment.get_date)
-token(0xEF0A, 'getTime',     res=Environment.get_time)
-token(0xEF0B, 'startTmr',    res=Environment.start_tmr)
-token(0xEF0C, 'getDtFmt',    res=Environment.get_dt_fmt)
-token(0xEF0D, 'getTmFmt',    res=Environment.get_tm_fmt)
-token(0xEF0E, 'isClockOn',   res=Environment.is_clock_on)
-token(0xEF0F, 'ClockOff', cmd=modes.clock_off)
-token(0xEF10, 'ClockOn',  cmd=modes.clock_on)
-token(0xEF11, 'OpenLib(')
-token(0xEF12, 'ExecLib')
-token(0xEF13, 'invT(',       func=pf.inv_t)
-token(0xEF14, 'χ²GOF-Test(')
-token(0xEF15, 'LinRegTInt ')
-token(0xEF16, 'Manual-Fit ')
-token(0xEF17, 'ZQuadrant1')
-token(0xEF18, 'ZFrac1/2')
-token(0xEF19, 'ZFrac1/3')
-token(0xEF1A, 'ZFrac1/4')
-token(0xEF1B, 'ZFrac1/5')
-token(0xEF1C, 'ZFrac1/8')
-token(0xEF1D, 'ZFrac1/10')
-token(0xEF1E, 'mathprintbox')
-token(0xEF30, '►n/d◄►Un/d')
-token(0xEF31, '►F◄►D')
-token(0xEF32, 'remainder(', func=pf.remainder)
-token(0xEF33, 'Σ(', func=ef.sigma)
-token(0xEF34, 'logBASE(', func=ef.log_base)
-token(0xEF35, 'randIntNoRep(', func=pf.rand_int_no_rep)
-token(0xEF36, 'MATHPRINT')
-token(0xEF37, 'CLASSIC')
-token(0xEF38, 'n/d')
-token(0xEF39, 'Un/d')
-token(0xEF3A, 'AUTO')
-token(0xEF3B, 'DEC')
-token(0xEF3C, 'FRAC')
-token(0xEF3D, 'FRAC-APPROX')
+token(0xEF00, b'setDate(',    cmd=ef.set_date)
+token(0xEF01, b'setTime(',    cmd=ef.set_time)
+token(0xEF02, b'checkTmr(',   func=ef.check_tmr)
+token(0xEF03, b'setDtFmt(',   cmd=ef.set_dt_fmt)
+token(0xEF04, b'setTmFmt(',   cmd=ef.set_tm_fmt)
+token(0xEF05, b'timeCnv(',    func=pf.time_cnv)
+token(0xEF06, b'dayOfWk(',    func=pf.dayofwk)
+token(0xEF07, b'getDtStr(',   func=ef.get_dt_str)
+token(0xEF08, b'getTmStr(',   func=ef.get_tm_str)
+token(0xEF09, b'getDate',     res=Environment.get_date)
+token(0xEF0A, b'getTime',     res=Environment.get_time)
+token(0xEF0B, b'startTmr',    res=Environment.start_tmr)
+token(0xEF0C, b'getDtFmt',    res=Environment.get_dt_fmt)
+token(0xEF0D, b'getTmFmt',    res=Environment.get_tm_fmt)
+token(0xEF0E, b'isClockOn',   res=Environment.is_clock_on)
+token(0xEF0F, b'ClockOff', cmd=modes.clock_off)
+token(0xEF10, b'ClockOn',  cmd=modes.clock_on)
+token(0xEF11, b'OpenLib(')
+token(0xEF12, b'ExecLib')
+token(0xEF13, b'invT(',       func=pf.inv_t)
+token(0xEF14, b'\xd9\x12GOF-Test(')  # χ²GOF-Test(
+token(0xEF15, b'LinRegTInt ')
+token(0xEF16, b'Manual-Fit ')
+token(0xEF17, b'ZQuadrant1')
+token(0xEF18, b'ZFrac1/2')
+token(0xEF19, b'ZFrac1/3')
+token(0xEF1A, b'ZFrac1/4')
+token(0xEF1B, b'ZFrac1/5')
+token(0xEF1C, b'ZFrac1/8')
+token(0xEF1D, b'ZFrac1/10')
+token(0xEF1E, b'mathprintbox')
+token(0xEF30, b'\x05n/d\xcf\x05Un/d')  # ►n/d◄►Un/d
+token(0xEF31, b'\x05F\xcf\x05D')  # ►F◄►D
+token(0xEF32, b'remainder(', func=pf.remainder)
+token(0xEF33, b'\xc6(', func=ef.sigma)  # Σ(
+token(0xEF34, b'logBASE(', func=ef.log_base)
+token(0xEF35, b'randIntNoRep(', func=pf.rand_int_no_rep)
+token(0xEF36, b'MATHPRINT')
+token(0xEF37, b'CLASSIC')
+token(0xEF38, b'n/d')
+token(0xEF39, b'Un/d')
+token(0xEF3A, b'AUTO')
+token(0xEF3B, b'DEC')
+token(0xEF3C, b'FRAC')
+token(0xEF3D, b'FRAC-APPROX')
 
 # ── 0xF0–0xFF: power operators and regression commands ───────────────────────
 
-POW      = token(0xF0, char='^', bp=(70, 69), op=ops.power)
-XTH_ROOT = token(0xF1, 'ˣ√',     bp=(60, 61), op=ops.xth_root)
+POW      = token(0xF0, b'^', bp=(70, 69), op=ops.power, typeable=True)
+XTH_ROOT = token(0xF1, b'\xcd\x10',     bp=(60, 61), op=ops.xth_root)  # ˣ√
 
-token(0xF2, '1-Var Stats ')
-token(0xF3, '2-Var Stats ')
-token(0xF4, 'LinReg(a+bx) ')
-token(0xF5, 'ExpReg ')
-token(0xF6, 'LnReg ')
-token(0xF7, 'PwrReg ')
-token(0xF8, 'Med-Med ')
-token(0xF9, 'QuadReg ')
-token(0xFA, 'ClrList ', cmd=cmds.clr_list)
-token(0xFB, 'ClrTable')
-token(0xFC, 'Histogram')
-token(0xFD, 'xyLine')
-token(0xFE, 'Scatter')
-token(0xFF, 'LinReg(ax+b) ')
+token(0xF2, b'1-Var Stats ')
+token(0xF3, b'2-Var Stats ')
+token(0xF4, b'LinReg(a+bx) ')
+token(0xF5, b'ExpReg ')
+token(0xF6, b'LnReg ')
+token(0xF7, b'PwrReg ')
+token(0xF8, b'Med-Med ')
+token(0xF9, b'QuadReg ')
+token(0xFA, b'ClrList ', cmd=cmds.clr_list)
+token(0xFB, b'ClrTable')
+token(0xFC, b'Histogram')
+token(0xFD, b'xyLine')
+token(0xFE, b'Scatter')
+token(0xFF, b'LinReg(ax+b) ')
 
 
 if __name__ == '__main__':

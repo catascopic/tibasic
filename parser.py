@@ -80,9 +80,9 @@ class Parser:
 
 	def _parse_digits(self, first: Token) -> Number:
 		"""Parse a bare numeric literal with no DMS or ᴇ handling."""
-		num = [first.char]
+		num = [first.text]
 		while self.peek_digit_or_dot():
-			num.append(self.advance().char)
+			num.append(self.advance().text)
 		try:
 			return float(''.join(num))
 		except ValueError:
@@ -233,9 +233,9 @@ class Parser:
 		t = self.advance()
 		if not t.is_name_char():
 			raise TiSyntaxError("Expected a label")
-		label = t.char
+		label = t.text
 		if self.peek().is_name_char():
-			label += self.advance().char
+			label += self.advance().text
 		return label
 
 	def read_name(self, limit) -> str:
@@ -243,9 +243,9 @@ class Parser:
 		t = self.advance()
 		if not t.is_numeric_var():
 			raise TiSyntaxError("Expected a name")
-		chars = [t.char]
+		chars = [t.text]
 		while self.peek().is_name_char():
-			chars.append(self.advance().char)
+			chars.append(self.advance().text)
 		name = ''.join(chars)
 		if len(name) > limit:
 			raise TiSyntaxError(f"Name to long; limit {limit} chars but got: {name}")

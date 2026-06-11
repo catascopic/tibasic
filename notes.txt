@@ -1,5 +1,7 @@
 Text(:
-Look
+figure out small font
+reformat large font
+
 
 Which is the better system for mapping characters?
 

@@ -403,8 +403,8 @@ class TiString:
 	@classmethod
 	def from_str(cls, s: str) -> TiString:
 		"""Create a TiString from a plain Python string."""
-		from catalog import CHARS
-		return cls([CHARS[c] for c in s])
+		from catalog import TEXT_INPUT
+		return cls([TEXT_INPUT[c] for c in s])
 
 	def __len__(self) -> int:
 		return len(self.tokens)
