@@ -570,20 +570,27 @@ def _value_to_display_bytes(value) -> bytes:
 	raise DataTypeError(f"Text(: expected a real number or string, got {type(value).__name__}")
 
 
-def _draw_glyph(screen, row: int, col: int, col_data: bytes, height: int) -> None:
-	"""Render one glyph's column bitmap onto the screen, clipping at screen edges.
+def _blit_char(screen, row: int, col: int, glyph: bytes, height: int, gap: int) -> int:
+	"""Draw one character cell at (row, col) in overwrite mode; return the next column.
 
-	Both set and clear pixels according to the bitmap (overwrite mode).
+	The cell spans the glyph plus `gap` blank columns on its right and `gap` blank
+	rows below it — the large font's 1-pixel separator (the small font uses gap=0,
+	since its trailing blank column is baked into each glyph).  Every pixel in the
+	cell is written: glyph bits where they fall, off everywhere else.  Pixels past
+	the screen edges are clipped.
 	"""
-	for dc, col_byte in enumerate(col_data):
+	width = len(glyph)
+	for dc in range(width + gap):
 		c = col + dc
 		if c > MAX_COL:
-			return
-		for dr in range(height):
+			break
+		for dr in range(height + gap):
 			r = row + dr
 			if r > MAX_ROW:
 				break
-			screen.set(r, c, bool((col_byte >> (height - 1 - dr)) & 1))
+			lit = dc < width and dr < height and (glyph[dc] >> (height - 1 - dr)) & 1
+			screen.set(r, c, bool(lit))
+	return col + width + gap
 
 
 @forms_func
@@ -598,7 +605,7 @@ def text(args):
 	if first == -1.0:
 		font   = _LARGEFONT
 		height = 7
-		gap    = 1    # large font characters are separated by one blank column
+		gap    = 1    # large font cells have a 1-pixel separator on the right and below
 		row    = py_int(args.expr())
 		col    = py_int(args.expr())
 	else:
@@ -610,27 +617,11 @@ def text(args):
 
 	cur_col = col
 	while args.has_next:
-		display_bytes = _value_to_display_bytes(args.expr())
-		for b in display_bytes:
+		for b in _value_to_display_bytes(args.expr()):
 			if cur_col > MAX_COL:
 				break
 			glyph = font[b]
 			if glyph is not None:
-				char_start = cur_col
-				_draw_glyph(env.screen, row, cur_col, glyph, height)
-				cur_col += len(glyph)
-				if gap:
-					if cur_col <= MAX_COL:
-						for dr in range(height):
-							r = row + dr
-							if r > MAX_ROW:
-								break
-							env.screen.set(r, cur_col, False)
-						cur_col += 1
-					# Clear the bottom padding row across the full cell (glyph + gap)
-					r_pad = row + height
-					if r_pad <= MAX_ROW:
-						for c in range(char_start, min(cur_col, MAX_COL + 1)):
-							env.screen.set(r_pad, c, False)
+				cur_col = _blit_char(env.screen, row, cur_col, glyph, height, gap)
 
 	args.end_paren_cmd()
