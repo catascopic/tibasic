@@ -1,7 +1,8 @@
+impor graph
+
 TiProgram: require uppercase for writing
 
 Put tests in one place, command files in one place? How to organize?
-
 
 Xmin, Xmax, Ymin, Ymax — determine the lower and upper X and Y bounds of the graph screen itself.
 ΔX, ΔY — defined to be (Xmax-Xmin)/94 and (Ymax-Ymin)/62 respectively; storing to them will change Xmax and Ymax to arrange this.

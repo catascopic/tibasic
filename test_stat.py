@@ -4,8 +4,8 @@ import math
 import pytest
 from pytest import approx
 
-import purefunctions as pf
 import tilist
+import distributions as dist
 from environment import Environment
 from errors import (
 	TiSyntaxError, StatError, DimMismatchError, InvalidDimError,
@@ -84,32 +84,32 @@ class TestStatUnit:
 	# ── normalcdf: 68–95–99.7 rule ────────────────────────────────────────────
 
 	def test_normalcdf_full_range(self):
-		assert pf.normalcdf(float('-inf'), float('inf')) == approx(1.0, rel=1e-6)
+		assert dist.normalcdf(float('-inf'), float('inf')) == approx(1.0, rel=1e-6)
 
 	def test_normalcdf_median(self):
-		assert pf.normalcdf(float('-inf'), 0) == approx(0.5, rel=1e-6)
+		assert dist.normalcdf(float('-inf'), 0) == approx(0.5, rel=1e-6)
 
 	def test_normalcdf_one_sigma(self):
-		assert pf.normalcdf(-1, 1) == approx(0.6827, rel=1e-3)
+		assert dist.normalcdf(-1, 1) == approx(0.6827, rel=1e-3)
 
 	def test_normalcdf_two_sigma(self):
-		assert pf.normalcdf(-2, 2) == approx(0.9545, rel=1e-3)
+		assert dist.normalcdf(-2, 2) == approx(0.9545, rel=1e-3)
 
 	def test_normalcdf_three_sigma(self):
-		assert pf.normalcdf(-3, 3) == approx(0.9973, rel=1e-3)
+		assert dist.normalcdf(-3, 3) == approx(0.9973, rel=1e-3)
 
 	# ── tcdf ──────────────────────────────────────────────────────────────────
 
 	def test_tcdf_symmetric(self):
 		# t distribution is symmetric around 0
-		assert pf.tcdf(float('-inf'), 0, 10) == approx(0.5, rel=1e-6)
+		assert dist.tcdf(float('-inf'), 0, 10) == approx(0.5, rel=1e-6)
 
 	def test_tcdf_full_range(self):
-		assert pf.tcdf(float('-inf'), float('inf'), 10) == approx(1.0, rel=1e-6)
+		assert dist.tcdf(float('-inf'), float('inf'), 10) == approx(1.0, rel=1e-6)
 
 	def test_tcdf_converges_to_normal(self):
 		# At large df the t-distribution approaches normal; ±1.96 ≈ 95%
-		assert pf.tcdf(-1.96, 1.96, 1000) == approx(0.95, rel=1e-2)
+		assert dist.tcdf(-1.96, 1.96, 1000) == approx(0.95, rel=1e-2)
 
 
 # ── Empty-list behaviour ──────────────────────────────────────────────────────

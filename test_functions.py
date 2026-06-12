@@ -639,7 +639,7 @@ class TestSigmaPrn:
 
 	def test_sigma_prn_equals_bal_difference(self, mortgage):
 		# ΣPrn(n1,n2) = bal(n2) - bal(n1-1)
-		from envfunctions import _bal
+		from finance import _bal
 		sprn = calc('Σprn( 13,24', mortgage)
 		expected = _bal(mortgage, 24) - _bal(mortgage, 12)
 		assert sprn == approx(expected, rel=1e-10)

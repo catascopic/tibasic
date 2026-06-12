@@ -1,7 +1,7 @@
 import math
 from numbers import Number
 
-import purefunctions as pf
+import distributions as dist
 from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk
 from decorators import forms_func, no_arg_command
 from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
@@ -398,7 +398,7 @@ def draw_inv(env: Env, formula: Thunk) -> None:
 @preparse_cmd_func
 def shade_norm(env: Env, lower: Real, upper: Real, mu: Real = 0, sigma: Real = 1) -> None:
 	"""ShadeNorm(lower,upper[,μ,σ]) — draw the normal curve, shade the interval's area."""
-	f = lambda x: pf.normalpdf(x, mu, sigma)
+	f = lambda x: dist.normalpdf(x, mu, sigma)
 	_trace_curve(env, f)
 	_shade_under(env, f, lower, upper)
 
@@ -406,7 +406,7 @@ def shade_norm(env: Env, lower: Real, upper: Real, mu: Real = 0, sigma: Real = 1
 @preparse_cmd_func
 def shade_t(env: Env, lower: Real, upper: Real, df: Real) -> None:
 	"""Shade_t(lower,upper,df) — draw the Student-t curve, shade the interval's area."""
-	f = lambda x: pf.tpdf(x, df)
+	f = lambda x: dist.tpdf(x, df)
 	_trace_curve(env, f)
 	_shade_under(env, f, lower, upper)
 
@@ -414,7 +414,7 @@ def shade_t(env: Env, lower: Real, upper: Real, df: Real) -> None:
 @preparse_cmd_func
 def shade_chi_sq(env: Env, lower: Real, upper: Real, df: Real) -> None:
 	"""Shadeχ²(lower,upper,df) — draw the chi-square curve, shade the interval's area."""
-	f = lambda x: pf.chi_sq_pdf(x, df)
+	f = lambda x: dist.chi_sq_pdf(x, df)
 	_trace_curve(env, f)
 	_shade_under(env, f, lower, upper)
 
@@ -422,7 +422,7 @@ def shade_chi_sq(env: Env, lower: Real, upper: Real, df: Real) -> None:
 @preparse_cmd_func
 def shade_f(env: Env, lower: Real, upper: Real, df1: Real, df2: Real) -> None:
 	"""Shade𝐅(lower,upper,df1,df2) — draw the F curve, shade the interval's area."""
-	f = lambda x: pf.f_pdf(x, df1, df2)
+	f = lambda x: dist.f_pdf(x, df1, df2)
 	_trace_curve(env, f)
 	_shade_under(env, f, lower, upper)
 

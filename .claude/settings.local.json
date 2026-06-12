@@ -69,7 +69,8 @@
       "Bash(PYTHONIOENCODING=utf-8 python -m pytest test_tibasic.py -q)",
       "Bash(PYTHONIOENCODING=utf-8 python -m pytest -q)",
       "Bash(PYTHONIOENCODING=utf-8 python junk/gen_displaybytes.py)",
-      "Bash(python -c \"import draw; help\\(draw.text\\)\")"
+      "Bash(python -c \"import draw; help\\(draw.text\\)\")",
+      "mcp__visualize__read_me"
     ]
   }
 }

@@ -3,15 +3,16 @@ from __future__ import annotations
 
 import builtins
 import math
+import operator
 from itertools import accumulate, pairwise
 from numbers import Number
 from typing import Any, TYPE_CHECKING
 
-from tiobjects import TiList, is_complex_val, require_list, require_real_list, require_complex_list, require_vectorizable, require_vectorizable_real
+from tiobjects import TiList, TiMatrix, is_complex_val, require_list, require_real_list, require_complex_list, require_vectorizable, require_vectorizable_real
 from core import Variable, require_real, require_int, py_int
-from preparse import preparse_func, preparse_cmd, preparse_cmd_func, Real, Env, ListVar, ListVarPrefixOptional
+from preparse import preparse_func, preparse_cmd, preparse_cmd_func, Real, Env, Thunk, NumericVar, ListVar, ListVarPrefixOptional
 from decorators import forms_func, no_arg_command
-from errors import DataTypeError, DimMismatchError, InvalidDimError, StatError, UndefinedError
+from errors import DataTypeError, DimMismatchError, InvalidDimError, IncrementError, StatError, UndefinedError
 
 if TYPE_CHECKING:
 	from environment import Environment
@@ -236,3 +237,51 @@ def set_up_editor(env: Env, *list_vars: ListVarPrefixOptional):
 		for var in env.lists:
 			if var.value is None:
 				var.value = TiList([])
+
+
+# ── Dimension / iteration ─────────────────────────────────────────────────────
+
+@forms_func
+def dim(args: ArgParser):
+	if args.peek().is_list_start():
+		var = args.list_var()
+		val = var.value
+		if val is None:
+			raise UndefinedError("Undefined list variable")
+		args.end_func()
+		return len(val)
+
+	value = args.expr()
+	args.end_func()
+	if isinstance(value, TiList):
+		return len(value)
+	if isinstance(value, TiMatrix):
+		return TiList([value.rows, value.cols])
+	raise DataTypeError(f"dim: expected list or matrix; got {value}")
+
+
+@preparse_func
+def seq(env: Env, formula: Thunk, var: NumericVar, start: Real, end: Real, step: Real = 1) -> TiList:
+	n = start
+	result = []
+	if step == 0:
+		raise IncrementError("seq: step cannot be zero")
+
+	if step > 0:
+		if start > end + 1e-10:
+			raise IncrementError(f"seq: step is positive but start ({start}) > end ({end})")
+		op = operator.le
+		end += 1e-10
+	else:
+		if start < end - 1e-10:
+			raise IncrementError(f"seq: step is negative but start ({start}) < end ({end})")
+		op = operator.ge
+		end -= 1e-10
+
+	with env.nest_guard(seq), var.scoped():
+		while op(n, end):
+			var.value = n
+			result.append(formula.eval())
+			n += step
+
+	return TiList(result)

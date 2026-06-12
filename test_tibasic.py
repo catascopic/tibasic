@@ -4,7 +4,6 @@ import math
 import pytest
 from pytest import approx, mark
 
-import purefunctions as pf
 from environment import Environment
 from modes import AngleMode
 from errors import (
