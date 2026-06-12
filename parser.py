@@ -1,7 +1,7 @@
 from numbers import Number
 
 import operators
-from tiobjects import TiList, TiMatrix, TiString, py_int, require_num, require_real
+from tiobjects import TiList, TiMatrix, TiString
 from titoken import Token, EOF_TOKEN
 from catalog import (
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
@@ -11,7 +11,8 @@ from catalog import (
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
 from environment import Environment
-from core import Variable, UserList, Thunk
+from core import Variable, Thunk, py_int, require_num, require_real
+from tilist import UserList
 from preparse import _Arity
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError
 

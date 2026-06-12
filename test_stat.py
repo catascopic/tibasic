@@ -5,6 +5,7 @@ import pytest
 from pytest import approx
 
 import purefunctions as pf
+import tilist
 from environment import Environment
 from errors import (
 	TiSyntaxError, StatError, DimMismatchError, InvalidDimError,
@@ -28,57 +29,57 @@ class TestStatUnit:
 	# ── mean ──────────────────────────────────────────────────────────────────
 
 	def test_mean_basic(self):
-		assert pf.mean(self._lst(1, 2, 3, 4, 5)) == approx(3.0)
+		assert tilist.mean(self._lst(1, 2, 3, 4, 5)) == approx(3.0)
 
 	def test_mean_weighted(self):
 		# [0, 0, 0, 10] → 10/4 = 2.5
-		assert pf.mean(self._lst(0, 10), self._lst(3, 1)) == approx(2.5)
+		assert tilist.mean(self._lst(0, 10), self._lst(3, 1)) == approx(2.5)
 
 	def test_mean_single(self):
-		assert pf.mean(self._lst(7)) == approx(7.0)
+		assert tilist.mean(self._lst(7)) == approx(7.0)
 
 	# ── variance ──────────────────────────────────────────────────────────────
 
 	def test_variance_known(self):
 		# Classic dataset; sample variance = 32/7
-		assert pf.variance(self._lst(2, 4, 4, 4, 5, 5, 7, 9)) == approx(32 / 7)
+		assert tilist.variance(self._lst(2, 4, 4, 4, 5, 5, 7, 9)) == approx(32 / 7)
 
 	def test_variance_two_elements(self):
 		# mean=2; ((1-2)²+(3-2)²)/(2-1) = 2
-		assert pf.variance(self._lst(1, 3)) == approx(2.0)
+		assert tilist.variance(self._lst(1, 3)) == approx(2.0)
 
 	def test_variance_weighted(self):
 		# mean=1; 3*(0-1)² + 1*(4-1)² = 12; 12/(4-1) = 4.0
-		assert pf.variance(self._lst(0, 4), self._lst(3, 1)) == approx(4.0)
+		assert tilist.variance(self._lst(0, 4), self._lst(3, 1)) == approx(4.0)
 
 	# ── stddev ────────────────────────────────────────────────────────────────
 
 	def test_stddev_known(self):
-		assert pf.stddev(self._lst(2, 4, 4, 4, 5, 5, 7, 9)) == approx(math.sqrt(32 / 7))
+		assert tilist.stddev(self._lst(2, 4, 4, 4, 5, 5, 7, 9)) == approx(math.sqrt(32 / 7))
 
 	def test_stddev_is_sqrt_variance(self):
 		lst = self._lst(3, 7, 7, 19)
-		assert pf.stddev(lst) == approx(math.sqrt(pf.variance(lst)))
+		assert tilist.stddev(lst) == approx(math.sqrt(tilist.variance(lst)))
 
 	def test_stddev_weighted_is_sqrt_variance(self):
 		lst, freq = self._lst(0, 4), self._lst(3, 1)
-		assert pf.stddev(lst, freq) == approx(math.sqrt(pf.variance(lst, freq)))
+		assert tilist.stddev(lst, freq) == approx(math.sqrt(tilist.variance(lst, freq)))
 
 	# ── median ────────────────────────────────────────────────────────────────
 
 	def test_median_odd(self):
-		assert pf.median(self._lst(3, 1, 4, 1, 5)) == approx(3.0)
+		assert tilist.median(self._lst(3, 1, 4, 1, 5)) == approx(3.0)
 
 	def test_median_even(self):
-		assert pf.median(self._lst(1, 2, 3, 4)) == approx(2.5)
+		assert tilist.median(self._lst(1, 2, 3, 4)) == approx(2.5)
 
 	def test_median_weighted_odd_total(self):
 		# Expanded: [10, 10, 20, 30, 30] → middle is 20
-		assert pf.median(self._lst(10, 20, 30), self._lst(2, 1, 2)) == approx(20.0)
+		assert tilist.median(self._lst(10, 20, 30), self._lst(2, 1, 2)) == approx(20.0)
 
 	def test_median_weighted_even_total(self):
 		# Expanded: [10, 10, 30, 30] → (10+30)/2 = 20
-		assert pf.median(self._lst(10, 30), self._lst(2, 2)) == approx(20.0)
+		assert tilist.median(self._lst(10, 30), self._lst(2, 2)) == approx(20.0)
 
 	# ── normalcdf: 68–95–99.7 rule ────────────────────────────────────────────
 

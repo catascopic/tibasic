@@ -11,6 +11,9 @@ import envfunctions as ef
 import commands as cmds
 import modes
 import draw
+import tilist
+import matrix as mat
+import tistring as tis
 
 
 
@@ -108,20 +111,20 @@ L_PAREN   = token(0x10, b'(',           typeable=True)
 R_PAREN   = token(0x11, b')',           typeable=True)
 token(0x12, b'round(',                  func=pf.round)
 token(0x13, b'pxl-Test(',               func=draw.pxl_test)
-token(0x14, b'augment(',                func=pf.augment)
-token(0x15, b'rowSwap(',                func=pf.row_swap)
-token(0x16, b'row+(',                   func=pf.row_plus)
-token(0x17, b'*row(',                   func=pf.times_row)
-token(0x18, b'*row+(',                  func=pf.times_row_plus)
+token(0x14, b'augment(',                func=mat.augment)
+token(0x15, b'rowSwap(',                func=mat.row_swap)
+token(0x16, b'row+(',                   func=mat.row_plus)
+token(0x17, b'*row(',                   func=mat.times_row)
+token(0x18, b'*row+(',                  func=mat.times_row_plus)
 token(0x19, b'max(',                    func=pf.max)
 token(0x1A, b'min(',                    func=pf.min)
 token(0x1B, b'R\x05Pr(',                func=ef.rect_to_polar_radius)  # R►Pr(
 token(0x1C, b'R\x05P\x5b(',             func=ef.rect_to_polar_angle)   # R►Pθ(
 token(0x1D, b'P\x05Rx(',                func=ef.polar_to_rect_x)       # P►Rx(
 token(0x1E, b'P\x05Ry(',                func=ef.polar_to_rect_y)       # P►Ry(
-token(0x1F, b'median(',                 func=pf.median)
-token(0x20, b'randM(',                  func=pf.rand_m)
-token(0x21, b'mean(',                   func=pf.mean)
+token(0x1F, b'median(',                 func=tilist.median)
+token(0x20, b'randM(',                  func=mat.rand_m)
+token(0x21, b'mean(',                   func=tilist.mean)
 token(0x22, b'solve(')
 token(0x23, b'seq(',                    func=ef.seq)
 token(0x24, b'fnInt(',                  func=ef.fn_int)
@@ -269,12 +272,12 @@ token(0x6233, b'upper')
 token(0x6234, b's')
 token(0x6235, b'r\x12')     # r²
 token(0x6236, b'R\x12')     # R²
-token(0x6237, b'Factor df')
-token(0x6238, b'Factor SS')
-token(0x6239, b'Factor MS')
-token(0x623A, b'Error df')
-token(0x623B, b'Error SS')
-token(0x623C, b'Error MS')
+token(0x6237, b'df')        # Factor df
+token(0x6238, b'SS')        # Factor SS
+token(0x6239, b'MS')        # Factor MS
+token(0x623A, b'df')        # Error df
+token(0x623B, b'SS')        # Error SS
+token(0x623C, b'MS')        # Error MS
 
 def _window_getter(attr: str):
 	return lambda env: getattr(env.window, attr)
@@ -423,11 +426,11 @@ token(0xAF, b'?',                       typeable=True)
 NEG = token(0xB0, b'\x1a')  # ⁻
 token(0xB1, b'int(',                    func=pf.int_)
 token(0xB2, b'abs(',                    func=pf.abs)
-token(0xB3, b'det(',                    func=pf.det)
-token(0xB4, b'identity(',               func=pf.identity)
+token(0xB3, b'det(',                    func=mat.det)
+token(0xB4, b'identity(',               func=mat.identity)
 DIM = token(0xB5, b'dim(',              func=ef.dim)
-token(0xB6, b'sum(',                    func=pf.sum)
-token(0xB7, b'prod(',                   func=pf.prod)
+token(0xB6, b'sum(',                    func=tilist.sum)
+token(0xB7, b'prod(',                   func=tilist.prod)
 token(0xB8, b'not(',                    func=pf.not_)
 token(0xB9, b'iPart(',                  func=pf.i_part)
 token(0xBA, b'fPart(',                  func=pf.f_part)
@@ -445,10 +448,10 @@ token(0xBB08, b'lcm(',                  func=pf.lcm)
 token(0xBB09, b'gcd(',                  func=pf.gcd)
 token(0xBB0A, b'randInt(',              func=pf.rand_int)
 token(0xBB0B, b'randBin(',              func=pf.rand_bin)
-token(0xBB0C, b'sub(',                  func=pf.sub)
-token(0xBB0D, b'stdDev(',               func=pf.stddev)
-token(0xBB0E, b'variance(',             func=pf.variance)
-token(0xBB0F, b'inString(',             func=pf.in_string)
+token(0xBB0C, b'sub(',                  func=tis.sub)
+token(0xBB0D, b'stdDev(',               func=tilist.stddev)
+token(0xBB0E, b'variance(',             func=tilist.variance)
+token(0xBB0F, b'inString(',             func=tis.in_string)
 token(0xBB10, b'normalcdf(',            func=pf.normalcdf)
 token(0xBB11, b'invNorm(',              func=pf.inv_norm)
 token(0xBB12, b'tcdf(',                 func=pf.tcdf)
@@ -474,12 +477,12 @@ token(0xBB25, b'conj(',                 func=pf.conj)
 token(0xBB26, b'real(',                 func=pf.real_)
 token(0xBB27, b'imag(',                 func=pf.imag)
 token(0xBB28, b'angle(',                func=pf.angle)
-token(0xBB29, b'cumSum(',               func=pf.cum_sum)
-token(0xBB2A, b'expr(',                 func=ef.expr)
-token(0xBB2B, b'length(',               func=pf.length)
-token(0xBB2C, b'\xbeList(',             func=pf.delta_list)  # ΔList(
-token(0xBB2D, b'ref(',                  func=pf.ref)
-token(0xBB2E, b'rref(',                 func=pf.rref)
+token(0xBB29, b'cumSum(',               func=mat.cum_sum)
+token(0xBB2A, b'expr(',                 func=tis.expr)
+token(0xBB2B, b'length(',               func=tis.length)
+token(0xBB2C, b'\xbeList(',             func=tilist.delta_list)  # ΔList(
+token(0xBB2D, b'ref(',                  func=mat.ref)
+token(0xBB2E, b'rref(',                 func=mat.rref)
 token(0xBB2F, b'\x05Rect')  # ►Rect
 token(0xBB30, b'\x05Polar')  # ►Polar
 token(0xBB31, b'\xdb',                  res=lambda env: math.e, typeable=True)  # 𝑒
@@ -490,8 +493,8 @@ token(0xBB35, b'ShadeNorm(',            cmd=draw.shade_norm)
 token(0xBB36, b'Shade_t(',              cmd=draw.shade_t)
 token(0xBB37, b'Shade\xd9\x12(',        cmd=draw.shade_chi_sq)  # Shadeχ²(
 token(0xBB38, b'Shade\xda(',            cmd=draw.shade_f)       # Shade𝐅(
-token(0xBB39, b'Matr\x05list(',         cmd=cmds.matr_to_list)  # Matr►list(
-token(0xBB3A, b'List\x05matr(',         cmd=cmds.list_to_matr)  # List►matr(
+token(0xBB39, b'Matr\x05list(',         cmd=mat.matr_to_list)  # Matr►list(
+token(0xBB3A, b'List\x05matr(',         cmd=mat.list_to_matr)  # List►matr(
 token(0xBB3B, b'Z-Test(')
 token(0xBB3C, b'T-Test')
 token(0xBB3D, b'2-SampZTest(')
@@ -507,7 +510,7 @@ token(0xBB46, b'2-SampTTest ')
 token(0xBB47, b'2-SampFTest ')
 token(0xBB48, b'TInterval ')
 token(0xBB49, b'2-SampTInt ')
-token(0xBB4A, b'SetUpEditor ',          cmd=cmds.set_up_editor)
+token(0xBB4A, b'SetUpEditor ',          cmd=tilist.set_up_editor)
 token(0xBB4B, b'Pmt_End')
 token(0xBB4C, b'Pmt_Bgn')
 token(0xBB4D, b'Real',                  cmd=modes.real)
@@ -515,11 +518,11 @@ token(0xBB4E, b're^\x5bi',              cmd=modes.re_theta_i)  # re^θi
 token(0xBB4F, b'a+bi',                  cmd=modes.a_plus_bi)
 token(0xBB50, b'ExprOn',                cmd=modes.expr_on)
 token(0xBB51, b'ExprOff',               cmd=modes.expr_off)
-token(0xBB52, b'ClrAllLists',           cmd=cmds.clr_all_lists)
+token(0xBB52, b'ClrAllLists',           cmd=tilist.clr_all_lists)
 token(0xBB53, b'GetCalc(')
 token(0xBB54, b'DelVar ',               cmd=cmds.del_var)
-token(0xBB55, b'Equ\x05String(',        cmd=cmds.equ_to_string)  # Equ►String(
-token(0xBB56, b'String\x05Equ(',        cmd=cmds.string_to_equ)  # String►Equ(
+token(0xBB55, b'Equ\x05String(',        cmd=tis.equ_to_string)  # Equ►String(
+token(0xBB56, b'String\x05Equ(',        cmd=tis.string_to_equ)  # String►Equ(
 token(0xBB57, b'Clear Entries')
 token(0xBB58, b'Select(')
 token(0xBB59, b'ANOVA(')
@@ -533,7 +536,7 @@ token(0xBB68, b'Archive ')
 token(0xBB69, b'UnArchive ')
 token(0xBB6A, b'Asm(')
 token(0xBB6B, b'AsmComp(')
-token(0xBB6C, b'AsmPrgm')
+token(0xBB6C, b'?')  # "compiled asm" token, displays as '?'
 token(0xBB6D, b'compiled asm')
 token(0xBB6E, b'\x8a',                  typeable=True)  # Á
 token(0xBB6F, b'\x8b',                  typeable=True)  # À
@@ -591,12 +594,12 @@ token(0xBBA3, b'\xbf',                  typeable=True)  # δ
 token(0xBBA4, b'\xc0',                  typeable=True)  # ε
 token(0xBBA5, b'\xc2',                  typeable=True)  # λ
 token(0xBBA6, b'\xc3',                  typeable=True)  # μ
-token(0xBBA7, b'\xc4')                                  # π (alternate pi)
+token(0xBBA7, b'\xc4')                                  # π (homoglyph of 0xAC without syntactic meaning)
 token(0xBBA8, b'\xc5',                  typeable=True)  # ρ
 token(0xBBA9, b'\xc6',                  typeable=True)  # Σ
 token(0xBBAB, b'\xc9',                  typeable=True)  # φ
 token(0xBBAC, b'\xca',                  typeable=True)  # Ω
-token(0xBBAD, b'\xd8',                  typeable=True)  # ṕ (Is this different than 6228?)
+token(0xBBAD, b'\xd8',                  typeable=True)  # ṕ (homoglyph of 0x6228 without syntactic meaning)
 token(0xBBAE, b'\xd9',                  typeable=True)  # χ
 token(0xBBAF, b'\x0f')                                  # Mathematical Bold Capital Digamma, known as "Hexadecimal F" in the tibasicdev docs
 token(0xBBB0, b'a',                     typeable=True)
@@ -660,7 +663,7 @@ token(0xBBEB, b'\xcf')                                  # ◄
 token(0xBBEC, b'\xdf')                                  # 🡆
 token(0xBBED, b'\x1e')                                  # ↑
 token(0xBBEE, b'\x1f')                                  # ↓
-token(0xBBF0, b'x')                                     # Alternate X (what is this?)
+token(0xBBF0, b'\x09')                                     # Alternate X (what is this?)
 token(0xBBF1, b'\x08',                  typeable=True)  # ∫
 token(0xBBF2, b'\x06')                                  # 🡅
 token(0xBBF3, b'\x07')                                  # 🡇
@@ -704,9 +707,9 @@ token(0xDE, b'Disp ',                   cmd=cmds.disp)
 token(0xDF, b'DispGraph')
 token(0xE0, b'Output(')
 token(0xE1, b'ClrHome')
-token(0xE2, b'Fill(',                   cmd=cmds.fill)
-token(0xE3, b'SortA(',                  cmd=cmds.sort_a)
-token(0xE4, b'SortD(',                  cmd=cmds.sort_d)
+token(0xE2, b'Fill(',                   cmd=tilist.fill)
+token(0xE3, b'SortA(',                  cmd=tilist.sort_a)
+token(0xE4, b'SortD(',                  cmd=tilist.sort_d)
 token(0xE5, b'DispTable')
 token(0xE6, b'Menu(')
 token(0xE7, b'Send(')
@@ -776,7 +779,7 @@ token(0xF6, b'LnReg ')
 token(0xF7, b'PwrReg ')
 token(0xF8, b'Med-Med ')
 token(0xF9, b'QuadReg ')
-token(0xFA, b'ClrList ',                cmd=cmds.clr_list)
+token(0xFA, b'ClrList ',                cmd=tilist.clr_list)
 token(0xFB, b'ClrTable')
 token(0xFC, b'Histogram')
 token(0xFD, b'xyLine')
@@ -786,3 +789,5 @@ token(0xFF, b'LinReg(ax+b) ')
 
 if __name__ == '__main__':
 	print(len(ALL_TOKENS))
+	for t in ALL_TOKENS:
+		t.text

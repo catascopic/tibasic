@@ -35,11 +35,11 @@ from typing import Any, Callable, TYPE_CHECKING
 
 from tiobjects import (
 	TiList, TiMatrix, TiString,
-	require_num, require_real, require_list, require_real_list, require_complex_list,
+	require_list, require_real_list, require_complex_list,
 	require_matrix, require_str, require_list_or_matrix,
 	require_vectorizable, require_vectorizable_real, require_matrix_vectorizable,
 )
-from core import Variable, Thunk
+from core import Variable, Thunk, require_num, require_real
 from decorators import TiCall, vectorize, matrix_vectorize
 
 if TYPE_CHECKING:

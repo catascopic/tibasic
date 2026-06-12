@@ -1,4 +1,3 @@
-# TODO: Remove after moving equation-eval logic
 from __future__ import annotations
 
 import builtins
@@ -7,8 +6,9 @@ from collections.abc import Callable, Iterator
 from functools import wraps
 from itertools import repeat
 from numbers import Number
-from typing import Any, TypeVar, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
+from core import _require_type, require_real, require_int, py_int, repr_num
 from errors import (
 	DataTypeError, DimMismatchError, InvalidDimError,
 	SingularMatrixError, DomainError, TiMemoryError
@@ -19,43 +19,14 @@ if TYPE_CHECKING:
 	from environment import Environment
 
 
-def repr_num(value: Number) -> str:
-	return repr(int(value) if not isinstance(value, complex) and value.is_integer() else value)
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def is_complex_val(x) -> bool:
 	"""Return True if x is a complex scalar or a TiList containing complex elements."""
 	return isinstance(x, complex) or (isinstance(x, TiList) and x.is_complex)
 
 
-# ── Guard functions ───────────────────────────────────────────────────────────────
-
-_T = TypeVar('_T')
-
-def _require_type(value: Any, tp: type[_T], exc_cls=DataTypeError) -> _T:
-	if not isinstance(value, tp):
-		raise exc_cls(f"Invalid value: {value!r}; required: {tp.__name__}")
-	return value
-
-def require_num(value: Any, exc_cls=DataTypeError) -> Number:
-	return _require_type(value, Number, exc_cls)
-
-def require_real(value: Any, exc_cls=DataTypeError) -> float:
-	require_num(value, exc_cls)
-	if isinstance(value, complex):
-		raise exc_cls(f"Expected real number, got complex: {value}")
-	return value
-
-def require_int(value: Any, exc_cls=DomainError) -> float:
-	require_real(value, exc_cls)
-	if not value.is_integer():
-		raise exc_cls(f"Expected integer, got {value}")
-	return value
-
-def py_int(value: Any, exc_cls=DomainError) -> int:
-	"""Validate that value is a whole number, then return it as a Python int.
-	Use when passing a TI value to a Python API that requires int (range, math.comb, etc.).
-	For TI-level validation only, use require_int."""
-	return int(require_int(value, exc_cls))
+# ── Guard functions ────────────────────────────────────────────────────────────
 
 def require_list(value: Any) -> TiList:
 	return _require_type(value, TiList)

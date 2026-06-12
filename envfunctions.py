@@ -16,7 +16,8 @@ from errors import (
 	DataTypeError, IncrementError, UndefinedError,
 )
 from modes import ComplexMode
-from tiobjects import TiList, TiMatrix, TiString, require_str, py_int
+from tiobjects import TiList, TiMatrix, TiString
+from core import py_int
 
 
 def _inv_trig(func, env, x):
@@ -171,22 +172,6 @@ def sigma_int(env: Env, n1: Real, n2: Real, roundvalue: Real = None):
 		raise DomainError("ΣInt: payment numbers must be positive")
 	sprn = _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
 	return (n2 - n1 + 1) * env.pmt.resolve() - sprn
-
-
-####################
-# STRING FUNCTIONS #
-####################
-
-@preparse_func
-def expr(env: Env, string: TiString):
-	"""Evaluate a TiString as a TI-BASIC expression."""
-	from parser import Parser
-	with env.nest_guard(expr):
-		p = Parser(string.tokens, env)
-		result = p.parse_expr()
-		if p.has_next:
-			raise TiSyntaxError(f"expr: evaluated string must contain a single expression; got: {string!r}")
-		return result
 
 
 ####################

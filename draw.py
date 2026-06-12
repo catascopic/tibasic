@@ -8,7 +8,8 @@ from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError
 from modes import DrawMode
 from screen import Screen
 from fonts import SMALL_FONT, LARGE_FONT
-from tiobjects import TiEquation, TiString, py_int
+from tiobjects import TiEquation, TiString
+from core import py_int
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
 # rows 0–62 (63 rows) and columns 0–94 (95 columns), inclusive.

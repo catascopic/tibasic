@@ -7,7 +7,7 @@ from core import Variable, Thunk
 from environment import Environment
 from errors import TiSyntaxError, IncrementError, LabelError
 from signals import ReturnSignal
-from tiobjects import require_real
+from core import require_real
 from catalog import THEN, ELSE, LBL
 
 

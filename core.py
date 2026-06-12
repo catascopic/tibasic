@@ -1,66 +1,86 @@
-"""Low-level runtime types shared across the interpreter.
+"""Low-level runtime types and scalar validators shared across the interpreter.
 
-These types form a foundational layer that several heavyweight modules
-(parser, program, environment, argspec/preparse) all need to reference — most
-often as type hints.  Keeping them here, rather than inside parser.py or
-environment.py, lets those modules import the *types* without importing each
-other, avoiding circular-import knots.
+Deliberately kept free of all project-internal imports so that nothing in the
+dependency graph can create a cycle back to this file.
 
 Contents:
-  - The Variable hierarchy (storable, typed calculator variables) plus UserList.
+  - Scalar guard functions (require_num, require_real, require_int, py_int).
+  - The Variable hierarchy — abstract base and numeric/real subclasses only.
+    Collection-typed subclasses (ListVariable, MatrixVariable, StringVariable,
+    EquationVariable, UserList) live in their respective domain modules.
   - Thunk — a captured, lazily-evaluated token slice.
 
-Token lives in titoken.py and the control-flow signals in signals.py; both are
+Token lives in titoken.py and control-flow signals in signals.py; both are
 already dependency-free, so they stay where they are.
 """
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from numbers import Number
+from typing import Any, TypeVar, TYPE_CHECKING
 
-from tiobjects import (
-	TiString, TiEquation,
-	require_num, require_real, require_list, require_matrix, require_str,
-)
-from errors import DataTypeError, InvalidDimError, UndefinedError
+from errors import DataTypeError, DomainError, UndefinedError
 from titoken import Token
 
 if TYPE_CHECKING:
 	from environment import Environment
 
 
-# ── Variable hierarchy ────────────────────────────────────────────────────────
+# ── Scalar validators ────────────────────────────────────────────────────────
+
+_T = TypeVar('_T')
+
+def _require_type(value: Any, tp: type[_T], exc_cls=DataTypeError) -> _T:
+	if not isinstance(value, tp):
+		raise exc_cls(f"Invalid value: {value!r}; required: {tp.__name__}")
+	return value
+
+def require_num(value: Any, exc_cls=DataTypeError) -> Number:
+	return _require_type(value, Number, exc_cls)
+
+def require_real(value: Any, exc_cls=DataTypeError) -> float:
+	require_num(value, exc_cls)
+	if isinstance(value, complex):
+		raise exc_cls(f"Expected real number, got complex: {value}")
+	return value
+
+def require_int(value: Any, exc_cls=DomainError) -> float:
+	require_real(value, exc_cls)
+	if not value.is_integer():
+		raise exc_cls(f"Expected integer, got {value}")
+	return value
+
+def py_int(value: Any, exc_cls=DomainError) -> int:
+	"""Validate that value is a whole number, then return it as a Python int.
+	Use when passing a TI value to a Python API that requires int (range, math.comb, etc.).
+	For TI-level validation only, use require_int."""
+	return int(require_int(value, exc_cls))
+
+def repr_num(value: Number) -> str:
+	return repr(int(value) if not isinstance(value, complex) and value.is_integer() else value)
+
+
+# ── Variable hierarchy ───────────────────────────────────────────────────────
 
 class Variable(ABC):
 	"""Abstract base for all TI-BASIC variable types.
 
-	Concrete subclasses fall into two storage models:
-	  - Instance-stored (NumericVariable and its descendants, ListVariable, etc.):
-	    value lives in self.value; NumericVariable provides __init__(default=None)
-	    which subclasses inherit.  Other instance-stored classes have no __init__
-	    and therefore never accept a constructor default — intentional, since lists,
-	    matrices, strings and equations are always initialised to undefined (None).
-	  - Proxy-stored (UserList): value lives in env.user_lists[name]; the class
-	    manages its own __init__ and exposes value as a property.  It inherits from
-	    Variable without calling super().__init__() because there is no super
-	    __init__ to call.
+	Collection-typed subclasses (ListVariable, MatrixVariable, StringVariable,
+	EquationVariable, UserList) live in their respective domain modules.
 	"""
 	value = None  # class-level sentinel; instance writes shadow it
 
 	def resolve(self) -> Any:
-		"""Called when the user references a variable."""
 		if self.value is None:
 			raise UndefinedError(f"Undefined {type(self).__name__}")
 		return self.value
 
 	def store(self, new_value) -> None:
-		"""Called when the user stores a variable."""
 		self.value = self.normalize(new_value)
 
 	@abstractmethod
 	def normalize(self, value) -> Any:
-		"""Validates and coerces a value before storage. For structured types, returns a defensive copy."""
 		pass
 
 	def __repr__(self):
@@ -96,66 +116,6 @@ class RealVariable(NumericVariable):
 	def normalize(self, value):
 		return require_real(value)
 
-class ListVariable(Variable):
-	def resolve(self):
-		lst = super().resolve()
-		if not lst.data:
-			raise InvalidDimError("empty list")
-		return lst
-
-	def normalize(self, value):
-		return require_list(value).copy()
-
-	def store(self, new_value) -> None:
-		was_complex = self.value is not None and self.value.is_complex
-		self.value = self.normalize(new_value)
-		if was_complex:
-			self.value._upgrade_to_complex()
-
-class MatrixVariable(Variable):
-	def normalize(self, value):
-		return require_matrix(value).copy()
-
-class StringVariable(Variable):
-	def normalize(self, value):
-		return require_str(value)
-
-class EquationVariable(Variable):
-	def normalize(self, value):
-		if isinstance(value, TiEquation):
-			return value
-		if isinstance(value, TiString):
-			return TiEquation(value.tokens)
-		raise DataTypeError(f"Expected equation or string; got {value}")
-
-
-class UserList(ListVariable):
-
-	def __init__(self, env: Environment, name: str):
-		self.lookup = env.user_lists
-		self.name = name
-		# Don't call super().__init__() — value is managed via the property below.
-
-	@property
-	def value(self):
-		return self.lookup.get(self.name)
-
-	@value.setter
-	def value(self, new_value):
-		if new_value is None:
-			self.lookup.pop(self.name, None)
-		else:
-			self.lookup[self.name] = new_value
-
-	def resolve(self) -> Any:
-		try:
-			lst = self.lookup[self.name]
-		except KeyError:
-			raise UndefinedError(f"User list {self.name!r} is not defined")
-		if not lst.data:
-			raise InvalidDimError("empty list")
-		return lst
-
 
 # ── Thunk ─────────────────────────────────────────────────────────────────────
 
@@ -175,6 +135,5 @@ class Thunk:
 		parser = Parser(self.tokens, self.env)
 		value = parser.parse_expr()
 		if parser.has_next:
-			# This is a ValueError, not a TiError, because the parser should always get this right
 			raise ValueError(f"Expected end of Thunk; remaining: {parser.tokens[parser.pos:]}")
 		return value

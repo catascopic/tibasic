@@ -1,27 +1,6 @@
-Write a test program for me that does the following:
-Iterates through all 707 tokens, batched 8 at a time, and uses Text( to print them to the screen in large font (new line for each one, 8 pixels per line). It then pauses for user input, clears the screen, and prints the next 8. It has an alternate mode where it prints the tokens batched 10 at a time in small font mode (6 pixels per line).
-
-
-token(0xBBAD, b'\xd8', typeable=True)  # Is this different than 6228?
-asmprgm
+TiProgram: require uppercase for writing
 
 Put tests in one place, command files in one place? How to organize?
-
-
-Function/Command Reorganization plan:
-tilist: list functions, also move TiList definition here
-matrix: matrix functions, also move TiMatrix definition here
-tistring: string functions, also move TiString here
-Get rid of tiobjects, but what to do with require_* statements?
-timath: functions with dedicated buttons, plus the math menu (math/num/cpx/prb), plus maybe the hyperbolic trig functions?
-program: put program functions in program.py. This would currently cause a circular import because program uses catalog. Not sure how to handle that.
-distributions: distr functions
-draw: good as is, although shade_norm, shade_t, shade_chi_sq, shade_f are actually distr/draw functions, so maybe they should be in distributions
-finance: finance functions. Note that dbd is a finance function, but none of the other datetime functions are.
-settings: zoom/graph/function/plot commands. These are mostly not implemented.
-catalog: everything else, like datetime functions. Of course, we can't call it catalog! Maybe we can see what functions are left, promote some of them to other files (like the hyperbolic trig functions), and make this a dedicated datetime function group.
-angle: there are very few angle functions, maybe don't deserve their own file.
-
 
 
 Xmin, Xmax, Ymin, Ymax — determine the lower and upper X and Y bounds of the graph screen itself.
@@ -107,6 +86,29 @@ I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 Okay, let's do Text(. Text can either do 3x5 or 5x7 if the alternate flag is set. Let's start with the alternate mode, because it's actually easier. You can find the data for the character in gl
 
 ********
+
+
+Function/Command Reorganization plan:
+tilist: list functions, also move TiList definition here
+matrix: matrix functions, also move TiMatrix definition here
+tistring: string functions, also move TiString here
+Get rid of tiobjects, but what to do with require_* statements?
+timath: functions with dedicated buttons, plus the math menu (math/num/cpx/prb), plus maybe the hyperbolic trig functions?
+program: put program functions in program.py. This would currently cause a circular import because program uses catalog. Not sure how to handle that.
+distributions: distr functions
+draw: good as is, although shade_norm, shade_t, shade_chi_sq, shade_f are actually distr/draw functions, so maybe they should be in distributions
+finance: finance functions. Note that dbd is a finance function, but none of the other datetime functions are.
+settings: zoom/graph/function/plot commands. These are mostly not implemented.
+catalog: everything else, like datetime functions. Of course, we can't call it catalog! Maybe we can see what functions are left, promote some of them to other files (like the hyperbolic trig functions), and make this a dedicated datetime function group.
+angle: there are very few angle functions, maybe don't deserve their own file.
+What do you think of all this?
+
+Write a test program for me that does the following:
+Iterates through all 707 tokens, batched 8 at a time, and uses Text( to print them to the screen in large font (new line for each one, 8 pixels per line). It then pauses for user input, clears the screen, and prints the next 8. It has an alternate mode where it prints the tokens batched 10 at a time in small font mode (6 pixels per line).
+Move require_* to core.py, move TiList/TiMatrix/TiString to their own files and move their associated functions into those files.
+
+token(0xBBAD, b'\xd8', typeable=True)  # Is this different than 6228?
+asmprgm
 
 Drawing: Line( Vertical Pt-On( Pt-Off( Pt-Change( Shade( Circle( Horizontal Tangent DrawInv DrawF ShadeNorm( Shade_t( Shadeχ²( ShadeF(
 Pixel: pxl-Test( Pxl-On( Pxl-Off( Pxl-Change(

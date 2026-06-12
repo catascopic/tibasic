@@ -5,7 +5,8 @@ from decorators import vectorize
 from functools import wraps
 from numbers import Number
 from errors import DataTypeError, DomainError, DivideByZeroError
-from tiobjects import TiMatrix, require_real, require_int, require_num, require_matrix, py_int
+from tiobjects import TiMatrix, require_matrix
+from core import require_real, require_int, require_num, py_int
 
 
 # ── Pure comparison operators ────────────────────────────────────────────────

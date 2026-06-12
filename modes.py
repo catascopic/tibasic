@@ -3,7 +3,7 @@ from enum import Enum, auto
 from decorators import no_arg_command, no_arg_bunch
 from preparse import preparse_cmd, Real, Env
 from errors import DomainError
-from tiobjects import py_int
+from core import py_int
 
 
 class AngleMode(Enum):
