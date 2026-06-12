@@ -11,7 +11,7 @@ from __future__ import annotations
 import builtins
 import math
 
-from tiobjects import TiList
+from core import TiList
 from core import require_int, py_int
 from preparse import preparse_func, Real
 from errors import DomainError

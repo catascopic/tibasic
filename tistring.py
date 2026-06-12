@@ -3,30 +3,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from tiobjects import TiString, TiEquation, require_str
-from core import Variable, py_int
+from core import TiString, TiEquation, require_str
+from core import py_int
 from preparse import preparse_func, preparse_cmd_func, Real, Env, StringVar, EquationVar
-from errors import DataTypeError, DomainError, InvalidDimError, ArgumentError, TiSyntaxError
+from errors import DomainError, InvalidDimError, ArgumentError, TiSyntaxError
 
 if TYPE_CHECKING:
 	from parser import ArgParser
 	from environment import Environment
-
-
-# ── Variable classes ──────────────────────────────────────────────────────────
-
-class StringVariable(Variable):
-	def normalize(self, value):
-		return require_str(value)
-
-
-class EquationVariable(Variable):
-	def normalize(self, value):
-		if isinstance(value, TiString):
-			return TiEquation(value.tokens)
-		if isinstance(value, TiEquation):
-			return value
-		raise DataTypeError(f"Expected equation or string, got {value!r}")
 
 
 # ── String functions ──────────────────────────────────────────────────────────

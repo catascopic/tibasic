@@ -7,21 +7,14 @@ import random
 from itertools import accumulate, batched
 from typing import TYPE_CHECKING
 
-from tiobjects import TiList, TiMatrix, require_list, require_matrix
-from core import Variable, require_real, require_int, py_int
+from core import TiList, TiMatrix, require_list, require_matrix
+from core import require_real, require_int, py_int
 from preparse import preparse_func, preparse_cmd_func, Real, MatrixVar, ListOrMatrix
 from decorators import forms_func
 from errors import DataTypeError, DimMismatchError, InvalidDimError, ArgumentError
 
 if TYPE_CHECKING:
 	from parser import ArgParser
-
-
-# ── Variable class ────────────────────────────────────────────────────────────
-
-class MatrixVariable(Variable):
-	def normalize(self, value):
-		return require_matrix(value).copy()
 
 
 # ── Matrix functions ──────────────────────────────────────────────────────────

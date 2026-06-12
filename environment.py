@@ -7,11 +7,8 @@ from contextlib import contextmanager
 from datetime import datetime, date, timedelta
 from typing import Any, ClassVar, TYPE_CHECKING
 
-from tiobjects import TiList, TiString, is_complex_val
-from core import Variable, NumericVariable, RealVariable, require_real, py_int
-from tilist import ListVariable, UserList
-from matrix import MatrixVariable
-from tistring import StringVariable, EquationVariable
+from core import TiList, TiString, is_complex_val
+from core import Variable, NumericVariable, RealVariable, ListVariable, UserList, MatrixVariable, StringVariable, EquationVariable, require_real, py_int
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 from signals import StopSignal

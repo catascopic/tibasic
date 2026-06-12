@@ -11,7 +11,7 @@ from errors import (
 	DataTypeError, InvalidDimError, ArgumentError, NonRealAnsError,
 )
 import catalog
-from tiobjects import TiList, TiMatrix, TiString
+from core import TiList, TiMatrix, TiString
 from test_tibasic import toks, calc, run, var, approx_mat
 
 

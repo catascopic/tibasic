@@ -8,7 +8,7 @@ from __future__ import annotations
 import builtins
 from datetime import date
 
-from tiobjects import TiList, require_list
+from core import TiList, require_list
 from core import require_real, require_int, py_int
 from preparse import preparse_func, Real, VectorizedReal, Env
 from errors import DomainError, DimMismatchError

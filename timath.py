@@ -20,7 +20,7 @@ import random
 from functools import wraps
 from numbers import Number
 
-from tiobjects import TiList, TiMatrix, require_list
+from core import TiList, TiMatrix, require_list
 from core import require_real, require_int, require_num, py_int
 from preparse import preparse_func, Real, Vectorized, VectorizedReal, MatrixVectorized, AnyValue, Thunk, NumericVar, Env
 from decorators import vectorize

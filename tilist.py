@@ -6,64 +6,16 @@ import math
 import operator
 from itertools import accumulate, pairwise
 from numbers import Number
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from tiobjects import TiList, TiMatrix, is_complex_val, require_list, require_real_list, require_complex_list, require_vectorizable, require_vectorizable_real
-from core import Variable, require_real, require_int, py_int
+from core import TiList, TiMatrix, is_complex_val, require_list, require_real_list, require_complex_list, require_vectorizable, require_vectorizable_real
+from core import require_real, require_int, py_int
 from preparse import preparse_func, preparse_cmd, preparse_cmd_func, Real, Env, Thunk, NumericVar, ListVar, ListVarPrefixOptional
 from decorators import forms_func, no_arg_command
 from errors import DataTypeError, DimMismatchError, InvalidDimError, IncrementError, StatError, UndefinedError
 
 if TYPE_CHECKING:
-	from environment import Environment
 	from parser import ArgParser
-
-
-# ── Variable classes ──────────────────────────────────────────────────────────
-
-class ListVariable(Variable):
-	def resolve(self):
-		lst = super().resolve()
-		if not lst.data:
-			raise InvalidDimError("empty list")
-		return lst
-
-	def normalize(self, value):
-		return require_list(value).copy()
-
-	def store(self, new_value) -> None:
-		was_complex = self.value is not None and self.value.is_complex
-		self.value = self.normalize(new_value)
-		if was_complex:
-			self.value._upgrade_to_complex()
-
-
-class UserList(ListVariable):
-
-	def __init__(self, env: Environment, name: str):
-		self.lookup = env.user_lists
-		self.name = name
-		# Don't call super().__init__() — value is managed via the property below.
-
-	@property
-	def value(self):
-		return self.lookup.get(self.name)
-
-	@value.setter
-	def value(self, new_value):
-		if new_value is None:
-			self.lookup.pop(self.name, None)
-		else:
-			self.lookup[self.name] = new_value
-
-	def resolve(self) -> Any:
-		try:
-			lst = self.lookup[self.name]
-		except KeyError:
-			raise UndefinedError(f"User list {self.name!r} is not defined")
-		if not lst.data:
-			raise InvalidDimError("empty list")
-		return lst
 
 
 # ── List functions ────────────────────────────────────────────────────────────

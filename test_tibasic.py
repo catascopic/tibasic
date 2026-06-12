@@ -14,7 +14,7 @@ from errors import (
 import catalog
 from titoken import Token
 from catalog import ALL_TOKENS, get_token, NEWLINE
-from tiobjects import TiList, TiMatrix, TiString
+from core import TiList, TiMatrix, TiString
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

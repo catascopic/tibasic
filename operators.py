@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 from decorators import vectorize, forms_func
 from errors import DataTypeError, DomainError, DivideByZeroError
-from tiobjects import TiList, TiMatrix, require_matrix
+from core import TiList, TiMatrix, require_matrix
 from core import require_real, require_int, require_num, py_int
 
 

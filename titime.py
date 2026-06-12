@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
 	from parser import ArgParser
 
-from tiobjects import TiList
+from core import TiList
 from core import py_int
 from preparse import preparse_func, Real, Env
 from decorators import TiCall

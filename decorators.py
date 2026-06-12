@@ -6,7 +6,7 @@ from itertools import repeat
 from numbers import Number
 from typing import Any, TYPE_CHECKING
 
-from tiobjects import TiList, TiMatrix
+from core import TiList, TiMatrix
 from errors import DimMismatchError
 
 if TYPE_CHECKING:

@@ -21,7 +21,7 @@ sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 from environment import Environment
 from catalog import ALL_TOKENS, get_token, DIGITS, COMMA, NEG, STRINGS
-from tiobjects import TiString
+from core import TiString
 
 TEXT = get_token(0x93)
 STR_VAR = STRINGS[0]   # Str1 — scratch register for the token being drawn

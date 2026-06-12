@@ -8,7 +8,7 @@ from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError
 from modes import DrawMode
 from screen import Screen
 from fonts import SMALL_FONT, LARGE_FONT
-from tiobjects import TiEquation, TiString
+from core import TiEquation, TiString
 from core import py_int
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:

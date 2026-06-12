@@ -10,7 +10,7 @@ from environment import Environment
 from errors import (
 	TiSyntaxError, StatError, DimMismatchError, InvalidDimError,
 )
-from tiobjects import TiList
+from core import TiList
 from test_tibasic import calc, run, var
 
 
