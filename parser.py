@@ -12,7 +12,6 @@ from titoken import (
 )
 from environment import Environment
 from core import Variable, Thunk, UserList, py_int, require_num, require_real
-from preparse import _Arity
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError
 
 
@@ -755,11 +754,11 @@ class ArgParser:
 				# env: inject the environment in this positional slot, no token.
 				out.append(self.env)
 				continue
-			if spec.arity is _Arity.VARIADIC:
+			if spec.is_variadic:
 				while self._next:
 					out.append(spec.parse(self))
 				break
-			if spec.arity is _Arity.OPTIONAL and not self._next:
+			if spec.is_optional and not self._next:
 				# Absent optional: omit it (and any following optionals).
 				break
 			out.append(spec.parse(self))

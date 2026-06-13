@@ -178,6 +178,14 @@ class ArgSpec:
 	role: _Role = _Role.VALUE       # drives vectorization wrapping (see PreparsedFunc)
 	arity: _Arity = _Arity.NORMAL   # NORMAL / OPTIONAL / VARIADIC
 
+	@property
+	def is_variadic(self) -> bool:
+		return self.arity is _Arity.VARIADIC
+
+	@property
+	def is_optional(self) -> bool:
+		return self.arity is _Arity.OPTIONAL
+
 	def __repr__(self):
 		name = 'env' if self.parse is None else getattr(self.parse, '__name__', 'parse')
 		flags = {_Arity.OPTIONAL: '?', _Arity.VARIADIC: '*'}.get(self.arity, '')
