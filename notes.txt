@@ -1,8 +1,8 @@
-impor graph
+Also for Text(: should be a domain error if not enough vertical space. Also, don't partially write characters if there's not enough room for them (counting the padding when using large font)
 
 TiProgram: require uppercase for writing
 
-Put tests in one place, command files in one place? How to organize?
+rework typeable!
 
 Xmin, Xmax, Ymin, Ymax — determine the lower and upper X and Y bounds of the graph screen itself.
 ΔX, ΔY — defined to be (Xmax-Xmin)/94 and (Ymax-Ymin)/62 respectively; storing to them will change Xmax and Ymax to arrange this.
@@ -18,46 +18,28 @@ Imporant: All of the above have a Z equivalent (ZXmin, Zθstep, etc.) that's use
 
 These dependent variables can be implemented by giving them special store() methods... but they'd also need access to the environment! This would have worked under the previous system, where variables were flyweight accessors, but now we either need to make the Window vars special vars that do have environment access somehow, or consider going back to the previous system.
 
-
 Stat plot vars:
 PlotStart, PlotStep — actually have nothing to do with plots, but determine which values of n are graphed.
 TblStart, ΔTbl — the starting value and step for the independent variable in the table screen.
 TblInput — a 7-element list of the values of a variable in the table.
 
-
-
-
 Text:
 Nice formatting logic! Probably should be moved elsewhere
 
-I'm getting errors with 2^2^2^2^2: power should be left to right, so this should give me 2^32, but it looks like it's giving me 2^65536.
-
 Text: collect all arguments first before printing anything?
-
-Should we be using Decimal everywhere?
-
 
 Which is the better system for mapping characters?
 
 Rename screen "graph"
 Make home screen
 
-
 Still don't love the nonreal answer check
 
-put environment in core!
-
 Revisit transform_to_domain_error decorator
-
-@nullary_command -> @preparse(env, end=CMD)
-one_or_more/zero_or_more
 
 peek/next/match/match_separator
 
 test fractional powers
-
-Move decorators to where they're used?
-utils.py: decorators, signals, other low-level things? Token?
 
 Refactor window: inner object
 
@@ -88,6 +70,12 @@ Okay, let's do Text(. Text can either do 3x5 or 5x7 if the alternate flag is set
 
 ********
 
+Should we be using Decimal everywhere?
+
+Move decorators to where they're used?
+utils.py: decorators, signals, other low-level things? Token?
+
+I'm getting errors with 2^2^2^2^2: power should be left to right, so this should give me 2^32, but it looks like it's giving me 2^65536.
 
 Function/Command Reorganization plan:
 tilist: list functions, also move TiList definition here

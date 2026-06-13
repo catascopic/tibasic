@@ -1,31 +1,37 @@
 from decimal import Decimal, ROUND_HALF_UP
 
-# I'm trying to write a function that matches the TI-83+ calculator's number format. It should return a string. The rules are: 10 decimal places, round .5 up, scientific notation for numbers outside of (1e-10, 1e10) and inside of (-1e-3, 1e-3). No plus sign for positive scientific exponents
+_SIG = 10  # the TI-83+ displays 10 significant figures in Normal mode
 
-_EPISLON = Decimal('1e-10')
-_POS_E_LIMIT = Decimal('1e10')
-_NEG_E_LIMIT = Decimal('1e-3')
 
-def ti83_format(x):
-    d = Decimal(str(x)).quantize(_EPISLON, rounding=ROUND_HALF_UP)    
-    if d == 0:
-        return "0"
-    
-    abs_d = abs(d)
-    if abs_d >= _POS_E_LIMIT or abs_d < _NEG_E_LIMIT:
-        # Find exponent by converting to string in scientific notation
-        exp = int(abs_d.log10().to_integral_value(rounding=ROUND_HALF_UP))
-        # Adjust if log10 rounded up past a power boundary
-        if Decimal(10) ** exp > abs_d:
-            exp -= 1
-        mantissa = (d / Decimal(10) ** exp).quantize(_EPISLON, rounding=ROUND_HALF_UP)
-        mantissa_str = strip_zeros(mantissa)
-        return f"{mantissa_str}e{exp}"
-    else:
-        return strip_zeros(d)
+def ti83_format(x) -> str:
+	"""Format a real number the way a TI-83+ shows it in Normal/Float mode.
 
-def strip_zeros(d):
-    s = str(d)
-    if '.' in s:
-        s = s.rstrip('0').rstrip('.')
-    return s
+	10 significant figures, ties rounded away from zero.  Scientific notation
+	when |x| ≥ 1e10 or 0 < |x| < 1e-3.  Positive exponents carry no '+' sign,
+	and a pure fraction drops its leading zero (.5, not 0.5).
+	"""
+	d = Decimal(str(x))
+	if d == 0:
+		return "0"
+
+	# Round to 10 significant figures.  adjusted() is the power of ten of the
+	# leading digit, so exp-(_SIG-1) is the place value of the last kept digit.
+	exp = d.adjusted()
+	d = d.quantize(Decimal(1).scaleb(exp - (_SIG - 1)), rounding=ROUND_HALF_UP)
+	exp = d.adjusted()  # re-read: rounding may have bumped it (9.999… → 10)
+
+	if exp >= 10 or exp < -3:
+		return _plain(d.scaleb(-exp)) + f"e{exp}"  # shift mantissa into [1, 10)
+	return _plain(d)
+
+
+def _plain(d: Decimal) -> str:
+	"""Fixed-point string with trailing zeros and a pure-fraction leading zero removed."""
+	s = format(d, 'f')
+	if '.' in s:
+		s = s.rstrip('0').rstrip('.')
+	if s.startswith('0.'):
+		return s[1:]
+	if s.startswith('-0.'):
+		return '-' + s[2:]
+	return s

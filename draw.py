@@ -614,14 +614,26 @@ def text(args):
 		row    = py_int(first)
 		col    = py_int(args.expr())
 
+	# Collect and validate every value before touching the screen, so an invalid
+	# argument (e.g. a complex number) can't leave a partially-drawn string.
+	display = bytearray()
+	while args.has_next:
+		display.extend(_value_to_display_bytes(args.expr()))
+	args.end_paren_cmd()
+
+	# A character's height can't be clipped, so a row with too little vertical room
+	# is an error rather than a partial draw. (Padding is optional overhang.)
+	if row < 0 or row + height > MAX_ROW + 1:
+		raise DomainError("Text(: not enough vertical space")
+
 	screen = args.env.screen
 	cur_col = col
-	while args.has_next:
-		for b in _value_to_display_bytes(args.expr()):
-			if cur_col > MAX_COL:
-				break
-			glyph = font[b]
-			if glyph is not None:
-				cur_col = _blit_char(screen, row, cur_col, glyph, height, gap)
-
-	args.end_paren_cmd()
+	for b in display:
+		glyph = font[b]
+		if glyph is None:
+			continue
+		# Draw a character only if the glyph itself fits; padding (gap, bottom row)
+		# is optional overhang. Stop here rather than writing a partial character.
+		if cur_col < 0 or cur_col + len(glyph) > MAX_COL + 1:
+			break
+		cur_col = _blit_char(screen, row, cur_col, glyph, height, gap)

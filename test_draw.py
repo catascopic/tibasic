@@ -9,6 +9,7 @@ from modes import DrawMode
 from test_tibasic import calc, run, toks, var
 from test_program import run as run_program
 from fonts import SMALL_FONT, LARGE_FONT
+from draw import MAX_ROW, MAX_COL
 
 
 def _col_count(env, col):
@@ -858,38 +859,53 @@ class TestText:
 		expected = sum(_glyph_pixels(LARGE_FONT, b) for b in [0x41, 0x34, 0x32])
 		assert _screen_pixel_count(env) == expected
 
-	# ── Clipping ──────────────────────────────────────────────────────────────
+	# ── Edge handling ─────────────────────────────────────────────────────────
+	# Horizontal: a character that doesn't fully fit (counting the gap) is not
+	# drawn at all — no partial characters.  Vertical: too little room is an error.
 
-	def test_small_clips_at_right_edge(self):
-		# 'A' starting at col 93 — some columns visible, none beyond col 94
-		env = run('Text( 0,93,"A"')
-		assert _screen_pixel_count(env) > 0
-		assert all(not env.screen.get(r, 95) for r in range(64))
+	def test_small_no_partial_at_right_edge(self):
+		# A character whose glyph would run past col 94 is skipped entirely.
+		# (Padding is optional overhang.)
+		last_fit = MAX_COL + 1 - len(SMALL_FONT[0x41])   # rightmost col where glyph fits
+		assert _screen_pixel_count(run(f'Text( 0,{last_fit + 1},"A"')) == 0
+		assert _screen_pixel_count(run(f'Text( 0,{last_fit},"A"')) == _glyph_pixels(SMALL_FONT, 0x41)
 
-	def test_small_clips_at_bottom_edge(self):
-		# Small font is 6 rows tall; starting at row 58, rows 58-63 used, 63 is out
-		env = run('Text( 58,0,"A"')
-		assert any(env.screen.get(r, c) for r in range(58, 63) for c in range(10))
-		assert all(not env.screen.get(63, c) for c in range(96))
+	def test_small_partial_string_stops_cleanly(self):
+		# In "AB" where 'A' fits but 'B' would overflow, 'A' draws fully and 'B' is skipped.
+		col = MAX_COL + 1 - len(SMALL_FONT[0x41])
+		env = run(f'Text( 0,{col},"AB"')
+		assert _screen_pixel_count(env) == _glyph_pixels(SMALL_FONT, 0x41)
 
 	def test_small_fully_offscreen_right(self):
 		env = run('Text( 0,95,"A"')
 		assert _screen_pixel_count(env) == 0
 
-	def test_large_clips_at_right_edge(self):
-		env = run('Text( ~1,0,93,"A"')
-		assert _screen_pixel_count(env) > 0
-		assert all(not env.screen.get(r, 95) for r in range(64))
+	def test_small_vertical_overflow_raises(self):
+		# Small font is 6 rows: row 57 fits (57-62); row 58 needs 58-63 (out).
+		assert _screen_pixel_count(run('Text( 57,0,"A"')) == _glyph_pixels(SMALL_FONT, 0x41)
+		with pytest.raises(DomainError):
+			run('Text( 58,0,"A"')
 
-	def test_large_clips_at_bottom_edge(self):
-		# Large font is 7 rows; starting at row 58, rows 58-64 used, 63-64 out
-		env = run('Text( ~1,58,0,"A"')
-		assert any(env.screen.get(r, c) for r in range(58, 63) for c in range(5))
-		assert all(not env.screen.get(63, c) for c in range(96))
+	def test_large_no_partial_at_right_edge(self):
+		# Padding (1px gap) is optional overhang; only the glyph must fit.
+		last_fit = MAX_COL + 1 - len(LARGE_FONT[0x41])
+		assert _screen_pixel_count(run(f'Text( ~1,0,{last_fit + 1},"A"')) == 0
+		assert _screen_pixel_count(run(f'Text( ~1,0,{last_fit},"A"')) == _glyph_pixels(LARGE_FONT, 0x41)
 
 	def test_large_fully_offscreen_right(self):
 		env = run('Text( ~1,0,95,"A"')
 		assert _screen_pixel_count(env) == 0
+
+	def test_large_vertical_overflow_raises(self):
+		# Large font is 7 rows: row 56 fits (56-62); row 57 needs 57-63 (out).
+		# (Bottom padding row is optional overhang.)
+		assert _screen_pixel_count(run('Text( ~1,56,0,"A"')) == _glyph_pixels(LARGE_FONT, 0x41)
+		with pytest.raises(DomainError):
+			run('Text( ~1,57,0,"A"')
+
+	def test_negative_row_raises(self):
+		with pytest.raises(DomainError):
+			run('Text( ~3,0,"A"')   # small font, row -3
 
 	# ── Type errors ───────────────────────────────────────────────────────────
 
