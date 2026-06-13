@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from titoken import Token, code_to_bytes
+from titoken import Token
 from catalog import ALL_TOKENS, read_token
 
 
@@ -58,7 +58,7 @@ class TiProgram:
 			return cls.read_from(f)
 
 	def write_to(self, f):
-		program    = b''.join(code_to_bytes(t.code) for t in self.tokens)
+		program    = b''.join(t.code_to_bytes() for t in self.tokens)
 		name_bytes = self.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
 		locked     = 0x06 if self.locked else 0x05
 		flag       = 0x80 if self.archived else 0x00

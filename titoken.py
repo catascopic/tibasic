@@ -80,11 +80,6 @@ END         = 0xD4
 LBL         = 0xD6
 
 
-def code_to_bytes(code: int) -> bytes:
-	"""Encode a token code as the 1 or 2 bytes stored in a .8xp program."""
-	return code.to_bytes(1 + (code > 0xFF))
-
-
 @dataclass(slots=True, frozen=True, eq=False)
 class Token:
 	code: int                 # token code as stored in a program (1 or 2 bytes packed into an int)
@@ -102,6 +97,10 @@ class Token:
 	def text(self) -> str:
 		"""Human-readable rendering of the display bytes (debugging/printing only)."""
 		return decode(self.display)
+
+	def code_to_bytes(self) -> bytes:
+		"""Encode this token's code as the 1 or 2 bytes stored in a .8xp program."""
+		return self.code.to_bytes(1 + (self.code > 0xFF))
 
 	def is_digit(self) -> bool:
 		return 0x30 <= self.code <= 0x39
