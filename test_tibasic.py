@@ -133,9 +133,9 @@ class TestArithmetic:
 	def test_precedence_parens(self):
 		assert calc('(2+3)*4') == 20
 
-	def test_pow_right_assoc(self):
-		# 2^3^2 = 2^(3^2) = 2^9 = 512 (right-associative)
-		assert calc('2^3^2') == 512
+	def test_pow_left_assoc(self):
+		# 2^3^2 = (2^3)^2 = 8^2 = 64 (left-associative, matches TI-84)
+		assert calc('2^3^2') == 64
 
 
 # ── Scientific notation (ᴇ) ───────────────────────────────────────────────────

@@ -776,7 +776,7 @@ token(0xEF3C, b'FRAC')
 token(0xEF3D, b'FRAC-APPROX')
 
 
-POW      = token(0xF0, b'^',            bp=(70, 69), op=ops.power, typeable=True)
+POW      = token(0xF0, b'^',            bp=(70, 70), op=ops.power, typeable=True)
 XTH_ROOT = token(0xF1, b'\xcd\x10',     bp=(60, 61), op=ops.xth_root)  # ˣ√
 token(0xF2, b'1-Var Stats ')
 token(0xF3, b'2-Var Stats ')
