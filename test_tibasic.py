@@ -23,7 +23,7 @@ def filter_token(t):
 	# Skip lower-case letters because they can screw things up
 	if len(t.text) == 1 and t.text.islower():
 		# But make exceptions (theta is correctly considered lower-case!)
-		return len(t.code) == 1
+		return t.code <= 0xFF
 	return True
 
 
@@ -109,7 +109,7 @@ class TestLookup:
 	def test_lookup(self):
 		with pytest.raises(KeyError):
 			q = toks('q')[0]
-			print(q.code, b'\xBB\xB0' <= q.code <= b'\xBB\xCA')
+			print(q.code, 0xBBB0 <= q.code <= 0xBBCA)
 			
 
 

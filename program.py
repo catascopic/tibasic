@@ -8,7 +8,7 @@ from environment import Environment
 from errors import TiSyntaxError, IncrementError, LabelError
 from signals import ReturnSignal
 from core import require_real
-from catalog import THEN, ELSE, LBL
+from titoken import THEN, ELSE, LBL
 
 
 class Program:
@@ -53,7 +53,7 @@ class Program:
 				# no special handling required for Else here
 			else:
 				found = self._parser.skip_block(else_mode=True)
-				if found is ELSE:
+				if found.code == ELSE:
 					# handle Else as if it's an If-Else block that's closed by End
 					self.push_block(ThenBlock())
 		elif not condition:

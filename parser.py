@@ -2,8 +2,8 @@ from numbers import Number
 
 import operators
 from core import TiList, TiMatrix, TiString
-from titoken import Token, EOF_TOKEN
-from catalog import (
+from titoken import (
+	Token, EOF_TOKEN, EOF_CODE,
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
 	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
 	SCI_E, DEG, RAD, APOS,
@@ -43,22 +43,22 @@ class Parser:
 			return t
 		raise TiSyntaxError("Unexpected end of input")
 
-	def eat_if(self, tok) -> bool:
-		"""Consume the next token if it matches.
+	def eat_if(self, code) -> bool:
+		"""Consume the next token if its code matches.
 
-		tok may be a single Token (identity check) or a set/frozenset of Tokens
-		(membership check).  Returns True and advances iff the token matched.
+		code may be a single token code (equality check) or a set/frozenset of
+		codes (membership check).  Returns True and advances iff the token matched.
 		"""
-		t = self.peek()
-		matched = t in tok if isinstance(tok, (set, frozenset)) else t is tok
+		c = self.peek().code
+		matched = c in code if isinstance(code, (set, frozenset)) else c == code
 		if matched:
 			self.pos += 1
 			return True
 		return False
 
-	def expect(self, tok: Token) -> None:
-		if self.peek() is not tok:
-			raise TiSyntaxError(f"Expected {tok}, got {self.peek()}")
+	def expect(self, code: int) -> None:
+		if self.peek().code != code:
+			raise TiSyntaxError(f"Expected 0x{code:X}, got {self.peek()}")
 		self.pos += 1
 
 	def end_statement(self):
@@ -67,13 +67,13 @@ class Parser:
 		if self.has_next:
 			raise TiSyntaxError(f"Expected end of statement; got {self.peek()}")
 
-	def close_delimiter(self, expected: Token) -> bool:
+	def close_delimiter(self, expected: int) -> bool:
 		"""Consume expected closer, or implicitly close at statement boundaries.
 		Raises ParseError if a stray ) is found."""
 		if self.eat_if(expected):
 			return True
-		if self.peek() is R_PAREN:
-			raise TiSyntaxError(f"Mismatched delimiter: expected {expected}, got ')'")
+		if self.peek().code == R_PAREN:
+			raise TiSyntaxError(f"Mismatched delimiter: expected 0x{expected:X}, got ')'")
 		return False
 
 	# ── Sub-parsers ────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ class Parser:
 	def _peek_dms_start(self) -> bool:
 		"""Return True if the next token can start a DMS minutes/seconds component."""
 		t = self.peek()
-		return t.is_digit() or t in {DOT, SCI_E}
+		return t.is_digit() or t.code in {DOT, SCI_E}
 
 	def _parse_dms_component(self) -> Number:
 		"""Parse one DMS component (minutes or seconds): digits[ᴇ exp] or prefix ᴇexp."""
@@ -130,7 +130,7 @@ class Parser:
 				seconds = self._parse_dms_component()
 				self.expect(QUOTE)
 			result = value + minutes / 60 + seconds / 3600
-			if self.peek() is SCI_E:
+			if self.peek().code == SCI_E:
 				raise TiSyntaxError("ᴇ cannot follow a DMS literal")
 			return result
 		return self.env.from_deg(value)
@@ -140,7 +140,7 @@ class Parser:
 		value = self._parse_digits(first)
 		if self.eat_if(SCI_E):
 			value = value * 10 ** self._parse_sci_exp()
-			if self.peek() is SCI_E:
+			if self.peek().code == SCI_E:
 				raise TiSyntaxError("Cannot chain ᴇ notation (e.g. 1ᴇ1ᴇ1 is invalid)")
 		return self._parse_dms_num(value)
 
@@ -148,7 +148,7 @@ class Parser:
 		"""Opening \" already consumed. Reads until closing \", STORE, NEWLINE, or EOF.
 		Colons are valid string content; newlines implicitly terminate the string."""
 		start = self.pos
-		while self.peek() not in {QUOTE, STORE, NEWLINE, EOF_TOKEN}:
+		while self.peek().code not in {QUOTE, STORE, NEWLINE, EOF_CODE}:
 			self.advance()
 		string = TiString(self.tokens[start:self.pos])
 		self.eat_if(QUOTE)
@@ -181,7 +181,7 @@ class Parser:
 			if not self.close_delimiter(R_BRACKET):
 				break
 			self.eat_if(COMMA)  # comma is completely optional between rows
-			if self.peek() is not L_BRACKET:
+			if self.peek().code != L_BRACKET:
 				break
 		self.close_delimiter(R_BRACKET)
 		self._struct_depth -= 1
@@ -197,36 +197,36 @@ class Parser:
 		COLON is a statement separator outside strings but is valid string content.
 		STORE (→) is always an error inside a formula argument."""
 		start = self.pos
-		stack: list[Token] = []
+		stack: list[int] = []
 		in_string = False
 		while self.has_next:
 			t = self.peek()
-			if t is STORE:
+			if t.code == STORE:
 				raise TiSyntaxError(f"Unexpected STORE in formula")
-			if t is NEWLINE:
+			if t.code == NEWLINE:
 				break
 
 			if in_string:
-				if t is QUOTE:
+				if t.code == QUOTE:
 					in_string = False
-			elif t is COLON or (not stack and t in {COMMA, R_PAREN}):
+			elif t.code == COLON or (not stack and t.code in {COMMA, R_PAREN}):
 				break
-			elif t is QUOTE:
+			elif t.code == QUOTE:
 				in_string = True
-			elif stack and t is stack[-1]:
+			elif stack and t.code == stack[-1]:
 				stack.pop()
-			elif t.function is not None or t is L_PAREN:
+			elif t.function is not None or t.code == L_PAREN:
 				stack.append(R_PAREN)
-			elif t is L_BRACE:
+			elif t.code == L_BRACE:
 				stack.append(R_BRACE)
-			elif t is L_BRACKET:
+			elif t.code == L_BRACKET:
 				stack.append(R_BRACKET)
 			self.advance()
 		return Thunk(self.tokens[start:self.pos], self.env)
 
 	def peek_digit_or_dot(self) -> bool:
 		t = self.peek()
-		return t.is_digit() or t is DOT
+		return t.is_digit() or t.code == DOT
 
 	def parse_label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name."""
@@ -258,44 +258,44 @@ class Parser:
 		return t.function.call_with_parser(ArgParser(self))
 
 	def parse_atom(self):
-		if self.peek() in {COLON, NEWLINE, EOF_TOKEN}:
+		if self.peek().code in {COLON, NEWLINE, EOF_CODE}:
 			raise TiSyntaxError("Expected an expression")
 
 		t = self.advance()
 
-		if t.is_digit() or t is DOT:
+		if t.is_digit() or t.code == DOT:
 			return self.parse_num_literal(t)
 
-		if t is QUOTE:
+		if t.code == QUOTE:
 			return self.parse_string_literal()
 
-		if t is L_BRACE:
+		if t.code == L_BRACE:
 			if self._struct_depth > 0:
 				raise TiSyntaxError("List literal not allowed inside a list or matrix")
 			return self.parse_list_literal()
 
-		if t is L_BRACKET:
+		if t.code == L_BRACKET:
 			if self._struct_depth > 0:
 				raise TiSyntaxError("Matrix literal not allowed inside a list or matrix")
 			return self.parse_matrix_literal()
 
-		if t is L_PAREN:
+		if t.code == L_PAREN:
 			val = self.parse_expr()
 			self.eat_if(R_PAREN)
 			return val
 
 		# special case: this is the only prefix unary operator
-		if t is NEG:
+		if t.code == NEG:
 			return -self.parse_expr(65)
 
 		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ3 = 1000, ᴇ~3 = 0.001)
-		if t is SCI_E:
+		if t.code == SCI_E:
 			return self._parse_dms_num(10 ** self._parse_sci_exp())
 
 		# Nullary constants (π, e, rand, Ans, getDate, etc.)
 		# Checked before function so tokens with both can dispatch on whether ( follows.
 		if t.nullary is not None:
-			if self.peek() is L_PAREN and t.function is not None:
+			if self.peek().code == L_PAREN and t.function is not None:
 				self.advance()
 				return self._call_function(t)
 			return t.nullary(self.env)
@@ -306,7 +306,7 @@ class Parser:
 		if t.is_list_var():
 			return self.parse_list_atom(t.variable(self.env))
 
-		if t is LIST_PREFIX:
+		if t.code == LIST_PREFIX:
 			return self.parse_list_atom(self.parse_user_list())
 
 		if t.is_matrix_var():
@@ -396,7 +396,7 @@ class Parser:
 		if t.is_list_var():
 			self.parse_store_list(t.variable(self.env), value)
 
-		elif t is LIST_PREFIX:
+		elif t.code == LIST_PREFIX:
 			self.parse_store_list(self.parse_user_list(), value)
 
 		elif t.is_matrix_var():
@@ -409,10 +409,10 @@ class Parser:
 		elif t.variable is not None:
 			t.variable(self.env).store(value)
 
-		elif t is DIM:
+		elif t.code == DIM:
 			self.parse_store_dim(value)
 
-		elif t is RAND:
+		elif t.code == RAND:
 			self.env.set_random_seed(value)
 
 		else:
@@ -433,7 +433,7 @@ class Parser:
 
 	def parse_store_dim(self, value):
 		t = self.peek()
-		if t.is_list_var() or t is LIST_PREFIX:
+		if t.is_list_var() or t.code == LIST_PREFIX:
 			var = self.parse_list_var()
 			if var.value is None:
 				var.value = TiList.alloc(value)
@@ -452,7 +452,7 @@ class Parser:
 
 	def parse_list_var(self):
 		t = self.advance()
-		if t is LIST_PREFIX:
+		if t.code == LIST_PREFIX:
 			return self.parse_user_list()
 		if t.is_list_var():
 			return t.variable(self.env)
@@ -473,14 +473,14 @@ class Parser:
 		"""
 		while self.has_next:
 			t = self.advance()
-			if t in {COLON, NEWLINE}:
+			if t.code in {COLON, NEWLINE}:
 				return
-			if t is QUOTE:
+			if t.code == QUOTE:
 				while self.has_next:
 					t = self.advance()
-					if t in {QUOTE, STORE}:
+					if t.code in {QUOTE, STORE}:
 						break
-					if t is NEWLINE:
+					if t.code == NEWLINE:
 						return
 		# statement skipped by reaching EOF
 
@@ -499,19 +499,19 @@ class Parser:
 		start_pos = self.pos
 		while self.has_next:
 			t = self.peek()
-			if t is THEN:
+			if t.code == THEN:
 				if prev_if:
 					depth += 1
-			elif t in {FOR, WHILE, REPEAT}:
+			elif t.code in {FOR, WHILE, REPEAT}:
 				depth += 1
-			if t is END:
+			if t.code == END:
 				if depth == 0:
 					break
 				depth -= 1
-			elif t is ELSE and else_mode and depth == 0:
+			elif t.code == ELSE and else_mode and depth == 0:
 				break
 			self.skip_statement()
-			prev_if = t is IF
+			prev_if = t.code == IF
 		else:
 			# If loop exits normally, the block was unclosed.
 			# This is legal in TI-Basic, and the program will just exit.
@@ -570,7 +570,7 @@ class Parser:
 def _can_start_atom(t: Token) -> bool:
 	return (
 		t.is_digit() or t.variable or t.nullary or t.function
-		or t in {L_PAREN, L_BRACE, L_BRACKET, QUOTE, DOT, SCI_E, NEG, LIST_PREFIX}
+		or t.code in {L_PAREN, L_BRACE, L_BRACKET, QUOTE, DOT, SCI_E, NEG, LIST_PREFIX}
 	)
 
 
@@ -596,7 +596,7 @@ class ArgParser:
 
 	def __init__(self, parser: Parser):
 		self._parser = parser
-		self._next = parser.peek() not in {COLON, NEWLINE, EOF_TOKEN}
+		self._next = parser.peek().code not in {COLON, NEWLINE, EOF_CODE}
 
 	def _arg(self, parse_fn):
 		if not self._next:
@@ -664,7 +664,7 @@ class ArgParser:
 		t = self._parser.advance()
 		if t.variable is not None:
 			return t.variable(self.env)
-		if t is LIST_PREFIX:
+		if t.code == LIST_PREFIX:
 			return self._parser.parse_user_list()
 		raise TiSyntaxError(f"Expected a variable, got {t}")
 

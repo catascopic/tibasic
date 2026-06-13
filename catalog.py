@@ -1,8 +1,9 @@
 import math
 from operator import attrgetter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from io import BytesIO
 from typing import Any
+import titoken as tk
 from titoken import Token
 from environment import Environment
 import operators as ops
@@ -30,25 +31,27 @@ ALL_TOKENS: list[Token] = []
 # by the token's decoded text.
 TEXT_INPUT: dict[str, Token] = {}
 
-def get_token(code: int | Sequence[int]) -> Token:
-	if isinstance(code, int):
-		code = code.to_bytes(1 + (code > 0xFF))
-	item = _TABLE[code[0]]
-	if len(code) > 1:
-		item = item[code[1]] if isinstance(item, list) and code[1] < len(item) else None
+def get_token(code: int) -> Token:
+	if code <= 0xFF:
+		item = _TABLE[code]
+	else:
+		sub = _TABLE[code >> 8]
+		lo = code & 0xFF
+		item = sub[lo] if isinstance(sub, list) and lo < len(sub) else None
 	if not isinstance(item, Token):
 		raise KeyError(code)
 	return item
 
 
 def _set_token(token: Token):
-	b0 = token.code[0]
-	if len(token.code) == 1:
+	code = token.code
+	if code <= 0xFF:
 		tbl = _TABLE
-		idx = b0
+		idx = code
 	else:
+		b0 = code >> 8
+		idx = code & 0xFF
 		tbl = _TABLE[b0]
-		idx = token.code[1]
 		if tbl is None:
 			_TABLE[b0] = tbl = []
 		if idx >= len(tbl):
@@ -60,12 +63,12 @@ def _set_token(token: Token):
 
 
 def read_token(f: BytesIO) -> Token:
-	first = f.read(1)
-	code = first + f.read(1) if isinstance(_TABLE[first[0]], list) else first
+	b0 = f.read(1)[0]
+	code = (b0 << 8) | f.read(1)[0] if isinstance(_TABLE[b0], list) else b0
 	try:
 		return get_token(code)
 	except KeyError:
-		raise ValueError(f"Invalid token code: 0x{int.from_bytes(code):0{2 * len(code)}X}")
+		raise ValueError(f"Invalid token code: 0x{code:0{4 if code > 0xFF else 2}X}")
 
 
 def _make_accessor(table: str, index: int):
@@ -86,7 +89,7 @@ def token(
 	cnv:  Callable | None = None,
 	var:  Callable | None = None,
 ) -> Token:
-	t = Token(code.to_bytes(1 + (code > 0xFF)), display, bp, op, post, func, cmd, res, cnv, var)
+	t = Token(code, display, bp, op, post, func, cmd, res, cnv, var)
 	_set_token(t)
 	ALL_TOKENS.append(t)
 	if typeable:
@@ -97,20 +100,20 @@ def token(
 token(0x01, b'\x05DMS')  # ►DMS
 token(0x02, b'\x05Dec')  # ►Dec
 token(0x03, b'\x05Frac')  # ►Frac
-STORE = token(0x04, b'\x1c')  # →
+STORE = token(tk.STORE, b'\x1c')  # →
 token(0x05, b'Boxplot')
-L_BRACKET = token(0x06, b'\xc1',        typeable=True)  # The '[' symbol (θ steals this place in the charset)
-R_BRACKET = token(0x07, b']',           typeable=True)
-L_BRACE   = token(0x08, b'{',           typeable=True)
-R_BRACE   = token(0x09, b'}',           typeable=True)
-RAD       = token(0x0A, b'\x15')                        # post needs env, handled specially
-DEG       = token(0x0B, b'\x14',        typeable=True)  # ditto
+L_BRACKET = token(tk.L_BRACKET, b'\xc1',        typeable=True)  # The '[' symbol (θ steals this place in the charset)
+R_BRACKET = token(tk.R_BRACKET, b']',           typeable=True)
+L_BRACE   = token(tk.L_BRACE, b'{',           typeable=True)
+R_BRACE   = token(tk.R_BRACE, b'}',           typeable=True)
+RAD       = token(tk.RAD, b'\x15')                        # post needs env, handled specially
+DEG       = token(tk.DEG, b'\x14',        typeable=True)  # ditto
 INV       = token(0x0C, b'\x11',        post=ops.inv)   # ¹
 SQ        = token(0x0D, b'\x12',        post=lambda x: x**2, typeable=True)  # ²
 TRANSPOSE = token(0x0E, b'\x16',        post=ops.transpose)                  # ᵀ
 CUBE      = token(0x0F, b'\xd5',        post=lambda x: x**3, typeable=True)  # ³
-L_PAREN   = token(0x10, b'(',           typeable=True)
-R_PAREN   = token(0x11, b')',           typeable=True)
+L_PAREN   = token(tk.L_PAREN, b'(',           typeable=True)
+R_PAREN   = token(tk.R_PAREN, b')',           typeable=True)
 token(0x12, b'round(',                  func=tm.round)
 token(0x13, b'pxl-Test(',               func=draw.pxl_test)
 token(0x14, b'augment(',                func=mat.augment)
@@ -134,8 +137,8 @@ token(0x25, b'nDeriv(',                 func=tm.n_deriv)
 token(0x27, b'fMin(')
 token(0x28, b'fMax(')
 SPACE = token(0x29, b' ',               typeable=True)
-QUOTE  = token(0x2A, b'"',              typeable=True)
-COMMA  = token(0x2B, b',',              typeable=True)
+QUOTE  = token(tk.QUOTE, b'"',              typeable=True)
+COMMA  = token(tk.COMMA, b',',              typeable=True)
 IMAG_I = token(0x2C, b'\xd7',           res=lambda env: 1j, typeable=True)  # 𝑖
 FACT   = token(0x2D, b'!',              post=ops.factorial, typeable=True)
 token(0x2E, b'CubicReg ')
@@ -148,12 +151,12 @@ DIGITS = tuple(token(
 	typeable=True
 ) for i in range(10))
 
-DOT       = token(0x3A, b'.',           typeable=True)
-SCI_E     = token(0x3B, b'\x1b')  # ᴇ
+DOT       = token(tk.DOT, b'.',           typeable=True)
+SCI_E     = token(tk.SCI_E, b'\x1b')  # ᴇ
 token(0x3C, b' or ',                    bp=(20, 21), op=ops.or_)
 token(0x3D, b' xor ',                   bp=(20, 21), op=ops.xor)
-COLON     = token(0x3E, b':',           typeable=True)
-NEWLINE   = token(0x3F, b'\xd6',        typeable=True)
+COLON     = token(tk.COLON, b':',           typeable=True)
+NEWLINE   = token(tk.NEWLINE, b'\xd6',        typeable=True)
 token(0x40, b' and ',                   bp=(30, 31), op=ops.and_)
 
 # A - Z, θ
@@ -420,17 +423,17 @@ STRINGS = tuple(token(
 	var=_make_accessor('strings', i)
 ) for i in range(10))
 
-RAND = token(0xAB, b'rand',             res=Environment.rand, func=tm.rand_list)
+RAND = token(tk.RAND, b'rand',             res=Environment.rand, func=tm.rand_list)
 token(0xAC, b'\xc4',                    res=lambda env: math.pi, typeable=True)  # π
 token(0xAD, b'getKey',                  res=Environment.get_key)
-APOS = token(0xAE, b"'",                typeable=True)
+APOS = token(tk.APOS, b"'",                typeable=True)
 token(0xAF, b'?',                       typeable=True)
-NEG = token(0xB0, b'\x1a')  # ⁻
+NEG = token(tk.NEG, b'\x1a')  # ⁻
 token(0xB1, b'int(',                    func=tm.int_)
 token(0xB2, b'abs(',                    func=tm.abs)
 token(0xB3, b'det(',                    func=mat.det)
 token(0xB4, b'identity(',               func=mat.identity)
-DIM = token(0xB5, b'dim(',              func=tilist.dim)
+DIM = token(tk.DIM, b'dim(',              func=tilist.dim)
 token(0xB6, b'sum(',                    func=tilist.sum)
 token(0xB7, b'prod(',                   func=tilist.prod)
 token(0xB8, b'not(',                    func=tm.not_)
@@ -689,15 +692,15 @@ token(0xCA, b'cosh(',	                func=tm.cosh)
 token(0xCB, b'cosh\x11(',	            func=tm.acosh)  # cosh¹(
 token(0xCC, b'tanh(',	                func=tm.tanh)
 token(0xCD, b'tanh\x11(',	            func=tm.atanh)  # tanh¹(
-IF     = token(0xCE, b'If ',            cmd=cmds.if_cmd)
-THEN   = token(0xCF, b'Then',           cmd=cmds.then_cmd)
-ELSE   = token(0xD0, b'Else',           cmd=cmds.else_cmd)
-WHILE  = token(0xD1, b'While ',         cmd=cmds.while_cmd)
-REPEAT = token(0xD2, b'Repeat ',        cmd=cmds.repeat_cmd)
-FOR    = token(0xD3, b'For(',           cmd=cmds.for_cmd)
-END    = token(0xD4, b'End',            cmd=cmds.end_cmd)
+IF     = token(tk.IF, b'If ',            cmd=cmds.if_cmd)
+THEN   = token(tk.THEN, b'Then',           cmd=cmds.then_cmd)
+ELSE   = token(tk.ELSE, b'Else',           cmd=cmds.else_cmd)
+WHILE  = token(tk.WHILE, b'While ',         cmd=cmds.while_cmd)
+REPEAT = token(tk.REPEAT, b'Repeat ',        cmd=cmds.repeat_cmd)
+FOR    = token(tk.FOR, b'For(',           cmd=cmds.for_cmd)
+END    = token(tk.END, b'End',            cmd=cmds.end_cmd)
 token(0xD5, b'Return',                  cmd=cmds.return_cmd)
-LBL    = token(0xD6, b'Lbl ',           cmd=cmds.lbl_cmd)
+LBL    = token(tk.LBL, b'Lbl ',           cmd=cmds.lbl_cmd)
 token(0xD7, b'Goto ',                   cmd=cmds.goto_cmd)
 token(0xD8, b'Pause ')
 token(0xD9, b'Stop',                    cmd=cmds.stop_cmd)
@@ -718,7 +721,7 @@ token(0xE7, b'Send(')
 token(0xE8, b'Get(')
 token(0xE9, b'PlotsOn')
 token(0xEA, b'PlotsOff')
-LIST_PREFIX = token(0xEB, b'\xdc')  # ᴸ
+LIST_PREFIX = token(tk.LIST_PREFIX, b'\xdc')  # ᴸ
 token(0xEC, b'Plot1(')
 token(0xED, b'Plot2(')
 token(0xEE, b'Plot3(')

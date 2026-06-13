@@ -65,8 +65,7 @@ def main() -> None:
 		env.screen.show()
 		# Console-side legend so you can match glyphs to codes/text.
 		for i, tok in enumerate(batch):
-			code = int.from_bytes(tok.code)
-			print(f"  line {i}: 0x{code:0{2 * len(tok.code)}X}  {tok.text!r}")
+			print(f"  line {i}: 0x{tok.code:0{4 if tok.code > 0xFF else 2}X}  {tok.text!r}")
 		print(f"\n── page {page + 1}/{pages} ──")
 
 		try:

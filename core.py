@@ -384,11 +384,12 @@ class TiEquation:
 		self.tokens = tokens
 
 	def eval(self, env: Environment) -> Any:
-		from parser import Parser, EOF_TOKEN
+		from parser import Parser
+		from titoken import EOF_CODE
 		try:
 			parser = Parser(self.tokens, env)
 			value = parser.parse_expr()
-			parser.expect(EOF_TOKEN)
+			parser.expect(EOF_CODE)
 			return value
 		except RecursionError:
 			raise TiMemoryError("Equation recursion overflow (ERR:MEMORY)")
