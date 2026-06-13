@@ -22,8 +22,7 @@ via ArgParser.expr(), then assert its calculator data type with an O(1) guard.
 Variable/name/thunk parsers delegate to the matching ArgParser method.
 
 Runtime imports: core (types, validators, vectorize) and parser (ArgParser, whose
-methods are referenced directly as the parse functions).  Environment stays behind
-TYPE_CHECKING.
+methods are referenced directly as the parse functions).
 """
 
 import inspect
@@ -31,7 +30,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
 from functools import update_wrapper
-from typing import Any, Callable, TYPE_CHECKING
+from typing import Any, Callable
 
 from core import (
 	Variable, Thunk,
@@ -42,10 +41,9 @@ from core import (
 	require_matrix, require_string, require_list_or_matrix,
 	require_vectorizable, require_vectorizable_real, require_matrix_vectorizable,
 )
+from environment import Environment
 from parser import ArgParser
 
-if TYPE_CHECKING:
-	from environment import Environment
 
 
 # ── Vocabulary: real types and PEP 695 aliases ────────────────────────────────
@@ -111,6 +109,7 @@ class _Arity(Enum):
 def validated(require: Callable) -> Callable:
 	"""Build a value parser: parse a general expression, then assert its type."""
 	return lambda args: require(args.expr())
+
 
 _REGISTRY = {
 	Numeric:               (validated(require_num),                 _Role.VALUE),
@@ -248,34 +247,6 @@ class no_arg_bunch(TiCall):
 		self.func(args.env)
 
 
-# ── @preparse ─────────────────────────────────────────────────────────────────
-
-class Finalize(Enum):
-	"""Which ArgParser end method PreparsedFunc calls after parsing.
-
-	  FUNC      — end_func()       expression functions; eats ), no separator
-	  CMD       — end_cmd()        no-paren commands; eats trailing separator
-	  CMD_FUNC  — end_paren_cmd()  paren commands; eats ) + separator
-	  NONE      — (nothing)        leaves the parser untouched so the command
-	                               bunches with whatever follows (e.g. DelVar)
-	"""
-	FUNC = auto()
-	CMD = auto()
-	CMD_FUNC = auto()
-	NONE = auto()
-
-
-# Maps each Finalize mode to a callable f(parser) that finalizes the argument list.
-def _noop(_): pass
-
-_END_METHOD = {
-	Finalize.FUNC:     ArgParser.end_func,
-	Finalize.CMD:      ArgParser.end_cmd,
-	Finalize.CMD_FUNC: ArgParser.end_paren_cmd,
-	Finalize.NONE:     _noop,
-}
-
-
 class PreparsedFunc(TiCall):
 	"""Wraps a plain core function with a declarative arg schema (see module docs).
 
@@ -292,7 +263,7 @@ class PreparsedFunc(TiCall):
 	The core stays a plain function, so functions remain callable from other Python
 	code (composability) via TiCall.__call__.
 	"""
-	def __init__(self, core: Callable, end: Finalize = Finalize.FUNC) -> None:
+	def __init__(self, core: Callable, finalizer: Callable[[ArgParser], None]) -> None:
 		schema = schema_from_signature(core)
 		roles = [s.role for s in schema]
 		if _Role.MAT_VEC in roles:
@@ -308,15 +279,15 @@ class PreparsedFunc(TiCall):
 
 		super().__init__(func)
 		self.schema = schema
-		self.end_method = _END_METHOD[end]
+		self.finalizer = finalizer
 
 	def call_with_parser(self, args: ArgParser):
 		values = args.take(*self.schema)
-		self.end_method(args)
+		self.finalizer(args)
 		return args.env.guard_real(values, self.func(*values))
 
 
-def preparse(end: Finalize):
+def _preparse(finalizer: Callable[[ArgParser], None]):
 	"""Return a decorator that wraps a core function as a PreparsedFunc.
 
 	Prefer the named aliases below over calling this directly:
@@ -324,17 +295,16 @@ def preparse(end: Finalize):
 	  preparse_cmd      — no-paren commands     (end_cmd, eats trailing separator)
 	  preparse_cmd_func — paren commands        (end_paren_cmd, eats `) + sep`   )
 	  preparse_bunch    — bunching commands     (no finalizer, e.g. DelVar       )
-
-	Use this directly only when you need to select a Finalize mode dynamically.
 	"""
-
 	def decorator(core: Callable) -> PreparsedFunc:
-		return PreparsedFunc(core, end)
+		return PreparsedFunc(core, finalizer)
 	return decorator
 
 
-# Named decorator aliases — preferred over calling preparse() directly.
-preparse_func     = preparse(Finalize.FUNC)
-preparse_cmd      = preparse(Finalize.CMD)
-preparse_cmd_func = preparse(Finalize.CMD_FUNC)
-preparse_bunch    = preparse(Finalize.NONE)
+def _noop(_env): pass
+
+
+preparse_func     = _preparse(ArgParser.end_func)
+preparse_cmd      = _preparse(ArgParser.end_cmd)
+preparse_cmd_func = _preparse(ArgParser.end_paren_cmd)
+preparse_bunch    = _preparse(_noop)
