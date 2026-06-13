@@ -6,6 +6,8 @@ from typing import Any
 import titoken as tk
 from titoken import Token
 from environment import Environment
+from parser import ArgParser
+from preparse import forms_func
 import operators as ops
 import commands as cmds
 import modecmds
@@ -333,7 +335,7 @@ GE  = token(0x6E, b'\x19',              bp=(40, 41), op=ops.ge,  typeable=True) 
 NE  = token(0x6F, b'\x18',              bp=(40, 41), op=ops.ne,  typeable=True)  # ≠
 ADD = token(0x70, b'+',                 bp=(50, 51), op=ops.add, typeable=True)
 SUB = token(0x71, b'-',                 bp=(50, 51), op=ops.sub, typeable=True)
-ANS = token(0x72, b'Ans',               func=ops.ans_index_or_mul, res=Environment.get_ans)
+ANS = token(0x72, b'Ans',               func=forms_func(ArgParser.ans_index_or_mul), res=Environment.get_ans)
 
 token(0x73, b'Fix',                     cmd=modecmds.fix)
 token(0x74, b'Horiz')

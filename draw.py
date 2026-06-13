@@ -3,7 +3,7 @@ from numbers import Number
 
 import distributions as dist
 from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk
-from decorators import forms_func, no_arg_command
+from preparse import forms_func, no_arg_command
 from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
 from modes import DrawMode
 from screen import Screen

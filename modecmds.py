@@ -3,7 +3,7 @@
 The mode *enums* live in modes.py (low-level); these are the commands that set
 them, so they sit up here with the rest of the command layer.
 """
-from decorators import no_arg_command, no_arg_bunch
+from preparse import no_arg_command, no_arg_bunch
 from preparse import preparse_cmd, Real, Env
 from errors import DomainError
 from core import py_int

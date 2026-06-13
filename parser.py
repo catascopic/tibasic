@@ -769,6 +769,18 @@ class ArgParser:
 		self.end_func()
 		return indices
 
+	def ans_index_or_mul(self):
+		"""Ans followed by ( — index it if Ans is a list/matrix, else multiply."""
+		ans = self.env.ans
+		if isinstance(ans, TiList):
+			(index,) = self.parse_indices(1)
+			return ans[index]
+		if isinstance(ans, TiMatrix):
+			return ans[self.parse_indices(2)]
+		b = self.expr()
+		self.end_func()
+		return operators.mul(ans, b)
+
 	def peek(self):
 		return self._parser.peek()
 

@@ -23,7 +23,7 @@ from numbers import Number
 from core import TiList, TiMatrix, require_list
 from core import require_real, require_int, require_num, py_int
 from preparse import preparse_func, Real, Vectorized, VectorizedReal, MatrixVectorized, AnyValue, Thunk, NumericVar, Env
-from decorators import vectorize
+from core import vectorize
 from errors import DataTypeError, DimMismatchError, DomainError
 
 

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from core import TiList, TiMatrix, require_list, require_matrix
 from core import require_real, require_int, py_int
 from preparse import preparse_func, preparse_cmd_func, Real, MatrixVar, ListOrMatrix
-from decorators import forms_func
+from preparse import forms_func
 from errors import DataTypeError, DimMismatchError, InvalidDimError, ArgumentError
 
 if TYPE_CHECKING:

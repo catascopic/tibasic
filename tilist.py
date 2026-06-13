@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from core import TiList, TiMatrix, is_complex_val, require_list, require_real_list, require_complex_list, require_vectorizable, require_vectorizable_real
 from core import require_real, require_int, py_int
 from preparse import preparse_func, preparse_cmd, preparse_cmd_func, Real, Env, Thunk, NumericVar, ListVar, ListVarPrefixOptional
-from decorators import forms_func, no_arg_command
+from preparse import forms_func, no_arg_command
 from errors import DataTypeError, DimMismatchError, InvalidDimError, IncrementError, StatError, UndefinedError
 
 if TYPE_CHECKING:

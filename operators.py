@@ -1,16 +1,9 @@
-from __future__ import annotations
 import cmath
 import math
 from functools import wraps
-from numbers import Number
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-	from parser import ArgParser
-
-from decorators import vectorize, forms_func
 from errors import DataTypeError, DomainError, DivideByZeroError
-from core import TiList, TiMatrix, require_matrix
+from core import TiList, TiMatrix, require_matrix, vectorize
 from core import require_real, require_int, require_num, py_int
 
 
@@ -168,19 +161,3 @@ def factorial(n):
 		return math.gamma(require_real(n) + 1)
 	except ValueError:
 		raise DomainError(f"factorial: undefined for {n} (negative integer)")
-
-
-# ── Ans disambiguation ────────────────────────────────────────────────────────
-# When Ans is followed by (, decide between list/matrix indexing and multiplication.
-
-@forms_func
-def ans_index_or_mul(args: ArgParser):
-	ans = args.env.ans
-	if isinstance(ans, TiList):
-		(index,) = args.parse_indices(1)
-		return ans[index]
-	if isinstance(ans, TiMatrix):
-		return ans[args.parse_indices(2)]
-	b = args.expr()
-	args.end_func()
-	return mul(ans, b)

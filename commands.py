@@ -9,7 +9,7 @@ from preparse import (
 	preparse_cmd, preparse_cmd_func, preparse_bunch,
 	Thunk, NumericVar, LabelName, ProgramName, AnyVar, Real, Env,
 )
-from decorators import forms_func, no_arg_command
+from preparse import forms_func, no_arg_command
 from errors import TiSyntaxError
 from signals import ReturnSignal, StopSignal
 

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 from core import TiList
 from core import py_int
 from preparse import preparse_func, Real, Env
-from decorators import TiCall
+from preparse import TiCall
 from environment import Environment
 from errors import DomainError
 

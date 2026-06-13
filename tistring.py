@@ -31,7 +31,7 @@ def in_string(string: TiString, substring: TiString, start: Real = 1):
 	return 0
 
 
-from decorators import forms_func
+from preparse import forms_func
 
 
 @forms_func
