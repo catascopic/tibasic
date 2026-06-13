@@ -25,7 +25,6 @@ Runtime imports: core (types, validators, vectorize) and parser (ArgParser, whos
 methods are referenced directly as the parse functions).  Environment stays behind
 TYPE_CHECKING.
 """
-from __future__ import annotations
 
 import inspect
 from abc import ABC, abstractmethod

@@ -1,11 +1,9 @@
 """Matrix types, variables, validators, and functions."""
-from __future__ import annotations
 
 import builtins
 import math
 import random
 from itertools import accumulate, batched
-from typing import TYPE_CHECKING
 
 from core import TiList, TiMatrix, require_list, require_matrix
 from core import require_real, require_int, py_int
@@ -13,8 +11,7 @@ from preparse import preparse_func, preparse_cmd_func, Real, MatrixVar, ListOrMa
 from preparse import forms_func
 from errors import DataTypeError, DimMismatchError, InvalidDimError, ArgumentError
 
-if TYPE_CHECKING:
-	from parser import ArgParser
+from parser import ArgParser
 
 
 # ── Matrix functions ──────────────────────────────────────────────────────────

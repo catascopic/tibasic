@@ -1,7 +1,5 @@
-from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from core import Variable, Thunk
 from environment import Environment
@@ -42,7 +40,7 @@ class Program:
 			if finished is not self:
 				raise ValueError(f"Program stack out of order: expected {self}; got {finished}")
 
-	def push_block(self, block: Block):
+	def push_block(self, block: 'Block'):
 		self._block_stack.append(block)
 
 	def begin_if(self, condition: bool):

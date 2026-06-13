@@ -10,7 +10,6 @@ Covered menus / button groups:
   TEST LOGIC     : not(
   CATALOG        : sinh, cosh, tanh, sinh⁻¹, cosh⁻¹, tanh⁻¹
 """
-from __future__ import annotations
 
 import builtins
 import cmath

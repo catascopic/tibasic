@@ -1,16 +1,12 @@
 """String and equation types, variables, validators, and functions."""
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
 
 from core import TiString, TiEquation, require_str
 from core import py_int
 from preparse import preparse_func, preparse_cmd_func, Real, Env, StringVar, EquationVar
 from errors import DomainError, InvalidDimError, ArgumentError, TiSyntaxError
 
-if TYPE_CHECKING:
-	from parser import ArgParser
-	from environment import Environment
+from parser import ArgParser
 
 
 # ── String functions ──────────────────────────────────────────────────────────

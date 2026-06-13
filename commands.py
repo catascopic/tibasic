@@ -1,9 +1,6 @@
-from __future__ import annotations
 from itertools import zip_longest
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-	from parser import ArgParser
+from parser import ArgParser
 
 from preparse import (
 	preparse_cmd, preparse_cmd_func, preparse_bunch,

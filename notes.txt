@@ -30,7 +30,7 @@ TblInput — a 7-element list of the values of a variable in the table.
 Text:
 Nice formatting logic! Probably should be moved elsewhere
 
-2^2^2^2^2: power should be left to right, not right to left
+I'm getting errors with 2^2^2^2^2: power should be left to right, so this should give me 2^32, but it looks like it's giving me 2^65536.
 
 Text: collect all arguments first before printing anything?
 

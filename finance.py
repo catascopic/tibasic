@@ -3,7 +3,6 @@
   npv(      irr(      bal(      ΣPrn(     ΣInt(
   ►Nom(     ►Eff(     dbd(
 """
-from __future__ import annotations
 
 import builtins
 from datetime import date

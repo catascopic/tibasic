@@ -1,11 +1,8 @@
 """Time and date functions."""
-from __future__ import annotations
 import builtins
 from datetime import date
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-	from parser import ArgParser
+from parser import ArgParser
 
 from core import TiList
 from core import py_int

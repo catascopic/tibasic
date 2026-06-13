@@ -6,7 +6,6 @@ DISTR:
   9: Fpdf(         0: Fcdf(         A: binompdf(   B: binomcdf(
   C: poissonpdf(   D: poissoncdf(   E: geometpdf(  F: geometcdf(
 """
-from __future__ import annotations
 
 import builtins
 import math
