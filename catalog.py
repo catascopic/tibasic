@@ -104,18 +104,18 @@ token(0x02, b'\x05Dec')  # ►Dec
 token(0x03, b'\x05Frac')  # ►Frac
 STORE = token(tk.STORE, b'\x1c')  # →
 token(0x05, b'Boxplot')
-L_BRACKET = token(tk.L_BRACKET, b'\xc1',        typeable=True)  # The '[' symbol (θ steals this place in the charset)
-R_BRACKET = token(tk.R_BRACKET, b']',           typeable=True)
-L_BRACE   = token(tk.L_BRACE, b'{',           typeable=True)
-R_BRACE   = token(tk.R_BRACE, b'}',           typeable=True)
+L_BRACKET = token(tk.L_BRACKET, b'\xc1',typeable=True)  # The '[' symbol (θ steals this place in the charset)
+R_BRACKET = token(tk.R_BRACKET, b']',   typeable=True)
+L_BRACE   = token(tk.L_BRACE, b'{',     typeable=True)
+R_BRACE   = token(tk.R_BRACE, b'}',     typeable=True)
 RAD       = token(tk.RAD, b'\x15')                        # post needs env, handled specially
-DEG       = token(tk.DEG, b'\x14',        typeable=True)  # ditto
+DEG       = token(tk.DEG, b'\x14',      typeable=True)  # ditto
 INV       = token(0x0C, b'\x11',        post=ops.inv)   # ¹
 SQ        = token(0x0D, b'\x12',        post=lambda x: x**2, typeable=True)  # ²
 TRANSPOSE = token(0x0E, b'\x16',        post=ops.transpose)                  # ᵀ
 CUBE      = token(0x0F, b'\xd5',        post=lambda x: x**3, typeable=True)  # ³
-L_PAREN   = token(tk.L_PAREN, b'(',           typeable=True)
-R_PAREN   = token(tk.R_PAREN, b')',           typeable=True)
+L_PAREN   = token(tk.L_PAREN, b'(',     typeable=True)
+R_PAREN   = token(tk.R_PAREN, b')',     typeable=True)
 token(0x12, b'round(',                  func=tm.round)
 token(0x13, b'pxl-Test(',               func=draw.pxl_test)
 token(0x14, b'augment(',                func=mat.augment)
@@ -139,8 +139,8 @@ token(0x25, b'nDeriv(',                 func=tm.n_deriv)
 token(0x27, b'fMin(')
 token(0x28, b'fMax(')
 SPACE = token(0x29, b' ',               typeable=True)
-QUOTE  = token(tk.QUOTE, b'"',              typeable=True)
-COMMA  = token(tk.COMMA, b',',              typeable=True)
+QUOTE  = token(tk.QUOTE, b'"',          typeable=True)
+COMMA  = token(tk.COMMA, b',',          typeable=True)
 IMAG_I = token(0x2C, b'\xd7',           res=lambda env: 1j, typeable=True)  # 𝑖
 FACT   = token(0x2D, b'!',              post=ops.factorial, typeable=True)
 token(0x2E, b'CubicReg ')
@@ -157,8 +157,8 @@ DOT       = token(tk.DOT, b'.',           typeable=True)
 SCI_E     = token(tk.SCI_E, b'\x1b')  # ᴇ
 token(0x3C, b' or ',                    bp=(20, 21), op=ops.or_)
 token(0x3D, b' xor ',                   bp=(20, 21), op=ops.xor)
-COLON     = token(tk.COLON, b':',           typeable=True)
-NEWLINE   = token(tk.NEWLINE, b'\xd6',        typeable=True)
+COLON     = token(tk.COLON, b':',       typeable=True)
+NEWLINE   = token(tk.NEWLINE, b'\xd6',  typeable=True)
 token(0x40, b' and ',                   bp=(30, 31), op=ops.and_)
 
 # A - Z, θ
@@ -378,7 +378,7 @@ MUL = token(0x82, b'*',                 bp=(60, 61), op=ops.mul, typeable=True)
 DIV = token(0x83, b'/',                 bp=(60, 61), op=ops.div, typeable=True)
 
 token(0x84, b'Trace')
-token(0x85, b'ClrDraw', cmd=draw.clr_draw)
+token(0x85, b'ClrDraw',                 cmd=draw.clr_draw)
 token(0x86, b'ZStandard')
 token(0x87, b'ZTrig')
 token(0x88, b'ZBox')
@@ -425,17 +425,17 @@ STRINGS = tuple(token(
 	var=_make_accessor('strings', i)
 ) for i in range(10))
 
-RAND = token(tk.RAND, b'rand',             res=Environment.rand, func=tm.rand_list)
+RAND = token(tk.RAND, b'rand',          res=Environment.rand, func=tm.rand_list)
 token(0xAC, b'\xc4',                    res=lambda env: math.pi, typeable=True)  # π
 token(0xAD, b'getKey',                  res=Environment.get_key)
-APOS = token(tk.APOS, b"'",                typeable=True)
+APOS = token(tk.APOS, b"'",             typeable=True)
 token(0xAF, b'?',                       typeable=True)
 NEG = token(tk.NEG, b'\x1a')  # ⁻
 token(0xB1, b'int(',                    func=tm.int_)
 token(0xB2, b'abs(',                    func=tm.abs)
 token(0xB3, b'det(',                    func=mat.det)
 token(0xB4, b'identity(',               func=mat.identity)
-DIM = token(tk.DIM, b'dim(',              func=tilist.dim)
+DIM = token(tk.DIM, b'dim(',            func=tilist.dim)
 token(0xB6, b'sum(',                    func=tilist.sum)
 token(0xB7, b'prod(',                   func=tilist.prod)
 token(0xB8, b'not(',                    func=tm.not_)
@@ -694,15 +694,15 @@ token(0xCA, b'cosh(',	                func=tm.cosh)
 token(0xCB, b'cosh\x11(',	            func=tm.acosh)  # cosh¹(
 token(0xCC, b'tanh(',	                func=tm.tanh)
 token(0xCD, b'tanh\x11(',	            func=tm.atanh)  # tanh¹(
-IF     = token(tk.IF, b'If ',            cmd=cmds.if_cmd)
-THEN   = token(tk.THEN, b'Then',           cmd=cmds.then_cmd)
-ELSE   = token(tk.ELSE, b'Else',           cmd=cmds.else_cmd)
-WHILE  = token(tk.WHILE, b'While ',         cmd=cmds.while_cmd)
-REPEAT = token(tk.REPEAT, b'Repeat ',        cmd=cmds.repeat_cmd)
-FOR    = token(tk.FOR, b'For(',           cmd=cmds.for_cmd)
-END    = token(tk.END, b'End',            cmd=cmds.end_cmd)
+IF     = token(tk.IF, b'If ',           cmd=cmds.if_cmd)
+THEN   = token(tk.THEN, b'Then',        cmd=cmds.then_cmd)
+ELSE   = token(tk.ELSE, b'Else',        cmd=cmds.else_cmd)
+WHILE  = token(tk.WHILE, b'While ',     cmd=cmds.while_cmd)
+REPEAT = token(tk.REPEAT, b'Repeat ',   cmd=cmds.repeat_cmd)
+FOR    = token(tk.FOR, b'For(',         cmd=cmds.for_cmd)
+END    = token(tk.END, b'End',          cmd=cmds.end_cmd)
 token(0xD5, b'Return',                  cmd=cmds.return_cmd)
-LBL    = token(tk.LBL, b'Lbl ',           cmd=cmds.lbl_cmd)
+LBL    = token(tk.LBL, b'Lbl ',         cmd=cmds.lbl_cmd)
 token(0xD7, b'Goto ',                   cmd=cmds.goto_cmd)
 token(0xD8, b'Pause ')
 token(0xD9, b'Stop',                    cmd=cmds.stop_cmd)

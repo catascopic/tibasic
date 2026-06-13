@@ -530,7 +530,7 @@ def tangent(env: Env, formula: Thunk, value: Real) -> None:
 
 # ── Text( ────────────────────────────────────────────────────────────────────
 
-def _num_to_display_bytes(value: float) -> bytes:
+def _num_to_chars(value: float) -> bytes:
 	"""Format a real number as TI display bytes."""
 	if value.is_integer() and abs(value) < 1e10:
 		s = str(int(abs(value)))
@@ -556,7 +556,7 @@ def _num_to_display_bytes(value: float) -> bytes:
 	return bytes(result)
 
 
-def _value_to_display_bytes(value) -> bytes:
+def _get_text_chars(value) -> bytes:
 	"""Convert a real number or TiString to its display byte sequence.
 
 	Complex, list, and matrix values are rejected (ERR:DATA TYPE on the calculator).
@@ -566,7 +566,7 @@ def _value_to_display_bytes(value) -> bytes:
 	if isinstance(value, complex):
 		raise DataTypeError("Text(: complex numbers are not allowed")
 	if isinstance(value, float):
-		return _num_to_display_bytes(value)
+		return _num_to_chars(value)
 	raise DataTypeError(f"Text(: expected a real number or string, got {type(value).__name__}")
 
 
@@ -601,16 +601,16 @@ def text(args):
 	"""	
 	first = args.expr()
 
-	if first == -1.0:
+	if first == -1:
 		font   = LARGE_FONT
 		height = 7
-		gap    = 1    # large font cells have a 1-pixel separator on the right and below
+		gap    = 1  # large font cells have a 1-pixel separator on the right and below
 		row    = py_int(args.expr())
 		col    = py_int(args.expr())
 	else:
 		font   = SMALL_FONT
 		height = 6
-		gap    = 0    # small font glyphs have their own trailing spacing column
+		gap    = 0  # small font glyphs have their own trailing spacing column
 		row    = py_int(first)
 		col    = py_int(args.expr())
 
@@ -618,7 +618,7 @@ def text(args):
 	# argument (e.g. a complex number) can't leave a partially-drawn string.
 	display = bytearray()
 	while args.has_next:
-		display.extend(_value_to_display_bytes(args.expr()))
+		display.extend(_get_text_chars(args.expr()))
 	args.end_paren_cmd()
 
 	# A character's height can't be clipped, so a row with too little vertical room

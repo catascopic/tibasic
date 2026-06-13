@@ -427,7 +427,7 @@ def require_complex_list(value: Any, exc_cls=DataTypeError) -> TiList:
 def require_matrix(value: Any) -> TiMatrix:
 	return _require_type(value, TiMatrix)
 
-def require_str(value: Any) -> TiString:
+def require_string(value: Any) -> TiString:
 	return _require_type(value, TiString)
 
 def require_equation(value: Any) -> TiEquation:
@@ -605,7 +605,7 @@ class MatrixVariable(Variable):
 
 class StringVariable(Variable):
 	def normalize(self, value):
-		return require_str(value)
+		return require_string(value)
 
 
 class EquationVariable(Variable):

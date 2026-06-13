@@ -39,7 +39,7 @@ from core import (
 	vectorize, matrix_vectorize,
 	require_num, require_real,
 	require_list, require_real_list, require_complex_list,
-	require_matrix, require_str, require_list_or_matrix,
+	require_matrix, require_string, require_list_or_matrix,
 	require_vectorizable, require_vectorizable_real, require_matrix_vectorizable,
 )
 from parser import ArgParser
@@ -55,18 +55,18 @@ if TYPE_CHECKING:
 # Refinements that are NOT true types (e.g. "is this an integer?") belong in the
 # function body via require_int, not here.
 
-# Scalars.
+# Scalars
 type Real = float
 type Complex = complex
 type Numeric = Real | Complex
 
-# Aggregates.  TiList / TiMatrix / TiString are used directly as annotations.
+# Aggregates: TiList / TiMatrix / TiString are used directly as annotations.
 type TiListReal = TiList        # list with no complex element
 type TiListComplex = TiList     # list with at least one complex element
 type ListOrMatrix = TiList | TiMatrix
 type AnyValue = Any             # any value, parsed without a type guard (min/max)
 
-# Vectorized slots.  The body only ever sees scalars, so the annotation type is a
+# Vectorized slots: The body only ever sees scalars, so the annotation type is a
 # scalar; the alias's presence signals @preparse to wrap the function so it maps
 # element-wise over a list (Vectorized / VectorizedReal) or list-or-matrix
 # (MatrixVectorized).  The parse-time guard still accepts the aggregate.
@@ -74,7 +74,7 @@ type Vectorized = Numeric
 type VectorizedReal = Real
 type MatrixVectorized = Real
 
-# Variable references.  All alias Variable but select different parse methods.
+# Variable references: All alias Variable but select different parse methods.
 type NumericVar = Variable
 type ListVar = Variable
 type MatrixVar = Variable
@@ -83,52 +83,18 @@ type EquationVar = Variable
 type AnyVar = Variable
 type ListVarPrefixOptional = Variable
 
-# Names and environment.
+# Names and environment
 type LabelName = str
 type ProgramName = str
 type Env = Environment          # injected from ArgParser.env; consumes no token
 
 
-# ── Parse functions: parse(args: ArgParser) -> value ──────────────────────────
-
-def make_validator(require: Callable) -> Callable:
-	"""Build a value parser: parse a general expression, then assert its type."""
-	return lambda args: require(args.expr())
-
-parse_numeric           = make_validator(require_num)
-parse_real              = make_validator(require_real)
-parse_list              = make_validator(require_list)
-parse_real_list         = make_validator(require_real_list)
-parse_complex_list      = make_validator(require_complex_list)
-parse_matrix            = make_validator(require_matrix)
-parse_string            = make_validator(require_str)
-parse_list_or_matrix    = make_validator(require_list_or_matrix)
-parse_vectorized        = make_validator(require_vectorizable)
-parse_vectorized_real   = make_validator(require_vectorizable_real)
-parse_matrix_vectorized = make_validator(require_matrix_vectorizable)
-parse_value             = ArgParser.expr   # no guard
-
-# Variable / name / thunk parsers delegate to the matching ArgParser method.
-parse_thunk          = ArgParser.thunk
-parse_numeric_var    = ArgParser.numeric_var
-parse_list_var       = ArgParser.list_var
-parse_matrix_var     = ArgParser.matrix_var
-parse_string_var     = ArgParser.string_var
-parse_equation_var   = ArgParser.equation_var
-parse_any_var        = ArgParser.any_var
-parse_list_var_prefix_optional = ArgParser.list_var_prefix_optional
-parse_label_name     = ArgParser.label_name
-parse_program_name   = ArgParser.program_name
-
-
-# ── Kind and Arity enums ──────────────────────────────────────────────────────
-
 class _Role(Enum):
 	"""Drives vectorization wrapping in PreparsedFunc (see _REGISTRY)."""
-	VALUE  = auto()   # plain value: no wrapping
-	ENV    = auto()   # inject ArgParser.env; no token consumed
-	VEC    = auto()   # element-wise over TiList (and scalars)
-	MATVEC = auto()   # element-wise over TiMatrix or TiList (and scalars)
+	VALUE   = auto()   # plain value: no wrapping
+	ENV     = auto()   # inject ArgParser.env; no token consumed
+	VEC     = auto()   # element-wise over TiList (and scalars)
+	MAT_VEC = auto()   # element-wise over TiMatrix or TiList (and scalars)
 
 
 class _Arity(Enum):
@@ -142,30 +108,34 @@ class _Arity(Enum):
 # `kind` is consumed once by @preparse to decide how (if at all) to wrap the core
 # for vectorization.  env injects with no parse function (None).
 
+def validated(require: Callable) -> Callable:
+	"""Build a value parser: parse a general expression, then assert its type."""
+	return lambda args: require(args.expr())
+
 _REGISTRY = {
-	Numeric:               (parse_numeric, _Role.VALUE),
-	Real:                  (parse_real, _Role.VALUE),
-	TiList:                (parse_list, _Role.VALUE),
-	TiListReal:            (parse_real_list, _Role.VALUE),
-	TiListComplex:         (parse_complex_list, _Role.VALUE),
-	TiMatrix:              (parse_matrix, _Role.VALUE),
-	TiString:              (parse_string, _Role.VALUE),
-	ListOrMatrix:          (parse_list_or_matrix, _Role.VALUE),
-	AnyValue:              (parse_value, _Role.VALUE),
-	Vectorized:            (parse_vectorized, _Role.VEC),
-	VectorizedReal:        (parse_vectorized_real, _Role.VEC),
-	MatrixVectorized:      (parse_matrix_vectorized, _Role.MATVEC),
-	Thunk:                 (parse_thunk, _Role.VALUE),
-	NumericVar:            (parse_numeric_var, _Role.VALUE),
-	ListVar:               (parse_list_var, _Role.VALUE),
-	MatrixVar:             (parse_matrix_var, _Role.VALUE),
-	StringVar:             (parse_string_var, _Role.VALUE),
-	EquationVar:           (parse_equation_var, _Role.VALUE),
-	AnyVar:                (parse_any_var, _Role.VALUE),
-	ListVarPrefixOptional: (parse_list_var_prefix_optional, _Role.VALUE),
-	LabelName:             (parse_label_name, _Role.VALUE),
-	ProgramName:           (parse_program_name, _Role.VALUE),
-	Env:                   (None, _Role.ENV),
+	Numeric:               (validated(require_num),                 _Role.VALUE),
+	Real:                  (validated(require_real),                _Role.VALUE),
+	TiList:                (validated(require_list),                _Role.VALUE),
+	TiListReal:            (validated(require_real_list),           _Role.VALUE),
+	TiListComplex:         (validated(require_complex_list),        _Role.VALUE),
+	TiMatrix:              (validated(require_matrix),              _Role.VALUE),
+	TiString:              (validated(require_string),              _Role.VALUE),
+	ListOrMatrix:          (validated(require_list_or_matrix),      _Role.VALUE),
+	Vectorized:            (validated(require_vectorizable),        _Role.VEC),
+	VectorizedReal:        (validated(require_vectorizable_real),   _Role.VEC),
+	MatrixVectorized:      (validated(require_matrix_vectorizable), _Role.MAT_VEC),
+	AnyValue:              (ArgParser.expr,                         _Role.VALUE),
+	Thunk:                 (ArgParser.thunk,                        _Role.VALUE),
+	NumericVar:            (ArgParser.numeric_var,                  _Role.VALUE),
+	ListVar:               (ArgParser.list_var,                     _Role.VALUE),
+	MatrixVar:             (ArgParser.matrix_var,                   _Role.VALUE),
+	StringVar:             (ArgParser.string_var,                   _Role.VALUE),
+	EquationVar:           (ArgParser.equation_var,                 _Role.VALUE),
+	AnyVar:                (ArgParser.any_var,                      _Role.VALUE),
+	ListVarPrefixOptional: (ArgParser.list_var_prefix_optional,     _Role.VALUE),
+	LabelName:             (ArgParser.label_name,                   _Role.VALUE),
+	ProgramName:           (ArgParser.program_name,                 _Role.VALUE),
+	Env:                   (None,                                   _Role.ENV),
 }
 
 
@@ -174,9 +144,9 @@ _REGISTRY = {
 @dataclass(frozen=True)
 class ArgSpec:
 	"""One parsed parameter: how to read its value, plus arity/kind metadata."""
-	parse: Any                      # Callable[[ArgParser], value]; None ⇒ inject env
-	role: _Role = _Role.VALUE       # drives vectorization wrapping (see PreparsedFunc)
-	arity: _Arity = _Arity.NORMAL   # NORMAL / OPTIONAL / VARIADIC
+	parse: Callable[[ArgParser], Any] | None
+	role:  _Role = _Role.VALUE
+	arity: _Arity = _Arity.NORMAL
 
 	@property
 	def is_variadic(self) -> bool:
@@ -208,20 +178,22 @@ def schema_from_signature(func) -> tuple:
 	for name, p in inspect.signature(func).parameters.items():
 		if name not in annotations:
 			raise TypeError(f"@preparse: {func.__name__}: parameter {name!r} has no annotation")
+
 		ann = annotations[name]
 		try:
 			parse, role = _REGISTRY[ann]
 		except (KeyError, TypeError):
-			raise TypeError(
-				f"@preparse: {func.__name__}: parameter {name!r} has unknown arg type {ann!r}"
-			)
+			raise TypeError(f"@preparse: {func.__name__}: parameter {name!r} has unknown arg type {ann!r}")
+			
 		if p.kind is inspect.Parameter.VAR_POSITIONAL:
 			arity = _Arity.VARIADIC
 		elif p.default is not inspect.Parameter.empty:
 			arity = _Arity.OPTIONAL
 		else:
 			arity = _Arity.NORMAL
+
 		schema.append(ArgSpec(parse, role, arity))
+
 	return tuple(schema)
 
 
@@ -242,22 +214,6 @@ class TiCall(ABC):
 	@abstractmethod
 	def call_with_parser(self, a: ArgParser) -> Any:
 		pass
-
-
-class pure_func(TiCall):
-	"""Decorator for pure math functions that don't need access to the environment."""
-	def call_with_parser(self, args: ArgParser):
-		values = args.parse_args()
-		args.end_func()
-		return self(*values)
-
-
-class env_func(TiCall):
-	"""Decorator for functions that need access to the environment."""
-	def call_with_parser(self, args: ArgParser):
-		values = args.parse_args()
-		args.end_func()
-		return self(args.env, *values)
 
 
 class forms_func(TiCall):
@@ -339,8 +295,8 @@ class PreparsedFunc(TiCall):
 	def __init__(self, core: Callable, end: Finalize = Finalize.FUNC) -> None:
 		schema = schema_from_signature(core)
 		roles = [s.role for s in schema]
-		if _Role.MATVEC in roles:
-			if roles.count(_Role.MATVEC) > 1:
+		if _Role.MAT_VEC in roles:
+			if roles.count(_Role.MAT_VEC) > 1:
 				raise TypeError(f"{core.__name__}: at most one matrix-vectorized parameter allowed")
 			if _Role.VEC in roles:
 				raise TypeError(f"{core.__name__}: cannot mix matrix-vectorized and vectorized parameters")

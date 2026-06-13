@@ -1,7 +1,7 @@
 """String and equation types, variables, validators, and functions."""
 
 
-from core import TiString, TiEquation, require_str
+from core import TiString, TiEquation, require_string
 from core import py_int
 from preparse import preparse_func, preparse_cmd_func, Real, Env, StringVar, EquationVar
 from errors import DomainError, InvalidDimError, ArgumentError, TiSyntaxError
@@ -40,7 +40,7 @@ def sub(args: ArgParser):
 		return require_num(values[0]) / 100
 	if len(values) == 3:
 		string, start, length_val = values
-		require_str(string)
+		require_string(string)
 		start = py_int(start)
 		length_val = py_int(length_val)
 		if length_val < 1:
@@ -74,4 +74,4 @@ def equ_to_string(equ_var: EquationVar, str_var: StringVar) -> None:
 @preparse_cmd_func
 def string_to_equ(string: TiString, equ_var: EquationVar) -> None:
 	"""String►Equ(str_expr, equvar) — parse a string value into an equation variable."""
-	equ_var.value = TiEquation(require_str(string).tokens)
+	equ_var.value = TiEquation(require_string(string).tokens)

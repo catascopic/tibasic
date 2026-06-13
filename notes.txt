@@ -1,5 +1,7 @@
-Also for Text(: should be a domain error if not enough vertical space. Also, don't partially write characters if there's not enough room for them (counting the padding when using large font)
-
+Can we get rid of:
+		if c > MAX_COL:
+			break
+			
 TiProgram: require uppercase for writing
 
 rework typeable!
@@ -23,17 +25,10 @@ PlotStart, PlotStep — actually have nothing to do with plots, but determine wh
 TblStart, ΔTbl — the starting value and step for the independent variable in the table screen.
 TblInput — a 7-element list of the values of a variable in the table.
 
-Text:
-Nice formatting logic! Probably should be moved elsewhere
-
-Text: collect all arguments first before printing anything?
-
 Which is the better system for mapping characters?
 
 Rename screen "graph"
 Make home screen
-
-Still don't love the nonreal answer check
 
 Revisit transform_to_domain_error decorator
 
@@ -59,16 +54,23 @@ Add aliases to any token that has a character that can't be typed on the keyboar
 TODO:
 
 Commands: solve( fMin( fMax(
-Text(  #!!!
 StorePic RecallPic StoreGDB RecallGDB
 Modes: Horiz Full IndpntAuto IndpntAsk DependAuto DependAsk Time Web
 Finance: tvm_Pmt tvm_I% tvm_PV tvm_N tvm_FV Pmt_End Pmt_Bgn
 I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
 χ²-Test??? It has a weird display
 
-Okay, let's do Text(. Text can either do 3x5 or 5x7 if the alternate flag is set. Let's start with the alternate mode, because it's actually easier. You can find the data for the character in gl
 
 ********
+
+Text(  #!!!
+Okay, let's do Text(. Text can either do 3x5 or 5x7 if the alternate flag is set. Let's start with the alternate mode, because it's actually easier. You can find the data for the character in gl
+
+Still don't love the nonreal answer check
+
+Text: collect all arguments first before printing anything?
+
+Also for Text(: should be a domain error if not enough vertical space. Also, don't partially write characters if there's not enough room for them (counting the padding when using large font)
 
 Should we be using Decimal everywhere?
 
