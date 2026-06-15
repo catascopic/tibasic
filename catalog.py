@@ -150,12 +150,12 @@ token(0x2F, b'QuartReg ')
 for _i in range(10):
 	token(0x30 + _i, bytes([0x30 + _i]), typeable=True)
 
-token(tk.DOT, b'.',           typeable=True)
+token(tk.DOT, b'.',                     typeable=True)
 token(tk.SCI_E, b'\x1b')  # ᴇ
 token(0x3C, b' or ',                    bp=(20, 21), op=ops.or_)
 token(0x3D, b' xor ',                   bp=(20, 21), op=ops.xor)
-token(tk.COLON, b':',       typeable=True)
-token(tk.NEWLINE, b'\xd6',  typeable=True)
+token(tk.COLON, b':',                   typeable=True)
+token(tk.NEWLINE, b'\xd6',              typeable=True)
 token(0x40, b' and ',                   bp=(30, 31), op=ops.and_)
 
 # A - Z, θ
@@ -185,18 +185,18 @@ for _i in range(6):
 	token(0x5E40 + _i, bytes([0x72, 0x81 + _i]), var=_make_accessor('polar', _i))
 
 # 𝑢, 𝑣, 𝑤
-for i_ in range(3):
-	token(0x5E80 + i_, bytes([0x02 + i_]), var=_make_accessor('sequence', i_))
+for _i in range(3):
+	token(0x5E80 + _i, bytes([0x02 + _i]), var=_make_accessor('sequence', _i))
 
 PRGM = token(0x5F, b'prgm', cmd=cmds.prgm)
 
 # Pic1 - Pic0
-for i_ in range(10):
-	token(0x6000 + i_, b'Pic' + bytes([0x30 + (i_ + 1) % 10]))
+for _i in range(10):
+	token(0x6000 + _i, b'Pic' + bytes([0x30 + (_i + 1) % 10]))
 
 # GDB1 - GDB 0
-for i_ in range(10):
-	token(0x6100 | i_, b'GDB' + bytes([0x30 + (i_ + 1) % 10]))
+for _i in range(10):
+	token(0x6100 | _i, b'GDB' + bytes([0x30 + (_i + 1) % 10]))
 
 token(0x6201, b'RegEq')
 token(0x6202, b'n')
@@ -392,8 +392,8 @@ token(0xA8, b'DrawInv ',                cmd=draw.draw_inv)
 token(0xA9, b'DrawF ',                  cmd=draw.draw_f)
 
 # Str1 - Str0
-for i in range(10):
-	token(0xAA00 | i, b'Str' + bytes([0x30 + (i + 1) % 10]), var=_make_accessor('strings', i))
+for _i in range(10):
+	token(0xAA00 | _i, b'Str' + bytes([0x30 + (_i + 1) % 10]), var=_make_accessor('strings', _i))
 
 token(tk.RAND, b'rand',                 res=Environment.rand, func=tm.rand_list)
 token(0xAC, b'\xc4',                    res=lambda env: math.pi, typeable=True)  # π
