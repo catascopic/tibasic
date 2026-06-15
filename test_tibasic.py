@@ -39,30 +39,20 @@ _ALIASES = {
 }
 
 
-def _usable(t):
-	"""False for two-byte single-char duplicates (alt-font a–z, subscripts, …),
-	except the sequence variables — they're the only ones tests need to type."""
-	return not (t.code > 0xFF and len(t.text) == 1 and t.code not in _KEEP_SINGLE)
-
-
 def _create_lookup():
 	"""Map each typable string to the token it produces (see _KEEP_SINGLE above)."""
 	lookup = {}
-	# Primary keys: the typable test-charset spelling of each token.
 	for t in ALL_TOKENS:
-		if not _usable(t):
+		if t.code > 0xFF and len(t.text) == 1 and t.code not in _KEEP_SINGLE:
+			# False for two-byte single-char duplicates, except the sequence variables.
 			continue
+		lookup[t.text.strip(' ')] = t
 		try:
 			key = ''.join(_TEST_CHARSET[b] for b in t.display.strip(b' '))
 		except (IndexError, TypeError):
 			continue
-		if key:
-			lookup[key] = t
-	# Fallback: a token's debug rendering, so symbols like ≤ stay reachable.
-	for t in ALL_TOKENS:
-		if _usable(t):
-			lookup.setdefault(t.text.strip(' '), t)
-	# Readable aliases for the char-less operator tokens.
+		lookup[key] = t
+
 	by_code = {t.code: t for t in ALL_TOKENS}
 	for name, code in _ALIASES.items():
 		lookup[name] = by_code[code]
