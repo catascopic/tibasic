@@ -700,16 +700,6 @@ class ArgParser:
 	def pass_env(self):
 		return self._parser.env
 
-	def no_args(self) -> None:
-		"""Raise TiSyntaxError if any tokens follow on this statement.
-
-		For no-arg commands (Normal, Return, End, etc.) that should reject
-		trailing tokens outright.  Raises TiSyntaxError rather than ArgumentError
-		because stray tokens here are a syntactic mistake, not a wrong argument count.
-		"""
-		if self.has_next:
-			raise TiSyntaxError(f"Command takes no arguments, but got: {self.peek()}")
-
 	def end_func(self):
 		"""Consume the closing ) and validate no surplus arguments remain.
 

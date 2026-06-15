@@ -1,5 +1,3 @@
-Rename forms_func
-
 Is Decimal round really necessary in timath?
 
 _REGISTRY: ArgSpec repr name
@@ -11,25 +9,16 @@ x² doesn't, but odd roots... actually the TI-84 is tricky here — ^ with a fra
 log(, ln( — negative input
 sin⁻¹(, cos⁻¹( — input outside [-1, 1]
 
-
-Get rid of parse_args
 Cleanup: token(0xEF09, b'getDate',               res=Environment.get_date)
-func=forms_func(ArgParser.ans_index_or_mul)
 
 except ValueError:
 	return cmath.exp(cmath.log(complex(base)) * exp)
 
 UserList to Environment
 
-Can we get rid of:
-		if c > MAX_COL:
-			break
-
 TiProgram: require uppercase for writing
 
 rework typeable!
-
-rename forms_func
 
 Xmin, Xmax, Ymin, Ymax — determine the lower and upper X and Y bounds of the graph screen itself.
 ΔX, ΔY — defined to be (Xmax-Xmin)/94 and (Ymax-Ymin)/62 respectively; storing to them will change Xmax and Ymax to arrange this.
