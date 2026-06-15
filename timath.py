@@ -13,7 +13,6 @@ Covered menus / button groups:
 
 import builtins
 import cmath
-import decimal as _decimal
 import math
 import random
 from functools import wraps
@@ -29,9 +28,10 @@ from errors import DataTypeError, DimMismatchError, DomainError
 def handle_complex(func):
 	"""Apply a real-valued func separately to the real and imaginary parts."""
 	@wraps(func)
-	def apply(a):
-		return complex(func(a.real), func(a.imag)) if isinstance(a, complex) else func(a)
+	def apply(x, *args):
+		return complex(func(x.real, *args), func(x.imag, *args)) if isinstance(x, complex) else func(x, *args)
 	return apply
+
 
 def _inv_trig(func, env, x):
 	try:
@@ -207,17 +207,12 @@ def abs(x: MatrixVectorized):
 	return builtins.abs(x)
 
 
-def _ti_round(x: float, decimals: int) -> float:
-	"""Round half away from zero (TI-84 behavior; Python uses banker's rounding)."""
-	quant = _decimal.Decimal(10) ** -decimals
-	return float(_decimal.Decimal(str(x)).quantize(quant, rounding=_decimal.ROUND_HALF_UP))
-
 @preparse_func
+@handle_complex
 def round(x: MatrixVectorized, decimals: Real = 9.0):
-	n = py_int(decimals)
-	if isinstance(x, complex):
-		return complex(_ti_round(x.real, n), _ti_round(x.imag, n))
-	return _ti_round(x, n)
+	# Should this use Decimal to round?
+	mag = 10 ** decimals
+	return math.floor(x * mag + 0.5) / mag
 
 
 @preparse_func

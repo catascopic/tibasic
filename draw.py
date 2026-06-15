@@ -567,7 +567,7 @@ def _get_text_chars(value) -> bytes:
 		yield from _num_to_chars(value)
 
 	elif isinstance(value, TiString):
-		for token in value.tokens
+		for token in value.tokens:
 			yield from token.display
 	else:
 		raise DataTypeError(f"Text(: expected a real number or string, got {type(value).__name__}")

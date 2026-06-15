@@ -1,3 +1,5 @@
+Is Decimal round really necessary in timath?
+
 # TODO: clear gap
 
 _REGISTRY: ArgSpec repr name
