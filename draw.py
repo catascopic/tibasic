@@ -558,9 +558,6 @@ def _get_text_chars(value) -> bytes:
 
 	Complex, list, and matrix values are rejected (ERR:DATA TYPE on the calculator).
 	"""
-	if isinstance(value, complex):
-		raise DataTypeError("Text(: complex numbers are not allowed")
-
 	if isinstance(value, float):
 		yield from _num_to_chars(value)
 
@@ -572,13 +569,12 @@ def _get_text_chars(value) -> bytes:
 
 
 def _blit_char(screen, row: int, col: int, glyph: bytes, height: int) -> int:
-	"""Draw one character cell at (row, col) in overwrite mode; return the next column.
+	"""Draw one glyph at (row, col) in overwrite mode; return the column after it.
 
-	The cell spans the glyph plus `gap` blank columns on its right and `gap` blank
-	rows below it — the large font's 1-pixel separator (the small font uses gap=0,
-	since its trailing blank column is baked into each glyph).  Every pixel in the
-	cell is written: glyph bits where they fall, off everywhere else.  Pixels past
-	the screen edges are clipped.
+	Every pixel of the glyph's width×height box is written — glyph bits where they
+	fall, off everywhere else — so a 0-bit clears whatever was beneath it.  The
+	caller guarantees the box is on-screen; inter-character and below-glyph spacing
+	(the large font's 1px separator) is added by the caller.
 	"""
 	width = len(glyph)
 	for dc in range(width):
@@ -608,6 +604,11 @@ def text(args):
 		row    = py_int(first)
 		col    = py_int(args.expr())
 
+	if row < 0 or row + height > MAX_ROW + 1:
+		raise DomainError("Text: not enough vertical space")
+	if col < 0 or col > MAX_COL:
+		raise DomainError("Text: not enough horizontal space")
+
 	# Collect and validate every value before touching the screen, so an invalid
 	# argument (e.g. a complex number) can't leave a partially-drawn string. #
 	glyphs = []
@@ -616,16 +617,20 @@ def text(args):
 			glyphs.append(font[char])
 	args.end_paren_cmd()
 
-	# A character's height can't be clipped, so a row with too little vertical room
-	# is an error rather than a partial draw. (Padding is optional overhang.)
-	if row < 0 or row + height > MAX_ROW + 1:
-		raise DomainError("Text(: not enough vertical space")
-
 	screen = args.env.screen
 	cur_col = col
 	for glyph in glyphs:
 		if cur_col + len(glyph) > MAX_COL + 1:
 			break
-		cur_col = _blit_char(screen, row, cur_col, glyph, height, gap)
+		next_col = _blit_char(screen, row, cur_col, glyph, height)
 		if large_mode:
-			pass  # TODO: clear gap
+			# Large font carries a 1px separator: blank the column to the right of
+			# the glyph and the padding row beneath, but only if they fit in the drawable area.
+			if next_col <= MAX_COL:
+				for r in range(row, row + height + 1):
+					screen.set(r, next_col, False)
+			if row + height <= MAX_ROW:
+				for c in range(cur_col, next_col):
+					screen.set(row + height, c, False)
+			next_col += 1
+		cur_col = next_col
