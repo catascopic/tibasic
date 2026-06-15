@@ -2,10 +2,8 @@
 import builtins
 from datetime import date
 
-from parser import ArgParser
-
-from core import TiList, py_int
-from preparse import preparse_func, Real, Env, TiCall
+from core import TiList, TiString, py_int
+from preparse import preparse_func, preparse_cmd_func, Real, Env
 from environment import Environment
 from errors import DomainError
 
@@ -31,27 +29,53 @@ def dayofwk(year: Real, month: Real, day: Real):
 	return float(d.isoweekday() % 7 + 1)
 
 
-class _set_time_wrapper(TiCall):
-	def call_with_parser(self, args: ArgParser):
-		values = args.parse_args()
-		args.end_paren_cmd()
-		return self(args.env, *values)
+@preparse_cmd_func
+def set_date(env: Env, year: Real, month: Real, day: Real):
+	env.set_date(year, month, day)
 
 
-set_date   = _set_time_wrapper(Environment.set_date)
-set_time   = _set_time_wrapper(Environment.set_time)
-set_dt_fmt = _set_time_wrapper(Environment.set_dt_fmt)
-set_tm_fmt = _set_time_wrapper(Environment.set_tm_fmt)
+@preparse_cmd_func
+def set_time(env: Env, hour: Real, minute: Real, second: Real):
+	env.set_time(hour, minute, second)
+
+
+@preparse_cmd_func
+def set_dt_fmt(env: Env, fmt: Real):
+	fmt = py_int(fmt)
+	if fmt not in {1, 2, 3}:
+		raise DomainError(f"setDtFmt: expected 1, 2, or 3; got {fmt}")
+	env.dt_fmt = fmt
+
+
+@preparse_cmd_func
+def set_tm_fmt(env: Env, fmt: Real):
+	fmt = py_int(fmt)
+	if fmt not in {12, 24}:
+		raise DomainError(f"setTmFmt: expected 12 or 24; got {fmt}")
+	env.tm_fmt = fmt
 
 
 @preparse_func
-def check_tmr(env: Env):
-	return Environment.check_tmr(env)
+def check_tmr(env: Env, start: Real):
+	return float(int(env.now().timestamp()) - int(start))
+
 
 @preparse_func
-def get_dt_str(env: Env):
-	return Environment.get_dt_str(env)
+def get_dt_str(env: Env, fmt: Real):
+	fmt = py_int(fmt)
+	if fmt not in {1, 2, 3}:
+		raise DomainError(f"getDtStr: invalid format {fmt}")
+	return TiString.from_str(env.now().strftime(['%m/%d/%y', '%d/%m/%y', '%y/%m/%d'][fmt - 1]))
+
 
 @preparse_func
-def get_tm_str(env: Env):
-	return Environment.get_tm_str(env)
+def get_tm_str(env: Env, fmt: Real):
+	fmt = py_int(fmt)
+	now = env.now()
+	if fmt == 24:
+		time_str = now.strftime('%H:%M')
+	elif fmt == 12:
+		time_str = now.strftime('%I:%M %p').lstrip('0')
+	else:
+		raise DomainError(f"getTmStr: invalid format {fmt}")
+	return TiString.from_str(time_str)

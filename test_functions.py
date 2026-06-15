@@ -11,6 +11,7 @@ from errors import (
 	DataTypeError, InvalidDimError, ArgumentError, NonRealAnsError,
 )
 import catalog
+import titime
 from core import TiList, TiMatrix, TiString
 from test_tibasic import toks, calc, run, var, approx_mat
 
@@ -854,48 +855,48 @@ class TestDateTime:
 
 	def test_setdate_getdate(self):
 		e = Environment()
-		e.set_date(2008, 7, 4)
+		titime.set_date(e, 2008, 7, 4)
 		assert list(e.get_date()) == [2008, 7, 4]
 
 	def test_settime_gettime(self):
 		e = Environment()
-		e.set_time(14, 30, 2)
+		titime.set_time(e, 14, 30, 2)
 		assert list(e.get_time()) == [14, 30, approx(2, abs=1)]  # seconds omitted: may drift by 1 across a wall-clock tick
 
 	def test_dt_str_fmt1(self):
 		e = Environment()
-		e.set_date(2006, 6, 15)
-		assert str(e.get_dt_str(1)) == "06/15/06"
+		titime.set_date(e, 2006, 6, 15)
+		assert str(titime.get_dt_str(e, 1)) == "06/15/06"
 
 	def test_dt_str_fmt2(self):
 		e = Environment()
-		e.set_date(2005, 12, 25)
-		assert str(e.get_dt_str(2)) == "25/12/05"
+		titime.set_date(e, 2005, 12, 25)
+		assert str(titime.get_dt_str(e, 2)) == "25/12/05"
 
 	def test_dt_str_fmt3(self):
 		e = Environment()
-		e.set_date(2009, 2, 20)
-		assert str(e.get_dt_str(3)) == "09/02/20"
+		titime.set_date(e, 2009, 2, 20)
+		assert str(titime.get_dt_str(e, 3)) == "09/02/20"
 
 	def test_tm_str_24h(self):
 		e = Environment()
-		e.set_time(2, 30, 5)
-		assert str(e.get_tm_str(24)) == "02:30"
+		titime.set_time(e, 2, 30, 5)
+		assert str(titime.get_tm_str(e, 24)) == "02:30"
 
 	def test_tm_str_12h_pm(self):
 		e = Environment()
-		e.set_time(14, 30, 5)
-		assert str(e.get_tm_str(12)) == "2:30 PM"
+		titime.set_time(e, 14, 30, 5)
+		assert str(titime.get_tm_str(e, 12)) == "2:30 PM"
 
 	def test_tm_str_12h_am(self):
 		e = Environment()
-		e.set_time(9, 5, 0)
-		assert str(e.get_tm_str(12)) == "9:05 AM"
+		titime.set_time(e, 9, 5, 0)
+		assert str(titime.get_tm_str(e, 12)) == "9:05 AM"
 
 	def test_check_tmr(self):
 		e = Environment()
 		start = e.start_tmr()
-		assert 0 <= e.check_tmr(start) <= 2
+		assert 0 <= titime.check_tmr(e, start) <= 2
 
 
 # ── rand ─────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
-Is Decimal round really necessary in timath?
+Rename forms_func
 
-# TODO: clear gap
+Is Decimal round really necessary in timath?
 
 _REGISTRY: ArgSpec repr name
 

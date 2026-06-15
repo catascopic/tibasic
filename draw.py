@@ -605,9 +605,7 @@ def text(args):
 		col    = py_int(args.expr())
 
 	if row < 0 or row + height > MAX_ROW + 1:
-		raise DomainError("Text: not enough vertical space")
-	if col < 0 or col > MAX_COL:
-		raise DomainError("Text: not enough horizontal space")
+		raise DomainError("Text(: not enough vertical space")
 
 	# Collect and validate every value before touching the screen, so an invalid
 	# argument (e.g. a complex number) can't leave a partially-drawn string. #

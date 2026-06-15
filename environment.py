@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime, date, timedelta
 from typing import Any, ClassVar
 
-from core import TiList, TiString, is_complex_val
+from core import TiList, is_complex_val
 from core import Variable, NumericVariable, RealVariable, ListVariable, UserList, MatrixVariable, StringVariable, EquationVariable, require_real, py_int
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
@@ -129,7 +129,7 @@ class Environment:
 
 	# ── Virtual clock ────────────────────────────────────────────────────────────
 
-	def _now(self) -> datetime:
+	def now(self) -> datetime:
 		"""Current datetime adjusted by any offset set via setDate/setTime."""
 		return datetime.now() + self._datetime_offset
 
@@ -145,53 +145,18 @@ class Environment:
 		new_v = datetime(v.year, v.month, v.day, py_int(hour), py_int(minute), py_int(second))
 		self._datetime_offset = new_v - now
 
-	def check_tmr(self, start):
-		return float(int(self._now().timestamp()) - int(require_real(start)))
-
-	def set_dt_fmt(self, fmt):
-		fmt = py_int(fmt)
-		if fmt not in {1, 2, 3}:
-			raise DomainError(f"setDtFmt: expected 1, 2, or 3; got {fmt}")
-		self.dt_fmt = fmt
-
-	def set_tm_fmt(self, fmt):
-		fmt = py_int(fmt)
-		if fmt not in {12, 24}:
-			raise DomainError(f"setTmFmt: expected 12 or 24; got {fmt}")
-		self.tm_fmt = fmt
-
-	def get_dt_str(self, fmt):
-		fmt = py_int(fmt)
-		if fmt not in {1, 2, 3}:
-			raise DomainError(f"getDtStr: invalid format {fmt}")
-		return TiString.from_str(self._now().strftime(['%m/%d/%y', '%d/%m/%y', '%y/%m/%d'][fmt - 1]))
-
-	def get_tm_str(self, fmt):
-		fmt = py_int(fmt)
-		now = self._now()
-		if fmt == 24:
-			time_str = now.strftime('%H:%M')
-		elif fmt == 12:
-			time_str = now.strftime('%I:%M %p').lstrip('0')
-		else:
-			raise DomainError(f"getTmStr: invalid format {fmt}")
-		return TiString.from_str(time_str)
-
 	# ── Nullary helpers (used by nullary= fields in tokens) ──────────────────────
 
-	def get_ans(self):
-		return self.ans
-
 	def get_date(self):
-		d = self._now()
+		d = self.now()
 		return TiList([d.year, d.month, d.day])
 
 	def get_time(self):
-		t = self._now()
+		t = self.now()
 		return TiList([t.hour, t.minute, t.second])
 
 	def start_tmr(self):
-		return float(int(self._now().timestamp()))
+		return float(int(self.now().timestamp()))
 
 	def get_dt_fmt(self):
 		return self.dt_fmt

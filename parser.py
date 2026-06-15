@@ -741,12 +741,6 @@ class ArgParser:
 			raise ArgumentError(f"Too many arguments: unexpected {self.peek()}")
 		self._parser.end_statement()
 
-	def parse_args(self) -> list:
-		args = [self.expr()]
-		while self.has_next:
-			args.append(self.expr())
-		return args
-
 	def take(self, *specs) -> list:
 		"""Parse a fixed argument schema (see preparse.py); return values.
 

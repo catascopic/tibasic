@@ -1,6 +1,6 @@
 from core import TiString, TiEquation, require_num, require_string, py_int
 from preparse import preparse_func, preparse_cmd_func, forms_func, Real, Env, StringVar, EquationVar
-from errors import DomainError, InvalidDimError, ArgumentError, TiSyntaxError
+from errors import DomainError, InvalidDimError, TiSyntaxError
 from parser import ArgParser, Parser
 
 
@@ -21,26 +21,22 @@ def in_string(string: TiString, substring: TiString, start: Real = 1.0):
 
 @forms_func
 def sub(args: ArgParser):
-	# sub( with a single numeric arg divides by 100, like the undocumented % operator.
-	values = args.parse_args()
-	args.end_func()
-	if len(values) == 1:
-		return require_num(values[0]) / 100
-		
-	if len(values) == 3:
-		string, start, length_val = values
-		require_string(string)
-		start = py_int(start)
-		length_val = py_int(length_val)
-		if length_val < 1:
-			raise DomainError(f"sub: length must be ≥ 1, got {length_val}")
-			
-		if not (1 <= start <= len(string) - length_val + 1):
-			raise InvalidDimError("sub: index out of range")
-			
-		return TiString(string.tokens[start - 1 : start + length_val - 1])
+	first = args.expr()
+	if not args.has_next:
+		# sub( with a single numeric arg divides by 100, like the undocumented % operator.
+		args.end_func()
+		return require_num(first) / 100
 
-	raise ArgumentError(f"Invalid arguments: {values}")
+	string = require_string(first)
+	start = py_int(args.expr())
+	length_val = py_int(args.expr())
+	args.end_func()
+
+	if length_val < 1:
+		raise DomainError(f"sub: length must be ≥ 1, got {length_val}")
+	if not (1 <= start <= len(string) - length_val + 1):
+		raise InvalidDimError("sub: index out of range")
+	return TiString(string.tokens[start - 1 : start + length_val - 1])
 
 @preparse_func
 def expr(env: Env, string: TiString):
