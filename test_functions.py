@@ -40,10 +40,10 @@ class TestNumericFunctions:
 	def test_f_part_neg(self):    assert calc('fPart( ~3.7') == approx(-0.7)
 	def test_int_floor_pos(self): assert calc('int( 3.9') == 3
 	def test_int_floor_neg(self): assert calc('int( ~3.1') == -4     # floor, not truncate
-	def test_sqrt(self):                  assert calc('SQRT 9') == approx(3)
-	def test_sqrt_negative_complex(self): assert calc('SQRT ~1', cpx()) == approx(1j)
-	def test_sqrt_negative_real(self):    pytest.raises(NonRealAnsError, calc, 'SQRT ~1')
-	def test_cbrt(self):                  assert calc('CBRT 8') == approx(2)
+	def test_sqrt(self):                  assert calc('sqrt( 9') == approx(3)
+	def test_sqrt_negative_complex(self): assert calc('sqrt( ~1', cpx()) == approx(1j)
+	def test_sqrt_negative_real(self):    pytest.raises(NonRealAnsError, calc, 'sqrt( ~1')
+	def test_cbrt(self):                  assert calc('cbrt( 8') == approx(2)
 	def test_ln(self):                    assert calc(f'ln( {math.e}') == approx(1)
 	def test_ln_negative_complex(self):   assert calc('ln( ~1', cpx()) == approx(1j * math.pi)
 	def test_ln_negative_real(self):      pytest.raises(NonRealAnsError, calc, 'ln( ~1')
@@ -162,7 +162,7 @@ class TestMatrixOperations:
 		assert result.data == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
 
 	def test_transpose(self):
-		result = calc('[[1,2,3][4,5,6]] TRANSPOSE')
+		result = calc('[[1,2,3][4,5,6]]t')
 		assert result.data == [[1, 4], [2, 5], [3, 6]]
 
 	def test_matmul(self):
@@ -1445,23 +1445,23 @@ class TestNot:
 
 class TestTranspose:
 	def test_square(self):
-		assert calc('[[1,2][3,4]] TRANSPOSE').data == [[1, 3], [2, 4]]
+		assert calc('[[1,2][3,4]] t').data == [[1, 3], [2, 4]]
 
 	def test_row_to_column(self):
-		assert calc('[[1,2,3]] TRANSPOSE').data == [[1], [2], [3]]
+		assert calc('[[1,2,3]] t').data == [[1], [2], [3]]
 
 	def test_column_to_row(self):
-		assert calc('[[1][2][3]] TRANSPOSE').data == [[1, 2, 3]]
+		assert calc('[[1][2][3]] t').data == [[1, 2, 3]]
 
 	def test_involution(self):
-		result = calc('( [[1,2,3][4,5,6]] TRANSPOSE ) TRANSPOSE')
+		result = calc('( [[1,2,3][4,5,6]] t ) t')
 		assert result.data == [[1, 2, 3], [4, 5, 6]]
 
 	def test_non_matrix_raises(self):
-		with pytest.raises(DataTypeError): calc('5 TRANSPOSE')
+		with pytest.raises(DataTypeError): calc('5 t')
 
 	def test_vertical_stack_via_transpose(self):
 		# (augment(Aᵀ, Bᵀ))ᵀ stacks two row vectors as rows of a new matrix
-		result = calc('( augment( [[1,2,3]] TRANSPOSE , [[4,5,6]] TRANSPOSE ) TRANSPOSE')
+		result = calc('( augment( [[1,2,3]] t , [[4,5,6]] t ) t')
 		assert result.data == [[1, 2, 3], [4, 5, 6]]
 

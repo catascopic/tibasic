@@ -18,7 +18,7 @@ from core import TiList, TiMatrix, TiString
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-_TEST_CHARSET = [None, 'n', 'u', 'v', 'w', '►', None, None, None, None, None, None, None, 't', '3', 'F', None, 'inv', 'sq', None, 'deg', 'rad', '#', 'le', 'ne', 'ge', '~', 'e', '@', 'ten', None, None, '_', '!', '"', None, None, '%', None, "'", '(', ')', '*', '+', ',', '-', '.', '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', None, 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'θ', None, ']', '^', '_', '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', None, None, '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Á', 'À', 'Â', 'Ä', 'á', 'à', 'â', 'ä', 'É', 'È', 'Ê', 'Ë', 'é', 'è', 'ê', 'ë', 'Í', 'Ì', 'Î', 'Ï', 'í', 'ì', 'î', 'ï', 'Ó', 'Ò', 'Ô', 'Ö', 'ó', 'ò', 'ô', 'ö', 'Ú', 'Ù', 'Û', 'Ü', 'ú', 'ù', 'û', 'ü', 'Ç', 'ç', 'Ñ', 'ñ', None, None, None, '¿', '¡', 'α', 'β', 'γ', 'Δ', 'δ', 'ε', '[', 'λ', 'μ', 'π', 'ρ', 'Σ', 'σ', 'τ', 'φ', 'Ω', 'ẍ', 'ȳ', 'x', '…', '◄', None, None, None, None, None, 'cube', '\n', 'i', 'ṕ', 'χ', '𝐅', 'e', '$', '𝐍', '⸩', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'ß', None, None, None, None, None, None, None, None, None, None, None]
+_TEST_CHARSET = [None, 'n', 'u', 'v', 'w', '►', None, None, None, None, None, None, None, 't', '3', 'F', None, 'inv', 'sq', None, 'deg', 'rad', 't', 'le', 'ne', 'ge', '~', 'e', '@', 'ten', None, None, '_', '!', '"', None, None, '%', None, "'", '(', ')', '*', '+', ',', '-', '.', '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', None, 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'θ', None, ']', '^', '_', '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', None, None, '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Á', 'À', 'Â', 'Ä', 'á', 'à', 'â', 'ä', 'É', 'È', 'Ê', 'Ë', 'é', 'è', 'ê', 'ë', 'Í', 'Ì', 'Î', 'Ï', 'í', 'ì', 'î', 'ï', 'Ó', 'Ò', 'Ô', 'Ö', 'ó', 'ò', 'ô', 'ö', 'Ú', 'Ù', 'Û', 'Ü', 'ú', 'ù', 'û', 'ü', 'Ç', 'ç', 'Ñ', 'ñ', None, None, None, '¿', '¡', 'α', 'β', 'γ', 'Δ', 'δ', 'ε', '[', 'λ', 'μ', 'π', 'ρ', 'Σ', 'σ', 'τ', 'φ', 'Ω', 'ẍ', 'ȳ', 'x', '…', '◄', None, None, None, None, None, 'cube', '\n', 'i', 'ṕ', 'χ', '𝐅', 'e', '$', '𝐍', '⸩', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'ß', None, None, None, None, None, None, None, None, None, None, None]
 
 
 # Two-byte tokens that render to a single character are alternate-font duplicates
@@ -31,7 +31,7 @@ _KEEP_SINGLE = {0x6221, 0x5E80, 0x5E81, 0x5E82}  # n, u, v, w
 
 # Operator tokens with no convenient typable character keep the readable names
 # they had as catalog constants, since the tests spell them out.
-_ALIASES = {'SQRT': 0xBC, 'XTH_ROOT': 0xF1, 'INV': 0x0C, 'SQ': 0x0D, 'TRANSPOSE': 0x0E}
+_ALIASES = {'sqrt(': 0xBC, 'cbrt(': 0xBD, 'xthroot': 0xF1}
 
 
 def _usable(t):
@@ -602,7 +602,7 @@ class TestParserFeatures:
 		assert result.data == approx_mat([[-2, 1], [1.5, -0.5]])
 
 	def test_transpose_postfix(self):
-		result = calc('[[1,2][3,4]] TRANSPOSE')
+		result = calc('[[1,2][3,4]] t')
 		assert result.data == [[1, 3], [2, 4]]
 
 
@@ -1575,10 +1575,10 @@ class TestOperatorTypes:
 		with pytest.raises(DataTypeError): calc('"A"≥"B"')
 
 	def test_sqrt(self):
-		assert calc('SQRT 16') == approx(4)
-		assert calc('SQRT {1,4,9}').data == approx([1, 2, 3])
-		with pytest.raises(DataTypeError): calc('SQRT [[1,2][3,4]]')
-		with pytest.raises(DataTypeError): calc('SQRT "A"')
+		assert calc('sqrt( 16') == approx(4)
+		assert calc('sqrt( {1,4,9}').data == approx([1, 2, 3])
+		with pytest.raises(DataTypeError): calc('sqrt( [[1,2][3,4]]')
+		with pytest.raises(DataTypeError): calc('sqrt( "A"')
 
 
 # ── Indexing errors ───────────────────────────────────────────────────────────
