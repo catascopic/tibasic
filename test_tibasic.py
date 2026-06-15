@@ -31,7 +31,12 @@ _KEEP_SINGLE = {0x6221, 0x5E80, 0x5E81, 0x5E82}  # n, u, v, w
 
 # Operator tokens with no convenient typable character keep the readable names
 # they had as catalog constants, since the tests spell them out.
-_ALIASES = {'sqrt(': 0xBC, 'cbrt(': 0xBD, 'xthroot': 0xF1}
+_ALIASES = {
+	'sqrt(': 0xBC, 'cbrt(': 0xBD, 'xthroot': 0xF1,
+	# inverse trig: nicer than the charset spelling 'sininv(', etc.
+	'asin(': 0xC3, 'acos(': 0xC5, 'atan(': 0xC7,
+	'asinh(': 0xC9, 'acosh(': 0xCB, 'atanh(': 0xCD,
+}
 
 
 def _usable(t):
@@ -148,8 +153,8 @@ class TestArithmetic:
 	def test_div(self):          assert calc('7/2') == 3.5
 	def test_pow(self):          assert calc('2^10') == 1024
 	def test_negation(self):     assert calc('~5') == -5
-	def test_sq_postfix(self):   assert calc('7 SQ') == 49
-	def test_xroot(self):        assert calc('4 XTH_ROOT 256') == approx(4)
+	def test_sq_postfix(self):   assert calc('7 sq') == 49
+	def test_xroot(self):        assert calc('4 xthroot 256') == approx(4)
 	def test_sci_e(self):        assert calc('1e3') == 1000
 	def test_implicit_mul(self): assert calc('2(3+4)') == 14
 
@@ -409,11 +414,11 @@ class TestOpVectorized:
 
 	def test_xth_root_list_radicand(self):
 		# 2 ˣ√ {4, 9} = {√4, √9} = {2, 3}
-		assert calc('2 XTH_ROOT {4,9}').data == approx([2.0, 3.0])
+		assert calc('2 xthroot {4,9}').data == approx([2.0, 3.0])
 
 	def test_xth_root_list_degree(self):
 		# {2,3} ˣ√ 8 = {√8, ∛8} = {2√2, 2}
-		assert calc('{2,3} XTH_ROOT 8').data == approx([8 ** 0.5, 2.0])
+		assert calc('{2,3} xthroot 8').data == approx([8 ** 0.5, 2.0])
 
 
 # ── List and matrix arithmetic with both operands non-scalar ──────────────────
@@ -598,7 +603,7 @@ class TestParserFeatures:
 
 	def test_inv_postfix(self):
 		# [[1,2][3,4]]¹ gives the inverse
-		result = calc('[[1,2][3,4]] INV')
+		result = calc('[[1,2][3,4]] inv')
 		assert result.data == approx_mat([[-2, 1], [1.5, -0.5]])
 
 	def test_transpose_postfix(self):
@@ -1839,9 +1844,9 @@ class TestCompleXor:
 
 	def test_xor(self):
 		env = run('55@A:99@B')
-		run('int( log( 2) INV log( max( {A,B', env)
+		run('int( log( 2) inv log( max( {A,B', env)
 		run('2^ cumSum( binomcdf( Ans ,0', env)
-		assert calc('sum( Ans .5(1= abs( int( 2 fPart( Ans INV (A+Bi', env) == 84
+		assert calc('sum( Ans .5(1= abs( int( 2 fPart( Ans inv (A+Bi', env) == 84
 
 	def test_xor2(self):
 		env = run('55@A:99@B')

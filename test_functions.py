@@ -64,23 +64,23 @@ class TestTrig:
 	def test_sin(self):   assert calc(f'sin( {math.pi / 6}') == approx(0.5)
 	def test_cos(self):   assert calc(f'cos( 0') == approx(1)
 	def test_tan(self):   assert calc(f'tan( {math.pi / 4}') == approx(1)
-	def test_asin(self):  assert calc(f'sin¹( 0.5') == approx(math.pi / 6)
-	def test_acos(self):  assert calc(f'cos¹( 1') == approx(0)
-	def test_atan(self):  assert calc(f'tan¹( 1') == approx(math.pi / 4)
+	def test_asin(self):  assert calc(f'asin( 0.5') == approx(math.pi / 6)
+	def test_acos(self):  assert calc(f'acos( 1') == approx(0)
+	def test_atan(self):  assert calc(f'atan( 1') == approx(math.pi / 4)
 	# deg() mode
 	def test_sin_deg(self):  assert calc('sin( 30',   deg()) == approx(0.5)
 	def test_cos_deg(self):  assert calc('cos( 0',    deg()) == approx(1)
 	def test_tan_deg(self):  assert calc('tan( 45',   deg()) == approx(1)
-	def test_asin_deg(self): assert calc('sin¹( 0.5', deg()) == approx(30)
-	def test_acos_deg(self): assert calc('cos¹( 1',   deg()) == approx(0)
-	def test_atan_deg(self): assert calc('tan¹( 1',   deg()) == approx(45)
+	def test_asin_deg(self): assert calc('asin( 0.5', deg()) == approx(30)
+	def test_acos_deg(self): assert calc('acos( 1',   deg()) == approx(0)
+	def test_atan_deg(self): assert calc('atan( 1',   deg()) == approx(45)
 	# Hyperbolics stay in purefunctions, no angle mode
 	def test_sinh(self):  assert calc('sinh( 0') == approx(0)
 	def test_cosh(self):  assert calc('cosh( 0') == approx(1)
 	def test_tanh(self):  assert calc('tanh( 0') == approx(0)
-	def test_asinh(self): assert calc('sinh¹( 0') == approx(0)
-	def test_acosh(self): assert calc('cosh¹( 1') == approx(0)
-	def test_atanh(self): assert calc('tanh¹( 0') == approx(0)
+	def test_asinh(self): assert calc('asinh( 0') == approx(0)
+	def test_acosh(self): assert calc('acosh( 1') == approx(0)
+	def test_atanh(self): assert calc('atanh( 0') == approx(0)
 
 
 # ── List operations ───────────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ class TestMatrixOperations:
 		assert calc('[[1,2][3,4]]*[[5,6][7,8]]').data == [[19, 22], [43, 50]]
 
 	def test_inv_roundtrip(self):
-		result = calc('[[1,2][3,4]]*[[1,2][3,4]] INV')
+		result = calc('[[1,2][3,4]]*[[1,2][3,4]] inv')
 		assert result.data == approx_mat([[1, 0], [0, 1]])
 
 	def test_dim_matrix(self):
@@ -1381,43 +1381,43 @@ class TestNegate:
 
 class TestInvert:
 	def test_real(self):
-		assert calc('4 INV') == approx(0.25)
+		assert calc('4 inv') == approx(0.25)
 
 	def test_complex(self):
-		assert calc('i INV') == approx(-1j)
+		assert calc('i inv') == approx(-1j)
 
 	def test_real_list(self):
-		assert calc('{2,4} INV').data == approx([0.5, 0.25])
+		assert calc('{2,4} inv').data == approx([0.5, 0.25])
 
 	def test_complex_list(self):
-		assert calc('{i,2i} INV').data == approx([-1j, -0.5j])
+		assert calc('{i,2i} inv').data == approx([-1j, -0.5j])
 
 	def test_matrix(self):
-		result = calc('[[2,0][0,4]] INV')
+		result = calc('[[2,0][0,4]] inv')
 		assert result.data == approx_mat([[0.5, 0], [0, 0.25]])
 
 	def test_string(self):
-		with pytest.raises(TypeError): calc('"A" INV')
+		with pytest.raises(TypeError): calc('"A" inv')
 
 
 class TestFactorial:
 	def test_real(self):
-		assert calc('5 FACT') == approx(120)
+		assert calc('5 !') == approx(120)
 
 	def test_complex(self):
-		with pytest.raises(DataTypeError): calc('i FACT')
+		with pytest.raises(DataTypeError): calc('i !')
 
 	def test_real_list(self):
-		assert calc('{3,4} FACT').data == approx([6, 24])
+		assert calc('{3,4} !').data == approx([6, 24])
 
 	def test_complex_list(self):
-		with pytest.raises(DataTypeError): calc('{i,2i} FACT')
+		with pytest.raises(DataTypeError): calc('{i,2i} !')
 
 	def test_matrix(self):
-		with pytest.raises(DataTypeError): calc('[[2,3]] FACT')
+		with pytest.raises(DataTypeError): calc('[[2,3]] !')
 
 	def test_string(self):
-		with pytest.raises(DataTypeError): calc('"A" FACT')
+		with pytest.raises(DataTypeError): calc('"A" !')
 
 
 class TestNot:
