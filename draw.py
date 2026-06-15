@@ -536,24 +536,23 @@ def _num_to_chars(value: float) -> bytes:
 		s = str(int(abs(value)))
 	else:
 		s = f'{abs(value):.10g}'
-	result = bytearray()
 	if value < 0:
-		result.append(0x1A)        # ⁻ (negation glyph)
+		yield 0x1A        # ⁻ (negation glyph)
+
 	i = 0
 	while i < len(s):
 		ch = s[i]
 		if ch in 'eE':
-			result.append(0x1B)    # ᴇ
+			yield 0x1B    # ᴇ
 			i += 1
 			if i < len(s) and s[i] == '+':
 				i += 1             # skip '+' in exponent — TI omits it
 			elif i < len(s) and s[i] == '-':
-				result.append(0x1A)  # ⁻ before negative exponent digits
+				yield 0x1A  # ⁻ before negative exponent digits
 				i += 1
 		else:
-			result.append(ord(ch)) # digits and '.' are the same bytes as ASCII
+			yield ord(ch) # digits and '.' are the same bytes as ASCII
 			i += 1
-	return bytes(result)
 
 
 def _get_text_chars(value) -> bytes:
@@ -561,16 +560,20 @@ def _get_text_chars(value) -> bytes:
 
 	Complex, list, and matrix values are rejected (ERR:DATA TYPE on the calculator).
 	"""
-	if isinstance(value, TiString):
-		return b''.join(t.display for t in value.tokens)
 	if isinstance(value, complex):
 		raise DataTypeError("Text(: complex numbers are not allowed")
+
 	if isinstance(value, float):
-		return _num_to_chars(value)
-	raise DataTypeError(f"Text(: expected a real number or string, got {type(value).__name__}")
+		yield from _num_to_chars(value)
+
+	elif isinstance(value, TiString):
+		for token in value.tokens
+			yield from token.display
+	else:
+		raise DataTypeError(f"Text(: expected a real number or string, got {type(value).__name__}")
 
 
-def _blit_char(screen, row: int, col: int, glyph: bytes, height: int, gap: int) -> int:
+def _blit_char(screen, row: int, col: int, glyph: bytes, height: int) -> int:
 	"""Draw one character cell at (row, col) in overwrite mode; return the next column.
 
 	The cell spans the glyph plus `gap` blank columns on its right and `gap` blank
@@ -580,17 +583,11 @@ def _blit_char(screen, row: int, col: int, glyph: bytes, height: int, gap: int) 
 	the screen edges are clipped.
 	"""
 	width = len(glyph)
-	for dc in range(width + gap):
+	for dc in range(width):
 		c = col + dc
-		if c > MAX_COL:
-			break
-		for dr in range(height + gap):
-			r = row + dr
-			if r > MAX_ROW:
-				break
-			lit = dc < width and dr < height and (glyph[dc] >> (height - 1 - dr)) & 1
-			screen.set(r, c, bool(lit))
-	return col + width + gap
+		for dr in range(height):
+			screen.set(row + dr, c, bool((glyph[dc] >> (height - 1 - dr)) & 1))
+	return col + width
 
 
 @forms_func
@@ -600,25 +597,25 @@ def text(args):
 	Text(-1,row,col,val[,val...]) uses the large font instead.
 	"""	
 	first = args.expr()
+	large_mode = first == -1
 
-	if first == -1:
+	if large_mode:
 		font   = LARGE_FONT
 		height = 7
-		gap    = 1  # large font cells have a 1-pixel separator on the right and below
 		row    = py_int(args.expr())
 		col    = py_int(args.expr())
 	else:
 		font   = SMALL_FONT
 		height = 6
-		gap    = 0  # small font glyphs have their own trailing spacing column
 		row    = py_int(first)
 		col    = py_int(args.expr())
 
 	# Collect and validate every value before touching the screen, so an invalid
-	# argument (e.g. a complex number) can't leave a partially-drawn string.
-	display = bytearray()
+	# argument (e.g. a complex number) can't leave a partially-drawn string. #
+	glyphs = []
 	while args.has_next:
-		display.extend(_get_text_chars(args.expr()))
+		for char in _get_text_chars(args.expr()):
+			glyphs.append(font[char])
 	args.end_paren_cmd()
 
 	# A character's height can't be clipped, so a row with too little vertical room
@@ -628,12 +625,9 @@ def text(args):
 
 	screen = args.env.screen
 	cur_col = col
-	for b in display:
-		glyph = font[b]
-		if glyph is None:
-			continue
-		# Draw a character only if the glyph itself fits; padding (gap, bottom row)
-		# is optional overhang. Stop here rather than writing a partial character.
-		if cur_col < 0 or cur_col + len(glyph) > MAX_COL + 1:
+	for glyph in glyphs:
+		if cur_col + len(glyph) > MAX_COL + 1:
 			break
 		cur_col = _blit_char(screen, row, cur_col, glyph, height, gap)
+		if large_mode:
+			pass  # TODO: clear gap

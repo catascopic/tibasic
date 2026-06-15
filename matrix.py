@@ -14,8 +14,6 @@ from errors import DataTypeError, DimMismatchError, InvalidDimError, ArgumentErr
 from parser import ArgParser
 
 
-# ── Matrix functions ──────────────────────────────────────────────────────────
-
 @preparse_func
 def det(mat: TiMatrix):
 	n = mat.rows
@@ -126,7 +124,6 @@ def times_row_plus(factor: Real, mat: TiMatrix, row1: Real, row2: Real):
 	result.set_row(row2, [factor * a + b for a, b in zip(mat.get_row(row1), mat.get_row(row2))])
 	return result
 
-# ── Matrix commands ───────────────────────────────────────────────────────────
 
 @forms_func
 def list_to_matr(args: ArgParser) -> None:

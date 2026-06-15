@@ -13,8 +13,6 @@ from preparse import preparse_func, Real, VectorizedReal, Env
 from errors import DomainError, DimMismatchError
 
 
-# ── dbd ───────────────────────────────────────────────────────────────────────
-
 def _parse_dbd_date(d):
 	"""Parse a TI Finance date float into a date object.
 
@@ -55,8 +53,6 @@ def dbd(date1: VectorizedReal, date2: VectorizedReal):
 	return (_parse_dbd_date(date2) - _parse_dbd_date(date1)).days
 
 
-# ── npv / irr ─────────────────────────────────────────────────────────────────
-
 def _expand_cash_flows(cflist, cffreq):
 	require_list(cflist)
 	if cffreq is None:
@@ -72,6 +68,7 @@ def _expand_cash_flows(cflist, cffreq):
 		result.extend([cf] * int(freq))
 	return result
 
+
 @preparse_func
 def npv(rate: Real, cf0: Real, cflist: TiList, cffreq: TiList = None):
 	"""Net present value: CF0 + Σ CFj·(1+rate/100)^-j over expanded cash flows."""
@@ -80,6 +77,7 @@ def npv(rate: Real, cf0: Real, cflist: TiList, cffreq: TiList = None):
 		return cf0 + builtins.sum(flows)
 	r = 1 + rate / 100
 	return cf0 + builtins.sum(cf * r ** -j for j, cf in enumerate(flows, 1))
+
 
 @preparse_func
 def irr(cf0: Real, cflist: TiList, cffreq: TiList = None):
@@ -114,8 +112,6 @@ def irr(cf0: Real, cflist: TiList, cffreq: TiList = None):
 	raise DomainError("irr: no positive real solution found (ERR:NO SIGN CHG)")
 
 
-# ── TVM: bal / ΣPrn / ΣInt ───────────────────────────────────────────────────
-
 def _bal(env, n, roundvalue=None):
 	"""Balance after n payments, using TVM variables from env."""
 	r = env.i_pct.resolve() / 100
@@ -130,6 +126,7 @@ def _bal(env, n, roundvalue=None):
 		return pv + pmt * n
 	return pv * (1 + r) ** n + pmt * ((1 + r) ** n - 1) / r
 
+
 @preparse_func
 def bal(env: Env, n: Real, roundvalue: Real = None):
 	"""bal(n[,roundvalue]) — remaining balance after n payments."""
@@ -139,6 +136,7 @@ def bal(env: Env, n: Real, roundvalue: Real = None):
 	if roundvalue is not None:
 		roundvalue = py_int(roundvalue)
 	return _bal(env, n, roundvalue)
+
 
 @preparse_func
 def sigma_prn(env: Env, n1: Real, n2: Real, roundvalue: Real = None):
@@ -150,6 +148,7 @@ def sigma_prn(env: Env, n1: Real, n2: Real, roundvalue: Real = None):
 	if n1 < 1 or n2 < 0:
 		raise DomainError("ΣPrn: payment numbers must be positive")
 	return _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
+
 
 @preparse_func
 def sigma_int(env: Env, n1: Real, n2: Real, roundvalue: Real = None):
@@ -164,8 +163,6 @@ def sigma_int(env: Env, n1: Real, n2: Real, roundvalue: Real = None):
 	return (n2 - n1 + 1) * env.pmt.resolve() - sprn
 
 
-# ── ►Nom / ►Eff ───────────────────────────────────────────────────────────────
-
 @preparse_func
 def eff(nom: VectorizedReal, cp: VectorizedReal):
 	"""►Eff(: convert nominal interest rate to effective interest rate."""
@@ -176,6 +173,7 @@ def eff(nom: VectorizedReal, cp: VectorizedReal):
 	if nom <= -100:
 		raise DomainError("►Eff: nominal rate must be > -100%")
 	return 100 * ((1 + nom / (100 * cp)) ** cp - 1)
+
 
 @preparse_func
 def nom(eff_rate: VectorizedReal, cp: VectorizedReal):

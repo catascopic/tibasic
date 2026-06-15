@@ -16,8 +16,6 @@ from preparse import preparse_func, Real
 from errors import DomainError
 
 
-# ── Numerical helpers ─────────────────────────────────────────────────────────
-
 def _regularized_inc_gamma(a, x):
 	"""Lower regularized incomplete gamma function P(a, x) via series."""
 	if x < 0:
@@ -103,14 +101,13 @@ def _inc_beta(a, b, x):
 	return math.exp(a * math.log(x) + b * math.log(1 - x) - lbeta) * h / a
 
 
-# ── Normal distribution ───────────────────────────────────────────────────────
-
 @preparse_func
 def normalpdf(x: Real, mu: Real = 0, sigma: Real = 1):
 	if sigma == 0:
 		raise DomainError("normalpdf: sigma must be non-zero")
 	z = (x - mu) / sigma
 	return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2 * math.pi))
+
 
 @preparse_func
 def normalcdf(lower: Real, upper: Real, mu: Real = 0, sigma: Real = 1):
@@ -119,6 +116,7 @@ def normalcdf(lower: Real, upper: Real, mu: Real = 0, sigma: Real = 1):
 	def _cdf(z):
 		return 0.5 * (1 + math.erf(z / math.sqrt(2)))
 	return _cdf((upper - mu) / sigma) - _cdf((lower - mu) / sigma)
+
 
 @preparse_func
 def inv_norm(p: Real, mu: Real = 0, sigma: Real = 1):
@@ -144,12 +142,11 @@ def inv_norm(p: Real, mu: Real = 0, sigma: Real = 1):
 	return mu + sigma * _inv_std(p)
 
 
-# ── Student's t distribution ──────────────────────────────────────────────────
-
 @preparse_func
 def tpdf(t: Real, df: Real):
 	log_coeff = math.lgamma((df + 1) / 2) - 0.5 * math.log(df * math.pi) - math.lgamma(df / 2)
 	return math.exp(log_coeff - (df + 1) / 2 * math.log(1 + t * t / df))
+
 
 @preparse_func
 def tcdf(lower: Real, upper: Real, df: Real):
@@ -163,6 +160,7 @@ def tcdf(lower: Real, upper: Real, df: Real):
 		else:
 			return 0.5 * ib
 	return _t_cdf(upper, df) - _t_cdf(lower, df)
+
 
 @preparse_func
 def inv_t(p: Real, df: Real):
@@ -183,14 +181,13 @@ def inv_t(p: Real, df: Real):
 	return x
 
 
-# ── Chi-squared distribution ──────────────────────────────────────────────────
-
 @preparse_func
 def chi_sq_pdf(x: Real, df: Real):
 	if x <= 0:
 		return 0.0
 	k = df
 	return math.exp((k / 2 - 1) * math.log(x) - x / 2 - (k / 2) * math.log(2) - math.lgamma(k / 2))
+
 
 @preparse_func
 def chi_sq_cdf(lower: Real, upper: Real, df: Real):
@@ -201,8 +198,6 @@ def chi_sq_cdf(lower: Real, upper: Real, df: Real):
 	return _cdf(upper, df) - _cdf(lower, df)
 
 
-# ── F distribution ────────────────────────────────────────────────────────────
-
 @preparse_func
 def f_pdf(x: Real, df1: Real, df2: Real):
 	if x <= 0:
@@ -210,6 +205,7 @@ def f_pdf(x: Real, df1: Real, df2: Real):
 	log_num = (df1 / 2) * math.log(df1 * x) + (df2 / 2) * math.log(df2) - ((df1 + df2) / 2) * math.log(df1 * x + df2)
 	log_den = math.log(x) + math.lgamma(df1 / 2) + math.lgamma(df2 / 2) - math.lgamma((df1 + df2) / 2)
 	return math.exp(log_num - log_den)
+
 
 @preparse_func
 def fcdf(lower: Real, upper: Real, df1: Real, df2: Real):
@@ -221,8 +217,6 @@ def fcdf(lower: Real, upper: Real, df1: Real, df2: Real):
 	return _cdf(upper, df1, df2) - _cdf(lower, df1, df2)
 
 
-# ── Binomial distribution ─────────────────────────────────────────────────────
-
 @preparse_func
 def binompdf(n: Real, p: Real, k: Real = None):
 	n = py_int(n)
@@ -230,6 +224,7 @@ def binompdf(n: Real, p: Real, k: Real = None):
 		return TiList([math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(n + 1)])
 	k = py_int(k)
 	return math.comb(n, k) * p ** k * (1 - p) ** (n - k)
+
 
 @preparse_func
 def binomcdf(n: Real, p: Real, k: Real = None):
@@ -244,12 +239,11 @@ def binomcdf(n: Real, p: Real, k: Real = None):
 	return float(builtins.sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(py_int(k) + 1)))
 
 
-# ── Poisson distribution ──────────────────────────────────────────────────────
-
 @preparse_func
 def poissonpdf(lam: Real, k: Real):
 	k = py_int(k)
 	return math.exp(-lam) * lam ** k / math.factorial(k)
+
 
 @preparse_func
 def poissoncdf(lam: Real, k: Real):
@@ -257,12 +251,11 @@ def poissoncdf(lam: Real, k: Real):
 	return builtins.sum(math.exp(-lam) * lam ** i / math.factorial(i) for i in range(k + 1))
 
 
-# ── Geometric distribution ────────────────────────────────────────────────────
-
 @preparse_func
 def geometpdf(p: Real, n: Real):
 	n = py_int(n)
 	return p * (1 - p) ** (n - 1)
+
 
 @preparse_func
 def geometcdf(p: Real, n: Real):

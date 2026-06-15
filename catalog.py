@@ -98,8 +98,8 @@ def token(
 	return t
 
 
-token(0x01, b'\x05DMS')  # ►DMS
-token(0x02, b'\x05Dec')  # ►Dec
+token(0x01, b'\x05DMS')   # ►DMS
+token(0x02, b'\x05Dec')   # ►Dec
 token(0x03, b'\x05Frac')  # ►Frac
 token(tk.STORE, b'\x1c')  # →
 token(0x05, b'Boxplot')
@@ -345,10 +345,8 @@ token(0x7E12, b'uwAxes')
 token(0x7F, b'\n')    # ▫
 token(0x80, b'\x0b')  # ﹢
 token(0x81, b'\x0c')  # ·
-
 token(0x82, b'*',                       bp=(60, 61), op=ops.mul, typeable=True)
 token(0x83, b'/',                       bp=(60, 61), op=ops.div, typeable=True)
-
 token(0x84, b'Trace')
 token(0x85, b'ClrDraw',                 cmd=draw.clr_draw)
 token(0x86, b'ZStandard')
@@ -365,10 +363,8 @@ token(0x90, b'ZoomRcl')
 token(0x91, b'PrintScreen')
 token(0x92, b'ZoomSto')
 token(0x93, b'Text(',                   cmd=draw.text)
-
 token(0x94, b'nPr',                     bp=(60, 61), op=ops.npr)
 token(0x95, b'nCr',                     bp=(60, 61), op=ops.ncr)
-
 token(0x96, b'FnOn ')
 token(0x97, b'FnOff ')
 token(0x98, b'StorePic ')
@@ -645,6 +641,8 @@ token(0xBBF2, b'\x06')                                  # 🡅
 token(0xBBF3, b'\x07')                                  # 🡇
 token(0xBBF4, b'\x10')                                  # √
 token(0xBBF5, b'\x7f')                                  # ≛
+
+
 token(0xBC, b'\x10(',                   func=timath.sqrt)   # √(
 token(0xBD, b'\x0e\x10(',               func=timath.cbrt)   # 𝟑√(
 token(0xBE, b'ln(',		                func=timath.ln)

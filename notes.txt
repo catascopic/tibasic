@@ -1,6 +1,14 @@
+# TODO: clear gap
+
 _REGISTRY: ArgSpec repr name
 
 call_with_parser: guard_real?
+√( — square root of a negative
+ˣ√
+x² doesn't, but odd roots... actually the TI-84 is tricky here — ^ with a fractional exponent on a negative number will error rather than give a real odd root
+log(, ln( — negative input
+sin⁻¹(, cos⁻¹( — input outside [-1, 1]
+
 
 Get rid of parse_args
 Cleanup: token(0xEF09, b'getDate',               res=Environment.get_date)
@@ -14,7 +22,7 @@ UserList to Environment
 Can we get rid of:
 		if c > MAX_COL:
 			break
-			
+
 TiProgram: require uppercase for writing
 
 rework typeable!

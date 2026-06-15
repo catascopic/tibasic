@@ -26,8 +26,6 @@ from core import vectorize
 from errors import DataTypeError, DimMismatchError, DomainError
 
 
-# ── Shared helpers ────────────────────────────────────────────────────────────
-
 def handle_complex(func):
 	"""Apply a real-valued func separately to the real and imaginary parts."""
 	@wraps(func)
@@ -42,7 +40,14 @@ def _inv_trig(func, env, x):
 		raise DomainError(f"{func.__name__}: argument out of domain: {x}")
 
 
-# ── Dedicated keys ────────────────────────────────────────────────────────────
+# NOT (the only LOGIC command that's actually a function)
+
+@preparse_func
+def not_(x: VectorizedReal):
+	return float(not x)
+
+
+# DEDICATED KEYS
 
 @preparse_func
 def sin(env: Env, x: VectorizedReal):
@@ -105,8 +110,7 @@ def pow10(x: Vectorized):
 	return 10 ** x
 
 
-# ── MATH menu ─────────────────────────────────────────────────────────────────
-# MATH 4: ³√(
+# MATH MENU
 
 @preparse_func
 def cbrt(x: Vectorized):
@@ -116,7 +120,6 @@ def cbrt(x: Vectorized):
 		return cmath.exp(cmath.log(x) / 3)
 	return math.cbrt(x)
 
-# MATH 8: nDeriv(
 
 @preparse_func
 def n_deriv(env: Env, formula: Thunk, var: NumericVar, val: Real, h: Real = 0.001) -> float:
@@ -127,7 +130,6 @@ def n_deriv(env: Env, formula: Thunk, var: NumericVar, val: Real, h: Real = 0.00
 		bwd = formula.eval()
 	return (fwd - bwd) / (2 * h)
 
-# MATH 9: fnInt(
 
 _K15_NODES = [
 	0.0,                0.2077849550078985, 0.4058451513773972, 0.5860872354676911,
@@ -174,7 +176,6 @@ def fn_int(env: Env, formula: Thunk, var: NumericVar, lo: Real, hi: Real, tol: R
 			return formula.eval()
 		return _adaptive_gk15(f, lo, hi, tol)
 
-# MATH 0: Σ(
 
 @preparse_func
 def sigma(env: Env, formula: Thunk, var: NumericVar, start: Real, end: Real) -> float:
@@ -187,7 +188,6 @@ def sigma(env: Env, formula: Thunk, var: NumericVar, start: Real, end: Real) -> 
 			n += 1
 	return total
 
-# MATH A: logBASE(
 
 @preparse_func
 def log_base(x: Vectorized, base: Vectorized):
@@ -202,14 +202,10 @@ def log_base(x: Vectorized, base: Vectorized):
 	return cmath.log(x, base)
 
 
-# ── NUM menu ──────────────────────────────────────────────────────────────────
-# NUM 1: abs(  (also CPX 5: abs()
-
 @preparse_func
 def abs(x: MatrixVectorized):
 	return builtins.abs(x)
 
-# NUM 2: round(
 
 def _ti_round(x: float, decimals: int) -> float:
 	"""Round half away from zero (TI-84 behavior; Python uses banker's rounding)."""
@@ -217,34 +213,30 @@ def _ti_round(x: float, decimals: int) -> float:
 	return float(_decimal.Decimal(str(x)).quantize(quant, rounding=_decimal.ROUND_HALF_UP))
 
 @preparse_func
-def round(x: MatrixVectorized, decimals: Real = 9):
+def round(x: MatrixVectorized, decimals: Real = 9.0):
 	n = py_int(decimals)
 	if isinstance(x, complex):
 		return complex(_ti_round(x.real, n), _ti_round(x.imag, n))
 	return _ti_round(x, n)
 
-# NUM 3: iPart(
 
 @preparse_func
 @handle_complex
 def i_part(x: MatrixVectorized):
 	return float(math.trunc(x))
 
-# NUM 4: fPart(
 
 @preparse_func
 @handle_complex
 def f_part(x: MatrixVectorized):
 	return x - math.trunc(x)
 
-# NUM 5: int(
 
 @preparse_func
 @handle_complex
 def int_(x: MatrixVectorized):
 	return float(math.floor(x))
 
-# NUM 6: min(  /  NUM 7: max(
 
 def _minmax(func, a, b):
 	if b is None:
@@ -265,19 +257,16 @@ def min(a: AnyValue, b: AnyValue = None):
 def max(a: AnyValue, b: AnyValue = None):
 	return _minmax(builtins.max, a, b)
 
-# NUM 8: lcm(
 
 @preparse_func
 def lcm(a: VectorizedReal, b: VectorizedReal) -> float:
 	return float(math.lcm(py_int(a), py_int(b)))
 
-# NUM 9: gcd(
 
 @preparse_func
 def gcd(a: VectorizedReal, b: VectorizedReal) -> float:
 	return float(math.gcd(py_int(a), py_int(b)))
 
-# NUM 0: remainder(
 
 @preparse_func
 def remainder(a: VectorizedReal, b: VectorizedReal):
@@ -290,54 +279,25 @@ def remainder(a: VectorizedReal, b: VectorizedReal):
 	return a % b
 
 
-# ── CPX menu ──────────────────────────────────────────────────────────────────
-# CPX 1: conj(
-
 @preparse_func
 def conj(x: Vectorized):
 	return complex(x.real, -x.imag) if isinstance(x, complex) else x
 
-# CPX 2: real(
 
 @preparse_func
 def real(x: Vectorized):
 	return x.real if isinstance(x, complex) else x
 
-# CPX 3: imag(
 
 @preparse_func
 def imag(x: Vectorized):
 	return x.imag if isinstance(x, complex) else 0
 
-# CPX 4: angle(
-# Note: matrix support is intentionally omitted (see comment in original code).
 
 @preparse_func
 def angle(x: Vectorized):
 	return cmath.phase(x)
 
-
-# ── ANGLE menu ────────────────────────────────────────────────────────────────
-
-@preparse_func
-def rect_to_polar_radius(env: Env, x: VectorizedReal, y: VectorizedReal):
-	return math.hypot(x, y)
-
-@preparse_func
-def rect_to_polar_angle(env: Env, x: VectorizedReal, y: VectorizedReal):
-	return env.from_rad(math.atan2(y, x))
-
-@preparse_func
-def polar_to_rect_x(env: Env, r: VectorizedReal, theta: VectorizedReal):
-	return r * math.cos(env.to_rad(theta))
-
-@preparse_func
-def polar_to_rect_y(env: Env, r: VectorizedReal, theta: VectorizedReal):
-	return r * math.sin(env.to_rad(theta))
-
-
-# ── PRB menu ──────────────────────────────────────────────────────────────────
-# (PRB 1: rand is a token with a special res= handler in catalog.py, not a function here)
 
 @preparse_func
 def rand_list(n: Real):
@@ -347,7 +307,6 @@ def rand_list(n: Real):
 def _rand_int_single(low, high):
 	return float(random.randint(py_int(low), py_int(high)))
 
-# PRB 5: randInt(
 
 @preparse_func
 def rand_int(low: AnyValue, high: AnyValue, n: Real = 1.0):
@@ -366,7 +325,6 @@ def rand_int(low: AnyValue, high: AnyValue, n: Real = 1.0):
 	n = py_int(n)
 	return TiList([float(random.randint(low, high)) for _ in range(n)])
 
-# PRB 6: randNorm(
 
 @preparse_func
 def rand_norm(mu: Real, sigma: Real, n: Real = None):
@@ -374,7 +332,6 @@ def rand_norm(mu: Real, sigma: Real, n: Real = None):
 		return random.gauss(mu, sigma)
 	return TiList([random.gauss(mu, sigma) for _ in range(py_int(n))])
 
-# PRB 7: randBin(
 
 @preparse_func
 def rand_bin(n: Real, p: Real, simulations: Real = None):
@@ -388,7 +345,6 @@ def rand_bin(n: Real, p: Real, simulations: Real = None):
 	simulations = py_int(simulations)
 	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(simulations)])
 
-# PRB 8: randIntNoRep(
 
 @preparse_func
 def rand_int_no_rep(low: Real, high: Real):
@@ -397,7 +353,26 @@ def rand_int_no_rep(low: Real, high: Real):
 	return TiList(lst)
 
 
-# ── Hyperbolic trig (CATALOG) ─────────────────────────────────────────────────
+# ANGLE MENU
+
+@preparse_func
+def rect_to_polar_radius(env: Env, x: VectorizedReal, y: VectorizedReal):
+	return math.hypot(x, y)
+
+@preparse_func
+def rect_to_polar_angle(env: Env, x: VectorizedReal, y: VectorizedReal):
+	return env.from_rad(math.atan2(y, x))
+
+@preparse_func
+def polar_to_rect_x(env: Env, r: VectorizedReal, theta: VectorizedReal):
+	return r * math.cos(env.to_rad(theta))
+
+@preparse_func
+def polar_to_rect_y(env: Env, r: VectorizedReal, theta: VectorizedReal):
+	return r * math.sin(env.to_rad(theta))
+
+
+# CATALOG (hyperbolic trig functions)
 
 @preparse_func
 def sinh(x: VectorizedReal):
@@ -428,16 +403,3 @@ def atanh(x: VectorizedReal):
 	if builtins.abs(x) == 1:
 		raise DomainError("atanh: undefined for ±1")
 	return cmath.atanh(x)
-
-
-# ── TEST LOGIC menu ────────────────────────────────────────────────────────────
-
-@preparse_func
-def not_(x: VectorizedReal):
-	return float(not x)
-
-
-
-if __name__ == '__main__':
-	print(round.schema)
-
