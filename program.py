@@ -2,9 +2,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from core import Variable, Thunk
-from environment import Environment
+from environment import Environment, ReturnSignal
 from errors import TiSyntaxError, IncrementError, LabelError
-from signals import ReturnSignal
 from core import require_real
 from titoken import THEN, ELSE, LBL
 

@@ -7,7 +7,7 @@ from itertools import accumulate, batched
 
 from core import TiList, TiMatrix, require_list, require_matrix
 from core import require_real, require_int, py_int
-from preparse import preparse_func, preparse_cmd_func, Real, MatrixVar, ListOrMatrix
+from preparse import preparse_func, preparse_cmd_func, Real, MatrixVar
 from preparse import forms_func
 from errors import DataTypeError, DimMismatchError, InvalidDimError, ArgumentError
 
@@ -125,35 +125,6 @@ def times_row_plus(factor: Real, mat: TiMatrix, row1: Real, row2: Real):
 	result = mat.copy()
 	result.set_row(row2, [factor * a + b for a, b in zip(mat.get_row(row1), mat.get_row(row2))])
 	return result
-
-
-# ── Cross-type functions (list or matrix) ─────────────────────────────────────
-
-@preparse_func
-def cum_sum(obj: ListOrMatrix):
-	if isinstance(obj, TiMatrix):
-		cols = obj.cols
-		rows = obj.rows
-		return TiMatrix([
-			[builtins.sum(obj.data[rr][c] for rr in range(r + 1))
-				for c in range(cols)]
-			for r in range(rows)
-		])
-	if isinstance(obj, TiList):
-		return TiList(list(accumulate(obj.data)))
-	raise DataTypeError(f"Expected list or matrix; got {obj}")
-
-
-@preparse_func
-def augment(a: ListOrMatrix, b: ListOrMatrix):
-	if isinstance(a, TiList) and isinstance(b, TiList):
-		return TiList(a.data + b.data)
-	if isinstance(a, TiMatrix) and isinstance(b, TiMatrix):
-		if a.rows != b.rows:
-			raise DimMismatchError(f"Row count mismatch: {a.rows} vs {b.rows}")
-		return TiMatrix([r1 + r2 for r1, r2 in zip(a.data, b.data)])
-	raise DataTypeError(f"augment: both args must be lists or both must be matrices; got {a}, {b}")
-
 
 # ── Matrix commands ───────────────────────────────────────────────────────────
 

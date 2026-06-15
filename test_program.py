@@ -7,9 +7,8 @@ to the test rather than being swallowed by run_line.
 import pytest
 from pytest import approx
 
-from environment import Environment
+from environment import Environment, ReturnSignal, StopSignal
 from errors import IncrementError, TiSyntaxError, LabelError
-from signals import ReturnSignal, StopSignal
 from program import Program
 from test_tibasic import toks, var, calc
 
@@ -831,43 +830,6 @@ class TestRecursion:
 		""", env)
 
 		assert calc('$A( dim( $A', env) == 120
-
-	@pytest.mark.skip('WTF')
-	def test_fibonacci(self):
-		env = Environment()
-		calc('{9@A', env)
-		run("""
-		$A(  dim(  $A))@N
-		dim( $A)-1@ dim( $A)
-		If N≤1
-		Then
-			Disp N
-			N@$A(1+ dim( $A))
-			Return
-		End
-
-		N@$A(1+ dim( $A))
-		N-1@$A(1+ dim( $A))
-		prgm TEST
-		$A( dim( $A))@R
-		dim( $A)-1@ dim( $A)
-		$A( dim( $A))@N
-
-		R@$A(1+ dim( $A))
-		N@$A(1+ dim( $A))
-		N-2@$A(1+ dim( $A))
-		prgm TEST
-		$A( dim( $A))@S
-		dim( $A)-1@ dim( $A)
-		dim( $A)-1@ dim( $A)
-		$A( dim( $A))@R
-		dim( $A)-1@ dim( $A)
-
-		R+S@$A(1+ dim( $A))
-		""", env)
-
-		assert calc('$A( dim( $A', env) == 34
-
 
 class TestEngima:
 

@@ -1,10 +1,8 @@
-import cmath
 import math
 from functools import wraps
 
 from errors import DataTypeError, DomainError, DivideByZeroError
-from core import TiList, TiMatrix, require_matrix, vectorize
-from core import require_real, require_int, require_num, py_int
+from core import TiList, TiMatrix, require_matrix, vectorize, require_real, require_int, require_num, py_int
 
 
 # ── Pure comparison operators ────────────────────────────────────────────────
@@ -26,13 +24,13 @@ def comparison(func):
 @comparison
 def eq(a, b):
 	if isinstance(a, complex) != isinstance(b, complex):
-		raise DataTypeError("Cannot compare complex and real number with = or ≠")
+		raise DataTypeError("eq not supported across real/complex")
 	return a == b
 
 @comparison
 def ne(a, b):
 	if isinstance(a, complex) != isinstance(b, complex):
-		raise DataTypeError("Cannot compare complex and real number with = or ≠")
+		raise DataTypeError("ne not supported across real/complex")
 	return a != b
 
 @comparison
@@ -121,8 +119,6 @@ def power(base, exp):
 	"""^ operator — returns complex when the result is non-real."""
 	try:
 		result = base ** exp
-	except ValueError:
-		return cmath.exp(cmath.log(complex(base)) * exp)
 	except TypeError:
 		raise DataTypeError(f"{base}^{exp} not supported")
 	return result
@@ -134,8 +130,6 @@ def xth_root(x, n):
 		raise DataTypeError(f"xth root not supported for matrix")
 	try:
 		return n ** (1 / x)
-	except ValueError:
-		return cmath.exp(cmath.log(n) / x)
 	except TypeError:
 		raise DataTypeError(f"{x}th root of {n} not supported")
 
@@ -151,8 +145,7 @@ def inv(x):
 		raise DivideByZeroError("Division by zero")
 
 def transpose(mat):
-	require_matrix(mat)
-	return TiMatrix([[mat.data[r][c] for r in range(mat.rows)] for c in range(mat.cols)])
+	return require_matrix(mat).transpose()
 
 @vectorize
 def factorial(n):

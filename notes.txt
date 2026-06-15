@@ -1,3 +1,14 @@
+_REGISTRY: ArgSpec repr name
+
+call_with_parser: guard_real?
+
+Get rid of parse_args
+Cleanup: token(0xEF09, b'getDate',               res=Environment.get_date)
+func=forms_func(ArgParser.ans_index_or_mul)
+
+except ValueError:
+	return cmath.exp(cmath.log(complex(base)) * exp)
+
 UserList to Environment
 
 Can we get rid of:

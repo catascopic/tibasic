@@ -1,24 +1,23 @@
-import math
 from operator import attrgetter
 from collections.abc import Callable
 from io import BytesIO
-from typing import Any
-import titoken as tk
-from titoken import Token
+
 from environment import Environment
 from parser import ArgParser
 from preparse import forms_func
-import operators as ops
+from titoken import Token
 import commands as cmds
-import modecmds
-import draw
-import tilist
-import matrix as mat
-import tistring as tis
-import timath as tm
-import titime
 import distributions as dist
-import finance as fin
+import draw
+import finance
+import matrix
+import modecmds
+import operators as ops
+import tilist
+import timath
+import tistring
+import titime
+import titoken as tk
 
 
 
@@ -116,26 +115,26 @@ token(0x0E, b'\x16',                    post=ops.transpose)                  # �
 token(0x0F, b'\xd5',                    post=lambda x: x**3, typeable=True)  # ³
 token(tk.L_PAREN, b'(',                 typeable=True)
 token(tk.R_PAREN, b')',                 typeable=True)
-token(0x12, b'round(',                  func=tm.round)
+token(0x12, b'round(',                  func=timath.round)
 token(0x13, b'pxl-Test(',               func=draw.pxl_test)
-token(0x14, b'augment(',                func=mat.augment)
-token(0x15, b'rowSwap(',                func=mat.row_swap)
-token(0x16, b'row+(',                   func=mat.row_plus)
-token(0x17, b'*row(',                   func=mat.times_row)
-token(0x18, b'*row+(',                  func=mat.times_row_plus)
-token(0x19, b'max(',                    func=tm.max)
-token(0x1A, b'min(',                    func=tm.min)
-token(0x1B, b'R\x05Pr(',                func=tm.rect_to_polar_radius)  # R►Pr(
-token(0x1C, b'R\x05P\x5b(',             func=tm.rect_to_polar_angle)   # R►Pθ(
-token(0x1D, b'P\x05Rx(',                func=tm.polar_to_rect_x)       # P►Rx(
-token(0x1E, b'P\x05Ry(',                func=tm.polar_to_rect_y)       # P►Ry(
+token(0x14, b'augment(',                func=tilist.augment)
+token(0x15, b'rowSwap(',                func=matrix.row_swap)
+token(0x16, b'row+(',                   func=matrix.row_plus)
+token(0x17, b'*row(',                   func=matrix.times_row)
+token(0x18, b'*row+(',                  func=matrix.times_row_plus)
+token(0x19, b'max(',                    func=timath.max)
+token(0x1A, b'min(',                    func=timath.min)
+token(0x1B, b'R\x05Pr(',                func=timath.rect_to_polar_radius)  # R►Pr(
+token(0x1C, b'R\x05P\x5b(',             func=timath.rect_to_polar_angle)   # R►Pθ(
+token(0x1D, b'P\x05Rx(',                func=timath.polar_to_rect_x)       # P►Rx(
+token(0x1E, b'P\x05Ry(',                func=timath.polar_to_rect_y)       # P►Ry(
 token(0x1F, b'median(',                 func=tilist.median)
-token(0x20, b'randM(',                  func=mat.rand_m)
+token(0x20, b'randM(',                  func=matrix.rand_m)
 token(0x21, b'mean(',                   func=tilist.mean)
 token(0x22, b'solve(')
 token(0x23, b'seq(',                    func=tilist.seq)
-token(0x24, b'fnInt(',                  func=tm.fn_int)
-token(0x25, b'nDeriv(',                 func=tm.n_deriv)
+token(0x24, b'fnInt(',                  func=timath.fn_int)
+token(0x25, b'nDeriv(',                 func=timath.n_deriv)
 token(0x27, b'fMin(')
 token(0x28, b'fMax(')
 token(0x29, b' ',                       typeable=True)
@@ -308,7 +307,7 @@ token(0x6E, b'\x19',                    bp=(40, 41), op=ops.ge,  typeable=True) 
 token(0x6F, b'\x18',                    bp=(40, 41), op=ops.ne,  typeable=True)  # ≠
 token(0x70, b'+',                       bp=(50, 51), op=ops.add, typeable=True)
 token(0x71, b'-',                       bp=(50, 51), op=ops.sub, typeable=True)
-token(0x72, b'Ans',                     func=forms_func(ArgParser.ans_index_or_mul), res=Environment.get_ans)
+token(tk.ANS, b'Ans')                   # Handled as special case in parser
 
 token(0x73, b'Fix',                     cmd=modecmds.fix)
 token(0x74, b'Horiz')
@@ -395,40 +394,40 @@ token(0xA9, b'DrawF ',                  cmd=draw.draw_f)
 for _i in range(10):
 	token(0xAA00 | _i, b'Str' + bytes([0x30 + (_i + 1) % 10]), var=_make_accessor('strings', _i))
 
-token(tk.RAND, b'rand',                 res=Environment.rand, func=tm.rand_list)
+token(tk.RAND, b'rand',                 res=Environment.rand, func=timath.rand_list)
 token(0xAC, b'\xc4',                    res=lambda env: math.pi, typeable=True)  # π
 token(0xAD, b'getKey',                  res=Environment.get_key)
 token(tk.APOS, b"'",                    typeable=True)
 token(0xAF, b'?',                       typeable=True)
 token(tk.NEG, b'\x1a')  # ⁻
-token(0xB1, b'int(',                    func=tm.int_)
-token(0xB2, b'abs(',                    func=tm.abs)
-token(0xB3, b'det(',                    func=mat.det)
-token(0xB4, b'identity(',               func=mat.identity)
+token(0xB1, b'int(',                    func=timath.int_)
+token(0xB2, b'abs(',                    func=timath.abs)
+token(0xB3, b'det(',                    func=matrix.det)
+token(0xB4, b'identity(',               func=matrix.identity)
 token(tk.DIM, b'dim(',                  func=tilist.dim)
 token(0xB6, b'sum(',                    func=tilist.sum)
 token(0xB7, b'prod(',                   func=tilist.prod)
-token(0xB8, b'not(',                    func=tm.not_)
-token(0xB9, b'iPart(',                  func=tm.i_part)
-token(0xBA, b'fPart(',                  func=tm.f_part)
+token(0xB8, b'not(',                    func=timath.not_)
+token(0xB9, b'iPart(',                  func=timath.i_part)
+token(0xBA, b'fPart(',                  func=timath.f_part)
 
 
-token(0xBB00, b'npv(',  			    func=fin.npv)
-token(0xBB01, b'irr(',  			    func=fin.irr)
-token(0xBB02, b'bal(',  			    func=fin.bal)
-token(0xBB03, b'\xc6prn(', 			    func=fin.sigma_prn)  # Σprn(
-token(0xBB04, b'\xc6Int(', 			    func=fin.sigma_int)  # ΣInt(
-token(0xBB05, b'\x05Nom(', 			    func=fin.nom)  # ►Nom(
-token(0xBB06, b'\x05Eff(', 			    func=fin.eff)  # ►Eff(
-token(0xBB07, b'dbd(',                  func=fin.dbd)
-token(0xBB08, b'lcm(',                  func=tm.lcm)
-token(0xBB09, b'gcd(',                  func=tm.gcd)
-token(0xBB0A, b'randInt(',              func=tm.rand_int)
-token(0xBB0B, b'randBin(',              func=tm.rand_bin)
-token(0xBB0C, b'sub(',                  func=tis.sub)
+token(0xBB00, b'npv(',  			    func=finance.npv)
+token(0xBB01, b'irr(',  			    func=finance.irr)
+token(0xBB02, b'bal(',  			    func=finance.bal)
+token(0xBB03, b'\xc6prn(', 			    func=finance.sigma_prn)  # Σprn(
+token(0xBB04, b'\xc6Int(', 			    func=finance.sigma_int)  # ΣInt(
+token(0xBB05, b'\x05Nom(', 			    func=finance.nom)  # ►Nom(
+token(0xBB06, b'\x05Eff(', 			    func=finance.eff)  # ►Eff(
+token(0xBB07, b'dbd(',                  func=finance.dbd)
+token(0xBB08, b'lcm(',                  func=timath.lcm)
+token(0xBB09, b'gcd(',                  func=timath.gcd)
+token(0xBB0A, b'randInt(',              func=timath.rand_int)
+token(0xBB0B, b'randBin(',              func=timath.rand_bin)
+token(0xBB0C, b'sub(',                  func=tistring.sub)
 token(0xBB0D, b'stdDev(',               func=tilist.stddev)
 token(0xBB0E, b'variance(',             func=tilist.variance)
-token(0xBB0F, b'inString(',             func=tis.in_string)
+token(0xBB0F, b'inString(',             func=tistring.in_string)
 token(0xBB10, b'normalcdf(',            func=dist.normalcdf)
 token(0xBB11, b'invNorm(',              func=dist.inv_norm)
 token(0xBB12, b'tcdf(',                 func=dist.tcdf)
@@ -444,22 +443,22 @@ token(0xBB1B, b'normalpdf(',            func=dist.normalpdf)
 token(0xBB1C, b'tpdf(',                 func=dist.tpdf)
 token(0xBB1D, b'\xd9\x12pdf(',          func=dist.chi_sq_pdf)  # χ²pdf(
 token(0xBB1E, b'Fpdf(',                 func=dist.f_pdf)
-token(0xBB1F, b'randNorm(',             func=tm.rand_norm)
+token(0xBB1F, b'randNorm(',             func=timath.rand_norm)
 token(0xBB20, b'tvm_Pmt')
 token(0xBB21, b'tvm_I%')
 token(0xBB22, b'tvm_PV')
 token(0xBB23, b'tvm_N')
 token(0xBB24, b'tvm_FV')
-token(0xBB25, b'conj(',                 func=tm.conj)
-token(0xBB26, b'real(',                 func=tm.real_)
-token(0xBB27, b'imag(',                 func=tm.imag)
-token(0xBB28, b'angle(',                func=tm.angle)
-token(0xBB29, b'cumSum(',               func=mat.cum_sum)
-token(0xBB2A, b'expr(',                 func=tis.expr)
-token(0xBB2B, b'length(',               func=tis.length)
+token(0xBB25, b'conj(',                 func=timath.conj)
+token(0xBB26, b'real(',                 func=timath.real)
+token(0xBB27, b'imag(',                 func=timath.imag)
+token(0xBB28, b'angle(',                func=timath.angle)
+token(0xBB29, b'cumSum(',               func=tilist.cum_sum)
+token(0xBB2A, b'expr(',                 func=tistring.expr)
+token(0xBB2B, b'length(',               func=tistring.length)
 token(0xBB2C, b'\xbeList(',             func=tilist.delta_list)  # ΔList(
-token(0xBB2D, b'ref(',                  func=mat.ref)
-token(0xBB2E, b'rref(',                 func=mat.rref)
+token(0xBB2D, b'ref(',                  func=matrix.ref)
+token(0xBB2E, b'rref(',                 func=matrix.rref)
 token(0xBB2F, b'\x05Rect')  # ►Rect
 token(0xBB30, b'\x05Polar')  # ►Polar
 token(0xBB31, b'\xdb',                  res=lambda env: math.e, typeable=True)  # 𝑒
@@ -470,8 +469,8 @@ token(0xBB35, b'ShadeNorm(',            cmd=draw.shade_norm)
 token(0xBB36, b'Shade_t(',              cmd=draw.shade_t)
 token(0xBB37, b'Shade\xd9\x12(',        cmd=draw.shade_chi_sq)  # Shadeχ²(
 token(0xBB38, b'Shade\xda(',            cmd=draw.shade_f)       # Shade𝐅(
-token(0xBB39, b'Matr\x05list(',         cmd=mat.matr_to_list)  # Matr►list(
-token(0xBB3A, b'List\x05matr(',         cmd=mat.list_to_matr)  # List►matr(
+token(0xBB39, b'Matr\x05list(',         cmd=matrix.matr_to_list)  # Matr►list(
+token(0xBB3A, b'List\x05matr(',         cmd=matrix.list_to_matr)  # List►matr(
 token(0xBB3B, b'Z-Test(')
 token(0xBB3C, b'T-Test')
 token(0xBB3D, b'2-SampZTest(')
@@ -498,8 +497,8 @@ token(0xBB51, b'ExprOff',               cmd=modecmds.expr_off)
 token(0xBB52, b'ClrAllLists',           cmd=tilist.clr_all_lists)
 token(0xBB53, b'GetCalc(')
 token(0xBB54, b'DelVar ',               cmd=cmds.del_var)
-token(0xBB55, b'Equ\x05String(',        cmd=tis.equ_to_string)  # Equ►String(
-token(0xBB56, b'String\x05Equ(',        cmd=tis.string_to_equ)  # String►Equ(
+token(0xBB55, b'Equ\x05String(',        cmd=tistring.equ_to_string)  # Equ►String(
+token(0xBB56, b'String\x05Equ(',        cmd=tistring.string_to_equ)  # String►Equ(
 token(0xBB57, b'Clear Entries')
 token(0xBB58, b'Select(')
 token(0xBB59, b'ANOVA(')
@@ -646,24 +645,24 @@ token(0xBBF2, b'\x06')                                  # 🡅
 token(0xBBF3, b'\x07')                                  # 🡇
 token(0xBBF4, b'\x10')                                  # √
 token(0xBBF5, b'\x7f')                                  # ≛
-token(0xBC, b'\x10(',                   func=tm.sqrt)   # √(
-token(0xBD, b'\x0e\x10(',               func=tm.cbrt)   # 𝟑√(
-token(0xBE, b'ln(',		                func=tm.ln)
-token(0xBF, b'\xdb^(',		            func=tm.exp)    # 𝑒^(
-token(0xC0, b'log(',		            func=tm.log)
-token(0xC1, b'\x1d^(',		            func=tm.pow10)  # ⑽^(
-token(0xC2, b'sin(',		            func=tm.sin)
-token(0xC3, b'sin\x11(',	            func=tm.asin)   # sin¹(
-token(0xC4, b'cos(',		            func=tm.cos)
-token(0xC5, b'cos\x11(',	            func=tm.acos)   # cos¹(
-token(0xC6, b'tan(',		            func=tm.tan)
-token(0xC7, b'tan\x11(',	            func=tm.atan)   # tan¹(
-token(0xC8, b'sinh(',	                func=tm.sinh)
-token(0xC9, b'sinh\x11(',	            func=tm.asinh)  # sinh¹(
-token(0xCA, b'cosh(',	                func=tm.cosh)
-token(0xCB, b'cosh\x11(',	            func=tm.acosh)  # cosh¹(
-token(0xCC, b'tanh(',	                func=tm.tanh)
-token(0xCD, b'tanh\x11(',	            func=tm.atanh)  # tanh¹(
+token(0xBC, b'\x10(',                   func=timath.sqrt)   # √(
+token(0xBD, b'\x0e\x10(',               func=timath.cbrt)   # 𝟑√(
+token(0xBE, b'ln(',		                func=timath.ln)
+token(0xBF, b'\xdb^(',		            func=timath.exp)    # 𝑒^(
+token(0xC0, b'log(',		            func=timath.log)
+token(0xC1, b'\x1d^(',		            func=timath.pow10)  # ⑽^(
+token(0xC2, b'sin(',		            func=timath.sin)
+token(0xC3, b'sin\x11(',	            func=timath.asin)   # sin¹(
+token(0xC4, b'cos(',		            func=timath.cos)
+token(0xC5, b'cos\x11(',	            func=timath.acos)   # cos¹(
+token(0xC6, b'tan(',		            func=timath.tan)
+token(0xC7, b'tan\x11(',	            func=timath.atan)   # tan¹(
+token(0xC8, b'sinh(',	                func=timath.sinh)
+token(0xC9, b'sinh\x11(',	            func=timath.asinh)  # sinh¹(
+token(0xCA, b'cosh(',	                func=timath.cosh)
+token(0xCB, b'cosh\x11(',	            func=timath.acosh)  # cosh¹(
+token(0xCC, b'tanh(',	                func=timath.tanh)
+token(0xCD, b'tanh\x11(',	            func=timath.atanh)  # tanh¹(
 token(tk.IF, b'If ',                    cmd=cmds.if_cmd)
 token(tk.THEN, b'Then',                 cmd=cmds.then_cmd)
 token(tk.ELSE, b'Else',                 cmd=cmds.else_cmd)
@@ -732,10 +731,10 @@ token(0xEF1D, b'ZFrac1/10')
 token(0xEF1E, b'mathprintbox')
 token(0xEF30, b'\x05n/d\xcf\x05Un/d')  # ►n/d◄►Un/d
 token(0xEF31, b'\x05F\xcf\x05D')  # ►F◄►D
-token(0xEF32, b'remainder(',            func=tm.remainder)
-token(0xEF33, b'\xc6(',                 func=tm.sigma)  # Σ(
-token(0xEF34, b'logBASE(',              func=tm.log_base)
-token(0xEF35, b'randIntNoRep(',         func=tm.rand_int_no_rep)
+token(0xEF32, b'remainder(',            func=timath.remainder)
+token(0xEF33, b'\xc6(',                 func=timath.sigma)  # Σ(
+token(0xEF34, b'logBASE(',              func=timath.log_base)
+token(0xEF35, b'randIntNoRep(',         func=timath.rand_int_no_rep)
 token(0xEF36, b'MATHPRINT')
 token(0xEF37, b'CLASSIC')
 token(0xEF38, b'n/d')
@@ -766,5 +765,3 @@ token(0xFF, b'LinReg(ax+b) ')
 
 if __name__ == '__main__':
 	print(len(ALL_TOKENS))
-	for t in ALL_TOKENS:
-		t.text

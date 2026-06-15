@@ -7,7 +7,8 @@ from titoken import (
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
 	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
 	SCI_E, DEG, RAD, APOS,
-	LIST_PREFIX, RAND, DIM,
+	ANS, RAND, DIM, 
+	LIST_PREFIX,
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
 from environment import Environment
@@ -290,9 +291,18 @@ class Parser:
 		# ᴇ with no left operand: treat as 10^rhs  (e.g. ᴇ3 = 1000, ᴇ~3 = 0.001)
 		if t.code == SCI_E:
 			return self._parse_dms_num(10 ** self._parse_sci_exp())
+		
+		if t.code == ANS:
+			ans = self.env.ans
+			if self.peek().code == L_PAREN:
+				if isinstance(ans, TiList):
+					self.advance()
+					return ans[self.parse_list_index()]
+				if isinstance(ans, TiMatrix):
+					self.advance()
+					return ans[self.parse_matrix_indices()]
+			return ans
 
-		# Nullary constants (π, e, rand, Ans, getDate, etc.)
-		# Checked before function so tokens with both can dispatch on whether ( follows.
 		if t.nullary is not None:
 			if self.peek().code == L_PAREN and t.function is not None:
 				self.advance()
@@ -327,12 +337,18 @@ class Parser:
 		if self.eat_if(L_PAREN):
 			value = value[self.parse_list_index()]
 		return value
-
+	
+	def parse_indices(self, count):
+		args = ArgParser(self)
+		indices = tuple(py_int(args.expr(), InvalidDimError) for _ in range(count))
+		args.end_func()
+		return indices
+		
 	def parse_list_index(self):
-		return ArgParser(self).parse_indices(1)[0]
+		return self.parse_indices(1)[0]
 
 	def parse_matrix_indices(self):
-		return ArgParser(self).parse_indices(2)
+		return self.parse_indices(2)
 
 	# ── Pratt expression parser ────────────────────────────────────────────────
 
@@ -371,7 +387,7 @@ class Parser:
 				continue
 
 			# Implicit multiplication
-			if _can_start_atom(t):
+			if t.can_start_atom():
 				if 60 <= min_bp:
 					break
 				lhs = operators.mul(lhs, self.parse_expr(61))
@@ -497,27 +513,27 @@ class Parser:
 		prev_if = False
 		start_pos = self.pos
 		while self.has_next:
-			t = self.peek()
-			if t.code == THEN:
+			code = self.peek().code
+			if code == THEN:
 				if prev_if:
 					depth += 1
-			elif t.code in {FOR, WHILE, REPEAT}:
+			elif code in {FOR, WHILE, REPEAT}:
 				depth += 1
-			if t.code == END:
+			if code == END:
 				if depth == 0:
 					break
 				depth -= 1
-			elif t.code == ELSE and else_mode and depth == 0:
+			elif code == ELSE and else_mode and depth == 0:
 				break
 			self.skip_statement()
-			prev_if = t.code == IF
+			prev_if = code == IF
 		else:
 			# If loop exits normally, the block was unclosed.
 			# This is legal in TI-Basic, and the program will just exit.
 			# TODO: emit warning for unclosed block
 			return EOF_TOKEN
 
-		self.advance()
+		t = self.advance()
 		self.end_statement()
 		return t
 
@@ -566,13 +582,6 @@ class Parser:
 			raise
 
 
-def _can_start_atom(t: Token) -> bool:
-	return (
-		t.is_digit() or t.variable or t.nullary or t.function
-		or t.code in {L_PAREN, L_BRACE, L_BRACKET, QUOTE, DOT, SCI_E, NEG, LIST_PREFIX}
-	)
-
-
 def _parse_arg(method):
 	def wrapper(self):
 		return self._arg(lambda: method(self))
@@ -595,14 +604,25 @@ class ArgParser:
 
 	def __init__(self, parser: Parser):
 		self._parser = parser
-		self._next = parser.peek().code not in {COLON, NEWLINE, EOF_CODE}
+		self._next = parser.peek().can_start_atom()
 
-	def _arg(self, parse_fn):
-		if not self._next:
+	def _arg(self, parse_func):
+		if not self.has_next:
 			raise ArgumentError("Missing argument: expected comma before next argument")
-		val = parse_fn()
+		val = parse_func()
 		self._next = self._parser.eat_if(COMMA)
 		return val
+
+	@property
+	def env(self):
+		return self._parser.env
+
+	@property
+	def has_next(self) -> bool:
+		return self._next
+
+	def peek(self):
+		return self._parser.peek()
 
 	@_parse_arg
 	def expr(self):
@@ -677,6 +697,9 @@ class ArgParser:
 		"""Read up to 8 alphanumeric characters as a program name (for prgm)."""
 		return self._parser.read_name(8)
 
+	def pass_env(self):
+		return self._parser.env
+
 	def no_args(self) -> None:
 		"""Raise TiSyntaxError if any tokens follow on this statement.
 
@@ -684,7 +707,7 @@ class ArgParser:
 		trailing tokens outright.  Raises TiSyntaxError rather than ArgumentError
 		because stray tokens here are a syntactic mistake, not a wrong argument count.
 		"""
-		if self._next:
+		if self.has_next:
 			raise TiSyntaxError(f"Command takes no arguments, but got: {self.peek()}")
 
 	def end_func(self):
@@ -694,7 +717,7 @@ class ArgParser:
 		optional closing ) (TI-BASIC allows implicit close), then checks that
 		no surplus arguments follow.  Does not eat the statement separator.
 		"""
-		if self._next:
+		if self.has_next:
 			raise ArgumentError(f"Too many arguments: unexpected {self.peek()}")
 		self._parser.eat_if(R_PAREN)
 
@@ -714,28 +737,20 @@ class ArgParser:
 		unexpected follows the command's arguments, then consumes the COLON/NEWLINE
 		(or does nothing at EOF).
 		"""
-		if self._next:
+		if self.has_next:
 			raise ArgumentError(f"Too many arguments: unexpected {self.peek()}")
 		self._parser.end_statement()
 
-	@property
-	def env(self):
-		return self._parser.env
-
-	@property
-	def has_next(self) -> bool:
-		return self._next
-
 	def parse_args(self) -> list:
 		args = [self.expr()]
-		while self._next:
+		while self.has_next:
 			args.append(self.expr())
 		return args
 
 	def take(self, *specs) -> list:
 		"""Parse a fixed argument schema (see preparse.py); return values.
 
-		Each spec carries a `parse(self) -> value` callable (or None for env).
+		Each spec carries a `parse(self) -> value` callable.
 		Because exactly the declared arguments are consumed, the existing
 		trailing-comma machinery reports the right errors with no extra code: a
 		missing required argument raises ArgumentError from the parse callable.
@@ -748,41 +763,17 @@ class ArgParser:
 		core function is called with fewer arguments and the defaults in its own
 		signature apply.
 		"""
-		out = []
+		args = []
 		for spec in specs:
-			if spec.parse is None:
-				# env: inject the environment in this positional slot, no token.
-				out.append(self.env)
-				continue
 			if spec.is_variadic:
-				while self._next:
-					out.append(spec.parse(self))
+				while self.has_next:
+					args.append(spec.parse(self))
 				break
-			if spec.is_optional and not self._next:
+			if spec.is_optional and not self.has_next:
 				# Absent optional: omit it (and any following optionals).
 				break
-			out.append(spec.parse(self))
-		return out
-	
-	def parse_indices(self, count):
-		indices = tuple(py_int(self.expr(), InvalidDimError) for _ in range(count))
-		self.end_func()
-		return indices
-
-	def ans_index_or_mul(self):
-		"""Ans followed by ( — index it if Ans is a list/matrix, else multiply."""
-		ans = self.env.ans
-		if isinstance(ans, TiList):
-			(index,) = self.parse_indices(1)
-			return ans[index]
-		if isinstance(ans, TiMatrix):
-			return ans[self.parse_indices(2)]
-		b = self.expr()
-		self.end_func()
-		return operators.mul(ans, b)
-
-	def peek(self):
-		return self._parser.peek()
+			args.append(spec.parse(self))
+		return args
 
 
 

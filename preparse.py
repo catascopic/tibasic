@@ -84,15 +84,7 @@ type ListVarPrefixOptional = Variable
 # Names and environment
 type LabelName = str
 type ProgramName = str
-type Env = Environment          # injected from ArgParser.env; consumes no token
-
-
-class _Role(Enum):
-	"""Drives vectorization wrapping in PreparsedFunc (see _REGISTRY)."""
-	VALUE   = auto()   # plain value: no wrapping
-	ENV     = auto()   # inject ArgParser.env; no token consumed
-	VEC     = auto()   # element-wise over TiList (and scalars)
-	MAT_VEC = auto()   # element-wise over TiMatrix or TiList (and scalars)
+type Env = Environment
 
 
 class _Arity(Enum):
@@ -108,35 +100,36 @@ class _Arity(Enum):
 
 def validated(require: Callable) -> Callable:
 	"""Build a value parser: parse a general expression, then assert its type."""
-	return lambda args: require(args.expr())
+	func = lambda args: require(args.expr())
+	func.__name__ = f"expr_{require.__name__}"
+	return func
 
 
 _REGISTRY = {
-	Numeric:               (validated(require_num),                 _Role.VALUE),
-	Real:                  (validated(require_real),                _Role.VALUE),
-	TiList:                (validated(require_list),                _Role.VALUE),
-	TiListReal:            (validated(require_real_list),           _Role.VALUE),
-	TiListComplex:         (validated(require_complex_list),        _Role.VALUE),
-	TiMatrix:              (validated(require_matrix),              _Role.VALUE),
-	TiString:              (validated(require_string),              _Role.VALUE),
-	ListOrMatrix:          (validated(require_list_or_matrix),      _Role.VALUE),
-	Vectorized:            (validated(require_vectorizable),        _Role.VEC),
-	VectorizedReal:        (validated(require_vectorizable_real),   _Role.VEC),
-	MatrixVectorized:      (validated(require_matrix_vectorizable), _Role.MAT_VEC),
-	AnyValue:              (ArgParser.expr,                         _Role.VALUE),
-	Thunk:                 (ArgParser.thunk,                        _Role.VALUE),
-	NumericVar:            (ArgParser.numeric_var,                  _Role.VALUE),
-	ListVar:               (ArgParser.list_var,                     _Role.VALUE),
-	MatrixVar:             (ArgParser.matrix_var,                   _Role.VALUE),
-	StringVar:             (ArgParser.string_var,                   _Role.VALUE),
-	EquationVar:           (ArgParser.equation_var,                 _Role.VALUE),
-	AnyVar:                (ArgParser.any_var,                      _Role.VALUE),
-	ListVarPrefixOptional: (ArgParser.list_var_prefix_optional,     _Role.VALUE),
-	LabelName:             (ArgParser.label_name,                   _Role.VALUE),
-	ProgramName:           (ArgParser.program_name,                 _Role.VALUE),
-	Env:                   (None,                                   _Role.ENV),
+	Numeric:               validated(require_num),
+	Real:                  validated(require_real),
+	TiList:                validated(require_list),
+	TiListReal:            validated(require_real_list),
+	TiListComplex:         validated(require_complex_list),
+	TiMatrix:              validated(require_matrix),
+	TiString:              validated(require_string),
+	ListOrMatrix:          validated(require_list_or_matrix),
+	Vectorized:            validated(require_vectorizable),
+	VectorizedReal:        validated(require_vectorizable_real),
+	MatrixVectorized:      validated(require_matrix_vectorizable),
+	AnyValue:              ArgParser.expr,
+	Thunk:                 ArgParser.thunk,
+	NumericVar:            ArgParser.numeric_var,
+	ListVar:               ArgParser.list_var,
+	MatrixVar:             ArgParser.matrix_var,
+	StringVar:             ArgParser.string_var,
+	EquationVar:           ArgParser.equation_var,
+	AnyVar:                ArgParser.any_var,
+	ListVarPrefixOptional: ArgParser.list_var_prefix_optional,
+	LabelName:             ArgParser.label_name,
+	ProgramName:           ArgParser.program_name,
+	Env:                   ArgParser.pass_env,
 }
-
 
 # ── ArgSpec and schema extraction ─────────────────────────────────────────────
 
@@ -144,56 +137,18 @@ _REGISTRY = {
 class ArgSpec:
 	"""One parsed parameter: how to read its value, plus arity/kind metadata."""
 	parse: Callable[[ArgParser], Any] | None
-	role:  _Role = _Role.VALUE
 	arity: _Arity = _Arity.NORMAL
-
-	@property
-	def is_variadic(self) -> bool:
-		return self.arity is _Arity.VARIADIC
 
 	@property
 	def is_optional(self) -> bool:
 		return self.arity is _Arity.OPTIONAL
 
+	@property
+	def is_variadic(self) -> bool:
+		return self.arity is _Arity.VARIADIC
+
 	def __repr__(self):
-		name = 'env' if self.parse is None else getattr(self.parse, '__name__', 'parse')
-		flags = {_Arity.OPTIONAL: '?', _Arity.VARIADIC: '*'}.get(self.arity, '')
-		return f"{name}{flags}"
-
-
-def schema_from_signature(func) -> tuple:
-	"""Build an ArgSpec schema from *func*'s annotated parameters.
-
-	Each parameter must be annotated with a vocabulary type.  A parameter with a
-	default becomes optional; a ``*args`` parameter becomes variadic.  The return
-	annotation is ignored.
-
-	Annotations are read with ``eval_str=True`` so this works whether or not the
-	defining module uses ``from __future__ import annotations`` — the vocabulary
-	names just have to be importable there (they are).
-	"""
-	annotations = inspect.get_annotations(func, eval_str=True)
-	schema = []
-	for name, p in inspect.signature(func).parameters.items():
-		if name not in annotations:
-			raise TypeError(f"@preparse: {func.__name__}: parameter {name!r} has no annotation")
-
-		ann = annotations[name]
-		try:
-			parse, role = _REGISTRY[ann]
-		except (KeyError, TypeError):
-			raise TypeError(f"@preparse: {func.__name__}: parameter {name!r} has unknown arg type {ann!r}")
-			
-		if p.kind is inspect.Parameter.VAR_POSITIONAL:
-			arity = _Arity.VARIADIC
-		elif p.default is not inspect.Parameter.empty:
-			arity = _Arity.OPTIONAL
-		else:
-			arity = _Arity.NORMAL
-
-		schema.append(ArgSpec(parse, role, arity))
-
-	return tuple(schema)
+		return f"{self.parse.__name__}{'?' if self.is_optional else ''}{'*' if self.is_variadic else ''}"
 
 
 # ── Call machinery: TiCall and the decorator forms ───────────────────────────
@@ -250,7 +205,7 @@ class no_arg_bunch(TiCall):
 class PreparsedFunc(TiCall):
 	"""Wraps a plain core function with a declarative arg schema (see module docs).
 
-	The schema is read from the core's type annotations.  Each parse method guards
+	The schema is read from the core function's type annotations.  Each parse method guards
 	its argument's true type at the token boundary, so the core needs no value
 	validation wrapper — vectorization (if any) is the only wrapper:
 
@@ -263,19 +218,51 @@ class PreparsedFunc(TiCall):
 	The core stays a plain function, so functions remain callable from other Python
 	code (composability) via TiCall.__call__.
 	"""
-	def __init__(self, core: Callable, finalizer: Callable[[ArgParser], None]) -> None:
-		schema = schema_from_signature(core)
-		roles = [s.role for s in schema]
-		if _Role.MAT_VEC in roles:
-			if roles.count(_Role.MAT_VEC) > 1:
-				raise TypeError(f"{core.__name__}: at most one matrix-vectorized parameter allowed")
-			if _Role.VEC in roles:
-				raise TypeError(f"{core.__name__}: cannot mix matrix-vectorized and vectorized parameters")
-			func = matrix_vectorize(core)
-		elif _Role.VEC in roles:
-			func = vectorize(core)
+	def __init__(self, core_func: Callable, finalizer: Callable[[ArgParser], None]) -> None:
+		"""Build an ArgSpec schema from *func*'s annotated parameters.
+
+		Each parameter must be annotated with a vocabulary type.  A parameter with a
+		default becomes optional; a ``*args`` parameter becomes variadic.  The return
+		annotation is ignored.
+		"""
+		annotations = inspect.get_annotations(core_func)
+		is_vectorized = False
+		mat_vec = 0
+		schema = []
+		for name, param in inspect.signature(core_func).parameters.items():
+			if name not in annotations:
+				raise TypeError(f"@preparse: {core_func.__name__}: parameter {name!r} has no annotation")
+
+			arg_type = annotations[name]
+			try:
+				parse = _REGISTRY[arg_type]
+			except (KeyError, TypeError):
+				raise TypeError(f"@preparse: {core_func.__name__}: parameter {name!r} has unknown arg type {arg_type!r}")
+			
+			if arg_type in {Vectorized, VectorizedReal}:
+				is_vectorized = True
+			elif arg_type is MatrixVectorized:
+				mat_vec += 1
+
+			if param.kind is inspect.Parameter.VAR_POSITIONAL:
+				arity = _Arity.VARIADIC
+			elif param.default is not inspect.Parameter.empty:
+				arity = _Arity.OPTIONAL
+			else:
+				arity = _Arity.NORMAL
+
+			schema.append(ArgSpec(parse, arity))
+
+		if mat_vec:
+			if mat_vec > 1:
+				raise TypeError(f"{core_func.__name__}: at most one matrix-vectorized parameter allowed")
+			if is_vectorized:
+				raise TypeError(f"{core_func.__name__}: cannot mix matrix-vectorized and vectorized parameters")
+			func = matrix_vectorize(core_func)
+		elif is_vectorized:
+			func = vectorize(core_func)
 		else:
-			func = core
+			func = core_func
 
 		super().__init__(func)
 		self.schema = schema
@@ -285,6 +272,9 @@ class PreparsedFunc(TiCall):
 		values = args.take(*self.schema)
 		self.finalizer(args)
 		return args.env.guard_real(values, self.func(*values))
+	
+	def __repr__(self):
+		return f"preparsed({self.func.__name__}, {self.schema}, {self.finalizer.__name__})"
 
 
 def _preparse(finalizer: Callable[[ArgParser], None]):
@@ -296,8 +286,8 @@ def _preparse(finalizer: Callable[[ArgParser], None]):
 	  preparse_cmd_func — paren commands        (end_paren_cmd, eats `) + sep`   )
 	  preparse_bunch    — bunching commands     (no finalizer, e.g. DelVar       )
 	"""
-	def decorator(core: Callable) -> PreparsedFunc:
-		return PreparsedFunc(core, finalizer)
+	def decorator(core_func: Callable) -> PreparsedFunc:
+		return PreparsedFunc(core_func, finalizer)
 	return decorator
 
 

@@ -10,7 +10,6 @@ from core import TiList, TiString, is_complex_val
 from core import Variable, NumericVariable, RealVariable, ListVariable, UserList, MatrixVariable, StringVariable, EquationVariable, require_real, py_int
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
-from signals import StopSignal
 from screen import Screen
 
 
@@ -280,3 +279,11 @@ class WindowVars:
 		self.y_fact     = RealVariable(4)
 		self.plot_step  = RealVariable(1)
 		self.xres       = RealVariable(1)
+
+
+class ReturnSignal(Exception):
+	"""Raised by Return to exit the current sub-program and return to the caller."""
+
+
+class StopSignal(Exception):
+	"""Raised by Stop to terminate all program execution immediately."""

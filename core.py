@@ -334,6 +334,9 @@ class TiMatrix:
 
 		return TiMatrix([row[n:] for row in aug])
 
+	def transpose(self):
+		return TiMatrix([[self.data[r][c] for r in range(self.rows)] for c in range(self.cols)])
+
 	def copy(self) -> TiMatrix:
 		return TiMatrix([row.copy() for row in self.data])
 

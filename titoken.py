@@ -61,6 +61,7 @@ DOT         = 0x3A
 SCI_E       = 0x3B
 COLON       = 0x3E
 NEWLINE     = 0x3F
+ANS         = 0x72
 APOS        = 0xAE
 NEG         = 0xB0
 LIST_PREFIX = 0xEB
@@ -132,41 +133,28 @@ class Token:
 	def is_name_char(self):
 		return self.is_numeric_var() or self.is_digit()
 
+	def can_start_atom(self) -> bool:
+		return bool(
+			self.is_digit() or self.variable or self.nullary or self.function
+			or self.code in {L_PAREN, L_BRACE, L_BRACKET, QUOTE, DOT, SCI_E, NEG, LIST_PREFIX, ANS}
+		)
+
 	def __repr__(self):
 		return f"0x{self.code:0{4 if self.code > 0xFF else 2}X}:{self.text!r}"
 
 
-class _EofToken:
-	"""Sentinel returned by Parser.peek() at end of input.
+class _EofToken(Token):
+	"""Sentinel returned by Parser.peek() at end of input."""
+	
+	@property
+	def text(self):
+		raise ValueError
 
-	All type predicates return False; all callable/variable fields are None.
-	Duck-type compatible with Token for all predicate and attribute access patterns
-	used in the parser.
-	"""
-	text      = '<END-OF-INPUT>'
-	code      = EOF_CODE
-	display   = b''
-	bp        = None
-	operator  = None
-	postfix   = None
-	function  = None
-	command   = None
-	nullary   = None
-	converter = None
-	variable  = None
-
-	def is_digit(self) -> bool:        return False
-	def is_numeric_var(self) -> bool:  return False
-	def is_list_var(self) -> bool:     return False
-	def is_list_start(self) -> bool:   return False
-	def is_matrix_var(self) -> bool:   return False
-	def is_equation_var(self) -> bool: return False
-	def is_string_var(self) -> bool:   return False
-	def is_stat_var(self) -> bool:     return False
-	def is_window_var(self) -> bool:   return False
-	def is_name_char(self) -> bool:    return False
-
-	def __repr__(self) -> str:         return '<EOF>'
+	def code_to_bytes(self):
+		raise ValueError
+	
+	def __repr__(self):
+		return '<EOF>'
 
 
-EOF_TOKEN = _EofToken()
+EOF_TOKEN = Token(-1, b'')

@@ -1,14 +1,14 @@
 """Math functions organized by calculator menu placement.
 
 Covered menus / button groups:
-  Dedicated keys : sin, cos, tan, sin⁻¹, cos⁻¹, tan⁻¹, √(, ln, log, e^(, 10^(
+  Dedicated keys : sin, cos, tan, asin, acos, atan, √(, ln, log, e^(, 10^(
   MATH           : ³√(, nDeriv(, fnInt(, Σ(, logBASE(
   NUM            : abs(, round(, iPart(, fPart(, int(, min(, max(, lcm(, gcd(, remainder(
   CPX            : conj(, real(, imag(, angle(
   ANGLE          : R►Pr(, R►Pθ(, P►Rx(, P►Ry(
   PRB            : randList, randInt(, randNorm(, randBin(, randIntNoRep(
   TEST LOGIC     : not(
-  CATALOG        : sinh, cosh, tanh, sinh⁻¹, cosh⁻¹, tanh⁻¹
+  CATALOG        : sinh, cosh, tanh, asinh, acosh, atanh
 """
 
 import builtins
@@ -300,7 +300,7 @@ def conj(x: Vectorized):
 # CPX 2: real(
 
 @preparse_func
-def real_(x: Vectorized):
+def real(x: Vectorized):
 	return x.real if isinstance(x, complex) else x
 
 # CPX 3: imag(
@@ -435,3 +435,9 @@ def atanh(x: VectorizedReal):
 @preparse_func
 def not_(x: VectorizedReal):
 	return float(not x)
+
+
+
+if __name__ == '__main__':
+	print(round.schema)
+

@@ -18,16 +18,24 @@ from core import TiList, TiMatrix, TiString
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-_TEST_CHARSET = [None, 'n', 'u', 'v', 'w', '►', None, None, None, None, None, None, None, 't', '3', 'F', None, 'inv', 'sq', None, 'deg', 'rad', 't', 'le', 'ne', 'ge', '~', 'e', '@', 'ten', None, None, '_', '!', '"', None, None, '%', None, "'", '(', ')', '*', '+', ',', '-', '.', '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', None, 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'θ', None, ']', '^', '_', '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', None, None, '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Á', 'À', 'Â', 'Ä', 'á', 'à', 'â', 'ä', 'É', 'È', 'Ê', 'Ë', 'é', 'è', 'ê', 'ë', 'Í', 'Ì', 'Î', 'Ï', 'í', 'ì', 'î', 'ï', 'Ó', 'Ò', 'Ô', 'Ö', 'ó', 'ò', 'ô', 'ö', 'Ú', 'Ù', 'Û', 'Ü', 'ú', 'ù', 'û', 'ü', 'Ç', 'ç', 'Ñ', 'ñ', None, None, None, '¿', '¡', 'α', 'β', 'γ', 'Δ', 'δ', 'ε', '[', 'λ', 'μ', 'π', 'ρ', 'Σ', 'σ', 'τ', 'φ', 'Ω', 'ẍ', 'ȳ', 'x', '…', '◄', None, None, None, None, None, 'cube', '\n', 'i', 'ṕ', 'χ', '𝐅', 'e', '$', '𝐍', '⸩', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'ß', None, None, None, None, None, None, None, None, None, None, None]
-
-
-# Two-byte tokens that render to a single character are alternate-font duplicates
-# of the plain one-byte tokens (the subscript ₁ vs the digit 1, 𝟊 vs F, the whole
-# 0xBBxx lower-case a–z plane, …) and would otherwise shadow the real token for
-# that key.  Drop them — except the sequence variables, which are the only
-# single-char two-byte tokens the tests actually need to type.
-_KEEP_SINGLE = {0x6221, 0x5E80, 0x5E81, 0x5E82}  # n, u, v, w
-
+_TEST_CHARSET = [
+	None, 'n', 'u', 'v', 'w', '►', None, None, None, None, None, None, None, 't', '3', 'F', 
+	None, 'inv', 'sq', None, 'deg', 'rad', 't', '<=', '!=', '>=', '~', 'e', '@', 'ten', None, None, 
+	'_', '!', '"', None, None, '%', None, "'", '(', ')', '*', '+', ',', '-', '.', '/', 
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', 
+	None, 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 
+	'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'θ', None, ']', '^', '_',
+	'`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+	'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', None, None, 
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Á', 'À', 'Â', 'Ä', 'á', 'à', 
+	'â', 'ä', 'É', 'È', 'Ê', 'Ë', 'é', 'è', 'ê', 'ë', 'Í', 'Ì', 'Î', 'Ï', 'í', 'ì', 
+	'î', 'ï', 'Ó', 'Ò', 'Ô', 'Ö', 'ó', 'ò', 'ô', 'ö', 'Ú', 'Ù', 'Û', 'Ü', 'ú', 'ù', 
+	'û', 'ü', 'Ç', 'ç', 'Ñ', 'ñ', None, None, None, '¿', '¡', 'α', 'β', 'γ', 'Δ', 'δ', 
+	'ε', '[', 'λ', 'μ', 'π', 'ρ', 'Σ', 'σ', 'τ', 'φ', 'Ω', 'ẍ', 'ȳ', 'x', '…', '◄', 
+	None, None, None, None, None, 'cube', '\n', 'i', 'ṕ', 'χ', '𝐅', 'e', '$', '𝐍', '⸩', None, 
+	None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 
+	None, None, None, None, 'ß', None, None, None, None, None, None, None, None, None, None, None,
+]
 
 # Operator tokens with no convenient typable character keep the readable names
 # they had as catalog constants, since the tests spell them out.
@@ -36,6 +44,8 @@ _ALIASES = {
 	# inverse trig: nicer than the charset spelling 'sininv(', etc.
 	'asin(': 0xC3, 'acos(': 0xC5, 'atan(': 0xC7,
 	'asinh(': 0xC9, 'acosh(': 0xCB, 'atanh(': 0xCD,
+	# Sequence variables that would be filtered out otherwise
+	'n': 0x6221, 'u': 0x5E80, 'v': 0x5E81, 'w': 0x5E82,
 }
 
 
@@ -43,8 +53,8 @@ def _create_lookup():
 	"""Map each typable string to the token it produces (see _KEEP_SINGLE above)."""
 	lookup = {}
 	for t in ALL_TOKENS:
-		if t.code > 0xFF and len(t.text) == 1 and t.code not in _KEEP_SINGLE:
-			# False for two-byte single-char duplicates, except the sequence variables.
+		if t.code > 0xFF and len(t.display) == 1:
+			# Exclude all two-byte one-char tokens, they just cause trouble.
 			continue
 		lookup[t.text.strip(' ')] = t
 		try:
@@ -127,11 +137,10 @@ def approx_mat(matrix, **kwargs):
 
 
 class TestLookup:
-	def test_lookup(self):
+	def test_no_q(self):
 		with pytest.raises(KeyError):
 			q = toks('q')[0]
 			print(q.code, 0xBBB0 <= q.code <= 0xBBCA)
-			
 
 
 # ── Arithmetic ────────────────────────────────────────────────────────────────
@@ -155,8 +164,7 @@ class TestArithmetic:
 		assert calc('(2+3)*4') == 20
 
 	def test_pow_left_assoc(self):
-		# 2^3^2 = (2^3)^2 = 8^2 = 64 (left-associative, matches TI-84)
-		assert calc('2^3^2') == 64
+		assert calc('2^2^2^2^2^2') == 429_496_7296
 
 
 # ── Scientific notation (ᴇ) ───────────────────────────────────────────────────

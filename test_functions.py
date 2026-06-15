@@ -51,8 +51,8 @@ class TestNumericFunctions:
 	def test_log(self):                   assert calc('log( 100') == approx(2)
 	def test_log_negative_real(self):     pytest.raises(NonRealAnsError, calc, 'log( ~1')
 	def test_log_zero(self):              pytest.raises(DomainError, calc, 'log( 0')
-	def test_exp(self):           assert calc('𝑒^( 0') == approx(1)
-	def test_pow10(self):         assert calc('⑽^( 3') == approx(1000)
+	def test_exp(self):           assert calc('e^( 0') == approx(1)
+	def test_pow10(self):         assert calc('ten^( 3') == approx(1000)
 	def test_not_false(self):     assert calc('not( 0') == 1
 	def test_not_true(self):      assert calc('not( 5') == 0
 
@@ -969,6 +969,8 @@ class TestMatrixVectorized:
 	"""Functions decorated with @matrix_vectorized applied to a TiMatrix."""
 
 	def test_ipart_matrix(self):
+		import timath
+		print(timath.i_part)
 		assert calc('iPart( [[1.7,~1.7]]').data == [[1, -1]]
 
 	def test_int_matrix(self):
@@ -1445,23 +1447,23 @@ class TestNot:
 
 class TestTranspose:
 	def test_square(self):
-		assert calc('[[1,2][3,4]] t').data == [[1, 3], [2, 4]]
+		assert calc('[[1,2][3,4]]t').data == [[1, 3], [2, 4]]
 
 	def test_row_to_column(self):
-		assert calc('[[1,2,3]] t').data == [[1], [2], [3]]
+		assert calc('[[1,2,3]]t').data == [[1], [2], [3]]
 
 	def test_column_to_row(self):
-		assert calc('[[1][2][3]] t').data == [[1, 2, 3]]
+		assert calc('[[1][2][3]]t').data == [[1, 2, 3]]
 
 	def test_involution(self):
-		result = calc('( [[1,2,3][4,5,6]] t ) t')
+		result = calc('([[1,2,3][4,5,6]]t)t')
 		assert result.data == [[1, 2, 3], [4, 5, 6]]
 
 	def test_non_matrix_raises(self):
-		with pytest.raises(DataTypeError): calc('5 t')
+		with pytest.raises(DataTypeError): calc('5t')
 
 	def test_vertical_stack_via_transpose(self):
 		# (augment(Aᵀ, Bᵀ))ᵀ stacks two row vectors as rows of a new matrix
-		result = calc('( augment( [[1,2,3]] t , [[4,5,6]] t ) t')
+		result = calc('( augment( [[1,2,3]]t,[[4,5,6]]t)t')
 		assert result.data == [[1, 2, 3], [4, 5, 6]]
 
