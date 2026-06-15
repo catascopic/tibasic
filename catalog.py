@@ -102,20 +102,20 @@ def token(
 token(0x01, b'\x05DMS')  # ►DMS
 token(0x02, b'\x05Dec')  # ►Dec
 token(0x03, b'\x05Frac')  # ►Frac
-STORE = token(tk.STORE, b'\x1c')  # →
+token(tk.STORE, b'\x1c')  # →
 token(0x05, b'Boxplot')
-L_BRACKET = token(tk.L_BRACKET, b'\xc1',typeable=True)  # The '[' symbol (θ steals this place in the charset)
-R_BRACKET = token(tk.R_BRACKET, b']',   typeable=True)
-L_BRACE   = token(tk.L_BRACE, b'{',     typeable=True)
-R_BRACE   = token(tk.R_BRACE, b'}',     typeable=True)
-RAD       = token(tk.RAD, b'\x15')                        # post needs env, handled specially
-DEG       = token(tk.DEG, b'\x14',      typeable=True)  # ditto
-INV       = token(0x0C, b'\x11',        post=ops.inv)   # ¹
-SQ        = token(0x0D, b'\x12',        post=lambda x: x**2, typeable=True)  # ²
-TRANSPOSE = token(0x0E, b'\x16',        post=ops.transpose)                  # ᵀ
-CUBE      = token(0x0F, b'\xd5',        post=lambda x: x**3, typeable=True)  # ³
-L_PAREN   = token(tk.L_PAREN, b'(',     typeable=True)
-R_PAREN   = token(tk.R_PAREN, b')',     typeable=True)
+token(tk.L_BRACKET, b'\xc1',            typeable=True)  # The '[' symbol (θ steals this place in the charset)
+token(tk.R_BRACKET, b']',               typeable=True)
+token(tk.L_BRACE, b'{',                 typeable=True)
+token(tk.R_BRACE, b'}',                 typeable=True)
+token(tk.RAD, b'\x15')                                    # post needs env, handled specially
+token(tk.DEG, b'\x14',                  typeable=True)  # ditto
+token(0x0C, b'\x11',                    post=ops.inv)   # ¹
+token(0x0D, b'\x12',                    post=lambda x: x**2, typeable=True)  # ²
+token(0x0E, b'\x16',                    post=ops.transpose)                  # ᵀ
+token(0x0F, b'\xd5',                    post=lambda x: x**3, typeable=True)  # ³
+token(tk.L_PAREN, b'(',                 typeable=True)
+token(tk.R_PAREN, b')',                 typeable=True)
 token(0x12, b'round(',                  func=tm.round)
 token(0x13, b'pxl-Test(',               func=draw.pxl_test)
 token(0x14, b'augment(',                func=mat.augment)
@@ -138,92 +138,65 @@ token(0x24, b'fnInt(',                  func=tm.fn_int)
 token(0x25, b'nDeriv(',                 func=tm.n_deriv)
 token(0x27, b'fMin(')
 token(0x28, b'fMax(')
-SPACE = token(0x29, b' ',               typeable=True)
-QUOTE  = token(tk.QUOTE, b'"',          typeable=True)
-COMMA  = token(tk.COMMA, b',',          typeable=True)
-IMAG_I = token(0x2C, b'\xd7',           res=lambda env: 1j, typeable=True)  # 𝑖
-FACT   = token(0x2D, b'!',              post=ops.factorial, typeable=True)
+token(0x29, b' ',                       typeable=True)
+token(tk.QUOTE, b'"',                   typeable=True)
+token(tk.COMMA, b',',                   typeable=True)
+token(0x2C, b'\xd7',                    res=lambda env: 1j, typeable=True)  # 𝑖
+token(0x2D, b'!',                       post=ops.factorial, typeable=True)
 token(0x2E, b'CubicReg ')
 token(0x2F, b'QuartReg ')
 
 # 0 - 9
-DIGITS = tuple(token(
-	0x30 + i, 
-	bytes([0x30 + i]), 
-	typeable=True
-) for i in range(10))
+for _i in range(10):
+	token(0x30 + _i, bytes([0x30 + _i]), typeable=True)
 
-DOT       = token(tk.DOT, b'.',           typeable=True)
-SCI_E     = token(tk.SCI_E, b'\x1b')  # ᴇ
+token(tk.DOT, b'.',           typeable=True)
+token(tk.SCI_E, b'\x1b')  # ᴇ
 token(0x3C, b' or ',                    bp=(20, 21), op=ops.or_)
 token(0x3D, b' xor ',                   bp=(20, 21), op=ops.xor)
-COLON     = token(tk.COLON, b':',       typeable=True)
-NEWLINE   = token(tk.NEWLINE, b'\xd6',  typeable=True)
+token(tk.COLON, b':',       typeable=True)
+token(tk.NEWLINE, b'\xd6',  typeable=True)
 token(0x40, b' and ',                   bp=(30, 31), op=ops.and_)
 
 # A - Z, θ
-LETTERS = tuple([*(token(
-	0x41 + i, 
-	bytes([0x41 + i]), 
-	var=_make_accessor('numerics', i),
-	typeable=True,
-) for i in range(26)), token(0x5B, b'\x5b', var=_make_accessor('numerics', 26), typeable=True)])
+for _i in range(26):
+	token(0x41 + _i, bytes([0x41 + _i]), var=_make_accessor('numerics', _i), typeable=True)
+
+token(0x5B, b'\x5b', var=_make_accessor('numerics', 26), typeable=True)
 
 # [A] - [J]
-MATRICES = tuple(token(
-	0x5C00 | i, 
-	bytes([0xC1, 0x41 + i, 0x5D]), 
-	var=_make_accessor('matrices', i)
-) for i in range(10))
+for _i in range(10):
+	token(0x5C00 | _i, bytes([0xC1, 0x41 + _i, 0x5D]), var=_make_accessor('matrices', _i))
 
 # L₁ - L₆
-LISTS = tuple(token(
-	0x5D00 | i, 
-	bytes([0x4C, 0x81 + i]), 
-	var=_make_accessor('lists', i)
-) for i in range(6))
+for _i in range(6):
+	token(0x5D00 | _i, bytes([0x4C, 0x81 + _i]), var=_make_accessor('lists', _i))
 
 # Y₁ - Y₀
-FUNCTION = tuple(token(
-	0x5E10 + i,
-	bytes([0x59, 0x80 + (i + 1) % 10]),
-	var=_make_accessor('function', i)
-) for i in range(10))
+for _i in range(10):
+	token(0x5E10 + _i, bytes([0x59, 0x80 + (_i + 1) % 10]), var=_make_accessor('function', _i))
 
 # X₁ₜ/Y₁ₜ - X₆ₜ/Y₆ₜ
-PARAMETRIC = tuple(token(
-	0x5E20 + i,
-	bytes([0x58 + i % 2, 0x81 + i // 2, 0x0D]),
-	var=_make_accessor('parametric', i)
-) for i in range(12))
+for _i in range(12):
+	token(0x5E20 + _i, bytes([0x58 + _i % 2, 0x81 + _i // 2, 0x0D]), var=_make_accessor('parametric', _i))
 
 # r₁ - r₆
-POLAR = tuple(token(
-	0x5E40 + i,
-	bytes([0x72, 0x81 + i]),
-	var=_make_accessor('polar', i)
-) for i in range(6))
+for _i in range(6):
+	token(0x5E40 + _i, bytes([0x72, 0x81 + _i]), var=_make_accessor('polar', _i))
 
 # 𝑢, 𝑣, 𝑤
-SEQUENCE = tuple(token(
-	0x5E80 + i,
-	bytes([0x02 + i]),
-	var=_make_accessor('sequence', i)
-) for i in range(3))
+for i_ in range(3):
+	token(0x5E80 + i_, bytes([0x02 + i_]), var=_make_accessor('sequence', i_))
 
-PRGM = token(0x5F, b'prgm',             cmd=cmds.prgm)
+PRGM = token(0x5F, b'prgm', cmd=cmds.prgm)
 
 # Pic1 - Pic0
-PICTURES = tuple(token(
-	0x6000 + i,
-	b'Pic' + bytes([0x30 + (i + 1) % 10])
-) for i in range(10))
+for i_ in range(10):
+	token(0x6000 + i_, b'Pic' + bytes([0x30 + (i_ + 1) % 10]))
 
 # GDB1 - GDB 0
-GDBS = tuple(token(
-	0x6100 | i, 
-	b'GDB' + bytes([0x30 + (i + 1) % 10])
-) for i in range(10))
+for i_ in range(10):
+	token(0x6100 | i_, b'GDB' + bytes([0x30 + (i_ + 1) % 10]))
 
 token(0x6201, b'RegEq')
 token(0x6202, b'n')
@@ -257,7 +230,7 @@ token(0x621D, b'x\x83')     # x₃
 token(0x621E, b'y\x81')     # y₁
 token(0x621F, b'y\x82')     # y₂
 token(0x6220, b'y\x83')     # y₃
-REC_N = token(0x6221, b'\x01',          var=attrgetter('n'))  # 𝑛
+token(0x6221, b'\x01',                  var=attrgetter('n'))  # 𝑛
 token(0x6222, b'p')
 token(0x6223, b'z')
 token(0x6224, b't')
@@ -327,15 +300,15 @@ token(0x67, b'Sci',                     cmd=modecmds.sci)
 token(0x68, b'Eng',                     cmd=modecmds.eng)
 token(0x69, b'Float',                   cmd=modecmds.float_)
 
-EQ  = token(0x6A, b'=',                 bp=(40, 41), op=ops.eq,  typeable=True)
-LT  = token(0x6B, b'<',                 bp=(40, 41), op=ops.lt,  typeable=True)
-GT  = token(0x6C, b'>',                 bp=(40, 41), op=ops.gt,  typeable=True)
-LE  = token(0x6D, b'\x17',              bp=(40, 41), op=ops.le,  typeable=True)  # ≤
-GE  = token(0x6E, b'\x19',              bp=(40, 41), op=ops.ge,  typeable=True)  # ≥
-NE  = token(0x6F, b'\x18',              bp=(40, 41), op=ops.ne,  typeable=True)  # ≠
-ADD = token(0x70, b'+',                 bp=(50, 51), op=ops.add, typeable=True)
-SUB = token(0x71, b'-',                 bp=(50, 51), op=ops.sub, typeable=True)
-ANS = token(0x72, b'Ans',               func=forms_func(ArgParser.ans_index_or_mul), res=Environment.get_ans)
+token(0x6A, b'=',                       bp=(40, 41), op=ops.eq,  typeable=True)
+token(0x6B, b'<',                       bp=(40, 41), op=ops.lt,  typeable=True)
+token(0x6C, b'>',                       bp=(40, 41), op=ops.gt,  typeable=True)
+token(0x6D, b'\x17',                    bp=(40, 41), op=ops.le,  typeable=True)  # ≤
+token(0x6E, b'\x19',                    bp=(40, 41), op=ops.ge,  typeable=True)  # ≥
+token(0x6F, b'\x18',                    bp=(40, 41), op=ops.ne,  typeable=True)  # ≠
+token(0x70, b'+',                       bp=(50, 51), op=ops.add, typeable=True)
+token(0x71, b'-',                       bp=(50, 51), op=ops.sub, typeable=True)
+token(0x72, b'Ans',                     func=forms_func(ArgParser.ans_index_or_mul), res=Environment.get_ans)
 
 token(0x73, b'Fix',                     cmd=modecmds.fix)
 token(0x74, b'Horiz')
@@ -374,8 +347,8 @@ token(0x7F, b'\n')    # ▫
 token(0x80, b'\x0b')  # ﹢
 token(0x81, b'\x0c')  # ·
 
-MUL = token(0x82, b'*',                 bp=(60, 61), op=ops.mul, typeable=True)
-DIV = token(0x83, b'/',                 bp=(60, 61), op=ops.div, typeable=True)
+token(0x82, b'*',                       bp=(60, 61), op=ops.mul, typeable=True)
+token(0x83, b'/',                       bp=(60, 61), op=ops.div, typeable=True)
 
 token(0x84, b'Trace')
 token(0x85, b'ClrDraw',                 cmd=draw.clr_draw)
@@ -394,8 +367,8 @@ token(0x91, b'PrintScreen')
 token(0x92, b'ZoomSto')
 token(0x93, b'Text(',                   cmd=draw.text)
 
-NPR = token(0x94, b'nPr',               bp=(60, 61), op=ops.npr)
-NCR = token(0x95, b'nCr',               bp=(60, 61), op=ops.ncr)
+token(0x94, b'nPr',                     bp=(60, 61), op=ops.npr)
+token(0x95, b'nCr',                     bp=(60, 61), op=ops.ncr)
 
 token(0x96, b'FnOn ')
 token(0x97, b'FnOff ')
@@ -419,23 +392,20 @@ token(0xA8, b'DrawInv ',                cmd=draw.draw_inv)
 token(0xA9, b'DrawF ',                  cmd=draw.draw_f)
 
 # Str1 - Str0
-STRINGS = tuple(token(
-	0xAA00 | i, 
-	b'Str' + bytes([0x30 + (i + 1) % 10]), 
-	var=_make_accessor('strings', i)
-) for i in range(10))
+for i in range(10):
+	token(0xAA00 | i, b'Str' + bytes([0x30 + (i + 1) % 10]), var=_make_accessor('strings', i))
 
-RAND = token(tk.RAND, b'rand',          res=Environment.rand, func=tm.rand_list)
+token(tk.RAND, b'rand',                 res=Environment.rand, func=tm.rand_list)
 token(0xAC, b'\xc4',                    res=lambda env: math.pi, typeable=True)  # π
 token(0xAD, b'getKey',                  res=Environment.get_key)
-APOS = token(tk.APOS, b"'",             typeable=True)
+token(tk.APOS, b"'",                    typeable=True)
 token(0xAF, b'?',                       typeable=True)
-NEG = token(tk.NEG, b'\x1a')  # ⁻
+token(tk.NEG, b'\x1a')  # ⁻
 token(0xB1, b'int(',                    func=tm.int_)
 token(0xB2, b'abs(',                    func=tm.abs)
 token(0xB3, b'det(',                    func=mat.det)
 token(0xB4, b'identity(',               func=mat.identity)
-DIM = token(tk.DIM, b'dim(',            func=tilist.dim)
+token(tk.DIM, b'dim(',                  func=tilist.dim)
 token(0xB6, b'sum(',                    func=tilist.sum)
 token(0xB7, b'prod(',                   func=tilist.prod)
 token(0xB8, b'not(',                    func=tm.not_)
@@ -676,8 +646,8 @@ token(0xBBF2, b'\x06')                                  # 🡅
 token(0xBBF3, b'\x07')                                  # 🡇
 token(0xBBF4, b'\x10')                                  # √
 token(0xBBF5, b'\x7f')                                  # ≛
-SQRT = token(0xBC, b'\x10(',            func=tm.sqrt)   # √(
-CBRT = token(0xBD, b'\x0e\x10(',        func=tm.cbrt)   # 𝟑√(
+token(0xBC, b'\x10(',                   func=tm.sqrt)   # √(
+token(0xBD, b'\x0e\x10(',               func=tm.cbrt)   # 𝟑√(
 token(0xBE, b'ln(',		                func=tm.ln)
 token(0xBF, b'\xdb^(',		            func=tm.exp)    # 𝑒^(
 token(0xC0, b'log(',		            func=tm.log)
@@ -694,15 +664,15 @@ token(0xCA, b'cosh(',	                func=tm.cosh)
 token(0xCB, b'cosh\x11(',	            func=tm.acosh)  # cosh¹(
 token(0xCC, b'tanh(',	                func=tm.tanh)
 token(0xCD, b'tanh\x11(',	            func=tm.atanh)  # tanh¹(
-IF     = token(tk.IF, b'If ',           cmd=cmds.if_cmd)
-THEN   = token(tk.THEN, b'Then',        cmd=cmds.then_cmd)
-ELSE   = token(tk.ELSE, b'Else',        cmd=cmds.else_cmd)
-WHILE  = token(tk.WHILE, b'While ',     cmd=cmds.while_cmd)
-REPEAT = token(tk.REPEAT, b'Repeat ',   cmd=cmds.repeat_cmd)
-FOR    = token(tk.FOR, b'For(',         cmd=cmds.for_cmd)
-END    = token(tk.END, b'End',          cmd=cmds.end_cmd)
+token(tk.IF, b'If ',                    cmd=cmds.if_cmd)
+token(tk.THEN, b'Then',                 cmd=cmds.then_cmd)
+token(tk.ELSE, b'Else',                 cmd=cmds.else_cmd)
+token(tk.WHILE, b'While ',              cmd=cmds.while_cmd)
+token(tk.REPEAT, b'Repeat ',            cmd=cmds.repeat_cmd)
+token(tk.FOR, b'For(',                  cmd=cmds.for_cmd)
+token(tk.END, b'End',                   cmd=cmds.end_cmd)
 token(0xD5, b'Return',                  cmd=cmds.return_cmd)
-LBL    = token(tk.LBL, b'Lbl ',         cmd=cmds.lbl_cmd)
+token(tk.LBL, b'Lbl ',                  cmd=cmds.lbl_cmd)
 token(0xD7, b'Goto ',                   cmd=cmds.goto_cmd)
 token(0xD8, b'Pause ')
 token(0xD9, b'Stop',                    cmd=cmds.stop_cmd)
@@ -723,7 +693,7 @@ token(0xE7, b'Send(')
 token(0xE8, b'Get(')
 token(0xE9, b'PlotsOn')
 token(0xEA, b'PlotsOff')
-LIST_PREFIX = token(tk.LIST_PREFIX, b'\xdc')  # ᴸ
+token(tk.LIST_PREFIX, b'\xdc')  # ᴸ
 token(0xEC, b'Plot1(')
 token(0xED, b'Plot2(')
 token(0xEE, b'Plot3(')
@@ -776,8 +746,8 @@ token(0xEF3C, b'FRAC')
 token(0xEF3D, b'FRAC-APPROX')
 
 
-POW      = token(0xF0, b'^',            bp=(70, 70), op=ops.power, typeable=True)
-XTH_ROOT = token(0xF1, b'\xcd\x10',     bp=(60, 61), op=ops.xth_root)  # ˣ√
+token(0xF0, b'^',                       bp=(70, 70), op=ops.power, typeable=True)
+token(0xF1, b'\xcd\x10',                bp=(60, 61), op=ops.xth_root)  # ˣ√
 token(0xF2, b'1-Var Stats ')
 token(0xF3, b'2-Var Stats ')
 token(0xF4, b'LinReg(a+bx) ')

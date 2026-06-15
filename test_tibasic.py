@@ -27,6 +27,9 @@ def filter_token(t):
 	return True
 
 
+_TEST_CHARSET = [None, 'n', 'u', 'v', 'w', '►', None, None, None, None, 'deg', None, None, 't', '3', 'F', None, 'inv', 'sq', None, '°', 'rad', '#', 'le', 'ne', 'ge', 'neg', 'e', '@', 'ten', None, None, '_', '!', '"', None, None, '%', None, "'", '(', ')', '*', '+', ',', '-', '.', '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', None, 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'θ', None, ']', '^', '_', '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', None, None, '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Á', 'À', 'Â', 'Ä', 'á', 'à', 'â', 'ä', 'É', 'È', 'Ê', 'Ë', 'é', 'è', 'ê', 'ë', 'Í', 'Ì', 'Î', 'Ï', 'í', 'ì', 'î', 'ï', 'Ó', 'Ò', 'Ô', 'Ö', 'ó', 'ò', 'ô', 'ö', 'Ú', 'Ù', 'Û', 'Ü', 'ú', 'ù', 'û', 'ü', 'Ç', 'ç', 'Ñ', 'ñ', None, None, None, '¿', '¡', 'α', 'β', 'γ', 'Δ', 'δ', 'ε', '[', 'λ', 'μ', 'π', 'ρ', 'Σ', 'σ', 'τ', 'φ', 'Ω', 'ẍ', 'ȳ', 'x', '…', '◄', None, None, None, None, None, 'cube', '\n', 'i', 'ṕ', 'χ', '𝐅', 'e', '$', '𝐍', '⸩', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'ß', None, None, None, None, None, None, None, None, None, None, None]
+
+
 lookup = {_t.text.strip().replace(' ', '_'): _t for _t in ALL_TOKENS if filter_token(_t)}
 lookup['~'] = catalog.NEG
 lookup['@'] = catalog.STORE
