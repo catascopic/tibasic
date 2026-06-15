@@ -3,7 +3,7 @@ import pytest
 from io import BytesIO
 
 from tifile import TiProgram
-from catalog import get_token, DIGITS, LETTERS, ADD, SUB, MUL, DIV, NEWLINE, STORE
+from test_tibasic import toks
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -73,40 +73,38 @@ class TestRoundtripTokens:
 		assert roundtrip(make_prog(tokens=[])).tokens == []
 
 	def test_single_digit(self):
-		prog = make_prog(tokens=[DIGITS[3]])
-		assert roundtrip(prog).tokens == [DIGITS[3]]
+		prog = make_prog(tokens=toks('3'))
+		assert roundtrip(prog).tokens == toks('3')
 
 	def test_single_letter(self):
-		prog = make_prog(tokens=[LETTERS[0]])  # A
-		assert roundtrip(prog).tokens == [LETTERS[0]]
+		prog = make_prog(tokens=toks('A'))
+		assert roundtrip(prog).tokens == toks('A')
 
 	def test_arithmetic_expression(self):
-		# 1+2*3
-		toks = [DIGITS[1], ADD, DIGITS[2], MUL, DIGITS[3]]
-		result = roundtrip(make_prog(tokens=toks))
-		assert result.tokens == toks
+		program = toks('1+2*3')
+		result = roundtrip(make_prog(tokens=program))
+		assert result.tokens == program
 
 	def test_two_byte_token(self):
 		# stdDev( is a two-byte token (0xBB0D)
-		stddev = get_token(0xBB0D)
-		result = roundtrip(make_prog(tokens=[stddev]))
-		assert result.tokens == [stddev]
+		program = toks('stdDev(')
+		result = roundtrip(make_prog(tokens=program))
+		assert result.tokens == program
 
 	def test_mixed_one_and_two_byte_tokens(self):
-		cumsum = get_token(0xBB29)  # cumSum(
-		toks = [cumsum, DIGITS[1], DIGITS[0]]
-		result = roundtrip(make_prog(tokens=toks))
-		assert result.tokens == toks
+		# cumSum( is two-byte (0xBB29); the digits are one-byte
+		program = toks('cumSum( 10')
+		result = roundtrip(make_prog(tokens=program))
+		assert result.tokens == program
 
 	def test_multiline_program(self):
-		# A→B\nB+1
-		toks = [LETTERS[0], STORE, LETTERS[1], NEWLINE, LETTERS[1], ADD, DIGITS[1]]
-		result = roundtrip(make_prog(tokens=toks))
-		assert result.tokens == toks
+		program = toks('A@B\nB+1')  # A→B (newline) B+1
+		result = roundtrip(make_prog(tokens=program))
+		assert result.tokens == program
 
 	def test_token_count_preserved(self):
-		toks = list(DIGITS) * 5  # 50 tokens
-		assert len(roundtrip(make_prog(tokens=toks)).tokens) == 50
+		program = toks('0123456789') * 5  # 50 tokens
+		assert len(roundtrip(make_prog(tokens=program)).tokens) == 50
 
 
 # ── Binary format: write_to ───────────────────────────────────────────────────
@@ -133,7 +131,7 @@ class TestWriteFormat:
 
 	def test_checksum_correct(self):
 		buf = BytesIO()
-		make_prog(tokens=[DIGITS[5]]).write_to(buf)
+		make_prog(tokens=toks('5')).write_to(buf)
 		data = buf.getvalue()
 		# var_entry starts at byte 55 (8 sig + 3 header + 42 comment + 2 length)
 		var_entry = data[55:-2]
