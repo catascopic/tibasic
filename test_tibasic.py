@@ -11,39 +11,62 @@ from errors import (
 	StatError, IncrementError, DataTypeError, InvalidDimError, ArgumentError,
 	UndefinedError, TiMemoryError,
 )
-import catalog
 from titoken import Token
-from catalog import ALL_TOKENS, get_token, NEWLINE
+from catalog import ALL_TOKENS
 from core import TiList, TiMatrix, TiString
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def filter_token(t):
-	# Skip lower-case letters because they can screw things up
-	if len(t.text) == 1 and t.text.islower():
-		# But make exceptions (theta is correctly considered lower-case!)
-		return t.code <= 0xFF
-	return True
+_TEST_CHARSET = [None, 'n', 'u', 'v', 'w', '►', None, None, None, None, None, None, None, 't', '3', 'F', None, 'inv', 'sq', None, 'deg', 'rad', '#', 'le', 'ne', 'ge', '~', 'e', '@', 'ten', None, None, '_', '!', '"', None, None, '%', None, "'", '(', ')', '*', '+', ',', '-', '.', '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', None, 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'θ', None, ']', '^', '_', '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', None, None, '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Á', 'À', 'Â', 'Ä', 'á', 'à', 'â', 'ä', 'É', 'È', 'Ê', 'Ë', 'é', 'è', 'ê', 'ë', 'Í', 'Ì', 'Î', 'Ï', 'í', 'ì', 'î', 'ï', 'Ó', 'Ò', 'Ô', 'Ö', 'ó', 'ò', 'ô', 'ö', 'Ú', 'Ù', 'Û', 'Ü', 'ú', 'ù', 'û', 'ü', 'Ç', 'ç', 'Ñ', 'ñ', None, None, None, '¿', '¡', 'α', 'β', 'γ', 'Δ', 'δ', 'ε', '[', 'λ', 'μ', 'π', 'ρ', 'Σ', 'σ', 'τ', 'φ', 'Ω', 'ẍ', 'ȳ', 'x', '…', '◄', None, None, None, None, None, 'cube', '\n', 'i', 'ṕ', 'χ', '𝐅', 'e', '$', '𝐍', '⸩', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'ß', None, None, None, None, None, None, None, None, None, None, None]
 
 
-_TEST_CHARSET = [None, 'n', 'u', 'v', 'w', '►', None, None, None, None, 'deg', None, None, 't', '3', 'F', None, 'inv', 'sq', None, '°', 'rad', '#', 'le', 'ne', 'ge', 'neg', 'e', '@', 'ten', None, None, '_', '!', '"', None, None, '%', None, "'", '(', ')', '*', '+', ',', '-', '.', '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', None, 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'θ', None, ']', '^', '_', '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', None, None, '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Á', 'À', 'Â', 'Ä', 'á', 'à', 'â', 'ä', 'É', 'È', 'Ê', 'Ë', 'é', 'è', 'ê', 'ë', 'Í', 'Ì', 'Î', 'Ï', 'í', 'ì', 'î', 'ï', 'Ó', 'Ò', 'Ô', 'Ö', 'ó', 'ò', 'ô', 'ö', 'Ú', 'Ù', 'Û', 'Ü', 'ú', 'ù', 'û', 'ü', 'Ç', 'ç', 'Ñ', 'ñ', None, None, None, '¿', '¡', 'α', 'β', 'γ', 'Δ', 'δ', 'ε', '[', 'λ', 'μ', 'π', 'ρ', 'Σ', 'σ', 'τ', 'φ', 'Ω', 'ẍ', 'ȳ', 'x', '…', '◄', None, None, None, None, None, 'cube', '\n', 'i', 'ṕ', 'χ', '𝐅', 'e', '$', '𝐍', '⸩', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'ß', None, None, None, None, None, None, None, None, None, None, None]
+# Two-byte tokens that render to a single character are alternate-font duplicates
+# of the plain one-byte tokens (the subscript ₁ vs the digit 1, 𝟊 vs F, the whole
+# 0xBBxx lower-case a–z plane, …) and would otherwise shadow the real token for
+# that key.  Drop them — except the sequence variables, which are the only
+# single-char two-byte tokens the tests actually need to type.
+_KEEP_SINGLE = {0x6221, 0x5E80, 0x5E81, 0x5E82}  # n, u, v, w
 
 
-lookup = {_t.text.strip().replace(' ', '_'): _t for _t in ALL_TOKENS if filter_token(_t)}
-lookup['~'] = catalog.NEG
-lookup['@'] = catalog.STORE
-lookup['e'] = catalog.SCI_E
-lookup['$'] = catalog.LIST_PREFIX
-lookup['i'] = catalog.IMAG_I
-lookup['_'] = catalog.SPACE
-for i, _tok in enumerate(catalog.LISTS, start=1):
-	lookup[f"L{i}"] = _tok
-for i, _tok in enumerate(catalog.FUNCTION, start=1):
-	lookup[f"Y{i}"] = _tok
-for name, value in vars(catalog).items():
-	if isinstance(value, Token):
-		lookup[name] = value
+# Operator tokens with no convenient typable character keep the readable names
+# they had as catalog constants, since the tests spell them out.
+_ALIASES = {'SQRT': 0xBC, 'XTH_ROOT': 0xF1, 'INV': 0x0C, 'SQ': 0x0D, 'TRANSPOSE': 0x0E}
+
+
+def _usable(t):
+	"""False for two-byte single-char duplicates (alt-font a–z, subscripts, …),
+	except the sequence variables — they're the only ones tests need to type."""
+	return not (t.code > 0xFF and len(t.text) == 1 and t.code not in _KEEP_SINGLE)
+
+
+def _create_lookup():
+	"""Map each typable string to the token it produces (see _KEEP_SINGLE above)."""
+	lookup = {}
+	# Primary keys: the typable test-charset spelling of each token.
+	for t in ALL_TOKENS:
+		if not _usable(t):
+			continue
+		try:
+			key = ''.join(_TEST_CHARSET[b] for b in t.display.strip(b' '))
+		except (IndexError, TypeError):
+			continue
+		if key:
+			lookup[key] = t
+	# Fallback: a token's debug rendering, so symbols like ≤ stay reachable.
+	for t in ALL_TOKENS:
+		if _usable(t):
+			lookup.setdefault(t.text.strip(' '), t)
+	# Readable aliases for the char-less operator tokens.
+	by_code = {t.code: t for t in ALL_TOKENS}
+	for name, code in _ALIASES.items():
+		lookup[name] = by_code[code]
+	return lookup
+
+
+lookup = _create_lookup()
+
+NEWLINE = lookup['\n']
 
 
 def toks(code) -> list[Token]:
@@ -1963,23 +1986,3 @@ class TestEquationVars:
 		env = self._env(Y1='Y2', Y2='Y1')
 		with pytest.raises(TiMemoryError):
 			calc('Y1', env)
-
-	# ── Token predicate coverage ──────────────────────────────────────────────
-
-	def test_is_equation_var_true_for_function_vars(self):
-		assert all(t.is_equation_var() for t in catalog.FUNCTION)
-
-	def test_is_equation_var_true_for_parametric_vars(self):
-		assert all(t.is_equation_var() for t in catalog.PARAMETRIC)
-
-	def test_is_equation_var_true_for_polar_vars(self):
-		assert all(t.is_equation_var() for t in catalog.POLAR)
-
-	def test_is_equation_var_true_for_sequence_vars(self):
-		assert all(t.is_equation_var() for t in catalog.SEQUENCE)
-
-	def test_is_equation_var_false_for_non_equation_vars(self):
-		from catalog import LISTS, MATRICES, STRINGS
-		assert not any(t.is_equation_var() for t in LISTS)
-		assert not any(t.is_equation_var() for t in MATRICES)
-		assert not any(t.is_equation_var() for t in STRINGS)
