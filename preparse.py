@@ -170,7 +170,7 @@ class TiCall(ABC):
 		pass
 
 
-class forms_func(TiCall):
+class special_func(TiCall):
 	"""Decorator for functions/commands that do their own parsing."""
 	def call_with_parser(self, args: ArgParser):
 		return self.func(args)

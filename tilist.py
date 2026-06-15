@@ -7,9 +7,9 @@ from itertools import accumulate, pairwise
 from numbers import Number
 
 from core import TiList, TiMatrix, is_complex_val, require_list, require_real_list, require_complex_list, require_vectorizable, require_vectorizable_real, require_real, require_int, py_int
-from preparse import preparse_func, preparse_cmd, preparse_cmd_func, Real, Env, Thunk, NumericVar, ListVar, ListVarPrefixOptional, forms_func, no_arg_command
+from preparse import preparse_func, preparse_cmd, preparse_cmd_func, Real, Env, Thunk, NumericVar, ListVar, ListVarPrefixOptional, special_func, no_arg_command
 from errors import DataTypeError, DimMismatchError, InvalidDimError, IncrementError, StatError, UndefinedError
-from preparse import preparse_func, preparse_cmd, preparse_cmd_func, forms_func, no_arg_command, Real, Env, Thunk, NumericVar, ListVar, ListOrMatrix, ListVarPrefixOptional
+from preparse import preparse_func, preparse_cmd, preparse_cmd_func, special_func, no_arg_command, Real, Env, Thunk, NumericVar, ListVar, ListOrMatrix, ListVarPrefixOptional
 from parser import ArgParser
 
 
@@ -47,7 +47,7 @@ def sort_d(main_var: ListVar, *dep_vars: ListVar):
 # .value (raw storage) instead of .resolve(), so dim(L1) returns 0 for an empty
 # list where a bare reference to L1 would raise InvalidDimError.  This mirrors
 # the calculator, where dim( works on both sides of → for the same reason.
-@forms_func
+@special_func
 def dim(args: ArgParser):
 	if args.peek().is_list_start():
 		var = args.list_var()
@@ -66,7 +66,7 @@ def dim(args: ArgParser):
 	raise DataTypeError(f"dim: expected list or matrix; got {value}")
 
 
-@forms_func
+@special_func
 def fill(args: ArgParser):
 	fill_value = require_real(args.expr())
 	if args.peek().is_matrix_var():

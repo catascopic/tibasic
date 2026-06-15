@@ -2,7 +2,7 @@ import math
 from numbers import Number
 
 import distributions as dist
-from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, forms_func, no_arg_command
+from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command
 from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
 from modes import DrawMode
 from screen import Screen
@@ -584,7 +584,7 @@ def _blit_char(screen, row: int, col: int, glyph: bytes, height: int) -> int:
 	return col + width
 
 
-@forms_func
+@special_func
 def text(args):
 	"""Text(row,col,val[,val...]) — draw values on the graph screen in small font.
 

@@ -7,7 +7,7 @@ from preparse import (
 	Thunk, NumericVar, LabelName, ProgramName, AnyVar, Real, Env,
 )
 from environment import ReturnSignal, StopSignal
-from preparse import forms_func, no_arg_command
+from preparse import special_func, no_arg_command
 from errors import TiSyntaxError
 
 ############
@@ -86,7 +86,7 @@ def del_var(var: AnyVar):
 	"""
 	var.value = None
 
-@forms_func
+@special_func
 def disp(args: ArgParser):
 	if args.has_next:
 		while True:

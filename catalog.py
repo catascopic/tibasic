@@ -4,7 +4,7 @@ from io import BytesIO
 
 from environment import Environment
 from parser import ArgParser
-from preparse import forms_func
+from preparse import special_func
 from titoken import Token
 import commands as cmds
 import distributions as dist

@@ -7,7 +7,7 @@ from itertools import accumulate, batched
 
 from core import TiList, TiMatrix, require_list, require_matrix
 from core import require_real, require_int, py_int
-from preparse import preparse_func, preparse_cmd_func, forms_func, Real, MatrixVar
+from preparse import preparse_func, preparse_cmd_func, special_func, Real, MatrixVar
 from errors import DataTypeError, DimMismatchError, InvalidDimError, ArgumentError
 
 from parser import ArgParser
@@ -124,7 +124,7 @@ def times_row_plus(factor: Real, mat: TiMatrix, row1: Real, row2: Real):
 	return result
 
 
-@forms_func
+@special_func
 def list_to_matr(args: ArgParser) -> None:
 	from itertools import zip_longest
 	list_vals = []
@@ -139,7 +139,7 @@ def list_to_matr(args: ArgParser) -> None:
 	args.end_paren_cmd()
 
 
-@forms_func
+@special_func
 def matr_to_list(args: ArgParser) -> None:
 	mat = args.expr()
 	if not isinstance(mat, TiMatrix):
