@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from core import Variable, Thunk
+from core import Variable, Thunk, require_real
 from environment import Environment, ReturnSignal
 from errors import TiSyntaxError, IncrementError, LabelError
-from core import require_real
 from titoken import THEN, ELSE, LBL
+from parser import Parser
 
 
 class Program:
@@ -22,7 +22,6 @@ class Program:
 	"""
 
 	def __init__(self, tokens: list, env: Environment):
-		from parser import Parser  # lazy: program → parser → tokens → forms → program
 		self._parser = Parser(tokens, env)
 		self._env = env
 		self._block_stack: list[Block] = []

@@ -4,10 +4,8 @@ from datetime import date
 
 from parser import ArgParser
 
-from core import TiList
-from core import py_int
-from preparse import preparse_func, Real, Env
-from preparse import TiCall
+from core import TiList, py_int
+from preparse import preparse_func, Real, Env, TiCall
 from environment import Environment
 from errors import DomainError
 

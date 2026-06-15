@@ -2,14 +2,12 @@ import math
 from numbers import Number
 
 import distributions as dist
-from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk
-from preparse import forms_func, no_arg_command
+from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, forms_func, no_arg_command
 from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
 from modes import DrawMode
 from screen import Screen
 from fonts import SMALL_FONT, LARGE_FONT
-from core import TiEquation, TiString
-from core import py_int
+from core import TiEquation, TiString, py_int
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
 # rows 0–62 (63 rows) and columns 0–94 (95 columns), inclusive.

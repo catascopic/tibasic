@@ -74,7 +74,7 @@ class TestTrig:
 	def test_asin_deg(self): assert calc('asin( 0.5', deg()) == approx(30)
 	def test_acos_deg(self): assert calc('acos( 1',   deg()) == approx(0)
 	def test_atan_deg(self): assert calc('atan( 1',   deg()) == approx(45)
-	# Hyperbolics stay in purefunctions, no angle mode
+	# Hyperbolics are unaffected by angle mode
 	def test_sinh(self):  assert calc('sinh( 0') == approx(0)
 	def test_cosh(self):  assert calc('cosh( 0') == approx(1)
 	def test_tanh(self):  assert calc('tanh( 0') == approx(0)
