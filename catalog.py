@@ -20,6 +20,14 @@ import titime
 import titoken as tk
 
 
+from preparse import special_func
+
+@special_func
+def _PLACEHOLDER(args):
+	while args.has_next:
+		args.equation_var()
+	args.end_cmd()
+
 
 _TABLE: list[Token | list[Token | None] | None] = [None] * 256
 
@@ -187,7 +195,7 @@ for _i in range(6):
 for _i in range(3):
 	token(0x5E80 + _i, bytes([0x02 + _i]), var=_make_accessor('sequence', _i))
 
-PRGM = token(0x5F, b'prgm', cmd=cmds.prgm)
+token(0x5F, b'prgm', cmd=cmds.prgm)
 
 # Pic1 - Pic0
 for _i in range(10):
@@ -365,8 +373,8 @@ token(0x92, b'ZoomSto')
 token(0x93, b'Text(',                   cmd=draw.text)
 token(0x94, b'nPr',                     bp=(60, 61), op=ops.npr)
 token(0x95, b'nCr',                     bp=(60, 61), op=ops.ncr)
-token(0x96, b'FnOn ')
-token(0x97, b'FnOff ')
+token(0x96, b'FnOn ', cmd=_PLACEHOLDER)
+token(0x97, b'FnOff ', cmd=_PLACEHOLDER)
 token(0x98, b'StorePic ')
 token(0x99, b'RecallPic ')
 token(0x9A, b'StoreGDB ')
@@ -688,8 +696,8 @@ token(0xE5, b'DispTable')
 token(0xE6, b'Menu(',                   cmd=cmds.menu_cmd)
 token(0xE7, b'Send(')
 token(0xE8, b'Get(')
-token(0xE9, b'PlotsOn')
-token(0xEA, b'PlotsOff')
+token(0xE9, b'PlotsOn', cmd=_PLACEHOLDER)
+token(0xEA, b'PlotsOff', cmd=_PLACEHOLDER)
 token(tk.LIST_PREFIX, b'\xdc')  # ᴸ
 token(0xEC, b'Plot1(')
 token(0xED, b'Plot2(')

@@ -77,7 +77,12 @@ _PAUSE_SPINNER   = '▚▞'   # one frame per redraw while a Pause is waiting
 _RUNNING_SPINNER = '▙▛▜▟'         # one frame per redraw while idle-polling (getKey)
 _FRAME_SECONDS = 0.1                # spinner redraw interval (~10 fps)
 _POLL_SECONDS = 0.01                # how often we check for a keypress within a frame
-_BOUNDARY = '█'
+_BOUNDARY = '░'
+
+# Inverse video for the menu's title bar and the selected item's "N:" marker —
+# matches the real calculator showing the menu title in white-on-black.
+_INV_ON  = '\033[7m'
+_INV_OFF = '\033[27m'
 
 class TerminalConsole(Console):
 	"""Interactive command-line console for quick prototyping."""
@@ -101,22 +106,33 @@ class TerminalConsole(Console):
 		self._render(home)
 
 	def _render(self, home: HomeScreen, marker: str | None = None) -> None:
-		# Repaint in place: home the cursor, overwrite each row clearing to its end,
-		# then erase anything below.  This avoids \033[2J — which clears only the
-		# viewport (old frames linger in scrollback) and is a no-op where VT is off —
-		# so the screen never scrolls.  The trailing newline drops the cursor below
-		# the grid so an Input prompt appears there (and is wiped on the next repaint).
-		#
-		# `marker`, if given, overlays one glyph into the top border, one cell left
-		# of the corner — standing in for the real calculator's status-bar icons
-		# (pause indicator, run indicator), which live above the character grid,
-		# not in it.  Putting it in the border rather than a content cell means it
-		# can never collide with anything a program actually Output(s, and there's
-		# nothing to restore afterward: the next plain update() just redraws the
-		# border without it.
+		# Remembered so _tick_running_indicator can redraw the real home screen
+		# while idle-polling getKey.  The menu screen (_menu_rows/_paint) never
+		# touches this — it isn't the home screen and shouldn't be confused for it.
 		self._last_home = home
+		self._paint(home.render().split('\n'), marker)
+
+	def _paint(self, rows: list, marker: str | None = None) -> None:
+		"""Repaint `rows` (ROWS strings of COLS visible characters, ANSI styling
+		allowed) framed in the border, with `marker` optionally overlaid one cell
+		left of the top-right corner.  Shared by the home screen and the menu
+		screen — neither carries any state for the other.
+
+		Repaints in place: home the cursor, overwrite each row clearing to its
+		end, then erase anything below.  This avoids \033[2J — which clears only
+		the viewport (old frames linger in scrollback) and is a no-op where VT is
+		off — so the screen never scrolls.  The trailing newline drops the cursor
+		below the grid so an Input prompt appears there (wiped on the next repaint).
+
+		`marker` stands in for the real calculator's status-bar icons (pause
+		indicator, run indicator), which live above the character grid, not in
+		it.  Putting it in the border rather than a content cell means it can
+		never collide with anything a program actually Output(s, and there's
+		nothing to restore afterward: the next plain repaint just redraws the
+		border without it.
+		"""
 		framed = [(_BOUNDARY * (HomeScreen.COLS + 1)) + (marker or _BOUNDARY)]
-		for row in home.render().split('\n'):
+		for row in rows:
 			framed.append(_BOUNDARY + row + _BOUNDARY)
 		framed.append(_BOUNDARY * (HomeScreen.COLS + 2))
 		frame = '\033[H' + '\n'.join(f'{row}\033[K' for row in framed) + '\033[J\n'
@@ -227,16 +243,99 @@ class TerminalConsole(Console):
 		return False
 
 	def choose(self, title: str, options: list[str]) -> int:
-		print(title)
-		for i, option in enumerate(options, 1):
-			print(f'{i}: {option}')
-		while True:
-			try:
-				choice = int(input('> '))
-			except ValueError:
-				continue
-			if 1 <= choice <= len(options):
-				return choice - 1
+		"""Render an actual bordered menu screen (title bar inverted, the
+		selected item's "N:" inverted) and animate the Pause spinner while
+		waiting — the menu is a genuine block-until-the-user-acts state, the
+		same as Pause, not a polling loop like getKey.
+
+		Up/Down move the highlighted item; a number key 1-7 jumps straight to
+		that item and confirms it immediately, matching the real calculator;
+		Enter confirms whichever item is currently highlighted.
+
+		Falls back to a plain numbered prompt without msvcrt or a real terminal,
+		for the same reason pause() does (msvcrt can't see piped/redirected input).
+		"""
+		try:
+			import msvcrt
+		except ImportError:
+			msvcrt = None
+		if msvcrt is None or not sys.stdin.isatty():
+			print(title)
+			for i, option in enumerate(options, 1):
+				print(f'{i}: {option}')
+			while True:
+				try:
+					choice = int(input('> '))
+				except ValueError:
+					continue
+				if 1 <= choice <= len(options):
+					return choice - 1
+		selected = 0
+		sys.stdout.write('\033[?25l')
+		sys.stdout.flush()
+		try:
+			while True:
+				marker = _PAUSE_SPINNER[self._pause_spin % len(_PAUSE_SPINNER)]
+				self._paint(self._menu_rows(title, options, selected), marker)
+				self._pause_spin += 1
+				result = self._poll_menu_key(msvcrt, len(options))
+				if result is None:
+					continue
+				if result == 'up':
+					selected = (selected - 1) % len(options)
+				elif result == 'down':
+					selected = (selected + 1) % len(options)
+				elif result == 'enter':
+					return selected
+				else:                # a number key: direct, immediate selection
+					return result
+		finally:
+			sys.stdout.write('\033[?25h')
+			sys.stdout.flush()
+
+	def _menu_rows(self, title: str, options: list[str], selected: int) -> list:
+		"""Build the menu's 8 display rows: an inverted title bar, then one
+		numbered option per row with the selected item's "N:" inverted.
+
+		Padding/truncation is done on *visible* width — the inverted spans embed
+		invisible ANSI codes, so they're added after sizing the plain text to
+		HomeScreen.COLS, never counted as part of it.
+		"""
+		title_text = title[:HomeScreen.COLS]
+		title_row = _INV_ON + title_text + _INV_OFF + ' ' * (HomeScreen.COLS - len(title_text))
+		rows = [title_row]
+		for i, option in enumerate(options):
+			prefix = f'{i + 1}:'
+			body = option[:HomeScreen.COLS - len(prefix)]
+			body = body.ljust(HomeScreen.COLS - len(prefix))
+			if i == selected:
+				prefix = _INV_ON + prefix + _INV_OFF
+			rows.append(prefix + body)
+		rows += [' ' * HomeScreen.COLS] * (HomeScreen.ROWS - len(rows))
+		return rows
+
+	def _poll_menu_key(self, msvcrt, n_options: int):
+		"""Poll for up to _FRAME_SECONDS; returns None (nothing relevant), 'up',
+		'down', 'enter', or an int 0..n_options-1 (a number key, chosen directly).
+		"""
+		deadline = time.monotonic() + _FRAME_SECONDS
+		while time.monotonic() < deadline:
+			if msvcrt.kbhit():
+				ch = msvcrt.getwch()
+				if ch in ('\x00', '\xe0'):
+					ch2 = msvcrt.getwch()        # see read_key: don't re-check kbhit
+					if ch2 == 'H':
+						return 'up'
+					if ch2 == 'P':
+						return 'down'
+				elif ch == '\r':
+					return 'enter'
+				elif ch.isdigit() and ch != '0':
+					index = int(ch) - 1
+					if index < n_options:
+						return index
+			time.sleep(_POLL_SECONDS)
+		return None
 
 
 def _enable_windows_vt() -> None:
@@ -267,14 +366,13 @@ def _enable_windows_vt() -> None:
 # Looked up upper-cased (read_key does ch.upper()), so one entry covers both
 # Caps Lock states.
 _TI_KEY_CODES: dict[str, int] = {
-	'\r': 105,   # Enter
-
 	'A': 41, 'B': 42, 'C': 43, 
 	'D': 51, 'E': 52, 'F': 53, 'G': 54, 'H': 55, 
 	'I': 61, 'J': 62, 'K': 63, 'L': 64, 'M': 65, 
 	'N': 71, 'O': 72, 'P': 73, 'Q': 74, 'R': 75,
 	'S': 81, 'T': 82, 'U': 83, 'V': 84, 'W': 85, 
-	'X': 91, 'Y': 92, 'Z': 93,
+	'X': 91, 'Y': 92, 'Z': 93, '=': 95,
+	' ': 102, '.': 103, '`': 104, '\r': 105,
 
 	'7': 72, '8': 73, '9': 74,
 	'4': 82, '5': 83, '6': 84, 

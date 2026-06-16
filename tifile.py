@@ -53,7 +53,7 @@ class ProgramFile:
 		)
 
 	@classmethod
-	def read(cls, file):
+	def load(cls, file):
 		with open(file, 'rb') as f:
 			return cls.read_from(f)
 

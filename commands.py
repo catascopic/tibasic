@@ -283,11 +283,11 @@ def menu_cmd(args: ArgParser):
 	zero options, and end_paren_cmd's leftover-token error covers more than seven.
 	"""
 	program = args.env.current_program()       # raises ERR:INVALID outside a program
-	title = require_string(args.expr())
+	title = str(require_string(args.expr()))
 	options: list[str] = []
 	labels: list[str] = []
 	for _ in range(7):
-		options.append(require_string(args.expr()))
+		options.append(str(require_string(args.expr())))
 		labels.append(args.label_name())
 		if not args.has_next:
 			break

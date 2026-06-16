@@ -42,7 +42,7 @@ class Graph:
 		for row in self.buffer:
 			row.__init__(self.COLS)  # hack?
 
-	def show(self) -> str:
+	def disp(self) -> str:
 		border = '▒' * (self.COLS + 4)
 		print(border)
 		for row1, row2 in batched(self.buffer, 2):

@@ -1,8 +1,9 @@
 """Tests for the home screen model and the I/O commands (Disp, Output(, ClrHome)."""
+import re
 import pytest
 
 from homescreen import HomeScreen
-from terminal import ScriptedConsole
+from terminal import ScriptedConsole, TerminalConsole
 from errors import DomainError, DataTypeError, TiSyntaxError, InvalidCommandError
 from environment import Environment
 from program import Program
@@ -240,6 +241,77 @@ class TestMenu:
 	def test_non_string_option_raises(self):
 		with pytest.raises(DataTypeError):
 			run_program('Menu( 5,"O",A\nLbl A', choices=[0])
+
+
+class TestTerminalMenuRendering:
+	"""Unit tests for TerminalConsole's menu-screen rendering/key logic, which
+	don't need msvcrt or a real terminal — pure data in, data out."""
+
+	def _console(self):
+		c = TerminalConsole.__new__(TerminalConsole)
+		c._pause_spin = c._run_spin = 0
+		c._last_home = None
+		c._last_run_render = 0.0
+		return c
+
+	@staticmethod
+	def _plain(row):
+		return re.sub(r'\x1b\[\d+m', '', row)
+
+	def test_eight_rows_of_sixteen_visible_chars(self):
+		rows = self._console()._menu_rows('T', ['A', 'B'], selected=0)
+		assert len(rows) == HomeScreen.ROWS
+		assert all(len(self._plain(r)) == HomeScreen.COLS for r in rows)
+
+	def test_title_row_is_inverted(self):
+		row = self._console()._menu_rows('PICK', ['A'], selected=0)[0]
+		# Only "PICK" itself is inverted — the trailing padding to fill the row
+		# is plain, not part of the inverted span.
+		assert row == '\033[7mPICK\033[27m' + ' ' * 12
+		assert self._plain(row) == 'PICK' + ' ' * 12
+
+	def test_selected_prefix_inverted_others_not(self):
+		rows = self._console()._menu_rows('T', ['ONE', 'TWO', 'THREE'], selected=1)
+		assert '\033[7m' not in rows[1] and self._plain(rows[1]) == '1:ONE' + ' ' * 11
+		assert rows[2].startswith('\033[7m2:\033[27m')
+		assert '\033[7m' not in rows[3]
+
+	def test_long_option_truncated_to_fit(self):
+		row = self._console()._menu_rows('T', ['X' * 30], selected=0)[1]
+		assert self._plain(row) == '1:' + 'X' * 14   # 16 - len('1:')
+
+	def test_blank_rows_pad_to_eight(self):
+		rows = self._console()._menu_rows('T', ['A'], selected=0)
+		assert rows[2:] == [' ' * HomeScreen.COLS] * 6
+
+	def test_poll_recognizes_up_down_enter_digit(self):
+		c = self._console()
+		assert c._poll_menu_key(_FakeMsvcrt(['\x00', 'H']), 3) == 'up'
+		assert c._poll_menu_key(_FakeMsvcrt(['\x00', 'P']), 3) == 'down'
+		assert c._poll_menu_key(_FakeMsvcrt(['\r']), 3) == 'enter'
+		assert c._poll_menu_key(_FakeMsvcrt(['2']), 3) == 1
+
+	def test_poll_ignores_digit_beyond_option_count(self):
+		c = self._console()
+		assert c._poll_menu_key(_FakeMsvcrt(['9']), 3) is None
+
+	def test_poll_returns_none_when_idle(self):
+		c = self._console()
+		assert c._poll_menu_key(_FakeMsvcrt([]), 3) is None
+
+
+class _FakeMsvcrt:
+	"""A one-shot fake: kbhit() is True exactly once per queued event, then
+	False forever — enough to drive a single _poll_menu_key call deterministically."""
+
+	def __init__(self, events):
+		self.events = list(events)
+
+	def kbhit(self):
+		return bool(self.events)
+
+	def getwch(self):
+		return self.events.pop(0)
 
 
 class TestInput:
