@@ -373,6 +373,9 @@ _TI_KEY_CODES: dict[str, int] = {
 	'S': 81, 'T': 82, 'U': 83, 'V': 84, 'W': 85, 
 	'X': 91, 'Y': 92, 'Z': 93, '=': 95,
 	' ': 102, '.': 103, '`': 104, '\r': 105,
+	'\x08': 45,  # Backspace
+	'\x1b': 21,  # Escape  → 2ND
+	'\x09': 31,  # Tab     → ALPHA
 
 	'7': 72, '8': 73, '9': 74,
 	'4': 82, '5': 83, '6': 84, 
@@ -387,4 +390,14 @@ _TI_EXTENDED_KEY_CODES: dict[str, int] = {
 	'P': 34,   # Down
 	'K': 24,   # Left
 	'M': 26,   # Right
+	'S': 23,   # Delete
+	'G': 22,   # Home    → MODE
+	'R': 32,   # Insert  → X,T,θ,n
+	'O': 33,   # End     → STAT
+	'I': 44,   # Page Up → VARS
+	';': 11,   # F1
+	'<': 12,   # F2
+	'=': 13,   # F3
+	'>': 14,   # F4
+	'?': 15,   # F5
 }
