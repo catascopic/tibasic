@@ -58,11 +58,11 @@ def main() -> None:
 
 	for page in range(pages):
 		batch = ALL_TOKENS[page * per_page:(page + 1) * per_page]
-		env.screen.clear()
+		env.graph.clear()
 		for i, tok in enumerate(batch):
 			_draw_token(env, tok, i * line_height, large)
 
-		env.screen.show()
+		env.graph.show()
 		# Console-side legend so you can match glyphs to codes/text.
 		for i, tok in enumerate(batch):
 			print(f"  line {i}: 0x{tok.code:0{4 if tok.code > 0xFF else 2}X}  {tok.text!r}")

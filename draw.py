@@ -5,7 +5,7 @@ import distributions as dist
 from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command
 from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
 from modes import DrawMode
-from screen import Screen
+from graph import Graph
 from fonts import SMALL_FONT, LARGE_FONT
 from core import TiEquation, TiString, py_int
 
@@ -114,27 +114,27 @@ def _validate(row, col):
 
 @preparse_cmd_func
 def pxl_on(env: Env, row: Real, col: Real) -> None:
-	env.screen.set(*_validate(row, col))
+	env.graph.set(*_validate(row, col))
 
 
 @preparse_cmd_func
 def pxl_off(env: Env, row: Real, col: Real) -> None:
-	env.screen.set_off(*_validate(row, col))
+	env.graph.set_off(*_validate(row, col))
 
 
 @preparse_cmd_func
 def pxl_change(env: Env, row: Real, col: Real) -> None:
-	env.screen.toggle(*_validate(row, col))
+	env.graph.toggle(*_validate(row, col))
 
 
 @preparse_cmd_func
 def pxl_test(env: Env, row: Real, col: Real) -> float:
-	return float(env.screen.get(*_validate(row, col)))
+	return float(env.graph.get(*_validate(row, col)))
 
 
 @no_arg_command
 def clr_draw(env) -> None:
-	env.screen.clear()
+	env.graph.clear()
 
 
 def _pt_action(env, x, y, mark, action) -> None:
@@ -143,28 +143,28 @@ def _pt_action(env, x, y, mark, action) -> None:
 		try:
 			points = _MARK_OFFSETS[mark]
 		except KeyError:
-			action(env.screen, row, col)
+			action(env.graph, row, col)
 		else:
 			for dr, dc in points:
 				r = row + dr
 				c = col + dc
 				if _in_bounds(r, c):
-					action(env.screen, r, c)
+					action(env.graph, r, c)
 
 
 @preparse_cmd_func
 def pt_on(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
-	_pt_action(env, x, y, mark, Screen.set)
+	_pt_action(env, x, y, mark, Graph.set)
 
 
 @preparse_cmd_func
 def pt_off(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
-	_pt_action(env, x, y, mark, Screen.set_off)
+	_pt_action(env, x, y, mark, Graph.set_off)
 
 
 @preparse_cmd_func
 def pt_change(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
-	_pt_action(env, x, y, mark, Screen.toggle)
+	_pt_action(env, x, y, mark, Graph.toggle)
 
 
 @preparse_cmd
@@ -173,7 +173,7 @@ def vertical(env: Env, x: Real) -> None:
 	col = _x_to_col(env, x)
 	if 0 <= col <= MAX_COL:
 		for row in range(MAX_ROW + 1):
-			env.screen.set(row, col, True)
+			env.graph.set(row, col, True)
 
 
 @preparse_cmd
@@ -182,7 +182,7 @@ def horizontal(env: Env, y: Real) -> None:
 	row = _y_to_row(env, y)
 	if 0 <= row <= MAX_ROW:
 		for col in range(MAX_COL + 1):
-			env.screen.set(row, col, True)
+			env.graph.set(row, col, True)
 
 
 @preparse_cmd_func
@@ -197,7 +197,7 @@ def line(env: Env, x1: Real, y1: Real, x2: Real, y2: Real, erase: Real = 1) -> N
 	r1, c1 = _graph_to_pixel(env, x2, y2)
 	for r, c in _bresenham(r0, c0, r1, c1):
 		if _in_bounds(r, c):
-			env.screen.set(r, c, on)
+			env.graph.set(r, c, on)
 
 
 @preparse_cmd_func
@@ -225,7 +225,7 @@ def circle(env: Env, x: Real, y: Real, r: Real, _fast: TiListComplex = None) -> 
 		col = cx + _round_half_up(rx * math.cos(theta))
 		row = cy - _round_half_up(ry * math.sin(theta))
 		if _in_bounds(row, col):
-			env.screen.set(row, col)
+			env.graph.set(row, col)
 
 
 # ── Function graphing (DrawF / DrawInv) and distribution shading ────────────────
@@ -301,7 +301,7 @@ def _plot_segment(env, r0: int, c0: int, r1: int, c1: int, on: bool = True) -> N
 		return
 	for r, c in _bresenham(*clipped):
 		if _in_bounds(r, c):
-			env.screen.set(r, c, on)
+			env.graph.set(r, c, on)
 
 
 def _trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
@@ -358,10 +358,10 @@ def _trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
 		if connected and prev is not None:
 			for r, c in _bresenham(*prev, *curr):
 				if _in_bounds(r, c):
-					env.screen.set(r, c, on)
+					env.graph.set(r, c, on)
 
 		elif _in_bounds(row, col):
-			env.screen.set(row, col, on)
+			env.graph.set(row, col, on)
 
 		prev = curr
 
@@ -378,7 +378,7 @@ def _shade_under(env, f, lo: float, hi: float) -> None:
 			continue
 		top, bot = sorted((_y_to_row(env, y), axis_row))
 		for row in range(max(top, 0), min(bot, MAX_ROW) + 1):
-			env.screen.set(row, col)
+			env.graph.set(row, col)
 
 
 @preparse_cmd
@@ -489,7 +489,7 @@ def shade(env: Env, lower: Thunk, upper: Thunk,
 		bot = _y_to_row(env, ylo)   # lower function → larger row number
 		for row in range(max(top, 0), min(bot, MAX_ROW) + 1):
 			if _shade_pixel(pat, res, row, col):
-				env.screen.set(row, col, True)
+				env.graph.set(row, col, True)
 
 
 def _numeric_derivative(f, x: float, h: float = 1e-3):
@@ -568,7 +568,7 @@ def _get_text_chars(value) -> bytes:
 		raise DataTypeError(f"Text(: expected a real number or string, got {type(value).__name__}")
 
 
-def _blit_char(screen, row: int, col: int, glyph: bytes, height: int) -> int:
+def _blit_char(graph, row: int, col: int, glyph: bytes, height: int) -> int:
 	"""Draw one glyph at (row, col) in overwrite mode; return the column after it.
 
 	Every pixel of the glyph's width×height box is written — glyph bits where they
@@ -580,7 +580,7 @@ def _blit_char(screen, row: int, col: int, glyph: bytes, height: int) -> int:
 	for dc in range(width):
 		c = col + dc
 		for dr in range(height):
-			screen.set(row + dr, c, bool((glyph[dc] >> (height - 1 - dr)) & 1))
+			graph.set(row + dr, c, bool((glyph[dc] >> (height - 1 - dr)) & 1))
 	return col + width
 
 
@@ -615,20 +615,20 @@ def text(args):
 			glyphs.append(font[char])
 	args.end_paren_cmd()
 
-	screen = args.env.screen
+	graph = args.env.graph
 	cur_col = col
 	for glyph in glyphs:
 		if cur_col + len(glyph) > MAX_COL + 1:
 			break
-		next_col = _blit_char(screen, row, cur_col, glyph, height)
+		next_col = _blit_char(graph, row, cur_col, glyph, height)
 		if large_mode:
 			# Large font carries a 1px separator: blank the column to the right of
 			# the glyph and the padding row beneath, but only if they fit in the drawable area.
 			if next_col <= MAX_COL:
 				for r in range(row, row + height + 1):
-					screen.set(r, next_col, False)
+					graph.set(r, next_col, False)
 			if row + height <= MAX_ROW:
 				for c in range(cur_col, next_col):
-					screen.set(row + height, c, False)
+					graph.set(row + height, c, False)
 			next_col += 1
 		cur_col = next_col

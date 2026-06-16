@@ -1,5 +1,3 @@
-Rename screen "graph"
-
 Is Decimal round really necessary in timath?
 
 _REGISTRY: ArgSpec repr name

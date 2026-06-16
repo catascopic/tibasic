@@ -109,7 +109,7 @@ while True:
 				print(f'  [{display}]')
 			except Exception as e:
 				print(f'  Error: {e}')
-			env.screen.show()
+			env.graph.show()
 			print()
 		else:
 			current_display = display
@@ -118,7 +118,7 @@ while True:
 	else:
 		try:
 			run(current_prefix + user_input, env)
-			env.screen.show()
+			env.graph.show()
 			print()
 		except Exception as parse_err:
 			print(parse_err)

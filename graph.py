@@ -3,8 +3,12 @@ import sys
 from itertools import batched
 
 
-class Screen:
-	"""The calculator's monochrome LCD: 64 rows × 96 columns.
+class Graph:
+	"""The calculator's graph screen: a 64 row × 96 column monochrome pixel buffer.
+
+	This is the pixel surface the graph-mode and drawing commands (Pxl-/Pt-/Line/
+	Circle/DrawF/Text/…) render onto.  The home screen reuses the same 64×96 LCD
+	but addresses it as a 16×8 character grid, so it will be a separate type.
 
 	The live buffer is dense — one byte per pixel (0 = off, 1 = on) — to keep
 	pixel access trivial.  Bit-packing is strictly a serialization concern

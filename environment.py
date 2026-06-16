@@ -10,7 +10,7 @@ from core import TiList, is_complex_val
 from core import Variable, NumericVariable, RealVariable, ListVariable, UserList, MatrixVariable, StringVariable, EquationVariable, require_real, py_int
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
-from screen import Screen
+from graph import Graph
 
 
 class Environment:
@@ -52,7 +52,7 @@ class Environment:
 		# Window / graphing variables (Xscl, Xmin, Xmax, …)
 		self.window = WindowVars()
 		# LCD pixel buffer (used by Pxl-/Pt-/Line/etc. drawing commands)
-		self.screen = Screen()
+		self.graph = Graph()
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
 		self.n_tvm = RealVariable()   # 𝐍 (number of payments)
 		self.i_pct = RealVariable()   # I% (interest rate per period, as percentage)
