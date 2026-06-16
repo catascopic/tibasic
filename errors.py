@@ -109,3 +109,26 @@ class TiMemoryError(TiError):
 class TiOverflowError(TiError):
 	"""ERR:OVERFLOW — a calculation went beyond the bounds of (1e100, 1e-100)."""
 	code = 'OVERFLOW'
+
+
+class BoundError(TiError):
+	"""ERR:BOUND — a lower bound is greater than its upper bound (e.g. fMin/fMax)."""
+	code = 'BOUND'
+
+
+class BadGuessError(TiError):
+	"""ERR:BAD GUESS — solve(: the guess is outside the bounds or the function is
+	undefined there."""
+	code = 'BAD GUESS'
+
+
+class NoSignChangeError(TiError):
+	"""ERR:NO SIGN CHG — solve(: no sign change was found over the search interval,
+	so no root could be bracketed."""
+	code = 'NO SIGN CHG'
+
+
+class ToleranceError(TiError):
+	"""ERR:TOL NOT MET — an iterative routine could not reach the requested
+	tolerance (e.g. fMin/fMax)."""
+	code = 'TOL NOT MET'

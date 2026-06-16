@@ -1,3 +1,5 @@
+Rename screen "graph"
+
 Is Decimal round really necessary in timath?
 
 _REGISTRY: ArgSpec repr name
@@ -41,7 +43,6 @@ TblInput — a 7-element list of the values of a variable in the table.
 
 Which is the better system for mapping characters?
 
-Rename screen "graph"
 Make home screen
 
 Revisit transform_to_domain_error decorator
@@ -67,7 +68,6 @@ Add aliases to any token that has a character that can't be typed on the keyboar
 
 TODO:
 
-Commands: solve( fMin( fMax(
 StorePic RecallPic StoreGDB RecallGDB
 Modes: Horiz Full IndpntAuto IndpntAsk DependAuto DependAsk Time Web
 Finance: tvm_Pmt tvm_I% tvm_PV tvm_N tvm_FV Pmt_End Pmt_Bgn

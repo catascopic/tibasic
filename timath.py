@@ -22,7 +22,11 @@ from core import TiList, TiMatrix, require_list
 from core import require_real, require_int, require_num, py_int
 from preparse import preparse_func, Real, Vectorized, VectorizedReal, MatrixVectorized, AnyValue, Thunk, NumericVar, Env
 from core import vectorize
-from errors import DataTypeError, DimMismatchError, DomainError
+from errors import (
+	DataTypeError, DimMismatchError, DomainError, InvalidDimError,
+	DivideByZeroError, NonRealAnsError, TiOverflowError,
+	BoundError, BadGuessError, NoSignChangeError, ToleranceError,
+)
 
 
 def handle_complex(func):
@@ -187,6 +191,221 @@ def sigma(env: Env, formula: Thunk, var: NumericVar, start: Real, end: Real) -> 
 			total += formula.eval()
 			n += 1
 	return total
+
+
+# ── Root finding and optimization (solve(, fMin(, fMax() ──────────────────────
+# All three drive a real-valued f(var) built from the user's expression, sweeping
+# `var` while leaving its stored value untouched (var.scoped()).
+
+def _real_of(env, formula, var):
+	"""Build f(x): set `var` to x, evaluate the expression, require a real result."""
+	def f(x):
+		var.value = x
+		return require_real(formula.eval())
+	return f
+
+
+def _brentq(f, a, b, tol=1e-12, max_iter=100):
+	"""Brent's method: the root of f in a bracket [a, b] where f(a), f(b) differ in
+	sign.  Raises NoSignChangeError if they don't."""
+	fa, fb = f(a), f(b)
+	if fa == 0.0:
+		return a
+	if fb == 0.0:
+		return b
+	if fa * fb > 0.0:
+		raise NoSignChangeError("solve: no sign change over the bracket")
+	if builtins.abs(fa) < builtins.abs(fb):
+		a, b, fa, fb = b, a, fb, fa
+	c, fc, d = a, fa, a
+	mflag = True
+	for _ in range(max_iter):
+		if fb == 0.0 or builtins.abs(b - a) < tol:
+			return b
+		if fa != fc and fb != fc:  # inverse quadratic interpolation
+			s = (a * fb * fc / ((fa - fb) * (fa - fc))
+			     + b * fa * fc / ((fb - fa) * (fb - fc))
+			     + c * fa * fb / ((fc - fa) * (fc - fb)))
+		else:                      # secant
+			s = b - fb * (b - a) / (fb - fa)
+		lo, hi = builtins.min((3 * a + b) / 4, b), builtins.max((3 * a + b) / 4, b)
+		if (not lo <= s <= hi
+		    or (mflag and builtins.abs(s - b) >= builtins.abs(b - c) / 2)
+		    or (not mflag and builtins.abs(s - b) >= builtins.abs(c - d) / 2)
+		    or (mflag and builtins.abs(b - c) < tol)
+		    or (not mflag and builtins.abs(c - d) < tol)):
+			s = (a + b) / 2          # fall back to bisection
+			mflag = True
+		else:
+			mflag = False
+		fs = f(s)
+		d, c, fc = c, b, fb
+		if fa * fs < 0:
+			b, fb = s, fs
+		else:
+			a, fa = s, fs
+		if builtins.abs(fa) < builtins.abs(fb):
+			a, b, fa, fb = b, a, fb, fa
+	return b
+
+
+def _bracket_root(f, guess, lo, hi, max_steps=2000):
+	"""Expand outward from `guess` within [lo, hi] until f brackets a root.
+
+	Returns a (left, right) bracket where f changes sign (or touches zero).  Steps
+	that overflow or leave the domain cap that side of the search.
+	"""
+	def safe(x):
+		# A probe where the expression can't yield a real value (overflow, ln/√ of a
+		# negative → NonRealAnsError in Real mode, 1/0, out-of-domain) caps the search
+		# in that direction; genuine errors (undefined var, non-scalar) propagate.
+		try:
+			return f(x)
+		except (OverflowError, DomainError, DivideByZeroError, NonRealAnsError, TiOverflowError):
+			return None
+
+	fg = safe(guess)
+	if fg is None:
+		raise BadGuessError(f"solve: function is undefined at the guess {guess}")
+	if fg == 0:
+		return guess, guess
+	left = right = guess
+	fleft = fright = fg
+	step = builtins.max(builtins.abs(guess) * 0.01, 1e-4)
+	left_done = right_done = False
+	for _ in range(max_steps):
+		if not right_done and right < hi:
+			nr = builtins.min(right + step, hi)
+			fnr = safe(nr)
+			if fnr is None:
+				right_done = True
+			else:
+				if fnr == 0 or fnr * fright < 0:
+					return right, nr
+				right, fright, right_done = nr, fnr, nr >= hi
+		else:
+			right_done = True
+		if not left_done and left > lo:
+			nl = builtins.max(left - step, lo)
+			fnl = safe(nl)
+			if fnl is None:
+				left_done = True
+			else:
+				if fnl == 0 or fnl * fleft < 0:
+					return nl, left
+				left, fleft, left_done = nl, fnl, nl <= lo
+		else:
+			left_done = True
+		if left_done and right_done:
+			break
+		step *= 1.6
+	raise NoSignChangeError("solve: no sign change found near the guess")
+
+
+def _solve_bounds(bounds: TiList):
+	data = bounds.data
+	if len(data) != 2:
+		raise InvalidDimError("solve: bounds must be a list {lower, upper}")
+	a, b = data
+	require_real(a)
+	require_real(b)	
+	return (a, b) if a <= b else (b, a)
+
+
+@preparse_func
+def solve(env: Env, formula: Thunk, var: NumericVar, guess: Real, bounds: TiList = None) -> float:
+	lo, hi = (-1e99, 1e99) if bounds is None else _solve_bounds(bounds)
+	if not lo <= guess <= hi:
+		raise BadGuessError(f"solve: guess {guess} is outside the bounds [{lo}, {hi}]")
+	with env.nest_guard('solve'), var.scoped():
+		f = _real_of(env, formula, var)
+		a, b = _bracket_root(f, guess, lo, hi)
+		return _brentq(f, a, b)
+
+
+def _brent_minimize(f, a, b, xatol, max_eval=500):
+	"""Brent's bounded minimization on [a, b] (SciPy's fminbound); returns the argmin.
+
+	Combines golden-section search with parabolic interpolation.  Raises
+	ToleranceError if it can't converge within max_eval evaluations.
+	"""
+	sqrt_eps = 1.4901161193847656e-08    # sqrt(machine epsilon)
+	golden = 0.3819660112501051          # (3 - √5) / 2
+	fulc = xf = nfc = a + golden * (b - a)
+	rat = e = 0.0
+	fx = ffulc = fnfc = f(xf)
+	xm = 0.5 * (a + b)
+	tol1 = sqrt_eps * builtins.abs(xf) + xatol / 3.0
+	tol2 = 2.0 * tol1
+	num = 1
+	while builtins.abs(xf - xm) > tol2 - 0.5 * (b - a):
+		use_golden = True
+		if builtins.abs(e) > tol1:                       # try a parabolic step
+			r = (xf - nfc) * (fx - ffulc)
+			q = (xf - fulc) * (fx - fnfc)
+			p = (xf - fulc) * q - (xf - nfc) * r
+			q = 2.0 * (q - r)
+			if q > 0.0:
+				p = -p
+			q = builtins.abs(q)
+			r, e = e, rat
+			if builtins.abs(p) < builtins.abs(0.5 * q * r) and q * (a - xf) < p < q * (b - xf):
+				rat = p / q
+				x = xf + rat
+				if x - a < tol2 or b - x < tol2:
+					rat = math.copysign(tol1, xm - xf)
+				use_golden = False
+		if use_golden:                                   # golden-section step
+			e = (a - xf) if xf >= xm else (b - xf)
+			rat = golden * e
+		si = math.copysign(1.0, rat) if rat != 0 else 1.0
+		x = xf + si * builtins.max(builtins.abs(rat), tol1)
+		fu = f(x)
+		num += 1
+		if fu <= fx:
+			if x >= xf:
+				a = xf
+			else:
+				b = xf
+			fulc, ffulc = nfc, fnfc
+			nfc, fnfc = xf, fx
+			xf, fx = x, fu
+		else:
+			if x < xf:
+				a = x
+			else:
+				b = x
+			if fu <= fnfc or nfc == xf:
+				fulc, ffulc = nfc, fnfc
+				nfc, fnfc = x, fu
+			elif fu <= ffulc or fulc == xf or fulc == nfc:
+				fulc, ffulc = x, fu
+		xm = 0.5 * (a + b)
+		tol1 = sqrt_eps * builtins.abs(xf) + xatol / 3.0
+		tol2 = 2.0 * tol1
+		if num >= max_eval:
+			raise ToleranceError("fMin/fMax: could not meet the requested tolerance")
+	return xf
+
+
+def _optimize(env, formula, var, lo, hi, tol, sign, func):
+	if lo > hi:
+		raise BoundError(f"{func.__name__}: lower bound {lo} > upper bound {hi}")
+	if tol == 0:
+		raise DomainError(f"{func.__name__}: tolerance cannot be 0")
+	with env.nest_guard(func), var.scoped():
+		f = _real_of(env, formula, var)
+		return _brent_minimize(lambda x: sign * f(x), lo, hi, builtins.abs(tol))
+
+
+@preparse_func
+def f_min(env: Env, formula: Thunk, var: NumericVar, lo: Real, hi: Real, tol: Real = 1e-5) -> float:
+	return _optimize(env, formula, var, lo, hi, tol, 1.0, f_min)
+
+
+@preparse_func
+def f_max(env: Env, formula: Thunk, var: NumericVar, lo: Real, hi: Real, tol: Real = 1e-5) -> float:
+	return _optimize(env, formula, var, lo, hi, tol, -1.0, f_max)
 
 
 @preparse_func

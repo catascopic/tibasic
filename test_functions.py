@@ -9,6 +9,7 @@ from modes import AngleMode, ComplexMode
 from errors import (
 	TiSyntaxError, DomainError, DimMismatchError,
 	DataTypeError, InvalidDimError, ArgumentError, NonRealAnsError,
+	BoundError, BadGuessError, NoSignChangeError,
 )
 import catalog
 import titime
@@ -1467,4 +1468,83 @@ class TestTranspose:
 		# (augment(Aᵀ, Bᵀ))ᵀ stacks two row vectors as rows of a new matrix
 		result = calc('( augment( [[1,2,3]]t,[[4,5,6]]t)t')
 		assert result.data == [[1, 2, 3], [4, 5, 6]]
+
+
+# ── solve( ────────────────────────────────────────────────────────────────────
+
+class TestSolve:
+	def test_linear_root(self):
+		assert calc('solve( X-2,X,0') == approx(2)
+
+	def test_quadratic_near_positive_guess(self):
+		assert calc('solve( X^2-4,X,3') == approx(2)
+
+	def test_quadratic_near_negative_guess(self):
+		# the root returned depends on the guess
+		assert calc('solve( X^2-4,X,~3') == approx(-2)
+
+	def test_trig_root(self):
+		assert calc('solve( cos( X),X,1.5') == approx(math.pi / 2)
+
+	def test_with_bounds(self):
+		assert calc('solve( X^2-4,X,1,{0,5}') == approx(2)
+
+	def test_returns_root_as_ans(self):
+		assert run('solve( X-2,X,0').ans == approx(2)
+
+	def test_does_not_modify_variable(self):
+		env = run('9@X')
+		run('solve( X-2,X,0', env)
+		assert var(env, 'X') == 9
+
+	def test_root_near_domain_boundary(self):
+		# ln(X) is undefined for X<=0; the search must treat those probes as a wall
+		# rather than letting NonRealAnsError escape, and still find the root at X=1
+		assert calc('solve( ln( X),X,1.5') == approx(1)
+
+	def test_no_real_root_raises(self):
+		with pytest.raises(NoSignChangeError): calc('solve( X^2+1,X,0')
+
+	def test_touch_root_no_sign_change_raises(self):
+		# a root the function only touches (never crosses) cannot be bracketed,
+		# matching the calculator's ERR:NO SIGN CHG for solve((X+1)²,X,0)
+		with pytest.raises(NoSignChangeError): calc('solve( (X+1)^2,X,0')
+
+	def test_guess_outside_bounds_raises(self):
+		with pytest.raises(BadGuessError): calc('solve( X-2,X,9,{0,5}')
+
+
+# ── fMin( / fMax( ─────────────────────────────────────────────────────────────
+
+class TestFMinFMax:
+	def test_fmin_parabola(self):
+		# returns the argmin (X value), not the minimum value
+		assert calc('fMin( (X-3)^2,X,0,10') == approx(3)
+
+	def test_fmin_spec_example(self):
+		assert calc('fMin( cos( sin( X)+X cos( X)),X,0,2') == approx(1.076873875, abs=1e-5)
+
+	def test_fmax_parabola(self):
+		assert calc('fMax( ~X^2+4X,X,0,5') == approx(2)
+
+	def test_fmax_spec_example(self):
+		# sin(X)cos(X) = sin(2X)/2 peaks at X = π/4 on [0, 3]
+		assert calc('fMax( sin( X) cos( X),X,0,3') == approx(math.pi / 4, abs=1e-4)
+
+	def test_tol_argument_accepted(self):
+		assert calc('fMin( (X-3)^2,X,0,10,1e~9') == approx(3)
+
+	def test_does_not_modify_variable(self):
+		env = run('9@X')
+		run('fMin( (X-3)^2,X,0,10', env)
+		assert var(env, 'X') == 9
+
+	def test_lower_greater_than_upper_raises(self):
+		with pytest.raises(BoundError): calc('fMin( X^2,X,5,1')
+
+	def test_fmax_lower_greater_than_upper_raises(self):
+		with pytest.raises(BoundError): calc('fMax( X^2,X,5,1')
+
+	def test_zero_tolerance_raises(self):
+		with pytest.raises(DomainError): calc('fMin( X^2,X,0,1,0')
 
