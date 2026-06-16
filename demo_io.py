@@ -8,7 +8,7 @@ a time with Output(, pressing Pause between each letter.  Runs as a Program so
 Menu('s and Goto's branching have a program context.
 """
 from environment import Environment
-from console import TerminalConsole
+from terminal import TerminalConsole
 from program import Program
 from test_tibasic import toks
 

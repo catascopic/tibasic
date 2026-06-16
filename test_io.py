@@ -2,7 +2,7 @@
 import pytest
 
 from homescreen import HomeScreen
-from console import ScriptedConsole
+from terminal import ScriptedConsole
 from errors import DomainError, DataTypeError, TiSyntaxError, InvalidCommandError
 from environment import Environment
 from program import Program

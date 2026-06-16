@@ -12,7 +12,7 @@ from errors import TiError, DataTypeError, DomainError, IllegalNestError, Invali
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 from graph import Graph
 from homescreen import HomeScreen
-from console import ScriptedConsole
+from terminal import ScriptedConsole
 
 
 class Environment:
