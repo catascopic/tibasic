@@ -6,11 +6,16 @@ from test_tibasic import toks
 code = toks("""
 4@I
 8@J
-4@K
-8@L
-ClrHome
-Output( I,J,"X
+1@K
+1@L
 Repeat A=105
+	If I≠K or J≠L
+	Then
+		Output( K,L,"_
+		Output( I,J,"X
+		I@K
+		J@L
+	End
 	getKey @A
 	If A=24
 		J-1@J
@@ -22,13 +27,6 @@ Repeat A=105
 		I+1@I
 	max( 1, min( 8,I@I
 	max( 1, min( 16,J@J
-	If I≠K or J≠L
-	Then
-		Output( K,L,"_
-		Output( I,J,"X
-		I@K
-		J@L
-	End
 End
 """)
 

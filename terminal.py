@@ -73,13 +73,14 @@ class ScriptedConsole(Console):
 		return self.choices.pop(0)
 
 
+_PAUSE_SPINNER   = '▚▞'   # one frame per redraw while a Pause is waiting
+_RUNNING_SPINNER = '▙▛▜▟'         # one frame per redraw while idle-polling (getKey)
+_FRAME_SECONDS = 0.1                # spinner redraw interval (~10 fps)
+_POLL_SECONDS = 0.01                # how often we check for a keypress within a frame
+_BOUNDARY = '█'
+
 class TerminalConsole(Console):
 	"""Interactive command-line console for quick prototyping."""
-
-	_PAUSE_SPINNER   = '▚▞'   # one frame per redraw while a Pause is waiting
-	_RUNNING_SPINNER = '▙▛▜▟'         # one frame per redraw while idle-polling (getKey)
-	_FRAME_SECONDS = 0.1                # spinner redraw interval (~10 fps)
-	_POLL_SECONDS = 0.01                # how often we check for a keypress within a frame
 
 	def __init__(self):
 		if sys.platform == 'win32':
@@ -114,9 +115,10 @@ class TerminalConsole(Console):
 		# nothing to restore afterward: the next plain update() just redraws the
 		# border without it.
 		self._last_home = home
-		top = ('▒' * (HomeScreen.COLS + 1)) + (marker or '▒')
-		rows = home.render().split('\n')
-		framed = [top, *(f'▒{row}▒' for row in rows), '▒' * (HomeScreen.COLS + 2)]
+		framed = [(_BOUNDARY * (HomeScreen.COLS + 1)) + (marker or _BOUNDARY)]
+		for row in home.render().split('\n'):
+			framed.append(_BOUNDARY + row + _BOUNDARY)
+		framed.append(_BOUNDARY * (HomeScreen.COLS + 2))
 		frame = '\033[H' + '\n'.join(f'{row}\033[K' for row in framed) + '\033[J\n'
 		sys.stdout.write(frame)
 		sys.stdout.flush()
@@ -140,7 +142,7 @@ class TerminalConsole(Console):
 			# Tiny sleep so a tight `Repeat getKey…End` poll loop doesn't peg a CPU
 			# core at 100% — far below human reaction time, so it costs nothing
 			# perceptible while idling, but it's worth knowing it's here.
-			time.sleep(self._POLL_SECONDS)
+			time.sleep(_POLL_SECONDS)
 			return 0
 		ch = msvcrt.getwch()
 		if ch in ('\x00', '\xe0'):
@@ -171,10 +173,10 @@ class TerminalConsole(Console):
 		if self._last_home is None:
 			return
 		now = time.monotonic()
-		if now - self._last_run_render < self._FRAME_SECONDS:
+		if now - self._last_run_render < _FRAME_SECONDS:
 			return
 		self._last_run_render = now
-		self._render(self._last_home, marker=self._RUNNING_SPINNER[self._run_spin % len(self._RUNNING_SPINNER)])
+		self._render(self._last_home, marker=_RUNNING_SPINNER[self._run_spin % len(_RUNNING_SPINNER)])
 		self._run_spin += 1
 
 	def pause(self, home: HomeScreen) -> None:
@@ -191,14 +193,14 @@ class TerminalConsole(Console):
 		except ImportError:
 			msvcrt = None
 		if msvcrt is None or not sys.stdin.isatty():
-			self._render(home, marker=self._PAUSE_SPINNER[0])
+			self._render(home, marker=_PAUSE_SPINNER[0])
 			input()
 			return
 		sys.stdout.write('\033[?25l')   # hide the text cursor while animating
 		sys.stdout.flush()
 		try:
 			while True:
-				self._render(home, marker=self._PAUSE_SPINNER[self._pause_spin % len(self._PAUSE_SPINNER)])
+				self._render(home, marker=_PAUSE_SPINNER[self._pause_spin % len(_PAUSE_SPINNER)])
 				self._pause_spin += 1
 				if self._wait_for_key(msvcrt, {'\r', ' '}):
 					return
@@ -211,11 +213,11 @@ class TerminalConsole(Console):
 
 		Other keys are consumed (so they don't pile up) but don't end the wait.
 		"""
-		deadline = time.monotonic() + self._FRAME_SECONDS
+		deadline = time.monotonic() + _FRAME_SECONDS
 		while time.monotonic() < deadline:
 			if msvcrt.kbhit() and msvcrt.getwch() in accept:
 				return True
-			time.sleep(self._POLL_SECONDS)
+			time.sleep(_POLL_SECONDS)
 		return False
 
 	def choose(self, title: str, options: list[str]) -> int:
