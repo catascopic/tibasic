@@ -58,18 +58,68 @@ class TestHomeScreen:
 		assert rows[0].startswith('one') and rows[1].startswith('two')
 		assert h.cursor_row == 2
 
-	def test_disp_clips_to_width(self):
+	def test_disp_truncates_with_ellipsis(self):
 		h = HomeScreen()
 		h.disp('X' * 20)
+		assert h.render().split('\n')[0] == 'X' * 15 + '…'
+
+	def test_disp_exact_width_no_ellipsis(self):
+		h = HomeScreen()
+		h.disp('X' * 16)
 		assert h.render().split('\n')[0] == 'X' * 16
 
+	def test_output_wraps_long_text_across_rows(self):
+		h = HomeScreen()
+		h.output(0, 0, 'X' * 20)
+		rows = h.render().split('\n')
+		assert rows[0] == 'X' * 16
+		assert rows[1].startswith('X' * 4)
+
+	def test_echo_wraps_instead_of_truncating(self):
+		h = HomeScreen()
+		h.echo('X' * 20)
+		rows = h.render().split('\n')
+		assert rows[0] == 'X' * 16
+		assert rows[1].startswith('X' * 4)
+		assert h.cursor_row == 2
+
+	def test_echo_empty_still_advances_cursor(self):
+		h = HomeScreen()
+		h.echo('')
+		assert h.cursor_row == 1
+
+	def test_echo_exact_width_advances_one_row(self):
+		h = HomeScreen()
+		h.echo('X' * 32)   # exactly 2 full rows
+		assert h.cursor_row == 2
+
+	def test_echo_may_fill_bottom_row_unlike_disp(self):
+		# Input/Prompt are allowed to leave the bottom row filled — only Disp
+		# guarantees a trailing blank line.
+		h = HomeScreen()
+		for i in range(7):
+			h.disp(str(i))
+		h.echo('LAST')
+		assert h.render().split('\n')[7].startswith('LAST')
+
 	def test_disp_scrolls_past_bottom(self):
+		# Disp guarantees a blank trailing line, so filling the bottom row
+		# triggers an extra scroll beyond just "make room" — '8' ends up on the
+		# second-to-last row, with the last row blank, not holding '8' itself.
 		h = HomeScreen()
 		for i in range(9):
 			h.disp(str(i))
 		rows = h.render().split('\n')
-		assert rows[0].startswith('1')   # '0' scrolled off the top
-		assert rows[7].startswith('8')
+		assert rows[0].startswith('2')   # '0' and '1' both scrolled off
+		assert rows[6].startswith('8')
+		assert rows[7] == ' ' * 16
+
+	def test_disp_always_leaves_a_blank_bottom_line(self):
+		h = HomeScreen()
+		for i in range(20):       # many more than fit; screen scrolls repeatedly
+			h.disp(str(i))
+		assert h.render().split('\n')[7] == ' ' * 16
+		assert h.cursor_row == 7
 
 	def test_clear_resets_grid_and_cursor(self):
 		h = HomeScreen()
@@ -215,6 +265,16 @@ class TestInput:
 	def test_unsupported_character_raises(self):
 		with pytest.raises(TiSyntaxError):
 			run_with('Input X', ['sin'])
+
+	def test_long_response_wraps_not_truncates(self):
+		# 1 (prompt '?') + 21 chars = 22, past one 16-wide row — should wrap
+		# across rows like Output(, not get Disp's truncate-with-ellipsis.
+		typed = '1+1+1+1+1+1+1+1+1+1+1'
+		env = run_with('Input X', [typed])
+		lines = env.home.render().split('\n')
+		assert lines[0] == ('?' + typed)[:16]
+		assert lines[1].startswith(('?' + typed)[16:])
+		assert '…' not in lines[0] and '…' not in lines[1]
 
 	def test_graph_form_not_supported(self):
 		with pytest.raises(TiSyntaxError):

@@ -1,3 +1,11 @@
+"Done" When program finishes or ans if the last line produced a result
+
+@preparse_func
+def length(string: TiString):
+	return float(len(string))
+
+Pause can take a value
+
 Is Decimal round really necessary in timath?
 
 _REGISTRY: ArgSpec repr name

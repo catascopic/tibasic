@@ -6,7 +6,7 @@ from parser import ArgParser, Parser
 
 @preparse_func
 def length(string: TiString):
-	return len(string)
+	return float(len(string))
 
 
 @preparse_func

@@ -4,8 +4,11 @@ from program import Program
 from test_tibasic import toks
 
 PROGRAM = """
-Input "GREETING=", Str1
-Disp Str1
+Output( 5,10,"X
+For( A,1,10
+Disp A
+Pause
+End
 """
 
 env = Environment()

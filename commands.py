@@ -236,7 +236,7 @@ def _input_one(env, prompt: str, var) -> None:
 	type evaluates the typed text as an expression, same as expr(.
 	"""
 	tokens = _tokenize_input(env.console.read_value(prompt))
-	env.home.disp(prompt + ''.join(t.text for t in tokens))
+	env.home.echo(prompt + ''.join(t.text for t in tokens))   # wraps, doesn't truncate
 	env.console.update(env.home)
 	if isinstance(var, StringVariable):
 		var.store(TiString(tokens))
