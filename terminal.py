@@ -76,13 +76,10 @@ class ScriptedConsole(Console):
 class TerminalConsole(Console):
 	"""Interactive command-line console for quick prototyping."""
 
-	_PAUSE_SPINNER   = '⠁⠂⠄⡀⢀⠠⠐⠈'   # one frame per redraw while a Pause is waiting
-	_RUNNING_SPINNER = '-\\|/'         # one frame per redraw while idle-polling (getKey)
+	_PAUSE_SPINNER   = '▚▞'   # one frame per redraw while a Pause is waiting
+	_RUNNING_SPINNER = '▙▛▜▟'         # one frame per redraw while idle-polling (getKey)
 	_FRAME_SECONDS = 0.1                # spinner redraw interval (~10 fps)
 	_POLL_SECONDS = 0.01                # how often we check for a keypress within a frame
-
-	_BORDER_TOP    = '╔' + '═' * HomeScreen.COLS + '╗'
-	_BORDER_BOTTOM = '╚' + '═' * HomeScreen.COLS + '╝'
 
 	def __init__(self):
 		if sys.platform == 'win32':
@@ -117,9 +114,9 @@ class TerminalConsole(Console):
 		# nothing to restore afterward: the next plain update() just redraws the
 		# border without it.
 		self._last_home = home
-		top = self._BORDER_TOP if marker is None else self._BORDER_TOP[:-2] + marker + self._BORDER_TOP[-1]
+		top = ('▒' * (HomeScreen.COLS + 1)) + (marker or '▒')
 		rows = home.render().split('\n')
-		framed = [top, *(f'║{row}║' for row in rows), self._BORDER_BOTTOM]
+		framed = [top, *(f'▒{row}▒' for row in rows), '▒' * (HomeScreen.COLS + 2)]
 		frame = '\033[H' + '\n'.join(f'{row}\033[K' for row in framed) + '\033[J\n'
 		sys.stdout.write(frame)
 		sys.stdout.flush()

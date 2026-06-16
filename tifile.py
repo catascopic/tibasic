@@ -7,7 +7,7 @@ from catalog import ALL_TOKENS, read_token
 
 
 @dataclass
-class TiProgram:
+class ProgramFile:
 	name:     str
 	tokens:   list[Token]
 	comment:  str  = ''

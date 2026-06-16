@@ -1,26 +1,26 @@
-"""Tests for TiProgram binary file format (read_from / write_to)."""
+"""Tests for ProgramFile binary file format (read_from / write_to)."""
 import pytest
 from io import BytesIO
 
-from tifile import TiProgram
+from tifile import ProgramFile
 from test_tibasic import toks
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def roundtrip(prog: TiProgram) -> TiProgram:
+def roundtrip(prog: ProgramFile) -> ProgramFile:
 	"""Write prog to a BytesIO buffer, seek back, and read it out again."""
 	buf = BytesIO()
 	prog.write_to(buf)
 	buf.seek(0)
-	return TiProgram.read_from(buf)
+	return ProgramFile.read_from(buf)
 
 
-def make_prog(**kwargs) -> TiProgram:
-	"""Construct a TiProgram with sensible defaults."""
+def make_prog(**kwargs) -> ProgramFile:
+	"""Construct a ProgramFile with sensible defaults."""
 	kwargs.setdefault('name', 'TEST')
 	kwargs.setdefault('tokens', [])
-	return TiProgram(**kwargs)
+	return ProgramFile(**kwargs)
 
 
 # ── Roundtrip: metadata ───────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ class TestRoundtripMetadata:
 
 	def test_name_lowercase_normalised(self):
 		# write() uppercases the name in the binary; read() decodes it as-is
-		prog = TiProgram(name='hello', tokens=[])
+		prog = ProgramFile(name='hello', tokens=[])
 		assert roundtrip(prog).name == 'HELLO'
 
 	def test_name_short(self):
@@ -157,10 +157,10 @@ class TestReadErrors:
 	def test_bad_signature_raises(self):
 		buf = BytesIO(b'BADSIG!!' + b'\x00' * 100)
 		with pytest.raises(ValueError, match='signature'):
-			TiProgram.read_from(buf)
+			ProgramFile.read_from(buf)
 
 	def test_wrong_signature_prefix(self):
 		# Starts with **TI but not **TI8x
 		buf = BytesIO(b'**TIXX**' + b'\x00' * 100)
 		with pytest.raises(ValueError):
-			TiProgram.read_from(buf)
+			ProgramFile.read_from(buf)
