@@ -208,7 +208,7 @@ def _decode_list_name(name_bytes: bytes) -> str:
 	# were padding.  A user list instead stores ASCII, whose first byte is always
 	# a letter (>= 0x41), so the 0x00..0x05 range cleanly tells the two apart.
 	if name_bytes[1] <= 0x05:
-		return str(name_bytes[1] + 1)
+		return str(name_bytes[1])
 	return name_bytes[1:].rstrip(b'\x00').decode('ascii', errors='replace')
 
 
