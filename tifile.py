@@ -23,9 +23,10 @@ def _read_var_header(f):
 	"""Read the shared .8x* envelope and leave `f` at the start of the variable
 	data (the body's own length/count prefix).
 
-	Returns (file_type, name_bytes, archived, comment).  `name_bytes` is the raw
-	8-byte name field — each caller decodes it, since lists carry the 0x5D prefix
-	token and programs don't.
+	Returns (file_type, name_bytes, archived, comment, version).  `name_bytes` is
+	the raw 8-byte name field — each caller decodes it, since lists carry the 0x5D
+	prefix token and programs don't.  `version` is the source file's var-version
+	byte, captured so writers can reproduce it byte-for-byte.
 	"""
 	signature = f.read(8)
 	if not signature.startswith(b'**TI8'):  # could be 82, 83, 83F
@@ -38,18 +39,19 @@ def _read_var_header(f):
 	f.seek(2, 1)  # skip data length
 	(file_type,) = f.read(1)
 	name_bytes = f.read(8)
-	_version, archived = f.read(2)  # TODO: field missing when entry_type != 0x000d???
+	version, archived = f.read(2)  # TODO: field missing when entry_type != 0x000d???
 	f.seek(2, 1)  # skip data length duplicate
 	# TODO: checksum check
-	return file_type, name_bytes, bool(archived & 0x80), comment
+	return file_type, name_bytes, bool(archived & 0x80), comment, version
 
 
 def _write_var_file(f, file_type, name_bytes, archived, comment, body, version):
 	"""Write a complete .8x* file wrapping `body` (the variable data, including
 	its own length/count prefix) in the standard envelope.
 
-	`version` is the type-dependent var-version byte — programs use 0x01, real
-	lists use 0x00.
+	`version` is the var-version byte.  It varies per file (e.g. real .8xp files
+	carry 0x00 or 0x03, not the 0x01 TI-Connect emits for fresh programs), so
+	callers pass through the value captured on read to round-trip byte-for-byte.
 	"""
 	data_len = len(body)
 	flag     = 0x80 if archived else 0x00
@@ -82,6 +84,7 @@ class ProgramFile:
 	comment:  str  = ''
 	archived: bool = False
 	locked:   bool = False
+	version:  int  = 0x01  # var-version byte; 0x01 is TI-Connect's default for fresh programs
 
 	def __repr__(self):
 		return f"prgm{self.name}(tokens={len(self.tokens)};{'' if self.archived else 'un'}archived/{'' if self.locked else 'un'}locked)"
@@ -94,7 +97,7 @@ class ProgramFile:
 
 	@classmethod
 	def read_from(cls, f):
-		file_type, name_bytes, archived, comment = _read_var_header(f)
+		file_type, name_bytes, archived, comment, version = _read_var_header(f)
 		name = name_bytes.rstrip(b'\x00').decode('ascii')
 		end = int.from_bytes(f.read(2), 'little') + f.tell()
 		tokens = []
@@ -107,6 +110,7 @@ class ProgramFile:
 			comment  = comment,
 			archived = archived,
 			locked   = file_type == 0x06,
+			version  = version,
 		)
 
 	@classmethod
@@ -119,7 +123,7 @@ class ProgramFile:
 		name_bytes = self.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
 		file_type  = 0x06 if self.locked else 0x05
 		body       = len(program).to_bytes(2, 'little') + program  # prog_len prefix + body
-		_write_var_file(f, file_type, name_bytes, self.archived, self.comment, body, version=0x01)
+		_write_var_file(f, file_type, name_bytes, self.archived, self.comment, body, version=self.version)
 
 	def write(self, file):
 		with open(file, 'wb') as f:
@@ -155,6 +159,7 @@ class ListFile:
 	values:   list[float]
 	comment:  str  = ''
 	archived: bool = False
+	version:  int  = 0x00  # var-version byte; real lists carry 0x00
 
 	def __repr__(self):
 		return f"list{self.name}(values={len(self.values)};{'' if self.archived else 'un'}archived)"
@@ -167,7 +172,7 @@ class ListFile:
 
 	@classmethod
 	def read_from(cls, f):
-		_file_type, name_bytes, archived, comment = _read_var_header(f)
+		_file_type, name_bytes, archived, comment, version = _read_var_header(f)
 		count  = int.from_bytes(f.read(2), 'little')
 		values = [_decode_ti_real(f.read(9)) for _ in range(count)]
 
@@ -176,6 +181,7 @@ class ListFile:
 			values   = values,
 			comment  = comment,
 			archived = archived,
+			version  = version,
 		)
 
 	@classmethod
@@ -184,10 +190,10 @@ class ListFile:
 			return cls.read_from(f)
 
 	def write_to(self, f):
-		name_bytes = (bytes([_LIST_NAME_TOKEN]) + self.name.upper().encode('ascii')[:5]).ljust(8, b'\x00')
+		name_bytes = _encode_list_name(self.name)
 		reals      = b''.join(_encode_ti_real(v) for v in self.values)
 		body       = len(self.values).to_bytes(2, 'little') + reals  # element count + reals
-		_write_var_file(f, 0x01, name_bytes, self.archived, self.comment, body, version=0x00)
+		_write_var_file(f, 0x01, name_bytes, self.archived, self.comment, body, version=self.version)
 
 	def write(self, file):
 		with open(file, 'wb') as f:
@@ -195,10 +201,27 @@ class ListFile:
 
 
 def _decode_list_name(name_bytes: bytes) -> str:
-	name = name_bytes.rstrip(b'\x00')
-	if name[:1] == bytes([_LIST_NAME_TOKEN]):
-		name = name[1:]
-	return name.decode('ascii', errors='replace')
+	if name_bytes[:1] != bytes([_LIST_NAME_TOKEN]):
+		return name_bytes.rstrip(b'\x00').decode('ascii', errors='replace')
+	# After the 0x5D token a built-in list L1-L6 stores a single index byte
+	# 0x00..0x05 — note L1's index is 0x00, so it must not be rstripped as if it
+	# were padding.  A user list instead stores ASCII, whose first byte is always
+	# a letter (>= 0x41), so the 0x00..0x05 range cleanly tells the two apart.
+	if name_bytes[1] <= 0x05:
+		return str(name_bytes[1] + 1)
+	return name_bytes[1:].rstrip(b'\x00').decode('ascii', errors='replace')
+
+
+def _encode_list_name(name: str) -> bytes:
+	# Built-in lists L1-L6 are named "1".."6" and store a single index byte after
+	# the 0x5D token; user lists store their (uppercased) name as ASCII.  A name
+	# starting with a digit is never a valid user list on the calculator, so
+	# "1".."6" is an unambiguous marker for the built-ins.
+	if name in ('1', '2', '3', '4', '5', '6'):
+		body = bytes([int(name) - 1])
+	else:
+		body = name.upper().encode('ascii')[:5]
+	return (bytes([_LIST_NAME_TOKEN]) + body).ljust(8, b'\x00')
 
 
 if __name__ == '__main__':

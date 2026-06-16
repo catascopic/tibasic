@@ -1,9 +1,10 @@
 from pathlib import Path
 
 from environment import Environment
+from core import TiList
 from terminal import TerminalConsole
 from program import Program
-from tifile import ProgramFile
+from tifile import ProgramFile, ListFile
 from catalog import get_token, TEXT_INPUT
 
 def load(dir_):
@@ -12,6 +13,15 @@ def load(dir_):
 		if file.suffix == '.8xp':
 			prgm = ProgramFile.load(file)
 			env.programs[prgm.name] = prgm.tokens
+			print('loaded:', prgm)
+		if file.suffix == '.8xl':
+			lst = ListFile.load(file)
+			ti_list = TiList(lst.values)
+			if lst.name.isdigit():
+				env.lists[int(lst.name)].value = ti_list
+			else:
+				env.user_lists[lst.name] = ti_list
+			print('loaded:', lst)
 	return env
 
 
@@ -22,6 +32,5 @@ def run(prgm_name):
 	env.run([get_token(0x5F), *(TEXT_INPUT[c] for c in prgm_name)])
 
 
-run('QRLIST')
 run('ENIGMA2')
 env.graph.disp()
