@@ -223,18 +223,21 @@ def _brentq(f, a, b, tol=1e-12, max_iter=100):
 		if fb == 0.0 or builtins.abs(b - a) < tol:
 			return b
 		if fa != fc and fb != fc:  # inverse quadratic interpolation
-			s = (a * fb * fc / ((fa - fb) * (fa - fc))
-			     + b * fa * fc / ((fb - fa) * (fb - fc))
-			     + c * fa * fb / ((fc - fa) * (fc - fb)))
-		else:                      # secant
+			s = (
+				a * fb * fc / ((fa - fb) * (fa - fc)) + 
+				b * fa * fc / ((fb - fa) * (fb - fc)) + 
+				c * fa * fb / ((fc - fa) * (fc - fb))
+			)
+		else:  # secant
 			s = b - fb * (b - a) / (fb - fa)
 		lo, hi = builtins.min((3 * a + b) / 4, b), builtins.max((3 * a + b) / 4, b)
 		if (not lo <= s <= hi
 		    or (mflag and builtins.abs(s - b) >= builtins.abs(b - c) / 2)
 		    or (not mflag and builtins.abs(s - b) >= builtins.abs(c - d) / 2)
 		    or (mflag and builtins.abs(b - c) < tol)
-		    or (not mflag and builtins.abs(c - d) < tol)):
-			s = (a + b) / 2          # fall back to bisection
+		    or (not mflag and builtins.abs(c - d) < tol)
+		):
+			s = (a + b) / 2  # fall back to bisection
 			mflag = True
 		else:
 			mflag = False
@@ -249,56 +252,70 @@ def _brentq(f, a, b, tol=1e-12, max_iter=100):
 	return b
 
 
+# _bracket_root tuning: the outward search starts with a step of _STEP_FRAC·|guess|
+# (but at least _MIN_STEP, so a guess of 0 still moves) and grows it by _GROWTH each
+# sweep, until a sign change is bracketed or both sides are exhausted.
+_BRACKET_STEP_FRAC = 0.01
+_BRACKET_MIN_STEP  = 1e-4
+_BRACKET_GROWTH    = 1.6
+
+
 def _bracket_root(f, guess, lo, hi, max_steps=2000):
 	"""Expand outward from `guess` within [lo, hi] until f brackets a root.
 
-	Returns a (left, right) bracket where f changes sign (or touches zero).  Steps
-	that overflow or leave the domain cap that side of the search.
+	Returns a (left, right) bracket where f changes sign (or touches zero).  A
+	probe that overflows or leaves the function's domain caps that side.
 	"""
-	def safe(x):
-		# A probe where the expression can't yield a real value (overflow, ln/√ of a
-		# negative → NonRealAnsError in Real mode, 1/0, out-of-domain) caps the search
-		# in that direction; genuine errors (undefined var, non-scalar) propagate.
+	def value(x):
+		# The function value at x, or None when the expression can't yield a real
+		# value there (overflow, ln/√ of a negative → NonRealAnsError in Real mode,
+		# 1/0, out-of-domain) — None caps the search in that direction.  Genuine
+		# errors (undefined var, non-scalar result) propagate.
 		try:
 			return f(x)
 		except (OverflowError, DomainError, DivideByZeroError, NonRealAnsError, TiOverflowError):
 			return None
 
-	fg = safe(guess)
-	if fg is None:
+	f_guess = value(guess)
+	if f_guess is None:
 		raise BadGuessError(f"solve: function is undefined at the guess {guess}")
-	if fg == 0:
+	if f_guess == 0:
 		return guess, guess
+
+	def expand(pos, f_pos, bound, direction):
+		"""Take one step of the current size from `pos` toward `bound`.
+
+		Returns (bracket, new_pos, new_f, done): `bracket` is the (left, right)
+		pair once a root is crossed or touched (else None); `done` is True when
+		this side is spent — the bound is reached or a wall (unevaluable probe).
+		"""
+		if pos == bound:
+			return None, pos, f_pos, True
+		probe = builtins.min(pos + step, bound) if direction > 0 else builtins.max(pos - step, bound)
+		f_probe = value(probe)
+		if f_probe is None:   # hit a wall
+			return None, pos, f_pos, True
+		if f_probe == 0 or f_probe * f_pos < 0:  # bracketed a root
+			bracket = (pos, probe) if direction > 0 else (probe, pos)
+			return bracket, probe, f_probe, True
+		return None, probe, f_probe, probe == bound
+
 	left = right = guess
-	fleft = fright = fg
-	step = builtins.max(builtins.abs(guess) * 0.01, 1e-4)
+	f_left = f_right = f_guess
 	left_done = right_done = False
+	step = builtins.max(builtins.abs(guess) * _BRACKET_STEP_FRAC, _BRACKET_MIN_STEP)
 	for _ in range(max_steps):
-		if not right_done and right < hi:
-			nr = builtins.min(right + step, hi)
-			fnr = safe(nr)
-			if fnr is None:
-				right_done = True
-			else:
-				if fnr == 0 or fnr * fright < 0:
-					return right, nr
-				right, fright, right_done = nr, fnr, nr >= hi
-		else:
-			right_done = True
-		if not left_done and left > lo:
-			nl = builtins.max(left - step, lo)
-			fnl = safe(nl)
-			if fnl is None:
-				left_done = True
-			else:
-				if fnl == 0 or fnl * fleft < 0:
-					return nl, left
-				left, fleft, left_done = nl, fnl, nl <= lo
-		else:
-			left_done = True
+		if not right_done:
+			bracket, right, f_right, right_done = expand(right, f_right, hi, +1)
+			if bracket:
+				return bracket
+		if not left_done:
+			bracket, left, f_left, left_done = expand(left, f_left, lo, -1)
+			if bracket:
+				return bracket
 		if left_done and right_done:
 			break
-		step *= 1.6
+		step *= _BRACKET_GROWTH
 	raise NoSignChangeError("solve: no sign change found near the guess")
 
 
@@ -323,69 +340,74 @@ def solve(env: Env, formula: Thunk, var: NumericVar, guess: Real, bounds: TiList
 		return _brentq(f, a, b)
 
 
+_GOLDEN   = 0.3819660112501051      # (3 − √5) / 2, the golden-section fraction
+_SQRT_EPS = 1.4901161193847656e-08  # √(machine epsilon), Brent's relative tolerance floor
+
+
 def _brent_minimize(f, a, b, xatol, max_eval=500):
 	"""Brent's bounded minimization on [a, b] (SciPy's fminbound); returns the argmin.
 
-	Combines golden-section search with parabolic interpolation.  Raises
-	ToleranceError if it can't converge within max_eval evaluations.
+	Combines golden-section search with parabolic interpolation, tracking the three
+	best points seen so far: `best`, then `second`, then `third`.  `delta` is the
+	step about to be taken and `last_span` the one taken last (used to decide
+	whether a parabolic step is worth trying).  Raises ToleranceError if it can't
+	converge within max_eval evaluations.
 	"""
-	sqrt_eps = 1.4901161193847656e-08    # sqrt(machine epsilon)
-	golden = 0.3819660112501051          # (3 - √5) / 2
-	fulc = xf = nfc = a + golden * (b - a)
-	rat = e = 0.0
-	fx = ffulc = fnfc = f(xf)
-	xm = 0.5 * (a + b)
-	tol1 = sqrt_eps * builtins.abs(xf) + xatol / 3.0
+	best = second = third = a + _GOLDEN * (b - a)
+	f_best = f_second = f_third = f(best)
+	delta = last_span = 0.0
+	mid = 0.5 * (a + b)
+	tol1 = _SQRT_EPS * builtins.abs(best) + xatol / 3.0
 	tol2 = 2.0 * tol1
-	num = 1
-	while builtins.abs(xf - xm) > tol2 - 0.5 * (b - a):
+	evals = 1
+	while builtins.abs(best - mid) > tol2 - 0.5 * (b - a):
 		use_golden = True
-		if builtins.abs(e) > tol1:                       # try a parabolic step
-			r = (xf - nfc) * (fx - ffulc)
-			q = (xf - fulc) * (fx - fnfc)
-			p = (xf - fulc) * q - (xf - nfc) * r
-			q = 2.0 * (q - r)
-			if q > 0.0:
-				p = -p
-			q = builtins.abs(q)
-			r, e = e, rat
-			if builtins.abs(p) < builtins.abs(0.5 * q * r) and q * (a - xf) < p < q * (b - xf):
-				rat = p / q
-				x = xf + rat
-				if x - a < tol2 or b - x < tol2:
-					rat = math.copysign(tol1, xm - xf)
+		if builtins.abs(last_span) > tol1:  # try a parabolic step
+			term = (best - second) * (f_best - f_third)
+			denom = (best - third) * (f_best - f_second)
+			numer = (best - third) * denom - (best - second) * term
+			denom = 2.0 * (denom - term)
+			if denom > 0.0:
+				numer = -numer
+			denom = builtins.abs(denom)
+			prev_span, last_span = last_span, delta
+			if builtins.abs(numer) < builtins.abs(0.5 * denom * prev_span) and denom * (a - best) < numer < denom * (b - best):
+				delta = numer / denom
+				step_to = best + delta
+				if step_to - a < tol2 or b - step_to < tol2:
+					delta = math.copysign(tol1, mid - best)
 				use_golden = False
-		if use_golden:                                   # golden-section step
-			e = (a - xf) if xf >= xm else (b - xf)
-			rat = golden * e
-		si = math.copysign(1.0, rat) if rat != 0 else 1.0
-		x = xf + si * builtins.max(builtins.abs(rat), tol1)
-		fu = f(x)
-		num += 1
-		if fu <= fx:
-			if x >= xf:
-				a = xf
+		if use_golden:  # golden-section step
+			last_span = (a - best) if best >= mid else (b - best)
+			delta = _GOLDEN * last_span
+		direction = math.copysign(1.0, delta) if delta != 0 else 1.0
+		trial = best + direction * builtins.max(builtins.abs(delta), tol1)
+		f_trial = f(trial)
+		evals += 1
+		if f_trial <= f_best:  # new incumbent
+			if trial >= best:
+				a = best
 			else:
-				b = xf
-			fulc, ffulc = nfc, fnfc
-			nfc, fnfc = xf, fx
-			xf, fx = x, fu
-		else:
-			if x < xf:
-				a = x
+				b = best
+			third, f_third = second, f_second
+			second, f_second = best, f_best
+			best, f_best = trial, f_trial
+		else:  # tighten the bracket
+			if trial < best:
+				a = trial
 			else:
-				b = x
-			if fu <= fnfc or nfc == xf:
-				fulc, ffulc = nfc, fnfc
-				nfc, fnfc = x, fu
-			elif fu <= ffulc or fulc == xf or fulc == nfc:
-				fulc, ffulc = x, fu
-		xm = 0.5 * (a + b)
-		tol1 = sqrt_eps * builtins.abs(xf) + xatol / 3.0
+				b = trial
+			if f_trial <= f_second or second == best:
+				third, f_third = second, f_second
+				second, f_second = trial, f_trial
+			elif f_trial <= f_third or third == best or third == second:
+				third, f_third = trial, f_trial
+		mid = 0.5 * (a + b)
+		tol1 = _SQRT_EPS * builtins.abs(best) + xatol / 3.0
 		tol2 = 2.0 * tol1
-		if num >= max_eval:
+		if evals >= max_eval:
 			raise ToleranceError("fMin/fMax: could not meet the requested tolerance")
-	return xf
+	return best
 
 
 def _optimize(env, formula, var, lo, hi, tol, sign, func):
