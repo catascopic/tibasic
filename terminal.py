@@ -76,9 +76,13 @@ class ScriptedConsole(Console):
 class TerminalConsole(Console):
 	"""Interactive command-line console for quick prototyping."""
 
-	_SPINNER = '⠁⠂⠄⡀⢀⠠⠐⠈'   # one frame per redraw while a Pause is waiting
-	_FRAME_SECONDS = 0.1        # spinner redraw interval (~10 fps)
-	_POLL_SECONDS = 0.01        # how often we check for a keypress within a frame
+	_PAUSE_SPINNER   = '⠁⠂⠄⡀⢀⠠⠐⠈'   # one frame per redraw while a Pause is waiting
+	_RUNNING_SPINNER = '-\\|/'         # one frame per redraw while idle-polling (getKey)
+	_FRAME_SECONDS = 0.1                # spinner redraw interval (~10 fps)
+	_POLL_SECONDS = 0.01                # how often we check for a keypress within a frame
+
+	_BORDER_TOP    = '╔' + '═' * HomeScreen.COLS + '╗'
+	_BORDER_BOTTOM = '╚' + '═' * HomeScreen.COLS + '╝'
 
 	def __init__(self):
 		if sys.platform == 'win32':
@@ -90,7 +94,10 @@ class TerminalConsole(Console):
 			sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 		except (AttributeError, ValueError):
 			pass
-		self._spin = 0
+		self._pause_spin = 0
+		self._run_spin = 0
+		self._last_home: HomeScreen | None = None
+		self._last_run_render = 0.0
 
 	def update(self, home: HomeScreen) -> None:
 		self._render(home)
@@ -102,17 +109,18 @@ class TerminalConsole(Console):
 		# so the screen never scrolls.  The trailing newline drops the cursor below
 		# the grid so an Input prompt appears there (and is wiped on the next repaint).
 		#
-		# `marker`, if given, overlays one glyph in the top-right cell — standing in
-		# for the real calculator's pause indicator, a small dotted icon that lives
-		# in the status bar above the character grid (so real programs can't
-		# Output( over it).  We have no separate status-bar row, so the top-right
-		# cell is the closest stand-in; it's purely cosmetic and never touches
-		# HomeScreen's actual content, so whatever a program wrote there reappears
-		# untouched on the next plain update().
+		# `marker`, if given, overlays one glyph into the top border, one cell left
+		# of the corner — standing in for the real calculator's status-bar icons
+		# (pause indicator, run indicator), which live above the character grid,
+		# not in it.  Putting it in the border rather than a content cell means it
+		# can never collide with anything a program actually Output(s, and there's
+		# nothing to restore afterward: the next plain update() just redraws the
+		# border without it.
+		self._last_home = home
+		top = self._BORDER_TOP if marker is None else self._BORDER_TOP[:-2] + marker + self._BORDER_TOP[-1]
 		rows = home.render().split('\n')
-		if marker is not None:
-			rows[0] = rows[0][:-1] + marker
-		frame = '\033[H' + '\n'.join(f'{row}\033[K' for row in rows) + '\033[J\n'
+		framed = [top, *(f'║{row}║' for row in rows), self._BORDER_BOTTOM]
+		frame = '\033[H' + '\n'.join(f'{row}\033[K' for row in framed) + '\033[J\n'
 		sys.stdout.write(frame)
 		sys.stdout.flush()
 
@@ -120,12 +128,57 @@ class TerminalConsole(Console):
 		return input(prompt)
 
 	def read_key(self) -> int:
-		# Best-effort non-blocking poll; returns 0 where the platform has no support.
+		"""Best-effort non-blocking poll; returns 0 where the platform has no support.
+
+		Arrows (and other special keys) arrive from msvcrt as two characters: a
+		prefix ('\\x00' or '\\xe0') then a scan code, not a single getwch() result —
+		so a plain key needs one read, an extended one needs two.
+		"""
 		try:
 			import msvcrt
 		except ImportError:
 			return 0
-		return _TI_KEY_CODES.get(msvcrt.getwch(), 0) if msvcrt.kbhit() else 0
+		if not msvcrt.kbhit():
+			self._tick_running_indicator()
+			# Tiny sleep so a tight `Repeat getKey…End` poll loop doesn't peg a CPU
+			# core at 100% — far below human reaction time, so it costs nothing
+			# perceptible while idling, but it's worth knowing it's here.
+			time.sleep(self._POLL_SECONDS)
+			return 0
+		ch = msvcrt.getwch()
+		if ch in ('\x00', '\xe0'):
+			# Once the prefix has arrived, the scan-code byte is guaranteed to
+			# follow as the other half of the same key event — read it directly
+			# rather than re-checking kbhit() first.  That check is wrong: the
+			# second byte isn't necessarily buffered the instant we look (a modern
+			# terminal forwards input through a pseudoconsole, which can add a
+			# sliver of latency between the two), so kbhit() can still say False
+			# in that gap — and re-checking would silently drop the byte, losing
+			# the whole keypress.  A direct read here blocks for at most an
+			# instant, which is a non-issue since the user already pressed a key.
+			return _TI_EXTENDED_KEY_CODES.get(msvcrt.getwch(), 0)
+		# .upper(): getwch() returns whatever case was actually typed (lowercase
+		# without Caps Lock), but TI's ALPHA keys are uppercase-only, so the table
+		# below only needs one entry per letter.
+		return _TI_KEY_CODES.get(ch.upper(), 0)
+
+	def _tick_running_indicator(self) -> None:
+		"""Animate the border's running indicator while idle-polling for a key.
+
+		Distinguishes "the program is alive and looping" (e.g. inside
+		`Repeat getKey…End`) from Pause's "stopped, waiting for you" — a lighter
+		glyph, and not redrawn on every single poll (read_key can be called
+		thousands of times a second), only at the same ~10fps pace as Pause's
+		animation.  No-op before anything has ever been rendered.
+		"""
+		if self._last_home is None:
+			return
+		now = time.monotonic()
+		if now - self._last_run_render < self._FRAME_SECONDS:
+			return
+		self._last_run_render = now
+		self._render(self._last_home, marker=self._RUNNING_SPINNER[self._run_spin % len(self._RUNNING_SPINNER)])
+		self._run_spin += 1
 
 	def pause(self, home: HomeScreen) -> None:
 		"""Animate the spinner in real time until Enter or Space is pressed.
@@ -141,15 +194,15 @@ class TerminalConsole(Console):
 		except ImportError:
 			msvcrt = None
 		if msvcrt is None or not sys.stdin.isatty():
-			self._render(home, marker=self._SPINNER[0])
+			self._render(home, marker=self._PAUSE_SPINNER[0])
 			input()
 			return
 		sys.stdout.write('\033[?25l')   # hide the text cursor while animating
 		sys.stdout.flush()
 		try:
 			while True:
-				self._render(home, marker=self._SPINNER[self._spin % len(self._SPINNER)])
-				self._spin += 1
+				self._render(home, marker=self._PAUSE_SPINNER[self._pause_spin % len(self._PAUSE_SPINNER)])
+				self._pause_spin += 1
 				if self._wait_for_key(msvcrt, {'\r', ' '}):
 					return
 		finally:
@@ -202,4 +255,33 @@ def _enable_windows_vt() -> None:
 
 # Physical key → TI getKey code for the interactive terminal (best-effort; the
 # scripted and HTML consoles supply key codes directly).
-_TI_KEY_CODES: dict[str, int] = {}
+#
+# Arrow codes (24/25/26/34) and Enter (105) match the standard TI-83+/84+ getKey
+# table.  Letters/digits below are placeholders (0 = unmapped) — fill in real
+# codes as you go; C and 7 are pre-filled from values you already confirmed.
+# Looked up upper-cased (read_key does ch.upper()), so one entry covers both
+# Caps Lock states.
+_TI_KEY_CODES: dict[str, int] = {
+	'\r': 105,   # Enter
+
+	'A': 41, 'B': 42, 'C': 43, 
+	'D': 51, 'E': 52, 'F': 53, 'G': 54, 'H': 55, 
+	'I': 61, 'J': 62, 'K': 63, 'L': 64, 'M': 65, 
+	'N': 71, 'O': 72, 'P': 73, 'Q': 74, 'R': 75,
+	'S': 81, 'T': 82, 'U': 83, 'V': 84, 'W': 85, 
+	'X': 91, 'Y': 92, 'Z': 93,
+
+	'7': 72, '8': 73, '9': 74,
+	'4': 82, '5': 83, '6': 84, 
+	'1': 92, '2': 93, '3': 94,
+	'0': 102,
+}
+
+# Arrows (and other special keys) arrive as a prefix byte ('\x00' or '\xe0') then
+# one of these classic DOS/Windows console scan-code letters.
+_TI_EXTENDED_KEY_CODES: dict[str, int] = {
+	'H': 25,   # Up
+	'P': 34,   # Down
+	'K': 24,   # Left
+	'M': 26,   # Right
+}

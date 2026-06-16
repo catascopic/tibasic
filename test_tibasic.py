@@ -48,7 +48,6 @@ _ALIASES = {
 	'n': 0x6221, 'u': 0x5E80, 'v': 0x5E81, 'w': 0x5E82,
 }
 
-
 def _create_lookup():
 	"""Map each typable string to the token it produces (see _KEEP_SINGLE above)."""
 	lookup = {}
@@ -61,7 +60,7 @@ def _create_lookup():
 			key = ''.join(_TEST_CHARSET[b] for b in t.display.strip(b' '))
 		except (IndexError, TypeError):
 			continue
-		lookup[key] = t
+		lookup[key or '_'] = t
 
 	by_code = {t.code: t for t in ALL_TOKENS}
 	for name, code in _ALIASES.items():

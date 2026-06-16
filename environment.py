@@ -32,7 +32,6 @@ class Environment:
 		# self.window      = [None] * 0x37 # window vars
 		self.n = NumericVariable()
 		self.ans = 0
-		self.key_code = 0
 		# MODES
 		self.angle_mode    = AngleMode.RAD
 		self.number_mode   = NumberMode.NORMAL
@@ -173,7 +172,7 @@ class Environment:
 		return self.clock_on
 
 	def get_key(self):
-		return self.key_code
+		return float(self.console.read_key())
 
 	def rand(self):
 		return random.random()
