@@ -533,11 +533,14 @@ class Variable(ABC):
 
 class NumericVariable(Variable):
 	def __init__(self, default=None):
-		self.value = default
+		# float(default), not the bare value: TI has no int type, so a caller
+		# passing a plain Python int literal (RealVariable(1), say) must not
+		# leave one sitting in TI memory — every numeric variable is a float.
+		self.value = None if default is None else float(default)
 
 	def resolve(self):
 		if self.value is None:
-			self.value = 0
+			self.value = 0.0
 		return self.value
 
 	def normalize(self, value):

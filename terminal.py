@@ -137,8 +137,14 @@ class TerminalConsole(Console):
 			import msvcrt
 		except ImportError:
 			return 0
+		# Tick on every call, not just when no key is found: while a key is held,
+		# the OS auto-repeats it, so kbhit() keeps saying True and this branch
+		# would otherwise never run — freezing the indicator for the whole hold,
+		# then jumping when released.  _tick_running_indicator self-paces off
+		# elapsed time, so calling it unconditionally just makes the scroll
+		# genuinely continuous regardless of whether keys are flowing.
+		self._tick_running_indicator()
 		if not msvcrt.kbhit():
-			self._tick_running_indicator()
 			# Tiny sleep so a tight `Repeat getKey…End` poll loop doesn't peg a CPU
 			# core at 100% — far below human reaction time, so it costs nothing
 			# perceptible while idling, but it's worth knowing it's here.

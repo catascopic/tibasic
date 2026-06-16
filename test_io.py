@@ -96,8 +96,20 @@ class TestDisp:
 		env = run('Disp 1 : Disp 2')
 		assert _line(env, 0).startswith('1') and _line(env, 1).startswith('2')
 
-	def test_complex_not_yet_supported(self):
-		with pytest.raises(DataTypeError): run('Disp i')
+	def test_complex(self):
+		assert _line(run('Disp 3+4i'), 0).startswith('3+4i')
+
+	def test_pure_imaginary_drops_zero_real_part(self):
+		assert _line(run('Disp i'), 0).startswith('1i')
+
+	def test_list(self):
+		assert _line(run('Disp {1,2,3}'), 0).startswith('{1 2 3}')
+
+	def test_matrix_one_line_per_row(self):
+		env = run('Disp [[1,2][3,4]]')
+		assert _line(env, 0).startswith('[[1 2]')
+		assert _line(env, 1).startswith(' [3 4]]')
+
 
 	def test_each_disp_renders_a_frame(self):
 		env = run('Disp 1 : Disp 2')

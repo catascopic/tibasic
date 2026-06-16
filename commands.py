@@ -7,7 +7,7 @@ from preparse import (
 )
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
-from core import TiString, py_int, require_string
+from core import TiString, TiList, TiMatrix, py_int, require_string
 from numberformat import ti83_format
 from errors import TiSyntaxError, DataTypeError, DomainError
 
@@ -88,25 +88,78 @@ def del_var(var: AnyVar):
 	var.value = None
 
 def _home_text(value) -> str:
-	"""The home-screen string for a value (a real number or a string).
+	"""The home-screen string for a scalar real number or string.
 
-	Complex/list/matrix values aren't handled yet — they raise, matching Text('s
-	current scope; expand here when Disp needs them.
+	Used by Output(/Pause, which — like the real calculator — only ever write a
+	single value to a single screen position; a list or matrix has no sensible
+	single-cell rendering there.  Disp uses the richer _home_lines instead.
 	"""
 	if isinstance(value, float):
 		return ti83_format(value)
 	if isinstance(value, TiString):
 		return str(value)
-	raise DataTypeError(f"Disp: expected a real number or string, got {type(value).__name__}")
+	raise DataTypeError(f"expected a real number or string, got {type(value).__name__}")
+
+
+def _format_complex(value: complex) -> str:
+	"""a+bi / a-bi, TI's complex notation.  The imaginary coefficient is always
+	shown explicitly (1i, not a bare i), and the real part is dropped only when
+	it's exactly zero."""
+	im = ti83_format(abs(value.imag))
+	sign = '-' if value.imag < 0 else '+'
+	if value.real == 0:
+		return f"{sign if value.imag < 0 else ''}{im}i"
+	return f"{ti83_format(value.real)}{sign}{im}i"
+
+
+def _format_scalar(value) -> str:
+	"""Real or complex scalar, as TI would show it — the shared piece between a
+	bare value and one element of a list."""
+	return _format_complex(value) if isinstance(value, complex) else ti83_format(value)
+
+
+def _format_ti_list(lst: TiList) -> str:
+	"""{a b c}, TI's list notation — elements are space-separated, not comma."""
+	return '{' + ' '.join(_format_scalar(v) for v in lst.data) + '}'
+
+
+def _format_matrix_lines(mat: TiMatrix) -> list[str]:
+	"""One line per row, with the outer/inner bracket nesting TI uses for a
+	multi-row matrix: [[1 2]    , closing on the last row:     [3 4]]
+	The exact column spacing is an approximation, not a verified hardware match.
+	"""
+	lines = []
+	for r in range(mat.rows):
+		row = '[' + ' '.join(ti83_format(v) for v in mat.data[r]) + ']'
+		left  = '[' if r == 0 else ' '
+		right = ']' if r == mat.rows - 1 else ''
+		lines.append(f"{left}{row}{right}")
+	return lines
+
+
+def _home_lines(value) -> list[str]:
+	"""The home-screen line(s) for any TI value — Disp can show every real data
+	type (reals, complex, strings, lists, matrices).  Scalars/strings/lists are
+	one line; a matrix is one line per row.
+	"""
+	if isinstance(value, complex):
+		return [_format_complex(value)]
+	if isinstance(value, TiList):
+		return [_format_ti_list(value)]
+	if isinstance(value, TiMatrix):
+		return _format_matrix_lines(value)
+	return [_home_text(value)]
 
 
 @special_func
 def disp(args: ArgParser):
 	"""Disp [value[,value...]] — append each value to the home screen (no args just
-	re-renders it)."""
+	re-renders it).  Every real TI data type is supported; a matrix prints one
+	line per row."""
 	home = args.env.home
 	while args.has_next:
-		home.disp(_home_text(args.expr()))
+		for line in _home_lines(args.expr()):
+			home.disp(line)
 	args.end_cmd()
 	args.env.console.update(home)
 
@@ -148,17 +201,39 @@ def pause_cmd(args: ArgParser):
 	env.console.pause(env.home)
 
 
-def _eval_input(text: str, env) -> object:
-	"""Tokenize text the user typed and evaluate it as one TI expression (like expr()."""
+def _tokenize_input(text: str) -> list:
+	"""Convert console-typed text to tokens, restricted to TI's typeable set.
+
+	This is the same restriction the real keypad imposes — there's no key for
+	`sin(` or similar — so it doubles as validation: a character with no
+	typeable token raises before anything is shown or evaluated.
+	"""
 	try:
-		tokens = TiString.from_str(text).tokens
+		return TiString.from_str(text).tokens
 	except KeyError as bad:
 		raise TiSyntaxError(f"Input: unsupported character {bad} in {text!r}")
+
+
+def _eval_input(tokens: list, env) -> object:
+	"""Evaluate a typed token sequence as one TI expression (like expr()."""
 	parser = Parser(tokens, env)
 	value = parser.parse_expr()
 	if parser.has_next:
+		text = ''.join(t.text for t in tokens)
 		raise TiSyntaxError(f"Input: expected a single expression, got {text!r}")
 	return value
+
+
+def _input_one(env, prompt: str, var) -> None:
+	"""Read one value for `var`: console-read text, echo prompt+text onto the
+	home screen exactly as typed, then evaluate and store it.  Shared by Input
+	and Prompt — using the same tokens for the echo and the evaluation means
+	what's shown and what's stored never disagree.
+	"""
+	tokens = _tokenize_input(env.console.read_value(prompt))
+	env.home.disp(prompt + ''.join(t.text for t in tokens))
+	env.console.update(env.home)
+	var.store(_eval_input(tokens, env))
 
 
 @special_func
@@ -174,7 +249,21 @@ def input_cmd(args: ArgParser):
 		prompt = str(args.expr())
 	var = args.any_var()
 	args.end_cmd()
-	var.store(_eval_input(args.env.console.read_value(prompt), args.env))
+	_input_one(args.env, prompt, var)
+
+
+@special_func
+def prompt_cmd(args: ArgParser):
+	"""Prompt var[,var...] — Input each variable in turn, with an implicit
+	"NAME=?" prompt instead of a custom one."""
+	pending = []
+	while args.has_next:
+		name = args.peek().text
+		pending.append((name, args.any_var()))
+	args.end_cmd()
+	env = args.env
+	for name, var in pending:
+		_input_one(env, f'{name}=?', var)
 
 
 @special_func
