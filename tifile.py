@@ -1,9 +1,78 @@
-"""Read and write TI-83/84 .8xp program files."""
+"""Read and write TI-83/84 variable files (.8xp programs, .8xl real lists).
+
+Every TI variable file shares one envelope — an 8-byte signature, a 42-byte
+comment, a variable-entry header (type, name, archive flag), and a trailing
+checksum — wrapping a type-specific body.  `_read_var_header` / `_write_var_file`
+own that envelope; ProgramFile and ListFile each supply only the body: a
+length-prefixed token stream for programs, a count-prefixed array of 9-byte TI
+reals for lists.
+"""
 from dataclasses import dataclass
 from pathlib import Path
 
 from titoken import Token
 from catalog import ALL_TOKENS, read_token
+
+
+# 0x5D is TI's "list name" token: a named list's 8-byte name field is this byte
+# followed by up to 5 ASCII characters (built-in L1-L6 use 0x5D + 0x00..0x05).
+_LIST_NAME_TOKEN = 0x5D
+
+
+def _read_var_header(f):
+	"""Read the shared .8x* envelope and leave `f` at the start of the variable
+	data (the body's own length/count prefix).
+
+	Returns (file_type, name_bytes, archived, comment).  `name_bytes` is the raw
+	8-byte name field — each caller decodes it, since lists carry the 0x5D prefix
+	token and programs don't.
+	"""
+	signature = f.read(8)
+	if not signature.startswith(b'**TI8'):  # could be 82, 83, 83F
+		raise ValueError(f"Invalid TI variable file signature: {signature!r}")
+
+	f.seek(3, 1)  # skip 1a 0a 00
+	comment = f.read(42).rstrip(b'\x00 ').decode('ascii', errors='replace')
+	f.seek(2, 1)  # skip total var-entry length
+	_entry_type = int.from_bytes(f.read(2), 'little')  # 0x000B or 0x000D
+	f.seek(2, 1)  # skip data length
+	(file_type,) = f.read(1)
+	name_bytes = f.read(8)
+	_version, archived = f.read(2)  # TODO: field missing when entry_type != 0x000d???
+	f.seek(2, 1)  # skip data length duplicate
+	# TODO: checksum check
+	return file_type, name_bytes, bool(archived & 0x80), comment
+
+
+def _write_var_file(f, file_type, name_bytes, archived, comment, body, version):
+	"""Write a complete .8x* file wrapping `body` (the variable data, including
+	its own length/count prefix) in the standard envelope.
+
+	`version` is the type-dependent var-version byte — programs use 0x01, real
+	lists use 0x00.
+	"""
+	data_len = len(body)
+	flag     = 0x80 if archived else 0x00
+
+	var_entry = (
+		b'\x0D\x00'                       # entry header type: 0x000D (includes version + flag)
+		+ data_len.to_bytes(2, 'little')  # length of var data
+		+ bytes([file_type])              # 0x01 list, 0x05 program, 0x06 locked program
+		+ name_bytes                      # variable name, null-padded to 8 bytes
+		+ bytes([version])                # var version
+		+ bytes([flag])                   # 0x80 = archived in flash, 0x00 = RAM
+		+ data_len.to_bytes(2, 'little')  # length of var data (repeated)
+		+ body
+	)
+
+	comment_bytes = comment.encode('ascii')[:42].ljust(42, b'\x00')
+	checksum = sum(var_entry) & 0xFFFF
+	f.write(b'**TI83F*')
+	f.write(b'\x1a\x0a\x00')
+	f.write(comment_bytes)
+	f.write(len(var_entry).to_bytes(2, 'little'))
+	f.write(var_entry)
+	f.write(checksum.to_bytes(2, 'little'))
 
 
 @dataclass
@@ -16,7 +85,7 @@ class ProgramFile:
 
 	def __repr__(self):
 		return f"prgm{self.name}(tokens={len(self.tokens)};{'' if self.archived else 'un'}archived/{'' if self.locked else 'un'}locked)"
-	
+
 	def print(self):
 		if self.comment:
 			print(self.comment)
@@ -25,30 +94,18 @@ class ProgramFile:
 
 	@classmethod
 	def read_from(cls, f):
-		signature = f.read(8)
-		if not signature.startswith(b'**TI8'):  # could be 82, 83, 83F
-			raise ValueError(f"Invalid .8xp signature: {signature!r}")
-
-		f.seek(3, 1)  # skip 1a 0a 00
-		comment = f.read(42).rstrip(b'\x00 ').decode('ascii', errors='replace')
-		f.seek(2, 1)  # skip meta/body length
-		entry_type = int.from_bytes(f.read(2), 'little')  # 0x000B or 0x000D
-		f.seek(2, 1)  # skip body/checksum length
-		(file_type,) = f.read(1)
-		name = f.read(8).rstrip(b'\x00').decode('ascii')
-		_version, archived = f.read(2)  # TODO: field missing when entry_type != 0x000d???
-		f.seek(2, 1)  # skip body/checksum length duplicate
+		file_type, name_bytes, archived, comment = _read_var_header(f)
+		name = name_bytes.rstrip(b'\x00').decode('ascii')
 		end = int.from_bytes(f.read(2), 'little') + f.tell()
 		tokens = []
 		while f.tell() < end:
 			tokens.append(read_token(f))
 
-		# TODO: checksum check
 		return cls(
 			name     = name,
 			tokens   = tokens,
 			comment  = comment,
-			archived = bool(archived & 0x80),
+			archived = archived,
 			locked   = file_type == 0x06,
 		)
 
@@ -60,38 +117,93 @@ class ProgramFile:
 	def write_to(self, f):
 		program    = b''.join(t.code_to_bytes() for t in self.tokens)
 		name_bytes = self.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
-		locked     = 0x06 if self.locked else 0x05
-		flag       = 0x80 if self.archived else 0x00
-		data_len   = len(program) + 2  # +2 for the prog_len prefix inside var data
-
-		var_entry = (
-			b'\x0D\x00'                           # entry header type: 0x000D (includes version + flag)
-			+ data_len.to_bytes(2, 'little')      # length of var data
-			+ bytes([locked])                     # 0x05 = program, 0x06 = edit-locked
-			+ name_bytes                          # variable name, null-padded to 8 bytes
-			+ b'\x01'                             # version
-			+ bytes([flag])                       # 0x80 = archived in flash, 0x00 = RAM
-			+ data_len.to_bytes(2, 'little')      # length of var data (repeated)
-			+ len(program).to_bytes(2, 'little')  # length of program body
-			+ program
-		)
-
-		comment_bytes = self.comment.encode('ascii')[:42].ljust(42, b'\x00')
-		checksum = sum(var_entry) & 0xFFFF
-		f.write(b'**TI83F*')
-		f.write(b'\x1a\x0a\x00')
-		f.write(comment_bytes)
-		f.write(len(var_entry).to_bytes(2, 'little'))
-		f.write(var_entry)
-		f.write(checksum.to_bytes(2, 'little'))
+		file_type  = 0x06 if self.locked else 0x05
+		body       = len(program).to_bytes(2, 'little') + program  # prog_len prefix + body
+		_write_var_file(f, file_type, name_bytes, self.archived, self.comment, body, version=0x01)
 
 	def write(self, file):
 		with open(file, 'wb') as f:
 			self.write_to(f)
 
 
+# A TI real is 9 bytes: a flags byte (bit 7 = sign), an exponent biased by 0x80,
+# and 7 BCD bytes holding 14 decimal digits as d.ddddddddddddd × 10^exponent.
+def _decode_ti_real(b9: bytes) -> float:
+	negative = bool(b9[0] & 0x80)
+	exp      = b9[1] - 0x80
+	digits   = b9[2:9].hex()  # 14 decimal digits (BCD nibbles are always 0-9)
+	value    = float(f'{digits[0]}.{digits[1:]}e{exp}')
+	return -value if negative else value
+
+
+def _encode_ti_real(value: float) -> bytes:
+	negative       = value < 0
+	mant, exp_str  = f'{abs(value):.13e}'.split('e')  # 'd.ddddddddddddd', '±NN'
+	digits         = mant.replace('.', '')            # 14 decimal digits
+	flags          = 0x80 if negative else 0x00
+	bcd            = bytes(int(digits[i:i+2], 16) for i in range(0, 14, 2))
+	return bytes([flags, int(exp_str) + 0x80]) + bcd
+
+
+def _format_real(v: float) -> str:
+	return str(int(v)) if float(v).is_integer() else repr(v)
+
+
+@dataclass
+class ListFile:
+	name:     str
+	values:   list[float]
+	comment:  str  = ''
+	archived: bool = False
+
+	def __repr__(self):
+		return f"list{self.name}(values={len(self.values)};{'' if self.archived else 'un'}archived)"
+
+	def print(self):
+		if self.comment:
+			print(self.comment)
+		print(f"LIST:{self.name} ({'' if self.archived else 'un'}archived)")
+		print('{' + ', '.join(_format_real(v) for v in self.values) + '}')
+
+	@classmethod
+	def read_from(cls, f):
+		_file_type, name_bytes, archived, comment = _read_var_header(f)
+		count  = int.from_bytes(f.read(2), 'little')
+		values = [_decode_ti_real(f.read(9)) for _ in range(count)]
+
+		return cls(
+			name     = _decode_list_name(name_bytes),
+			values   = values,
+			comment  = comment,
+			archived = archived,
+		)
+
+	@classmethod
+	def load(cls, file):
+		with open(file, 'rb') as f:
+			return cls.read_from(f)
+
+	def write_to(self, f):
+		name_bytes = (bytes([_LIST_NAME_TOKEN]) + self.name.upper().encode('ascii')[:5]).ljust(8, b'\x00')
+		reals      = b''.join(_encode_ti_real(v) for v in self.values)
+		body       = len(self.values).to_bytes(2, 'little') + reals  # element count + reals
+		_write_var_file(f, 0x01, name_bytes, self.archived, self.comment, body, version=0x00)
+
+	def write(self, file):
+		with open(file, 'wb') as f:
+			self.write_to(f)
+
+
+def _decode_list_name(name_bytes: bytes) -> str:
+	name = name_bytes.rstrip(b'\x00')
+	if name[:1] == bytes([_LIST_NAME_TOKEN]):
+		name = name[1:]
+	return name.decode('ascii', errors='replace')
+
+
 if __name__ == '__main__':
 	import sys
 
 	for path in sys.argv[1:]:
-		read(path).print()
+		reader = ListFile if path.lower().endswith('.8xl') else ProgramFile
+		reader.load(path).print()
