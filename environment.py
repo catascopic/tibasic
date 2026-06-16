@@ -11,6 +11,8 @@ from core import Variable, NumericVariable, RealVariable, ListVariable, UserList
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 from graph import Graph
+from homescreen import HomeScreen
+from console import ScriptedConsole
 
 
 class Environment:
@@ -53,6 +55,9 @@ class Environment:
 		self.window = WindowVars()
 		# LCD pixel buffer (used by Pxl-/Pt-/Line/etc. drawing commands)
 		self.graph = Graph()
+		# Home screen (16×8 char grid) and the I/O frontend that renders it.
+		self.home = HomeScreen()
+		self.console = ScriptedConsole()
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
 		self.n_tvm = RealVariable()   # 𝐍 (number of payments)
 		self.i_pct = RealVariable()   # I% (interest rate per period, as percentage)

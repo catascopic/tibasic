@@ -69,7 +69,9 @@ TODO:
 StorePic RecallPic StoreGDB RecallGDB
 Modes: Horiz Full IndpntAuto IndpntAsk DependAuto DependAsk Time Web
 Finance: tvm_Pmt tvm_I% tvm_PV tvm_N tvm_FV Pmt_End Pmt_Bgn
-I/O: Pause Input Prompt Output( ClrHome DispTable Menu(
+I/O: Disp, Pause, Input, Prompt, Output(, ClrHome, Menu(, getKey,
+
+DispTable, DispGraph
 χ²-Test??? It has a weird display
 
 
