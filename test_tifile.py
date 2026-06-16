@@ -1,8 +1,9 @@
-"""Tests for ProgramFile binary file format (read_from / write_to)."""
+"""Tests for ProgramFile and ListFile binary file format (read_from / write_to)."""
+import os
 import pytest
 from io import BytesIO
 
-from tifile import ProgramFile
+from tifile import ProgramFile, ListFile, _decode_list_name, _encode_list_name
 from test_tibasic import toks
 
 
@@ -164,3 +165,118 @@ class TestReadErrors:
 		buf = BytesIO(b'**TIXX**' + b'\x00' * 100)
 		with pytest.raises(ValueError):
 			ProgramFile.read_from(buf)
+
+
+# ── ListFile helpers ──────────────────────────────────────────────────────────
+
+def roundtrip_list(lst: ListFile) -> ListFile:
+	buf = BytesIO()
+	lst.write_to(buf)
+	buf.seek(0)
+	return ListFile.read_from(buf)
+
+
+def make_list(**kwargs) -> ListFile:
+	kwargs.setdefault('name', 'TEST')
+	kwargs.setdefault('values', [])
+	return ListFile(**kwargs)
+
+
+# ── List name coding ──────────────────────────────────────────────────────────
+
+class TestListNameCoding:
+	# built-in decode: L₁ is "0", L₂ is "1", ..., L₆ is "5" (raw index byte)
+	def test_decode_l1(self):
+		assert _decode_list_name(b'\x5d\x00' + b'\x00' * 6) == '0'
+
+	def test_decode_l2(self):
+		assert _decode_list_name(b'\x5d\x01' + b'\x00' * 6) == '1'
+
+	def test_decode_l6(self):
+		assert _decode_list_name(b'\x5d\x05' + b'\x00' * 6) == '5'
+
+	# user-list decode
+	def test_decode_user_list(self):
+		assert _decode_list_name(b'\x5d\x43\x57' + b'\x00' * 5) == 'CW'
+
+	def test_decode_user_list_named_l1(self):
+		# A user list literally named "L1" (distinct from built-in L₁)
+		assert _decode_list_name(b'\x5d\x4c\x31' + b'\x00' * 5) == 'L1'
+
+	# built-in encode
+	def test_encode_l1(self):
+		assert _encode_list_name('0') == b'\x5d\x00' + b'\x00' * 6
+
+	def test_encode_l6(self):
+		assert _encode_list_name('5') == b'\x5d\x05' + b'\x00' * 6
+
+	# user-list encode
+	def test_encode_user_list(self):
+		assert _encode_list_name('CW') == b'\x5d\x43\x57' + b'\x00' * 5
+
+	def test_encode_user_list_lowercase_normalised(self):
+		assert _encode_list_name('cw') == b'\x5d\x43\x57' + b'\x00' * 5
+
+	def test_encode_user_list_named_l1(self):
+		assert _encode_list_name('L1') == b'\x5d\x4c\x31' + b'\x00' * 5
+
+	# roundtrip consistency for all built-ins
+	def test_all_builtins_roundtrip(self):
+		for i in range(6):
+			name = str(i)
+			assert _decode_list_name(_encode_list_name(name)) == name
+
+
+# ── ListFile roundtrip ────────────────────────────────────────────────────────
+
+class TestListFileRoundtrip:
+	def test_user_list_name(self):
+		assert roundtrip_list(make_list(name='CW')).name == 'CW'
+
+	def test_builtin_list_name_l1(self):
+		assert roundtrip_list(make_list(name='0')).name == '0'
+
+	def test_builtin_list_name_l6(self):
+		assert roundtrip_list(make_list(name='5')).name == '5'
+
+	def test_values_preserved(self):
+		result = roundtrip_list(make_list(values=[1.0, 2.5, -3.0]))
+		assert result.values == pytest.approx([1.0, 2.5, -3.0])
+
+	def test_empty_values(self):
+		assert roundtrip_list(make_list(values=[])).values == []
+
+	def test_archived(self):
+		assert roundtrip_list(make_list(archived=True)).archived is True
+
+	def test_comment(self):
+		assert roundtrip_list(make_list(comment='my list')).comment == 'my list'
+
+	def test_version_preserved(self):
+		assert roundtrip_list(make_list(version=0x24)).version == 0x24
+
+
+# ── ListFile real-file byte-exact roundtrip ───────────────────────────────────
+
+_BUILTIN_LIST_FILES = [
+	(str(i), rf'C:\Users\Max\Documents\MyTiData\Backups\TI84Plus_1\L_{i+1}_.8xl')
+	for i in range(6)
+]
+
+
+@pytest.mark.parametrize('expected_name,path', _BUILTIN_LIST_FILES)
+def test_builtin_list_name_from_file(expected_name, path):
+	if not os.path.exists(path):
+		pytest.skip('real file not found')
+	assert ListFile.load(path).name == expected_name
+
+
+@pytest.mark.parametrize('expected_name,path', _BUILTIN_LIST_FILES)
+def test_builtin_list_byte_exact_roundtrip(expected_name, path):
+	if not os.path.exists(path):
+		pytest.skip('real file not found')
+	orig = open(path, 'rb').read()
+	lst = ListFile.load(path)
+	buf = BytesIO()
+	lst.write_to(buf)
+	assert buf.getvalue() == orig

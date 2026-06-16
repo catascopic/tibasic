@@ -13,7 +13,6 @@ def load(dir_):
 		if file.suffix == '.8xp':
 			prgm = ProgramFile.load(file)
 			env.programs[prgm.name] = prgm.tokens
-			print('loaded:', prgm)
 		if file.suffix == '.8xl':
 			lst = ListFile.load(file)
 			ti_list = TiList(lst.values)
@@ -21,7 +20,6 @@ def load(dir_):
 				env.lists[int(lst.name)].value = ti_list
 			else:
 				env.user_lists[lst.name] = ti_list
-			print('loaded:', lst)
 	return env
 
 
@@ -33,4 +31,5 @@ def run(prgm_name):
 
 
 run('ENIGMA2')
-env.graph.disp()
+# env.graph.disp()
+env.dump()

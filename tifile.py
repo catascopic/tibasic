@@ -159,7 +159,7 @@ class ListFile:
 	values:   list[float]
 	comment:  str  = ''
 	archived: bool = False
-	version:  int  = 0x00  # var-version byte; real lists carry 0x00
+	version:  int  = 0x00
 
 	def __repr__(self):
 		return f"list{self.name}(values={len(self.values)};{'' if self.archived else 'un'}archived)"
@@ -208,17 +208,17 @@ def _decode_list_name(name_bytes: bytes) -> str:
 	# were padding.  A user list instead stores ASCII, whose first byte is always
 	# a letter (>= 0x41), so the 0x00..0x05 range cleanly tells the two apart.
 	if name_bytes[1] <= 0x05:
-		return str(name_bytes[1])
+		return str(name_bytes[1])  # 0x00→"0" (L₁), 0x01→"1" (L₂), ..., 0x05→"5" (L₆)
 	return name_bytes[1:].rstrip(b'\x00').decode('ascii', errors='replace')
 
 
 def _encode_list_name(name: str) -> bytes:
-	# Built-in lists L1-L6 are named "1".."6" and store a single index byte after
-	# the 0x5D token; user lists store their (uppercased) name as ASCII.  A name
-	# starting with a digit is never a valid user list on the calculator, so
-	# "1".."6" is an unambiguous marker for the built-ins.
-	if name in ('1', '2', '3', '4', '5', '6'):
-		body = bytes([int(name) - 1])
+	# Built-in lists L₁–L₆ are named "0".."5" (matching the raw index byte);
+	# they store that byte directly after the 0x5D prefix.  User lists store
+	# their ASCII name.  "0".."5" is unambiguous because user list must start
+	# with a letter
+	if name.isdigit():
+		body = bytes([int(name)])
 	else:
 		body = name.upper().encode('ascii')[:5]
 	return (bytes([_LIST_NAME_TOKEN]) + body).ljust(8, b'\x00')

@@ -188,11 +188,20 @@ class Environment:
 			self._nest_depth[func] -= 1
 
 	def _iter_values(self):
-		from catalog import LETTERS, LISTS, MATRICES, STRINGS
-		for tok in (*LETTERS, *LISTS, *MATRICES, *STRINGS):
-			value = tok.variable(self).value
-			if value is not None:
-				yield tok.text, value
+		# Variable display names, reconstructed from each storage list's index so
+		# this doesn't depend on catalog's token tables.  Order/spelling mirror the
+		# TI charset: A–Z then θ; L₁–L₆ (subscript digits); [A]–[J]; Str1–Str0.
+		numeric_names = [chr(0x41 + i) for i in range(26)] + ['θ']
+		named = (
+			zip(numeric_names, self.numerics),
+			((f"L{chr(0x2081 + i)}", var) for i, var in enumerate(self.lists)),
+			((f"[{chr(0x41 + i)}]",  var) for i, var in enumerate(self.matrices)),
+			((f"Str{(i + 1) % 10}",  var) for i, var in enumerate(self.strings)),
+		)
+		for group in named:
+			for name, var in group:
+				if var.value is not None:
+					yield name, var.value
 		for name, lst in self.user_lists.items():
 			yield f"${name}", lst
 		yield "Ans", self.ans
