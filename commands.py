@@ -7,7 +7,7 @@ from preparse import (
 )
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
-from core import TiString, TiList, TiMatrix, py_int, require_string
+from core import TiString, TiList, TiMatrix, StringVariable, py_int, require_string
 from numberformat import ti83_format
 from errors import TiSyntaxError, DataTypeError, DomainError
 
@@ -226,14 +226,22 @@ def _eval_input(tokens: list, env) -> object:
 
 def _input_one(env, prompt: str, var) -> None:
 	"""Read one value for `var`: console-read text, echo prompt+text onto the
-	home screen exactly as typed, then evaluate and store it.  Shared by Input
-	and Prompt — using the same tokens for the echo and the evaluation means
-	what's shown and what's stored never disagree.
+	home screen exactly as typed, then store it.  Shared by Input and Prompt —
+	using the same tokens for the echo and the storing means what's shown and
+	what's stored never disagree.
+
+	A string variable takes the typed text as a literal string, verbatim — no
+	quotes, no expression evaluation (you can't type a quote-enclosed string
+	expression on the real keypad input line either).  Every other variable
+	type evaluates the typed text as an expression, same as expr(.
 	"""
 	tokens = _tokenize_input(env.console.read_value(prompt))
 	env.home.disp(prompt + ''.join(t.text for t in tokens))
 	env.console.update(env.home)
-	var.store(_eval_input(tokens, env))
+	if isinstance(var, StringVariable):
+		var.store(TiString(tokens))
+	else:
+		var.store(_eval_input(tokens, env))
 
 
 @special_func

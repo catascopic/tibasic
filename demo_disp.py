@@ -4,8 +4,8 @@ from program import Program
 from test_tibasic import toks
 
 PROGRAM = """
-Prompt A, Str1 , L1
-Disp A, Str1 , L1
+Input "GREETING=", Str1
+Disp Str1
 """
 
 env = Environment()
