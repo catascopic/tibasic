@@ -65,7 +65,12 @@ def ds_lt_cmd(env: Env, var: NumericVar, threshold: Real):
 
 @preparse_cmd
 def prgm(env: Env, name: ProgramName):
-	env.run_program(name)
+	try:
+		prgm_code = env.programs[name]
+	except KeyError:
+		raise UndefinedError(f"Program not found: {name!r}")
+	from program import Program
+	Program(prgm_code, env).run()
 
 @no_arg_command
 def return_cmd(env):
@@ -128,27 +133,23 @@ def _format_matrix_lines(mat: TiMatrix) -> list[str]:
 	multi-row matrix: [[1 2]    , closing on the last row:     [3 4]]
 	The exact column spacing is an approximation, not a verified hardware match.
 	"""
-	lines = []
-	for r in range(mat.rows):
-		row = '[' + ' '.join(ti83_format(v) for v in mat.data[r]) + ']'
-		left  = '[' if r == 0 else ' '
-		right = ']' if r == mat.rows - 1 else ''
-		lines.append(f"{left}{row}{right}")
-	return lines
+	for i, row in enumerate(mat.data):
+		yield f"{'[' if i == 0 else ' '}[{' '.join(ti83_format(v) for v in row)}]{']' if i == mat.rows - 1 else ''}"
 
 
-def _home_lines(value) -> list[str]:
+def _home_lines(value):
 	"""The home-screen line(s) for any TI value — Disp can show every real data
 	type (reals, complex, strings, lists, matrices).  Scalars/strings/lists are
 	one line; a matrix is one line per row.
 	"""
 	if isinstance(value, complex):
-		return [_format_complex(value)]
-	if isinstance(value, TiList):
-		return [_format_ti_list(value)]
-	if isinstance(value, TiMatrix):
-		return _format_matrix_lines(value)
-	return [_home_text(value)]
+		yield _format_complex(value)
+	elif isinstance(value, TiList):
+		yield _format_ti_list(value)
+	elif isinstance(value, TiMatrix):
+		yield from _format_matrix_lines(value)
+	else:
+		yield _home_text(value)
 
 
 @special_func

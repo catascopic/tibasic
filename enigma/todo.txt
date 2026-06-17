@@ -1,0 +1,6 @@
+Enigma updates:
+Rotor order overwrite
+Asterisk marker
+Mode: NORMAL
+Rotor selector: [  ]
+Rotor library

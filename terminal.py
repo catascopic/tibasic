@@ -61,7 +61,7 @@ class ScriptedConsole(Console):
 
 	def read_value(self, prompt: str, home: HomeScreen) -> str:
 		if not self.inputs:
-			raise RuntimeError(f"ScriptedConsole: no input queued for prompt {prompt!r}")
+			raise ValueError(f"ScriptedConsole: no input queued for prompt {prompt!r}")
 		return self.inputs.pop(0)
 
 	def read_key(self) -> int:
@@ -72,14 +72,14 @@ class ScriptedConsole(Console):
 
 	def choose(self, title: str, options: list[str]) -> int:
 		if not self.choices:
-			raise RuntimeError(f"ScriptedConsole: no choice queued for menu {title!r}")
+			raise ValueError(f"ScriptedConsole: no choice queued for menu {title!r}")
 		return self.choices.pop(0)
 
 
-_PAUSE_SPINNER   = '▚▞'   # one frame per redraw while a Pause is waiting
-_RUNNING_SPINNER = '▙▛▜▟'         # one frame per redraw while idle-polling (getKey)
-_FRAME_SECONDS = 0.1                # spinner redraw interval (~10 fps)
-_POLL_SECONDS = 0.01                # how often we check for a keypress within a frame
+_PAUSE_SPINNER   = '▚▞'	# one frame per redraw while a Pause is waiting
+_RUNNING_SPINNER = '▙▛▜▟'	# one frame per redraw while idle-polling (getKey)
+_FRAME_SECONDS = 0.1        # spinner redraw interval (~10 fps)
+_POLL_SECONDS = 0.01        # how often we check for a keypress within a frame
 _BOUNDARY = '░'
 
 # Inverse video for the menu's title bar and the selected item's "N:" marker —

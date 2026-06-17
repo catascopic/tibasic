@@ -21,7 +21,7 @@ def time_cnv(seconds: Real):
 
 @preparse_func
 def dayofwk(year: Real, month: Real, day: Real):
-	"""Day of week: 1=Sunday, 2=Monday, …, 7=Saturday."""
+	"""Day of week: 1=Sunday, 2=Monday, ..., 7=Saturday."""
 	try:
 		d = date(py_int(year), py_int(month), py_int(day))
 	except ValueError as e:
@@ -42,7 +42,7 @@ def set_time(env: Env, hour: Real, minute: Real, second: Real):
 @preparse_cmd_func
 def set_dt_fmt(env: Env, fmt: Real):
 	fmt = py_int(fmt)
-	if fmt not in {1, 2, 3}:
+	if not 1 <= fmt <= 3:
 		raise DomainError(f"setDtFmt: expected 1, 2, or 3; got {fmt}")
 	env.dt_fmt = fmt
 

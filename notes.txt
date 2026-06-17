@@ -1,3 +1,12 @@
+home vs console
+
+Cursor blinking while running
+
+Timer-based indicator
+
+Program class for program table
+Program -> ProgramRunner
+
 QR: Fix version bump 5->6 when set explicitly
 
 Spinner doesn't spin without getkey

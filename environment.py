@@ -1,4 +1,3 @@
-
 import math
 import random
 from collections import defaultdict, deque
@@ -13,11 +12,12 @@ from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, Graph
 from graph import Graph
 from homescreen import HomeScreen
 from terminal import ScriptedConsole
+from titoken import Token
 
 
 class Environment:
 
-	def __init__(self):
+	def __init__(self, console=None):
 		# VARIABLES
 		self.numerics   = [NumericVariable()  for _ in range(27)]  # A–Z, θ
 		self.lists      = [ListVariable()     for _ in range(6)]   # L1–L6
@@ -29,7 +29,6 @@ class Environment:
 		self.sequence   = [EquationVariable() for _ in range(3)]   # u, v, w
 		self.user_lists = {}
 		# self.stat        = [None] * 0x3D # stat vars
-		# self.window      = [None] * 0x37 # window vars
 		self.n = NumericVariable()
 		self.ans = 0
 		# MODES
@@ -54,9 +53,9 @@ class Environment:
 		self.window = WindowVars()
 		# LCD pixel buffer (used by Pxl-/Pt-/Line/etc. drawing commands)
 		self.graph = Graph()
-		# Home screen (16×8 char grid) and the I/O frontend that renders it.
+		# Home screen (16×8 char grid) and the I/O frontend that renders it
 		self.home = HomeScreen()
-		self.console = ScriptedConsole()
+		self.console = console or ScriptedConsole()
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
 		self.n_tvm = RealVariable()   # 𝐍 (number of payments)
 		self.i_pct = RealVariable()   # I% (interest rate per period, as percentage)
@@ -66,16 +65,45 @@ class Environment:
 		self.py    = RealVariable(1.0)  # P/Y (payments per year)
 		self.cy    = RealVariable(1.0)  # C/Y (compounding periods per year)
 		# Programs
-		self.programs: dict[str, list] = {}  # name -> token list for stored programs
-		self.program_stack: deque = deque()  # currently executing programs (innermost last)
+		self.programs: dict[str, list[Token]] = {}  # name -> token list for stored programs
+		self.program_stack: list[object] = []  # currently executing programs (innermost last)
 		# Internal data
 		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
 		self._nest_depth: dict[object, int] = defaultdict(lambda: 0)  # tracks nesting depth for ILLEGAL NEST guards
 
-	# ── Graph variables ──────────────────────────────────────────────────────────
-	# X and Y are ordinary numeric variables (letters 'X' and 'Y'); the graph and
-	# drawing commands (DrawF, DrawInv, Tangent, …) read and update them by name.
+	def run(self, tokens: list[Token]):
+		"""Runs a string of tokens as if from the home screen."""
+		# TODO: Should there be some kind of flag that makes newline characters raise an error?
+		# On the calculator, it's impossible to get a newline character on the home screen (arguably that's what Enter does)
+		# And actually, maybe if you treat NEWLINE as pressing Enter, everything works as intended
+		from parser import Parser
+		try:
+			Parser(tokens, self).run()
+		except StopSignal:
+			# It's correct to catch here because doing `prgmTEST:1->A` (where TEST just runs Stop) will not reach the following store command.
+			pass
+		self.console.finish(self.home)
 
+	def to_rad(self, x: float):
+		"""Convert x from the current angle mode to radians (for trig input)."""
+		return x if self.in_radians else x * (math.pi / 180)
+
+	def from_rad(self, r: float):
+		"""Convert r (radians) to the current angle mode (for inverse trig output)."""
+		return r if self.in_radians else r * (180 / math.pi)
+
+	def from_deg(self, x: float):
+		"""Convert x (in degrees) to the current angle mode (for DMS literals)."""
+		return x * (math.pi / 180) if self.in_radians else x
+	
+	@property
+	def in_radians(self):
+		return self.angle_mode is AngleMode.RAD
+	
+	@property
+	def real_only(self):
+		return self.complex_mode is ComplexMode.REAL
+		
 	@property
 	def x(self) -> Variable:
 		return self.numerics[23]
@@ -84,44 +112,13 @@ class Environment:
 	def y(self) -> Variable:
 		return self.numerics[24]
 
-	def run(self, tokens):
-		"""
-		Runs a string of tokens as if from the "home screen".
-		"""
-		# TODO: Should there be some kind of flag that makes newline characters raise an error?
-		# On the calculator, it's impossible to get a newline character on the home screen (arguably that's what Enter does)
-		# And actually, maybe if you treat NEWLINE as pressing Enter, everything works as intended
-		from parser import Parser
-		try:
-			Parser(tokens, self).run()
-		except StopSignal:
-			pass
-		self.console.finish(self.home)
-
-	def run_program(self, prgm_name: str):
-		"""Runs a stored program. To simulate running a program as you would on a calculator from the home screen, use Environment.run([PRGM, ...])."""
-		try:
-			prgm_code = self.programs[prgm_name]
-		except KeyError:
-			raise UndefinedError(f"Program not found: {prgm_name!r}")
-		from program import Program
-		Program(prgm_code, self).run()
-
-	def to_rad(self, x):
-		"""Convert x from the current angle mode to radians (for trig input)."""
-		return x * (math.pi / 180) if self.angle_mode is AngleMode.DEG else x
-
-	def from_rad(self, r):
-		"""Convert r (radians) to the current angle mode (for inverse trig output)."""
-		return r * (180 / math.pi) if self.angle_mode is AngleMode.DEG else r
-
-	def from_deg(self, x):
-		"""Convert x (in degrees) to the current angle mode (for DMS literals)."""
-		return x * (math.pi / 180) if self.angle_mode is AngleMode.RAD else x
-	
 	@property
-	def real_only(self):
-		return self.complex_mode is ComplexMode.REAL
+	def t(self) -> Variable:
+		return self.numerics[19]
+
+	@property
+	def theta(self) -> Variable:
+		return self.numerics[26]
 
 	def guard_real(self, inputs, result):
 		"""Raise NonRealAnsError if real-mode is active and a real-input operation produced a complex result."""
@@ -179,14 +176,14 @@ class Environment:
 		return random.random()
 
 	@contextmanager
-	def nest_guard(self, func: object, max_depth: int = 0):
-		if self._nest_depth[func] > max_depth:
-			raise IllegalNestError(func)
-		self._nest_depth[func] += 1
+	def nest_guard(self, key: object, max_depth: int = 0):
+		if self._nest_depth[key] > max_depth:
+			raise IllegalNestError(key)
+		self._nest_depth[key] += 1
 		try:
 			yield
 		finally:
-			self._nest_depth[func] -= 1
+			self._nest_depth[key] -= 1
 
 	def _iter_values(self):
 		# Variable display names, reconstructed from each storage list's index so
