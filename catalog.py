@@ -640,10 +640,10 @@ token(0xBBE8, b'\x88')                                  # ₈
 token(0xBBE9, b'\x89')                                  # ₉
 token(0xBBEA, b'\x1d')                                  # ⑽
 token(0xBBEB, b'\xcf')                                  # ◄
-token(0xBBEC, b'\xdf')                                  # 🡆
+token(0xBBEC, b'\x05')                                  # ►
 token(0xBBED, b'\x1e')                                  # ↑
 token(0xBBEE, b'\x1f')                                  # ↓
-token(0xBBF0, b'\x09')                                     # Alternate X (what is this?)
+token(0xBBF0, b'\x09')                                  # ×
 token(0xBBF1, b'\x08',                  typeable=True)  # ∫
 token(0xBBF2, b'\x06')                                  # 🡅
 token(0xBBF3, b'\x07')                                  # 🡇

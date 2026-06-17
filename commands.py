@@ -234,8 +234,13 @@ def _input_one(env, prompt: str, var) -> None:
 	quotes, no expression evaluation (you can't type a quote-enclosed string
 	expression on the real keypad input line either).  Every other variable
 	type evaluates the typed text as an expression, same as expr(.
+
+	Empty input is rejected: an entry that's blank (or only whitespace) re-prompts
+	rather than storing anything, so neither Input nor Prompt can yield a value.
 	"""
-	tokens = _tokenize_input(env.console.read_value(prompt))
+	while not (text := env.console.read_value(prompt).strip()):
+		pass
+	tokens = _tokenize_input(text)
 	env.home.echo(prompt + ''.join(t.text for t in tokens))   # wraps, doesn't truncate
 	env.console.update(env.home)
 	if isinstance(var, StringVariable):

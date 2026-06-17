@@ -1,6 +1,4 @@
-Input/Prompt: Shouldn't allow empty input
-
-Env dump totally broken
+ListFile/ProgramFile: if write target is dir, use name.8xp
 
 "Done" When program finishes or ans if the last line produced a result
 
