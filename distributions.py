@@ -248,7 +248,7 @@ def poissonpdf(lam: Real, k: Real):
 @preparse_func
 def poissoncdf(lam: Real, k: Real):
 	k = py_int(k)
-	return builtins.sum(math.exp(-lam) * lam ** i / math.factorial(i) for i in range(k + 1))
+	return float(builtins.sum(math.exp(-lam) * lam ** i / math.factorial(i) for i in range(k + 1)))
 
 
 @preparse_func

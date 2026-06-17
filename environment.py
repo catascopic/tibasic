@@ -154,23 +154,23 @@ class Environment:
 
 	def get_date(self):
 		d = self.now()
-		return TiList([d.year, d.month, d.day])
+		return TiList([float(d.year), float(d.month), float(d.day)])
 
 	def get_time(self):
 		t = self.now()
-		return TiList([t.hour, t.minute, t.second])
+		return TiList([float(t.hour), float(t.minute), float(t.second)])
 
 	def start_tmr(self):
 		return float(int(self.now().timestamp()))
 
 	def get_dt_fmt(self):
-		return self.dt_fmt
+		return float(self.dt_fmt)
 
 	def get_tm_fmt(self):
-		return self.tm_fmt
+		return float(self.tm_fmt)
 
 	def is_clock_on(self):
-		return self.clock_on
+		return float(self.clock_on)
 
 	def get_key(self):
 		return float(self.console.read_key())

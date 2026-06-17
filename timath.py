@@ -120,7 +120,7 @@ def pow10(x: Vectorized):
 def cbrt(x: Vectorized):
 	if isinstance(x, complex):
 		if x == 0:
-			return 0
+			return 0.0
 		return cmath.exp(cmath.log(x) / 3)
 	return math.cbrt(x)
 
@@ -183,7 +183,7 @@ def fn_int(env: Env, formula: Thunk, var: NumericVar, lo: Real, hi: Real, tol: R
 
 @preparse_func
 def sigma(env: Env, formula: Thunk, var: NumericVar, start: Real, end: Real) -> float:
-	total = 0
+	total = 0.0
 	n = start
 	with env.nest_guard(sigma), var.scoped():
 		while n <= end:
@@ -527,7 +527,7 @@ def real(x: Vectorized):
 
 @preparse_func
 def imag(x: Vectorized):
-	return x.imag if isinstance(x, complex) else 0
+	return x.imag if isinstance(x, complex) else 0.0
 
 
 @preparse_func
@@ -577,14 +577,14 @@ def rand_bin(n: Real, p: Real, simulations: Real = None):
 	if n <= 0:
 		raise DomainError("randBin: n must be positive")
 	if simulations is None:
-		return builtins.sum(1 for _ in range(n) if random.random() < p)
+		return float(builtins.sum(1 for _ in range(n) if random.random() < p))
 	simulations = py_int(simulations)
-	return TiList([builtins.sum(1 for _ in range(n) if random.random() < p) for _ in range(simulations)])
+	return TiList([float(builtins.sum(1 for _ in range(n) if random.random() < p)) for _ in range(simulations)])
 
 
 @preparse_func
 def rand_int_no_rep(low: Real, high: Real):
-	lst = list(range(py_int(low), py_int(high) + 1))
+	lst = [float(x) for x in range(py_int(low), py_int(high) + 1)]
 	random.shuffle(lst)
 	return TiList(lst)
 

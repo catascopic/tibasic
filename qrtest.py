@@ -31,5 +31,5 @@ def run(prgm_name):
 
 
 run('QR')
-env.graph.save('qr.bmp', 1)
+env.graph.save('qr.bmp', 3)
 # env.dump()

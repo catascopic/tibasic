@@ -1,12 +1,12 @@
-ListFile/ProgramFile: if write target is dir, use name.8xp
+QR: Fix version bump 5->6 when set explicitly
+
+Spinner doesn't spin without getkey
 
 "Done" When program finishes or ans if the last line produced a result
 
 @preparse_func
 def length(string: TiString):
 	return float(len(string))
-
-Pause can take a value
 
 Is Decimal round really necessary in timath?
 
@@ -19,7 +19,6 @@ x² doesn't, but odd roots... actually the TI-84 is tricky here — ^ with a fra
 log(, ln( — negative input
 sin⁻¹(, cos⁻¹( — input outside [-1, 1]
 
-Cleanup: token(0xEF09, b'getDate',               res=Environment.get_date)
 
 except ValueError:
 	return cmath.exp(cmath.log(complex(base)) * exp)

@@ -16,7 +16,7 @@ def time_cnv(seconds: Real):
 	remaining, secs = divmod(builtins.abs(seconds), 60)
 	remaining, minutes = divmod(remaining, 60)
 	days, hours = divmod(remaining, 24)
-	return sign * TiList([days, hours, minutes, secs])
+	return sign * TiList([float(days), float(hours), float(minutes), float(secs)])
 
 
 @preparse_func

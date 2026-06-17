@@ -50,7 +50,7 @@ def _parse_dbd_date(d):
 @preparse_func
 def dbd(date1: VectorizedReal, date2: VectorizedReal):
 	"""Days between two dates in TI Finance format (MM.DDYY or DDMM.YY)."""
-	return (_parse_dbd_date(date2) - _parse_dbd_date(date1)).days
+	return float((_parse_dbd_date(date2) - _parse_dbd_date(date1)).days)
 
 
 def _expand_cash_flows(cflist, cffreq):

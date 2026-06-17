@@ -99,14 +99,14 @@ def xor(a, b):  return a ^ b
 @vectorize
 def ncr(n, r):
 	try:
-		return math.comb(py_int(n), py_int(r))
+		return float(math.comb(py_int(n), py_int(r)))
 	except ValueError:
 		raise DomainError(f"nCr: invalid arguments ({n}, {r})")
 
 @vectorize
 def npr(n, r):
 	try:
-		return math.perm(py_int(n), py_int(r))
+		return float(math.perm(py_int(n), py_int(r)))
 	except ValueError:
 		raise DomainError(f"nPr: invalid arguments ({n}, {r})")
 

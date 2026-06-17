@@ -16,9 +16,9 @@ def in_string(string: TiString, substring: TiString, start: Real = 1.0):
 	start = py_int(start)
 	for i in range(start - 1, len(v) - len(s) + 1):
 		if v[i:i + len(s)] == s:
-			return i + 1
+			return float(i + 1)
 
-	return 0
+	return 0.0
 
 
 @special_func

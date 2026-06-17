@@ -55,14 +55,14 @@ def dim(args: ArgParser):
 		if val is None:
 			raise UndefinedError("Undefined list variable")
 		args.end_func()
-		return len(val)
+		return float(len(val))
 
 	value = args.expr()
 	args.end_func()
 	if isinstance(value, TiList):
-		return len(value)
+		return float(len(value))
 	if isinstance(value, TiMatrix):
-		return TiList([value.rows, value.cols])
+		return TiList([float(value.rows), float(value.cols)])
 	raise DataTypeError(f"dim: expected list or matrix; got {value}")
 
 

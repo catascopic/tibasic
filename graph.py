@@ -32,7 +32,7 @@ class Graph:
 		return bool(self.buffer[row][col])
 
 	def set(self, row: int, col: int, on: bool = True) -> None:
-		self.buffer[row][col] = 1 if on else 0
+		self.buffer[row][col] = on
 
 	def set_off(self, row: int, col: int, on: bool = True) -> None:
 		self.set(row, col, False)
@@ -57,8 +57,7 @@ class Graph:
 
 		with open(path, 'wb') as f:
 			f.write(struct.pack(
-				'<2sIHHIIiiHHIIiiII8B', 
-				b'BM', 
+				'<2sIHHIIiiHHIIiiII8B', b'BM', 
 				# file size, 2 reserved shorts
 				_PIXEL_DATA_OFFSET + stride * height, 0, 0,
 				# DIB header
