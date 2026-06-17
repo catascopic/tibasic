@@ -96,6 +96,7 @@ class Environment:
 			Parser(tokens, self).run()
 		except StopSignal:
 			pass
+		self.console.finish(self.home)
 
 	def run_program(self, prgm_name: str):
 		"""Runs a stored program. To simulate running a program as you would on a calculator from the home screen, use Environment.run([PRGM, ...])."""

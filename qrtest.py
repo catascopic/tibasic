@@ -23,13 +23,13 @@ def load(dir_):
 	return env
 
 
-env = load(r'C:\Users\Max\Documents\MyTiData\Backups\TI84PlusSilverEdition_10')
+env = load(r'enigma')
 env.console = TerminalConsole()
 
 def run(prgm_name):
 	env.run([get_token(0x5F), *(TEXT_INPUT[c] for c in prgm_name)])
 
 
-run('ENIGMA2')
+run('QR')
 # env.graph.disp()
-env.dump()
+# env.dump()

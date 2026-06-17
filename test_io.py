@@ -372,4 +372,4 @@ class TestScriptedConsole:
 
 	def test_read_value_without_input_errors(self):
 		with pytest.raises(RuntimeError):
-			ScriptedConsole().read_value('?')
+			ScriptedConsole().read_value('?', HomeScreen())

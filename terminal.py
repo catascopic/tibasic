@@ -23,7 +23,7 @@ class Console(ABC):
 		"""Re-render the home screen after a Disp / Output( / ClrHome."""
 
 	@abstractmethod
-	def read_value(self, prompt: str) -> str:
+	def read_value(self, prompt: str, home: HomeScreen) -> str:
 		"""Blocking: show `prompt`, return the raw text the user typed (Input/Prompt)."""
 
 	@abstractmethod
@@ -37,6 +37,9 @@ class Console(ABC):
 	@abstractmethod
 	def choose(self, title: str, options: list[str]) -> int:
 		"""Blocking: present a menu, return the chosen 0-based index (Menu()."""
+
+	def finish(self, home: HomeScreen) -> None:
+		"""Called when program execution ends; default is a no-op."""
 
 
 class ScriptedConsole(Console):
@@ -56,7 +59,7 @@ class ScriptedConsole(Console):
 	def update(self, home: HomeScreen) -> None:
 		self.frames.append(home.render())
 
-	def read_value(self, prompt: str) -> str:
+	def read_value(self, prompt: str, home: HomeScreen) -> str:
 		if not self.inputs:
 			raise RuntimeError(f"ScriptedConsole: no input queued for prompt {prompt!r}")
 		return self.inputs.pop(0)
@@ -103,7 +106,7 @@ class TerminalConsole(Console):
 		self._last_run_render = 0.0
 
 	def update(self, home: HomeScreen) -> None:
-		self._render(home)
+		self._render(home, marker=_RUNNING_SPINNER[self._run_spin % len(_RUNNING_SPINNER)])
 
 	def _render(self, home: HomeScreen, marker: str | None = None) -> None:
 		# Remembered so _tick_running_indicator can redraw the real home screen
@@ -139,7 +142,11 @@ class TerminalConsole(Console):
 		sys.stdout.write(frame)
 		sys.stdout.flush()
 
-	def read_value(self, prompt: str) -> str:
+	def finish(self, home: HomeScreen) -> None:
+		self._render(home)
+
+	def read_value(self, prompt: str, home: HomeScreen) -> str:
+		self._render(home)  # repaint without indicator before blocking on input
 		return input(prompt)
 
 	def read_key(self) -> int:

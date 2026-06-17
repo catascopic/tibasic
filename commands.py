@@ -238,7 +238,7 @@ def _input_one(env, prompt: str, var) -> None:
 	Empty input is rejected: an entry that's blank (or only whitespace) re-prompts
 	rather than storing anything, so neither Input nor Prompt can yield a value.
 	"""
-	while not (text := env.console.read_value(prompt).strip()):
+	while not (text := env.console.read_value(prompt, env.home).strip()):
 		pass
 	tokens = _tokenize_input(text)
 	env.home.echo(prompt + ''.join(t.text for t in tokens))   # wraps, doesn't truncate
