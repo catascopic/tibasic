@@ -4,10 +4,6 @@ Spinner doesn't spin without getkey
 
 "Done" When program finishes or ans if the last line produced a result
 
-@preparse_func
-def length(string: TiString):
-	return float(len(string))
-
 Is Decimal round really necessary in timath?
 
 _REGISTRY: ArgSpec repr name
@@ -18,7 +14,6 @@ call_with_parser: guard_real?
 x² doesn't, but odd roots... actually the TI-84 is tricky here — ^ with a fractional exponent on a negative number will error rather than give a real odd root
 log(, ln( — negative input
 sin⁻¹(, cos⁻¹( — input outside [-1, 1]
-
 
 except ValueError:
 	return cmath.exp(cmath.log(complex(base)) * exp)
@@ -48,19 +43,11 @@ PlotStart, PlotStep — actually have nothing to do with plots, but determine wh
 TblStart, ΔTbl — the starting value and step for the independent variable in the table screen.
 TblInput — a 7-element list of the values of a variable in the table.
 
-Which is the better system for mapping characters?
-
-Make home screen
-
 Revisit transform_to_domain_error decorator
 
 peek/next/match/match_separator
 
 test fractional powers
-
-Refactor window: inner object
-
-test_copy_string: okay to share internal data?
 
 Thunk:
 Hard to tell if commands are straight-up invalid
