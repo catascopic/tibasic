@@ -1,3 +1,7 @@
+errors.TiSyntaxError: Expected 0x6, got 0x33:'3'
+Would an IntEnum solve this?
+Or should we import catalog at this point
+
 home vs console
 
 Cursor blinking while running
