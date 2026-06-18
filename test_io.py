@@ -36,49 +36,49 @@ class TestHomeScreen:
 
 	def test_output_writes_at_position(self):
 		h = HomeScreen()
-		h.output(2, 3, 'AB')
+		h.output(2, 3, b'AB')
 		assert h.render().split('\n')[2] == '   AB' + ' ' * 11
 
 	def test_output_wraps_to_next_row(self):
 		h = HomeScreen()
-		h.output(0, 14, 'ABCD')        # 14,15 on row 0; 0,1 on row 1
+		h.output(0, 14, b'ABCD')        # 14,15 on row 0; 0,1 on row 1
 		rows = h.render().split('\n')
 		assert rows[0].endswith('AB')
 		assert rows[1].startswith('CD')
 
 	def test_output_clips_at_bottom(self):
 		h = HomeScreen()
-		h.output(7, 14, 'ABCDEF')      # only AB fit; CDEF fall off the bottom
+		h.output(7, 14, b'ABCDEF')      # only AB fit; CDEF fall off the bottom
 		assert h.render().split('\n')[7].endswith('AB')
 
 	def test_disp_appends_and_advances(self):
 		h = HomeScreen()
-		h.disp('one')
-		h.disp('two')
+		h.disp(b'one')
+		h.disp(b'two')
 		rows = h.render().split('\n')
 		assert rows[0].startswith('one') and rows[1].startswith('two')
 		assert h.cursor_row == 2
 
 	def test_disp_truncates_with_ellipsis(self):
 		h = HomeScreen()
-		h.disp('X' * 20)
+		h.disp(b'X' * 20)
 		assert h.render().split('\n')[0] == 'X' * 15 + '…'
 
 	def test_disp_exact_width_no_ellipsis(self):
 		h = HomeScreen()
-		h.disp('X' * 16)
+		h.disp(b'X' * 16)
 		assert h.render().split('\n')[0] == 'X' * 16
 
 	def test_output_wraps_long_text_across_rows(self):
 		h = HomeScreen()
-		h.output(0, 0, 'X' * 20)
+		h.output(0, 0, b'X' * 20)
 		rows = h.render().split('\n')
 		assert rows[0] == 'X' * 16
 		assert rows[1].startswith('X' * 4)
 
 	def test_echo_wraps_instead_of_truncating(self):
 		h = HomeScreen()
-		h.echo('X' * 20)
+		h.echo(b'X' * 20)
 		rows = h.render().split('\n')
 		assert rows[0] == 'X' * 16
 		assert rows[1].startswith('X' * 4)
@@ -86,12 +86,12 @@ class TestHomeScreen:
 
 	def test_echo_empty_still_advances_cursor(self):
 		h = HomeScreen()
-		h.echo('')
+		h.echo(b'')
 		assert h.cursor_row == 1
 
 	def test_echo_exact_width_advances_one_row(self):
 		h = HomeScreen()
-		h.echo('X' * 32)   # exactly 2 full rows
+		h.echo(b'X' * 32)   # exactly 2 full rows
 		assert h.cursor_row == 2
 
 	def test_echo_may_fill_bottom_row_unlike_disp(self):
@@ -99,8 +99,8 @@ class TestHomeScreen:
 		# guarantees a trailing blank line.
 		h = HomeScreen()
 		for i in range(7):
-			h.disp(str(i))
-		h.echo('LAST')
+			h.disp(str(i).encode())
+		h.echo(b'LAST')
 		assert h.render().split('\n')[7].startswith('LAST')
 
 	def test_disp_scrolls_past_bottom(self):
@@ -109,7 +109,7 @@ class TestHomeScreen:
 		# second-to-last row, with the last row blank, not holding '8' itself.
 		h = HomeScreen()
 		for i in range(9):
-			h.disp(str(i))
+			h.disp(str(i).encode())
 		rows = h.render().split('\n')
 		assert rows[0].startswith('2')   # '0' and '1' both scrolled off
 		assert rows[6].startswith('8')
@@ -118,13 +118,13 @@ class TestHomeScreen:
 	def test_disp_always_leaves_a_blank_bottom_line(self):
 		h = HomeScreen()
 		for i in range(20):       # many more than fit; screen scrolls repeatedly
-			h.disp(str(i))
+			h.disp(str(i).encode())
 		assert h.render().split('\n')[7] == ' ' * 16
 		assert h.cursor_row == 7
 
 	def test_clear_resets_grid_and_cursor(self):
 		h = HomeScreen()
-		h.disp('stuff')
+		h.disp(b'stuff')
 		h.clear()
 		assert h.render() == '\n'.join([' ' * 16] * 8)
 		assert h.cursor_row == 0
@@ -379,7 +379,7 @@ class TestScriptedConsole:
 	def test_captures_frames(self):
 		c = ScriptedConsole()
 		h = HomeScreen()
-		h.disp('hi')
+		h.disp(b'hi')
 		c.update(h)
 		assert c.frames == [h.render()]
 

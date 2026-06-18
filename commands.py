@@ -9,6 +9,7 @@ from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, StringVariable, py_int, require_string
 from tiformat import output_text, disp_lines
+from titoken import encode
 from errors import TiSyntaxError, DomainError
 
 ############
@@ -200,7 +201,7 @@ def _input_one(env, prompt: str, var) -> None:
 	while not (text := env.console.read_value(prompt, env.home).strip()):
 		pass
 	tokens = _tokenize_input(text)
-	env.home.echo(prompt + ''.join(t.text for t in tokens))   # wraps, doesn't truncate
+	env.home.echo(encode(prompt) + b''.join(t.display for t in tokens))   # wraps, doesn't truncate
 	env.console.update(env.home)
 	if isinstance(var, StringVariable):
 		var.store(TiString(tokens))

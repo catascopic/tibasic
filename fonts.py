@@ -4,7 +4,7 @@
 # where bit 6 is the top row and bit 0 is the bottom row.
 # None = no glyph defined for this display byte.
 LARGE_FONT: list[bytes | None] = [
-	None,        # 00 (undefined)
+	b'\x00\x00\x00\x00\x00',  # 00 (blank cell — empty home-screen byte)
 	b'\x13\x0c\x10\x13\x0c',  # 01 𝑛
 	b'\x1e\x01\x01\x02\x1f',  # 02 𝑢
 	b'\x18\x06\x01\x06\x18',  # 03 𝑣

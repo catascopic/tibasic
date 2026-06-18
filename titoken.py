@@ -13,7 +13,7 @@ from collections.abc import Callable
 
 _CHARSET: list[str | None] = [
 #	0		1		2		3		4		5		6		7		8		9		A		B		C		D		E		F
-	None,	'𝑛',	'𝑢',	'𝑣',	'𝑤',	'►',	'🡅',	'🡇',	'∫',	'×',	'▫',	'﹢',	'·',	'ₜ',		'𝟑',	'𝟊',	# 0
+	' ',	'𝑛',	'𝑢',	'𝑣',	'𝑤',	'►',	'🡅',	'🡇',	'∫',	'×',	'▫',	'﹢',	'·',	'ₜ',		'𝟑',	'𝟊',	# 0
 	'√',	'¹',	'²',	'∠',	'°',	'ʳ',	'ᵀ',	'≤',	'≠',	'≥',	'⁻',		'ᴇ',	'→',	'⑽',	'↑',	'↓',	# 1
 	' ',	'!',	'"',	'#',	'⁴',		'%',	'&',	"'",	'(',	')',	'*',	'+',	',',	'-',	'.',	'/',	# 2
 	'0',	'1',	'2',	'3',	'4',	'5',	'6',	'7',	'8',	'9',	':',	';',	'<',	'=',	'>',	'?',	# 3
@@ -34,6 +34,24 @@ _CHARSET: list[str | None] = [
 def decode(display: bytes) -> str:
 	"""Render display bytes as a human-readable string (undefined bytes as \\xNN)."""
 	return ''.join(_CHARSET[b] for b in display)
+
+
+# _ENCODE: Unicode character -> TI display byte, the inverse of _CHARSET, built
+# once at import.  Used to turn formatted text (number strings from tiformat) into
+# the display bytes the home screen stores.  Where two bytes share a glyph the
+# later one wins; that's harmless because the only thing encoded is ASCII, which is
+# unambiguous.  Byte 0x00 and the space 0x20 both decode to ' ', so encode(' ')
+# resolves to the real space glyph (0x20), leaving 0x00 free as the blank-cell fill.
+_ENCODE: dict[str, int] = {ch: b for b, ch in enumerate(_CHARSET) if ch is not None}
+
+
+def encode(text: str) -> bytes:
+	"""Encode a string into TI display bytes (the inverse of decode).
+
+	For the ASCII text produced by number formatting; raises KeyError on a
+	character with no charset glyph.
+	"""
+	return bytes(_ENCODE[c] for c in text)
 
 
 # ── Named token codes ─────────────────────────────────────────────────────────

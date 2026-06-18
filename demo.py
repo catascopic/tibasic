@@ -1,10 +1,16 @@
 from environment import Environment
 from terminal import TerminalConsole
-from program import Program
 from test_tibasic import toks
 
-Program(toks("""
+def run_demo(source):
+	env = Environment(console=TerminalConsole())
+	env.programs['DEMO'] = toks(source)
+	env.run(toks('prgm DEMO'))
 
-Disp [[1/3,2/3][ pi , sqrt( 2
 
-"""), Environment(TerminalConsole())).run()
+if __name__ == '__main__':
+	run_demo("""
+
+Pause [[ pi , e^( 1
+	
+	""")

@@ -2,8 +2,7 @@ home vs console
 
 Timer-based indicator
 
-Program class for program table
-Program -> ProgramRunner
+I feels wrong to me that the program table in Environment is a dict of names to token lists. We should probably have some kind of "stored program" class that wraps the tokens and has an exec method. Also, what should the name of this program be? I feel like maybe it should get the name "Program" while the current thing that's called Program should be called Executor or something.  What do you think?
 
 QR: Fix version bump 5->6 when set explicitly
 

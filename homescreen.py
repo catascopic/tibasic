@@ -1,19 +1,24 @@
-# The character catalog token 0xBBDB renders as (display byte 0xCE, already
-# typeable=True) — what Disp truncates a too-long line with, as its 16th
-# column.  A bare literal here rather than importing it from catalog: catalog
-# imports environment, which imports HomeScreen, so importing back from
-# catalog would be circular; the glyph itself needs no other catalog machinery.
-_ELLIPSIS = '…'
+from titoken import decode
+
+# Display byte for '…' (0xCE) — what Disp truncates a too-long line with, as its
+# 16th column.  An empty cell holds 0x00, which decodes to a blank glyph.
+_ELLIPSIS = 0xCE
+_BLANK = 0x00
 
 
 class HomeScreen:
-	"""The TI home screen: a 16-column × 8-row grid of characters with a Disp cursor.
+	"""The TI home screen: a 16-column × 8-row grid of display bytes with a Disp cursor.
 
 	Pure state, like Graph — the I/O commands mutate it and a Console renders it.
-	Output( writes at an absolute (row, col), wrapping across rows; Disp appends
-	on the cursor line and truncates with an ellipsis instead of wrapping;
-	ClrHome wipes it.  Coordinates here are 0-indexed; the commands translate
-	from TI's 1-indexed Output(row, col) and validate the range.
+	Each cell holds one TI display byte (one glyph); an empty cell is 0x00.  Output(
+	writes at an absolute (row, col), wrapping across rows; Disp appends on the
+	cursor line and truncates with an ellipsis instead of wrapping; ClrHome wipes
+	it.  Coordinates here are 0-indexed; the commands translate from TI's 1-indexed
+	Output(row, col) and validate the range.
+
+	Text arrives as display bytes (from tiformat / token.display), so what's stored
+	is exactly what a canvas frontend draws through the font tables; render() decodes
+	it back to characters for the terminal frontend.
 	"""
 
 	ROWS = 8
@@ -23,25 +28,25 @@ class HomeScreen:
 		self.clear()
 
 	def clear(self) -> None:
-		self._cells = [[' '] * self.COLS for _ in range(self.ROWS)]
+		self._cells = [bytearray([_BLANK] * self.COLS) for _ in range(self.ROWS)]
 		self.cursor_row = 0
 
 	def _scroll(self) -> None:
 		"""Drop the top row and append a blank one at the bottom."""
 		self._cells.pop(0)
-		self._cells.append([' '] * self.COLS)
+		self._cells.append(bytearray([_BLANK] * self.COLS))
 
-	def output(self, row: int, col: int, text: str) -> None:
+	def output(self, row: int, col: int, text: bytes) -> None:
 		"""Write `text` from (row, col), wrapping to following rows and clipping at
 		the bottom edge — matching the calculator, which silently drops overflow."""
 		index = row * self.COLS + col
-		for ch in text:
+		for byte in text:
 			if index >= self.ROWS * self.COLS:
 				break
-			self._cells[index // self.COLS][index % self.COLS] = ch
+			self._cells[index // self.COLS][index % self.COLS] = byte
 			index += 1
 
-	def disp(self, text: str) -> None:
+	def disp(self, text: bytes) -> None:
 		"""Append `text` on the cursor line and drop to the next line, scrolling
 		the grid up once the bottom is passed.  A line too long for the 16
 		columns is truncated with an ellipsis as the 16th character, rather than
@@ -57,15 +62,16 @@ class HomeScreen:
 			self._scroll()
 			self.cursor_row = self.ROWS - 1
 		if len(text) > self.COLS:
-			text = text[:self.COLS - 1] + _ELLIPSIS
-		for col, ch in enumerate(text):
-			self._cells[self.cursor_row][col] = ch
+			text = text[:self.COLS - 1] + bytes([_ELLIPSIS])
+		row = self._cells[self.cursor_row]
+		for col, byte in enumerate(text):
+			row[col] = byte
 		self.cursor_row += 1
 		if self.cursor_row >= self.ROWS:
 			self._scroll()
 			self.cursor_row = self.ROWS - 1
 
-	def echo(self, text: str) -> None:
+	def echo(self, text: bytes) -> None:
 		"""Write `text` starting at the cursor, wrapping to the next row instead
 		of truncating, and leaving the cursor on a fresh line afterward.
 
@@ -78,11 +84,11 @@ class HomeScreen:
 		a trailing blank line.
 		"""
 		col = 0
-		for ch in text:
+		for byte in text:
 			if self.cursor_row >= self.ROWS:
 				self._scroll()
 				self.cursor_row = self.ROWS - 1
-			self._cells[self.cursor_row][col] = ch
+			self._cells[self.cursor_row][col] = byte
 			col += 1
 			if col >= self.COLS:
 				col = 0
@@ -92,7 +98,7 @@ class HomeScreen:
 
 	def render(self) -> str:
 		"""The grid as 8 lines of 16 characters (trailing blanks preserved)."""
-		return '\n'.join(''.join(row) for row in self._cells)
+		return '\n'.join(decode(bytes(row)) for row in self._cells)
 
 	def __str__(self) -> str:
 		return self.render()
