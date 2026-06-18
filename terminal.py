@@ -32,8 +32,12 @@ class Console(ABC):
 		"""Non-blocking: the TI key code currently pressed, or 0 for none (getKey)."""
 
 	@abstractmethod
-	def pause(self, home: HomeScreen) -> None:
-		"""Blocking: render `home` and wait for the user to continue (Pause)."""
+	def pause(self, home: HomeScreen, scroll=None) -> None:
+		"""Blocking: render `home` and wait for the user to continue (Pause).
+
+		`scroll`, when given, is a ScrollView for a paused list/matrix that overflows
+		the screen; a frontend may let the user page it with the arrow keys before
+		continuing.  Frontends that can't take key input just render its window."""
 
 	@abstractmethod
 	def choose(self, title: str, options: list[str]) -> int:
@@ -68,7 +72,9 @@ class ScriptedConsole(Console):
 	def read_key(self) -> int:
 		return self.keys.pop(0) if self.keys else 0
 
-	def pause(self, home: HomeScreen) -> None:
+	def pause(self, home: HomeScreen, scroll=None) -> None:
+		if scroll is not None:
+			scroll.render_into(home)
 		self.frames.append(home.render())
 
 	def choose(self, title: str, options: list[str]) -> int:
@@ -82,6 +88,10 @@ _RUNNING_SPINNER = '▙▛▜▟'	# one frame per redraw while idle-polling (get
 _FRAME_SECONDS = 0.1        # spinner redraw interval (~10 fps)
 _POLL_SECONDS = 0.01        # how often we check for a keypress within a frame
 _BOUNDARY = '░'
+
+# Extended scan-code letter (after the '\x00'/'\xe0' prefix) → scroll direction,
+# for paging a scrollable Pause value (see _poll_scroll_key).
+_ARROW_DIRECTIONS = {'H': 'up', 'P': 'down', 'K': 'left', 'M': 'right'}
 
 # Inverse video for the menu's title bar and the selected item's "N:" marker —
 # matches the real calculator showing the menu title in white-on-black.
@@ -242,7 +252,7 @@ class TerminalConsole(Console):
 		self._render(self._last_home, marker=_RUNNING_SPINNER[self._run_spin % len(_RUNNING_SPINNER)])
 		self._run_spin += 1
 
-	def pause(self, home: HomeScreen) -> None:
+	def pause(self, home: HomeScreen, scroll=None) -> None:
 		"""Animate the spinner in real time until Enter or Space is pressed.
 
 		Needs msvcrt for non-blocking key polling (Windows-only) AND a real
@@ -250,12 +260,19 @@ class TerminalConsole(Console):
 		not redirected stdin, so it would never see piped/redirected input and spin
 		forever.  In either unsupported case this falls back to one static frame
 		plus a plain blocking input(), which correctly reads from a pipe.
+
+		With a `scroll` (an overflowing list/matrix), the arrow keys page the view —
+		each frame re-renders the current window before painting — and Enter/Space
+		ends the Pause.  Without msvcrt/a terminal there's no scrolling: the initial
+		window is shown and a plain input() waits.
 		"""
 		try:
 			import msvcrt
 		except ImportError:
 			msvcrt = None
 		if msvcrt is None or not sys.stdin.isatty():
+			if scroll is not None:
+				scroll.render_into(home)
 			self._render(home, marker=_PAUSE_SPINNER[0])
 			with self._input_cursor():
 				input()
@@ -263,10 +280,34 @@ class TerminalConsole(Console):
 		# _paint keeps the cursor hidden while the spinner animates; no need to
 		# manage it here — it stays hidden until an Input or the program ends.
 		while True:
+			if scroll is not None:
+				scroll.render_into(home)
 			self._render(home, marker=_PAUSE_SPINNER[self._pause_spin % len(_PAUSE_SPINNER)])
 			self._pause_spin += 1
-			if self._wait_for_key(msvcrt, {'\r', ' '}):
-				return
+			if scroll is None:
+				if self._wait_for_key(msvcrt, {'\r', ' '}):
+					return
+			else:
+				key = self._poll_scroll_key(msvcrt)
+				if key == 'exit':
+					return
+				if key:
+					scroll.move(key)
+
+	def _poll_scroll_key(self, msvcrt):
+		"""Poll for up to _FRAME_SECONDS; return 'exit' (Enter/Space), a scroll
+		direction ('up'/'down'/'left'/'right'), or None if nothing relevant arrived.
+		"""
+		deadline = time.monotonic() + _FRAME_SECONDS
+		while time.monotonic() < deadline:
+			if msvcrt.kbhit():
+				ch = msvcrt.getwch()
+				if ch in ('\x00', '\xe0'):
+					return _ARROW_DIRECTIONS.get(msvcrt.getwch())   # see read_key: don't re-check kbhit
+				if ch in ('\r', ' '):
+					return 'exit'
+			time.sleep(_POLL_SECONDS)
+		return None
 
 	def _wait_for_key(self, msvcrt, accept: set[str]) -> bool:
 		"""Poll for up to _FRAME_SECONDS; return True if a key in `accept` arrived.

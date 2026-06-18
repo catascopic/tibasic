@@ -114,6 +114,24 @@ def output_text(value) -> bytes:
 
 # ── Disp / Pause : calculation-result style, right-aligned ────────────────────
 
+def value_lines(value) -> list[bytes]:
+	"""The full content line(s) for a value, in display bytes — unaligned and not
+	clipped to any width.
+
+	This is the raw form a scroll view pages a window over (see scrollview.py);
+	disp_lines right-aligns these onto the screen.  A list is one space-separated
+	line, a matrix one line per row with columns aligned, a scalar/string a single
+	line.
+	"""
+	if isinstance(value, TiString):
+		return [_string_bytes(value)]
+	if isinstance(value, TiList):
+		return [_LBRACE + _SPACE.join(_scalar_bytes(v) for v in value.data) + _RBRACE]
+	if isinstance(value, TiMatrix):
+		return _matrix_disp_lines(value)
+	return [_scalar_bytes(value)]
+
+
 def disp_lines(value, width: int) -> list[bytes]:
 	"""Render `value` as the screen line(s) Disp/Pause would show, in display bytes.
 
@@ -121,14 +139,9 @@ def disp_lines(value, width: int) -> list[bytes]:
 	its columns aligned.  Numbers, lists, and matrices are right-aligned to
 	`width`; strings are left-aligned (returned as-is, written from column 0).
 	"""
+	lines = value_lines(value)
 	if isinstance(value, TiString):
-		return [_string_bytes(value)]
-	if isinstance(value, TiList):
-		lines = [_LBRACE + _SPACE.join(_scalar_bytes(v) for v in value.data) + _RBRACE]
-	elif isinstance(value, TiMatrix):
-		lines = _matrix_disp_lines(value)
-	else:
-		lines = [_scalar_bytes(value)]
+		return lines           # strings sit at the left margin, never right-aligned
 	return _right_align(lines, width)
 
 

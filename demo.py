@@ -11,6 +11,6 @@ def run_demo(source):
 if __name__ == '__main__':
 	run_demo("""
 
-Pause [[ pi , e^( 1
+Pause randM( 10,10
 	
 	""")

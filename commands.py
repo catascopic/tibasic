@@ -7,9 +7,10 @@ from preparse import (
 )
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
-from core import TiString, StringVariable, py_int, require_string
+from core import TiString, TiList, TiMatrix, StringVariable, py_int, require_string
 from tiformat import output_text, disp_lines
 from titoken import encode
+from scrollview import ScrollView
 from errors import TiSyntaxError, DomainError
 
 ############
@@ -147,18 +148,26 @@ def zoom_rcl(env):
 def pause_cmd(args: ArgParser):
 	"""Pause [value] — show value (Disp-style), then block until Enter.
 
-	The optional value is stored to Ans (a real quirk: no other command does this).
-	ERR:INVALID outside a program, like Goto/Return/Stop.
+	A list or matrix too big for the screen becomes scrollable: the arrow keys
+	page through it (left/right always, up/down for a too-tall matrix) until Enter.
+	A value that fits is just shown Disp-style.  The optional value is stored to Ans
+	(a real quirk: no other command does this).  ERR:INVALID outside a program,
+	like Goto/Return/Stop.
 	"""
 	env = args.env
 	env.current_program()       # raises ERR:INVALID outside a program
+	scroll = None
 	if args.has_next:
 		value = args.expr()
-		for line in disp_lines(value, env.home.COLS):
-			env.home.disp(line)
 		env.ans = value
+		view = ScrollView(value) if isinstance(value, (TiList, TiMatrix)) else None
+		if view is not None and view.scrollable:
+			scroll = view          # the console owns rendering (windowed + indicators)
+		else:
+			for line in disp_lines(value, env.home.COLS):
+				env.home.disp(line)
 	args.end_cmd()
-	env.console.pause(env.home)
+	env.console.pause(env.home, scroll)
 
 
 def _tokenize_input(text: str) -> list:
