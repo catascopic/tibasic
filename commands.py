@@ -90,7 +90,7 @@ def del_var(var: AnyVar):
 	whatever follows: DelVar ADelVar B and DelVar ADisp X are both valid on the
 	same line.  Does not update Ans.
 	"""
-	var.value = None
+	var.delete()
 
 @special_func
 def disp(args: ArgParser):

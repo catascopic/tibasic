@@ -523,6 +523,11 @@ class Variable(ABC):
 	def store(self, new_value) -> None:
 		self.value = self.normalize(new_value)
 
+	def delete(self) -> None:
+		"""Clear this variable (DelVar).  Most variables just drop their value;
+		those backed by external storage (e.g. UserList) override this."""
+		self.value = None
+
 	@abstractmethod
 	def normalize(self, value) -> Any:
 		pass
@@ -589,10 +594,10 @@ class UserList(ListVariable):
 
 	@value.setter
 	def value(self, new_value):
-		if new_value is None:
-			self.lookup.pop(self.name, None)
-		else:
-			self.lookup[self.name] = new_value
+		self.lookup[self.name] = new_value
+
+	def delete(self) -> None:
+		self.lookup.pop(self.name, None)
 
 	def resolve(self) -> Any:
 		try:
