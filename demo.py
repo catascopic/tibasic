@@ -5,6 +5,8 @@ from test_tibasic import toks
 
 Program(toks("""
 
-Disp [[1,2]][3.33,4
+For( A,1,10
+Disp A[[1,2][3.25,4
+End
 
 """), Environment(TerminalConsole())).run()

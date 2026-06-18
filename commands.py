@@ -7,8 +7,8 @@ from preparse import (
 )
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
-from core import TiString, TiList, TiMatrix, StringVariable, py_int, require_string
-from numberformat import ti83_format
+from core import TiString, StringVariable, py_int, require_string
+from tiformat import output_text, disp_lines
 from errors import TiSyntaxError, DataTypeError, DomainError
 
 ############
@@ -92,74 +92,15 @@ def del_var(var: AnyVar):
 	"""
 	var.value = None
 
-def _home_text(value) -> str:
-	"""The home-screen string for a scalar real number or string.
-
-	Used by Output(/Pause, which — like the real calculator — only ever write a
-	single value to a single screen position; a list or matrix has no sensible
-	single-cell rendering there.  Disp uses the richer _home_lines instead.
-	"""
-	if isinstance(value, float):
-		return ti83_format(value)
-	if isinstance(value, TiString):
-		return str(value)
-	raise DataTypeError(f"expected a real number or string, got {type(value).__name__}")
-
-
-def _format_complex(value: complex) -> str:
-	"""a+bi / a-bi, TI's complex notation.  The imaginary coefficient is always
-	shown explicitly (1i, not a bare i), and the real part is dropped only when
-	it's exactly zero."""
-	im = ti83_format(abs(value.imag))
-	sign = '-' if value.imag < 0 else '+'
-	if value.real == 0:
-		return f"{sign if value.imag < 0 else ''}{im}i"
-	return f"{ti83_format(value.real)}{sign}{im}i"
-
-
-def _format_scalar(value) -> str:
-	"""Real or complex scalar, as TI would show it — the shared piece between a
-	bare value and one element of a list."""
-	return _format_complex(value) if isinstance(value, complex) else ti83_format(value)
-
-
-def _format_ti_list(lst: TiList) -> str:
-	"""{a b c}, TI's list notation — elements are space-separated, not comma."""
-	return '{' + ' '.join(_format_scalar(v) for v in lst.data) + '}'
-
-
-def _format_matrix_lines(mat: TiMatrix) -> list[str]:
-	"""One line per row, with the outer/inner bracket nesting TI uses for a
-	multi-row matrix: [[1 2]    , closing on the last row:     [3 4]]
-	The exact column spacing is an approximation, not a verified hardware match.
-	"""
-	for i, row in enumerate(mat.data):
-		yield f"{'[' if i == 0 else ' '}[{' '.join(ti83_format(v) for v in row)}]{']' if i == mat.rows - 1 else ''}"
-
-
-def _home_lines(value):
-	"""The home-screen line(s) for any TI value — Disp can show every real data
-	type (reals, complex, strings, lists, matrices).  Scalars/strings/lists are
-	one line; a matrix is one line per row.
-	"""
-	if isinstance(value, complex):
-		yield _format_complex(value)
-	elif isinstance(value, TiList):
-		yield _format_ti_list(value)
-	elif isinstance(value, TiMatrix):
-		yield from _format_matrix_lines(value)
-	else:
-		yield _home_text(value)
-
-
 @special_func
 def disp(args: ArgParser):
 	"""Disp [value[,value...]] — append each value to the home screen (no args just
-	re-renders it).  Every real TI data type is supported; a matrix prints one
-	line per row."""
+	re-renders it).  Every TI data type is supported; numbers, lists, and matrices
+	are right-aligned (a matrix prints one line per row) while strings are
+	left-aligned."""
 	home = args.env.home
 	while args.has_next:
-		for line in _home_lines(args.expr()):
+		for line in disp_lines(args.expr(), home.COLS):
 			home.disp(line)
 	args.end_cmd()
 	args.env.console.update(home)
@@ -167,14 +108,18 @@ def disp(args: ArgParser):
 
 @special_func
 def output(args: ArgParser):
-	"""Output(row, col, value) — write value at a fixed 1-indexed home-screen cell."""
+	"""Output(row, col, value) — write value at a fixed 1-indexed home-screen cell.
+
+	The value is rendered linearly (as you'd type it): lists/matrices use comma
+	separators and a matrix is inlined onto the single starting position, wrapping
+	across cells from there."""
 	row = py_int(args.expr())
 	col = py_int(args.expr())
 	value = args.expr()
 	args.end_paren_cmd()
 	if not (1 <= row <= args.env.home.ROWS and 1 <= col <= args.env.home.COLS):
 		raise DomainError(f"Output(: position out of range: ({row}, {col})")
-	args.env.home.output(row - 1, col - 1, _home_text(value))
+	args.env.home.output(row - 1, col - 1, output_text(value))
 	args.env.console.update(args.env.home)
 
 
@@ -196,7 +141,12 @@ def pause_cmd(args: ArgParser):
 	env.current_program()       # raises ERR:INVALID outside a program
 	if args.has_next:
 		value = args.expr()
-		env.home.disp(_home_text(value))
+		# Pause writes to a single screen position, so — unlike Disp — it only
+		# accepts a scalar real or a string, not a complex/list/matrix.
+		if not isinstance(value, (float, TiString)):
+			raise DataTypeError(f"Pause: expected a real number or string, got {type(value).__name__}")
+		for line in disp_lines(value, env.home.COLS):
+			env.home.disp(line)
 		env.ans = value
 	args.end_cmd()
 	env.console.pause(env.home)

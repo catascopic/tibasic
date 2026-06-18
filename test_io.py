@@ -137,30 +137,36 @@ def _line(env, n):
 
 
 class TestDisp:
-	def test_number(self):
-		assert _line(run('Disp 5'), 0).startswith('5')
+	def test_number_right_aligned(self):
+		assert _line(run('Disp 5'), 0) == '5'.rjust(16)
 
-	def test_string(self):
+	def test_string_left_aligned(self):
 		assert _line(run('Disp "HELLO'), 0) == 'HELLO' + ' ' * 11
 
 	def test_multiple_values_stack(self):
 		env = run('Disp 1 : Disp 2')
-		assert _line(env, 0).startswith('1') and _line(env, 1).startswith('2')
+		assert _line(env, 0) == '1'.rjust(16) and _line(env, 1) == '2'.rjust(16)
 
-	def test_complex(self):
-		assert _line(run('Disp 3+4i'), 0).startswith('3+4i')
+	def test_complex_right_aligned(self):
+		assert _line(run('Disp 3+4i'), 0) == '3+4i'.rjust(16)
 
 	def test_pure_imaginary_drops_zero_real_part(self):
-		assert _line(run('Disp i'), 0).startswith('1i')
+		assert _line(run('Disp i'), 0) == '1i'.rjust(16)
 
-	def test_list(self):
-		assert _line(run('Disp {1,2,3}'), 0).startswith('{1 2 3}')
+	def test_list_space_separated_right_aligned(self):
+		assert _line(run('Disp {1,2,3}'), 0) == '{1 2 3}'.rjust(16)
 
 	def test_matrix_one_line_per_row(self):
 		env = run('Disp [[1,2][3,4]]')
-		assert _line(env, 0).startswith('[[1 2]')
-		assert _line(env, 1).startswith(' [3 4]]')
+		# Block right-aligned: both rows indented equally (16 - 7) so columns/brackets line up.
+		assert _line(env, 0).rstrip() == ' ' * 9 + '[[1 2]'
+		assert _line(env, 1)          == ' ' * 9 + ' [3 4]]'
 
+	def test_matrix_columns_left_aligned_to_common_width(self):
+		# Columns are padded to their widest entry, left-justified, ignoring magnitude.
+		env = run('Disp [[1,22][333,4]]')
+		assert _line(env, 0).rstrip() == ' ' * 6 + '[[1   22]'
+		assert _line(env, 1)          == ' ' * 6 + ' [333 4 ]]'
 
 	def test_each_disp_renders_a_frame(self):
 		env = run('Disp 1 : Disp 2')
@@ -173,6 +179,14 @@ class TestOutput:
 
 	def test_one_indexed_top_left(self):
 		assert _line(run('Output( 1,1,9'), 0).startswith('9')
+
+	def test_list_comma_separated_not_aligned(self):
+		# Output renders a list the way you'd type it: commas, no padding.
+		assert _line(run('Output( 1,1,{1,2,3}'), 0).startswith('{1,2,3}')
+
+	def test_matrix_inline_comma_separated(self):
+		# A matrix is written linearly with comma separators and no spaces.
+		assert _line(run('Output( 1,1,[[1,2][3,4]]'), 0).startswith('[[1,2][3,4]]')
 
 	def test_row_out_of_range_raises(self):
 		with pytest.raises(DomainError): run('Output( 9,1,5')
@@ -196,7 +210,7 @@ class TestPause:
 
 	def test_value_displayed_like_disp(self):
 		env = run_program('Pause 5')
-		assert env.home.render().split('\n')[0].startswith('5')
+		assert env.home.render().split('\n')[0] == '5'.rjust(16)
 
 	def test_value_stored_to_ans(self):
 		assert run_program('Pause 5').ans == 5
