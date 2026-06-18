@@ -1,10 +1,4 @@
-errors.TiSyntaxError: Expected 0x6, got 0x33:'3'
-Would an IntEnum solve this?
-Or should we import catalog at this point
-
 home vs console
-
-Cursor blinking while running
 
 Timer-based indicator
 
@@ -16,8 +10,6 @@ QR: Fix version bump 5->6 when set explicitly
 Spinner doesn't spin without getkey
 
 "Done" When program finishes or ans if the last line produced a result
-
-Is Decimal round really necessary in timath?
 
 _REGISTRY: ArgSpec repr name
 
@@ -36,6 +28,8 @@ UserList to Environment
 TiProgram: require uppercase for writing
 
 rework typeable!
+
+Here's how all the window variables work. Please implement these side effects.
 
 Xmin, Xmax, Ymin, Ymax — determine the lower and upper X and Y bounds of the graph screen itself.
 ΔX, ΔY — defined to be (Xmax-Xmin)/94 and (Ymax-Ymin)/62 respectively; storing to them will change Xmax and Ymax to arrange this.
@@ -78,11 +72,11 @@ TODO:
 StorePic RecallPic StoreGDB RecallGDB
 Modes: Horiz Full IndpntAuto IndpntAsk DependAuto DependAsk Time Web
 Finance: tvm_Pmt tvm_I% tvm_PV tvm_N tvm_FV Pmt_End Pmt_Bgn
-I/O: Disp, Pause, Input, Prompt, Output(, ClrHome, Menu(, getKey,
 
 DispTable, DispGraph
 χ²-Test??? It has a weird display
 
+Is Decimal round really necessary in timath?
 
 ********
 

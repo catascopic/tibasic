@@ -130,6 +130,18 @@ def clr_home(env):
 	env.console.update(env.home)
 
 
+@no_arg_command
+def zoom_sto(env):
+	"""ZoomSto — save the current window into the Zoom memory."""
+	env.zoom_store()
+
+
+@no_arg_command
+def zoom_rcl(env):
+	"""ZoomRcl — restore the window saved by the last ZoomSto."""
+	env.zoom_recall()
+
+
 @special_func
 def pause_cmd(args: ArgParser):
 	"""Pause [value] — show value (Disp-style), then block until Enter.

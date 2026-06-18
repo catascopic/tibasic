@@ -269,6 +269,9 @@ token(0x623C, b'MS')        # Error MS
 def _window_getter(attr: str):
 	return lambda env: getattr(env.window, attr)
 
+def _table_getter(attr: str):
+	return lambda env: getattr(env.table, attr)
+
 token(0x6302, b'Xscl',                  var=_window_getter('xscl'))
 token(0x6303, b'Yscl',                  var=_window_getter('yscl'))
 token(0x630A, b'Xmin',                  var=_window_getter('xmin'))
@@ -279,11 +282,11 @@ token(0x630E, b'Tmin',                  var=_window_getter('tmin'))
 token(0x630F, b'Tmax',                  var=_window_getter('tmax'))
 token(0x6310, b'\x5bmin',               var=_window_getter('theta_min'))   # θmin
 token(0x6311, b'\x5bmax',               var=_window_getter('theta_max'))   # θmax
-token(0x631A, b'TblStart',              var=_window_getter('tbl_start'))
+token(0x631A, b'TblStart',              var=_table_getter('tbl_start'))
 token(0x631B, b'PlotStart',             var=_window_getter('plot_start'))
 token(0x631D, b'nMax',                  var=_window_getter('n_max'))
 token(0x631F, b'nMin',                  var=_window_getter('n_min'))
-token(0x6321, b'\xbeTbl',               var=_window_getter('delta_tbl'))   # ΔTbl
+token(0x6321, b'\xbeTbl',               var=_table_getter('delta_tbl'))    # ΔTbl
 token(0x6322, b'Tstep',                 var=_window_getter('tstep'))
 token(0x6323, b'\x5bstep',              var=_window_getter('theta_step'))  # θstep
 token(0x6326, b'\xbeX',                 var=_window_getter('delta_x'))     # ΔX
@@ -367,9 +370,9 @@ token(0x8C, b'ZInteger')
 token(0x8D, b'ZPrevious')
 token(0x8E, b'ZDecimal')
 token(0x8F, b'ZoomStat')
-token(0x90, b'ZoomRcl')
+token(0x90, b'ZoomRcl',                 cmd=cmds.zoom_rcl)
 token(0x91, b'PrintScreen')
-token(0x92, b'ZoomSto')
+token(0x92, b'ZoomSto',                 cmd=cmds.zoom_sto)
 token(0x93, b'Text(',                   cmd=draw.text)
 token(0x94, b'nPr',                     bp=(60, 61), op=ops.npr)
 token(0x95, b'nCr',                     bp=(60, 61), op=ops.ncr)

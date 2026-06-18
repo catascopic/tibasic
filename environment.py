@@ -6,7 +6,7 @@ from datetime import datetime, date, timedelta
 from typing import Any, ClassVar
 
 from core import TiList, is_complex_val
-from core import Variable, NumericVariable, RealVariable, ListVariable, UserList, MatrixVariable, StringVariable, EquationVariable, require_real, py_int
+from core import Variable, NumericVariable, RealVariable, ListVariable, UserList, MatrixVariable, StringVariable, EquationVariable, require_real, require_int, py_int
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 from graph import Graph
@@ -49,8 +49,14 @@ class Environment:
 		self.dt_fmt        = 1
 		self.tm_fmt        = 12
 		self.clock_on      = True
-		# Window / graphing variables (Xscl, Xmin, Xmax, …)
-		self.window = WindowVars()
+		# Window / graphing variables (Xscl, Xmin, Xmax, …) plus the hidden Z-copy
+		# that ZoomSto/ZoomRcl snapshot and restore (the "Z" system vars aren't
+		# separate variables — they're a saved Window).
+		self.window = Window()
+		self.zoom_window = Window()
+		# Table-screen variables (TblStart, ΔTbl, TblInput).  The table itself isn't
+		# implemented, but programs can still store to and read these back.
+		self.table = TableVars()
 		# LCD pixel buffer (used by Pxl-/Pt-/Line/etc. drawing commands)
 		self.graph = Graph()
 		# Home screen (16×8 char grid) and the I/O frontend that renders it
@@ -128,6 +134,18 @@ class Environment:
 
 	def set_random_seed(self, value):
 		random.seed(require_real(value))
+
+	# ── Zoom memory (ZoomSto / ZoomRcl) ──────────────────────────────────────────
+	# The Z-window system variables (ZXmin, Zθstep, …) are a saved snapshot of the
+	# whole window rather than separate variables.
+
+	def zoom_store(self):
+		"""ZoomSto — save the current window into the Zoom memory."""
+		self.zoom_window = self.window.copy()
+
+	def zoom_recall(self):
+		"""ZoomRcl — restore the window saved by the last ZoomSto."""
+		self.window = self.zoom_window.copy()
 
 	# ── Virtual clock ────────────────────────────────────────────────────────────
 
@@ -228,33 +246,130 @@ class Environment:
 
 # ── Window variables ──────────────────────────────────────────────────────────
 
-class WindowVars:
-	"""Named storage for all TI-84 window/graphing variables."""
+class _DeltaVariable(RealVariable):
+	"""ΔX / ΔY — not stored, but derived from the window bounds as
+	(hi − lo) / divisions.  Storing one adjusts `hi` (keeping `lo` and the pixel
+	count fixed) so the relation holds, matching the calculator.
+
+	Holds a back-reference to its Window so it can read `lo` and write `hi`; this
+	is the only window variable that touches its siblings, so it's the only one
+	that needs the reference.
+	"""
+
+	def __init__(self, window: "Window", lo_attr: str, hi_attr: str, divisions: int):
+		self.window = window
+		self.lo_attr = lo_attr
+		self.hi_attr = hi_attr
+		self.divisions = divisions
+
+	def resolve(self):
+		lo = getattr(self.window, self.lo_attr).resolve()
+		hi = getattr(self.window, self.hi_attr).resolve()
+		return (hi - lo) / self.divisions
+
+	def store(self, new_value) -> None:
+		delta = require_real(new_value)
+		lo = getattr(self.window, self.lo_attr).resolve()
+		getattr(self.window, self.hi_attr).store(lo + self.divisions * delta)
+
+
+class _IntWindowVariable(RealVariable):
+	"""A window variable constrained to whole numbers (nMin, nMax)."""
+
+	def normalize(self, value):
+		return require_int(value)
+
+
+class _XresVariable(RealVariable):
+	"""Xres — Function-graph resolution; an integer 1–8."""
+
+	def normalize(self, value):
+		v = require_int(value)
+		if not (1 <= v <= 8):
+			raise DomainError(f"Xres must be an integer 1-8, got {v:g}")
+		return v
+
+
+class _FactorVariable(RealVariable):
+	"""XFact / YFact — Zoom In/Out scaling factors; must be ≥ 1."""
+
+	def normalize(self, value):
+		v = require_real(value)
+		if v < 1:
+			raise DomainError(f"Zoom factor must be ≥ 1, got {v:g}")
+		return v
+
+
+class Window:
+	"""The TI graph/window variables — everything that defines a graphing setup.
+
+	Most are plain RealVariables; the ones with side effects use the variable
+	subclasses above (ΔX/ΔY derived, Xres/nMin/nMax integers, XFact/YFact ≥ 1).
+	`copy()` snapshots it for the Zoom memory (see Environment.zoom_store).
+	"""
+
+	# The independently-stored variables — what copy() snapshots.  ΔX/ΔY are
+	# omitted: they're derived from the bounds, so a snapshot of the bounds carries
+	# them implicitly.
+	_STORED = (
+		'xmin', 'xmax', 'ymin', 'ymax', 'xscl', 'yscl', 'xres',
+		'tmin', 'tmax', 'tstep', 'theta_min', 'theta_max', 'theta_step',
+		'n_min', 'n_max', 'plot_start', 'plot_step',
+		'u_nmin', 'v_nmin', 'w_nmin', 'x_fact', 'y_fact',
+	)
 
 	def __init__(self):
-		self.xscl       = RealVariable(1.0)
-		self.yscl       = RealVariable(1.0)
+		# Screen bounds and axis scales
 		self.xmin       = RealVariable(-10.0)
 		self.xmax       = RealVariable(10.0)
 		self.ymin       = RealVariable(-10.0)
 		self.ymax       = RealVariable(10.0)
+		self.xscl       = RealVariable(1.0)
+		self.yscl       = RealVariable(1.0)
+		self.xres       = _XresVariable(1.0)
+		# ΔX/ΔY: derived from the bounds (94 columns / 62 rows of intervals)
+		self.delta_x    = _DeltaVariable(self, 'xmin', 'xmax', 94)
+		self.delta_y    = _DeltaVariable(self, 'ymin', 'ymax', 62)
+		# Parametric (T) and polar (θ) sweep ranges
 		self.tmin       = RealVariable()
 		self.tmax       = RealVariable()
+		self.tstep      = RealVariable()
 		self.theta_min  = RealVariable()
 		self.theta_max  = RealVariable()
-		self.tbl_start  = RealVariable()
-		self.plot_start = RealVariable(1.0)
-		self.n_max      = RealVariable(10.0)
-		self.n_min      = RealVariable(1.0)
-		self.delta_tbl  = RealVariable(1.0)
-		self.tstep      = RealVariable()
 		self.theta_step = RealVariable()
-		self.delta_x    = RealVariable()
-		self.delta_y    = RealVariable()
-		self.x_fact     = RealVariable(4.0)
-		self.y_fact     = RealVariable(4.0)
+		# Sequence (n) range — integers — and which n values are graphed
+		self.n_min      = _IntWindowVariable(1.0)
+		self.n_max      = _IntWindowVariable(10.0)
+		self.plot_start = RealVariable(1.0)
 		self.plot_step  = RealVariable(1.0)
-		self.xres       = RealVariable(1.0)
+		# Recursive sequence initial conditions: u(nMin), v(nMin), w(nMin)
+		self.u_nmin     = RealVariable()
+		self.v_nmin     = RealVariable()
+		self.w_nmin     = RealVariable()
+		# Zoom In/Out factors
+		self.x_fact     = _FactorVariable(4.0)
+		self.y_fact     = _FactorVariable(4.0)
+
+	def copy(self) -> "Window":
+		"""A snapshot of the stored window variables (for ZoomSto/ZoomRcl).
+
+		Copies raw values, not the Variable objects, so the clone's derived ΔX/ΔY
+		stay bound to the clone rather than the original.
+		"""
+		clone = Window()
+		for name in self._STORED:
+			getattr(clone, name).value = getattr(self, name).value
+		return clone
+
+
+class TableVars:
+	"""Table-screen variables.  The table feature isn't implemented; these exist
+	only so programs can store to and read them back."""
+
+	def __init__(self):
+		self.tbl_start = RealVariable()       # TblStart
+		self.delta_tbl = RealVariable(1.0)    # ΔTbl
+		self.tbl_input = ListVariable()       # TblInput — a 7-element list
 
 
 class ReturnSignal(Exception):
