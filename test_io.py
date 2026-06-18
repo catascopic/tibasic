@@ -229,8 +229,14 @@ class TestPause:
 	def test_outside_program_raises(self):
 		with pytest.raises(InvalidCommandError): run('Pause')
 
-	def test_complex_value_raises(self):
-		with pytest.raises(DataTypeError): run_program('Pause i')
+	def test_complex_displayed_like_disp(self):
+		# Pause shows any value Disp can — including complex, right-aligned.
+		env = run_program('Pause 3+4i')
+		assert env.home.render().split('\n')[0] == '3+4i'.rjust(16)
+
+	def test_list_displayed_like_disp(self):
+		env = run_program('Pause {1,2,3}')
+		assert env.home.render().split('\n')[0] == '{1 2 3}'.rjust(16)
 
 
 _MENU_PROG = """Menu( "PICK","ONE",A,"TWO",B
@@ -385,5 +391,5 @@ class TestScriptedConsole:
 		assert (c.read_key(), c.read_key(), c.read_key()) == (25, 34, 0)
 
 	def test_read_value_without_input_errors(self):
-		with pytest.raises(RuntimeError):
+		with pytest.raises(ValueError):
 			ScriptedConsole().read_value('?', HomeScreen())

@@ -9,7 +9,7 @@ from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, StringVariable, py_int, require_string
 from tiformat import output_text, disp_lines
-from errors import TiSyntaxError, DataTypeError, DomainError
+from errors import TiSyntaxError, DomainError
 
 ############
 # PROGRAMS #
@@ -141,10 +141,6 @@ def pause_cmd(args: ArgParser):
 	env.current_program()       # raises ERR:INVALID outside a program
 	if args.has_next:
 		value = args.expr()
-		# Pause writes to a single screen position, so — unlike Disp — it only
-		# accepts a scalar real or a string, not a complex/list/matrix.
-		if not isinstance(value, (float, TiString)):
-			raise DataTypeError(f"Pause: expected a real number or string, got {type(value).__name__}")
 		for line in disp_lines(value, env.home.COLS):
 			env.home.disp(line)
 		env.ans = value

@@ -12,6 +12,7 @@ block the browser), read_value / read_key / pause / choose are the hooks to yiel
 import sys
 import time
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 
 from homescreen import HomeScreen
 
@@ -90,6 +91,13 @@ _INV_OFF = '\033[27m'
 class TerminalConsole(Console):
 	"""Interactive command-line console for quick prototyping."""
 
+	# The terminal's hardware cursor is kept hidden the whole time a program runs
+	# (it would otherwise blink in the bottom-left corner where _paint parks it),
+	# and revealed only while an input() is actually collecting keystrokes and once
+	# the program finishes.  Class-level default so a bare __new__ instance (used
+	# in menu-rendering tests) still has a sane value.
+	_cursor_hidden = False
+
 	def __init__(self):
 		if sys.platform == 'win32':
 			_enable_windows_vt()
@@ -140,14 +148,40 @@ class TerminalConsole(Console):
 		framed.append(_BOUNDARY * (HomeScreen.COLS + 2))
 		frame = '\033[H' + '\n'.join(f'{row}\033[K' for row in framed) + '\033[J\n'
 		sys.stdout.write(frame)
+		self._hide_cursor()   # every painted frame is "program running" → no cursor
 		sys.stdout.flush()
+
+	def _hide_cursor(self) -> None:
+		if not self._cursor_hidden:
+			sys.stdout.write('\033[?25l')
+			self._cursor_hidden = True
+
+	def _show_cursor(self) -> None:
+		if self._cursor_hidden:
+			sys.stdout.write('\033[?25h')
+			self._cursor_hidden = False
+
+	@contextmanager
+	def _input_cursor(self):
+		"""Reveal the cursor for the duration of an input() call, then hide it again
+		so the program runs on with no blinking cursor."""
+		self._show_cursor()
+		sys.stdout.flush()
+		try:
+			yield
+		finally:
+			self._hide_cursor()
+			sys.stdout.flush()
 
 	def finish(self, home: HomeScreen) -> None:
 		self._render(home)
+		self._show_cursor()   # program's done — hand the cursor back to the terminal
+		sys.stdout.flush()
 
 	def read_value(self, prompt: str, home: HomeScreen) -> str:
 		self._render(home)  # repaint without indicator before blocking on input
-		return input(prompt)
+		with self._input_cursor():
+			return input(prompt)
 
 	def read_key(self) -> int:
 		"""Best-effort non-blocking poll; returns 0 where the platform has no support.
@@ -223,19 +257,16 @@ class TerminalConsole(Console):
 			msvcrt = None
 		if msvcrt is None or not sys.stdin.isatty():
 			self._render(home, marker=_PAUSE_SPINNER[0])
-			input()
+			with self._input_cursor():
+				input()
 			return
-		sys.stdout.write('\033[?25l')   # hide the text cursor while animating
-		sys.stdout.flush()
-		try:
-			while True:
-				self._render(home, marker=_PAUSE_SPINNER[self._pause_spin % len(_PAUSE_SPINNER)])
-				self._pause_spin += 1
-				if self._wait_for_key(msvcrt, {'\r', ' '}):
-					return
-		finally:
-			sys.stdout.write('\033[?25h')   # restore the cursor
-			sys.stdout.flush()
+		# _paint keeps the cursor hidden while the spinner animates; no need to
+		# manage it here — it stays hidden until an Input or the program ends.
+		while True:
+			self._render(home, marker=_PAUSE_SPINNER[self._pause_spin % len(_PAUSE_SPINNER)])
+			self._pause_spin += 1
+			if self._wait_for_key(msvcrt, {'\r', ' '}):
+				return
 
 	def _wait_for_key(self, msvcrt, accept: set[str]) -> bool:
 		"""Poll for up to _FRAME_SECONDS; return True if a key in `accept` arrived.
@@ -270,34 +301,32 @@ class TerminalConsole(Console):
 			print(title)
 			for i, option in enumerate(options, 1):
 				print(f'{i}: {option}')
-			while True:
-				try:
-					choice = int(input('> '))
-				except ValueError:
-					continue
-				if 1 <= choice <= len(options):
-					return choice - 1
+			with self._input_cursor():
+				while True:
+					try:
+						choice = int(input('> '))
+					except ValueError:
+						continue
+					if 1 <= choice <= len(options):
+						return choice - 1
 		selected = 0
-		sys.stdout.write('\033[?25l')
-		sys.stdout.flush()
-		try:
-			while True:
-				marker = _PAUSE_SPINNER[self._pause_spin % len(_PAUSE_SPINNER)]
-				self._paint(self._menu_rows(title, options, selected), marker)
-				self._pause_spin += 1
-				result = self._poll_menu_key(msvcrt, len(options))
-				if result is None:
-					continue
-				if result == 'up':
-					selected = (selected - 1) % len(options)
-				elif result == 'down':
-					selected = (selected + 1) % len(options)
-				elif result == 'enter':
-					return selected
-				else:                # a number key: direct, immediate selection
-					return result
-		finally:
-			sys.stdout.write('\033[?25h')
+		# _paint keeps the cursor hidden while the menu animates; like Pause, the
+		# menu never collects keystrokes through input(), so it stays hidden.
+		while True:
+			marker = _PAUSE_SPINNER[self._pause_spin % len(_PAUSE_SPINNER)]
+			self._paint(self._menu_rows(title, options, selected), marker)
+			self._pause_spin += 1
+			result = self._poll_menu_key(msvcrt, len(options))
+			if result is None:
+				continue
+			if result == 'up':
+				selected = (selected - 1) % len(options)
+			elif result == 'down':
+				selected = (selected + 1) % len(options)
+			elif result == 'enter':
+				return selected
+			else:                # a number key: direct, immediate selection
+				return result
 			sys.stdout.flush()
 
 	def _menu_rows(self, title: str, options: list[str], selected: int) -> list:
