@@ -46,6 +46,7 @@ _ALIASES = {
 	'asinh(': 0xC9, 'acosh(': 0xCB, 'atanh(': 0xCD,
 	# Sequence variables that would be filtered out otherwise
 	'n': 0x6221, 'u': 0x5E80, 'v': 0x5E81, 'w': 0x5E82,
+	'pi': 0xAC,
 }
 
 def _create_lookup():
