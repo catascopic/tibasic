@@ -16,6 +16,21 @@ from core import Variable, Thunk, UserList, py_int, require_num, require_real
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError
 
 
+def _describe_code(code: int) -> str:
+	"""Render a bare token code for an error message — its glyph (e.g. "'['") when
+	the code is in the catalog, else the raw hex.
+
+	catalog is imported lazily: catalog → commands → parser, so importing it at
+	module load would cycle.  By the time a parse error is raised catalog is fully
+	loaded, and this only runs on the (rare) error path.
+	"""
+	from catalog import get_token
+	try:
+		return repr(get_token(code))
+	except (KeyError, IndexError):
+		return f"0x{code:X}"
+
+
 class Parser:
 
 	def __init__(self, tokens: list[Token], env: Environment):
@@ -58,7 +73,7 @@ class Parser:
 
 	def expect(self, code: int) -> None:
 		if self.peek().code != code:
-			raise TiSyntaxError(f"Expected 0x{code:X}, got {self.peek()}")
+			raise TiSyntaxError(f"Expected {_describe_code(code)}, got {self.peek()}")
 		self.pos += 1
 
 	def end_statement(self):
@@ -73,7 +88,7 @@ class Parser:
 		if self.eat_if(expected):
 			return True
 		if self.peek().code == R_PAREN:
-			raise TiSyntaxError(f"Mismatched delimiter: expected 0x{expected:X}, got ')'")
+			raise TiSyntaxError(f"Mismatched delimiter: expected {_describe_code(expected)}, got ')'")
 		return False
 
 	# ── Sub-parsers ────────────────────────────────────────────────────────────
