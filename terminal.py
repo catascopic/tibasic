@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
 from homescreen import HomeScreen
+from scrollview import ScrollView
 
 
 class Console(ABC):
@@ -32,12 +33,13 @@ class Console(ABC):
 		"""Non-blocking: the TI key code currently pressed, or 0 for none (getKey)."""
 
 	@abstractmethod
-	def pause(self, home: HomeScreen, scroll=None) -> None:
+	def pause(self, home: HomeScreen, value=None) -> None:
 		"""Blocking: render `home` and wait for the user to continue (Pause).
 
-		`scroll`, when given, is a ScrollView for a paused list/matrix that overflows
-		the screen; a frontend may let the user page it with the arrow keys before
-		continuing.  Frontends that can't take key input just render its window."""
+		`value` is the paused value (already rendered onto `home` Disp-style).  A
+		frontend may offer to page it with the arrow keys when it's a list/matrix too
+		big for the screen — `ScrollView.of(value)` decides that; frontends that can't
+		take key input just render the initial window."""
 
 	@abstractmethod
 	def choose(self, title: str, options: list[str]) -> int:
@@ -72,9 +74,9 @@ class ScriptedConsole(Console):
 	def read_key(self) -> int:
 		return self.keys.pop(0) if self.keys else 0
 
-	def pause(self, home: HomeScreen, scroll=None) -> None:
-		if scroll is not None:
-			scroll.render_into(home)
+	def pause(self, home: HomeScreen, value=None) -> None:
+		if view := ScrollView.of(value):
+			view.render_into(home)
 		self.frames.append(home.render())
 
 	def choose(self, title: str, options: list[str]) -> int:
@@ -252,7 +254,7 @@ class TerminalConsole(Console):
 		self._render(self._last_home, marker=_RUNNING_SPINNER[self._run_spin % len(_RUNNING_SPINNER)])
 		self._run_spin += 1
 
-	def pause(self, home: HomeScreen, scroll=None) -> None:
+	def pause(self, home: HomeScreen, value=None) -> None:
 		"""Animate the spinner in real time until Enter or Space is pressed.
 
 		Needs msvcrt for non-blocking key polling (Windows-only) AND a real
@@ -261,18 +263,19 @@ class TerminalConsole(Console):
 		forever.  In either unsupported case this falls back to one static frame
 		plus a plain blocking input(), which correctly reads from a pipe.
 
-		With a `scroll` (an overflowing list/matrix), the arrow keys page the view —
-		each frame re-renders the current window before painting — and Enter/Space
-		ends the Pause.  Without msvcrt/a terminal there's no scrolling: the initial
-		window is shown and a plain input() waits.
+		When `value` overflows the screen (ScrollView.of returns a view), the arrow
+		keys page it — each frame re-renders the current window before painting — and
+		Enter/Space ends the Pause.  Without msvcrt/a terminal there's no scrolling:
+		the initial window is shown and a plain input() waits.
 		"""
+		view = ScrollView.of(value)
 		try:
 			import msvcrt
 		except ImportError:
 			msvcrt = None
 		if msvcrt is None or not sys.stdin.isatty():
-			if scroll is not None:
-				scroll.render_into(home)
+			if view is not None:
+				view.render_into(home)
 			self._render(home, marker=_PAUSE_SPINNER[0])
 			with self._input_cursor():
 				input()
@@ -280,11 +283,11 @@ class TerminalConsole(Console):
 		# _paint keeps the cursor hidden while the spinner animates; no need to
 		# manage it here — it stays hidden until an Input or the program ends.
 		while True:
-			if scroll is not None:
-				scroll.render_into(home)
+			if view is not None:
+				view.render_into(home)
 			self._render(home, marker=_PAUSE_SPINNER[self._pause_spin % len(_PAUSE_SPINNER)])
 			self._pause_spin += 1
-			if scroll is None:
+			if view is None:
 				if self._wait_for_key(msvcrt, {'\r', ' '}):
 					return
 			else:
@@ -292,7 +295,7 @@ class TerminalConsole(Console):
 				if key == 'exit':
 					return
 				if key:
-					scroll.move(key)
+					view.move(key)
 
 	def _poll_scroll_key(self, msvcrt):
 		"""Poll for up to _FRAME_SECONDS; return 'exit' (Enter/Space), a scroll

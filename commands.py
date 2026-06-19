@@ -3,14 +3,13 @@ from titoken import QUOTE
 
 from preparse import (
 	preparse_cmd, preparse_cmd_func, preparse_bunch,
-	Thunk, NumericVar, LabelName, ProgramName, AnyVar, Real, Env,
+	Thunk, NumericVar, LabelName, ProgramName, AnyVar, Real, Env, AnyValue,
 )
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
-from core import TiString, TiList, TiMatrix, StringVariable, py_int, require_string
+from core import TiString, StringVariable, py_int, require_string
 from tiformat import output_text, disp_lines
 from titoken import encode
-from scrollview import ScrollView
 from errors import TiSyntaxError, DomainError
 
 ############
@@ -144,30 +143,22 @@ def zoom_rcl(env):
 	env.zoom_recall()
 
 
-@special_func
-def pause_cmd(args: ArgParser):
+@preparse_cmd
+def pause_cmd(env: Env, value: AnyValue = None):
 	"""Pause [value] — show value (Disp-style), then block until Enter.
 
-	A list or matrix too big for the screen becomes scrollable: the arrow keys
-	page through it (left/right always, up/down for a too-tall matrix) until Enter.
-	A value that fits is just shown Disp-style.  The optional value is stored to Ans
-	(a real quirk: no other command does this).  ERR:INVALID outside a program,
-	like Goto/Return/Stop.
+	The value is rendered onto the home screen like Disp, and handed to the console:
+	a list or matrix too big for the screen can then be paged with the arrow keys,
+	which the frontend offers (see ScrollView) — Pause itself doesn't decide that.
+	The optional value is stored to Ans (a real quirk: no other command does this).
+	ERR:INVALID outside a program, like Goto/Return/Stop.
 	"""
-	env = args.env
 	env.current_program()       # raises ERR:INVALID outside a program
-	scroll = None
-	if args.has_next:
-		value = args.expr()
+	if value:
 		env.ans = value
-		view = ScrollView(value) if isinstance(value, (TiList, TiMatrix)) else None
-		if view is not None and view.scrollable:
-			scroll = view          # the console owns rendering (windowed + indicators)
-		else:
-			for line in disp_lines(value, env.home.COLS):
-				env.home.disp(line)
-	args.end_cmd()
-	env.console.pause(env.home, scroll)
+		for line in disp_lines(value, env.home.COLS):
+			env.home.disp(line)
+	env.console.pause(env.home, value)
 
 
 def _tokenize_input(text: str) -> list:

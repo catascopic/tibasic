@@ -15,6 +15,7 @@ per-character horizontally and per-row vertically), and indicators overlay the
 content cells at the edges rather than taking dedicated columns.  The bottom
 screen row is always left blank, matching Pause/Disp.
 """
+from core import TiList, TiMatrix
 from tiformat import value_lines
 from homescreen import HomeScreen
 
@@ -27,6 +28,19 @@ class ScrollView:
 
 	# The value fills every row but the last, which Pause/Disp keep blank.
 	VIEW_ROWS = HomeScreen.ROWS - 1
+
+	@classmethod
+	def of(cls, value) -> "ScrollView | None":
+		"""A ScrollView for `value`, or None when it doesn't need one.
+
+		Only a list or matrix that overflows the screen is scrollable; anything that
+		fits (or isn't a list/matrix) returns None, so a frontend can just decide
+		`if view := ScrollView.of(value): ...` without repeating the type/size test.
+		"""
+		if not isinstance(value, (TiList, TiMatrix)):
+			return None
+		view = cls(value)
+		return view if view.scrollable else None
 
 	def __init__(self, value):
 		self.lines = value_lines(value)
