@@ -215,6 +215,12 @@ class TestPause:
 	def test_value_stored_to_ans(self):
 		assert run_program('Pause 5').ans == 5
 
+	def test_zero_value_is_shown_and_stored(self):
+		# Guards against treating a falsy-but-present value (0) as "no argument".
+		env = run_program('Pause 0')
+		assert env.ans == 0
+		assert env.home.render().split('\n')[0] == '0'.rjust(16)
+
 	def test_string_value_stored_to_ans(self):
 		env = run_program('Pause "HI')
 		assert str(env.ans) == 'HI'

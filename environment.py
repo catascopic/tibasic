@@ -10,7 +10,7 @@ from core import Variable, NumericVariable, RealVariable, ListVariable, UserList
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
 from graph import Graph
-from homescreen import HomeScreen
+from iodevice import HomeScreenIO
 from terminal import ScriptedConsole
 from titoken import Token
 
@@ -59,9 +59,10 @@ class Environment:
 		self.table = TableVars()
 		# LCD pixel buffer (used by Pxl-/Pt-/Line/etc. drawing commands)
 		self.graph = Graph()
-		# Home screen (16×8 char grid) and the I/O frontend that renders it
-		self.home = HomeScreen()
-		self.console = console or ScriptedConsole()
+		# Text I/O device.  Commands talk to it semantically (io.disp/output/pause/…);
+		# it owns how that's realized — the default is the faithful 8×16 home screen
+		# painted by a Console backend (see iodevice.HomeScreenIO).
+		self.io = HomeScreenIO(console or ScriptedConsole())
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
 		self.n_tvm = RealVariable()   # 𝐍 (number of payments)
 		self.i_pct = RealVariable()   # I% (interest rate per period, as percentage)
@@ -88,7 +89,7 @@ class Environment:
 		except StopSignal:
 			# It's correct to catch here because doing `prgmTEST:1->A` (where TEST just runs Stop) will not reach the following store command.
 			pass
-		self.console.finish(self.home)
+		self.io.finish()
 
 	def to_rad(self, x: float):
 		"""Convert x from the current angle mode to radians (for trig input)."""
@@ -109,6 +110,23 @@ class Environment:
 	@property
 	def real_only(self):
 		return self.complex_mode is ComplexMode.REAL
+
+	# ── I/O convenience accessors ────────────────────────────────────────────────
+	# The home-screen device exposes its grid and Console backend; these shortcuts
+	# let callers reach them (and swap the Console) without going through .io.  They
+	# assume the default HomeScreenIO and don't apply to a grid-less device.
+
+	@property
+	def home(self):
+		return self.io.home
+
+	@property
+	def console(self):
+		return self.io.console
+
+	@console.setter
+	def console(self, value):
+		self.io = HomeScreenIO(value)
 		
 	@property
 	def x(self) -> Variable:
@@ -188,7 +206,7 @@ class Environment:
 		return float(self.clock_on)
 
 	def get_key(self):
-		return float(self.console.read_key())
+		return float(self.io.get_key())
 
 	def rand(self):
 		return random.random()

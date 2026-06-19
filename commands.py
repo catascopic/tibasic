@@ -8,9 +8,7 @@ from preparse import (
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, StringVariable, py_int, require_string
-from tiformat import output_text, disp_lines
-from titoken import encode
-from errors import TiSyntaxError, DomainError
+from errors import TiSyntaxError
 
 ############
 # PROGRAMS #
@@ -95,21 +93,20 @@ def del_var(var: AnyVar):
 
 @special_func
 def disp(args: ArgParser):
-	"""Disp [value[,value...]] — append each value to the home screen (no args just
-	re-renders it).  Every TI data type is supported; numbers, lists, and matrices
-	are right-aligned (a matrix prints one line per row) while strings are
-	left-aligned."""
-	home = args.env.home
+	"""Disp [value[,value...]] — show each value (no args just re-renders).  Every TI
+	data type is supported; how it's laid out is the device's call (the home screen
+	right-aligns numbers/lists/matrices, a matrix one line per row, strings left)."""
+	io = args.env.io
+	if not args.has_next:
+		io.refresh()
 	while args.has_next:
-		for line in disp_lines(args.expr(), home.COLS):
-			home.disp(line)
+		io.disp(args.expr())
 	args.end_cmd()
-	args.env.console.update(home)
 
 
 @special_func
 def output(args: ArgParser):
-	"""Output(row, col, value) — write value at a fixed 1-indexed home-screen cell.
+	"""Output(row, col, value) — write value at a fixed 1-indexed cell.
 
 	The value is rendered linearly (as you'd type it): lists/matrices use comma
 	separators and a matrix is inlined onto the single starting position, wrapping
@@ -118,17 +115,13 @@ def output(args: ArgParser):
 	col = py_int(args.expr())
 	value = args.expr()
 	args.end_paren_cmd()
-	if not (1 <= row <= args.env.home.ROWS and 1 <= col <= args.env.home.COLS):
-		raise DomainError(f"Output(: position out of range: ({row}, {col})")
-	args.env.home.output(row - 1, col - 1, output_text(value))
-	args.env.console.update(args.env.home)
+	args.env.io.output(row, col, value)
 
 
 @no_arg_command
 def clr_home(env):
-	"""ClrHome — clear the home screen and reset the Disp cursor."""
-	env.home.clear()
-	env.console.update(env.home)
+	"""ClrHome — clear the text screen."""
+	env.io.clear_home()
 
 
 @no_arg_command
@@ -145,20 +138,17 @@ def zoom_rcl(env):
 
 @preparse_cmd
 def pause_cmd(env: Env, value: AnyValue = None):
-	"""Pause [value] — show value (Disp-style), then block until Enter.
+	"""Pause [value] — show value, then block until the user continues.
 
-	The value is rendered onto the home screen like Disp, and handed to the console:
-	a list or matrix too big for the screen can then be paged with the arrow keys,
-	which the frontend offers (see ScrollView) — Pause itself doesn't decide that.
+	The device renders and waits; the home-screen device makes a too-big list/matrix
+	scrollable with the arrow keys (see ScrollView), but Pause doesn't decide that.
 	The optional value is stored to Ans (a real quirk: no other command does this).
 	ERR:INVALID outside a program, like Goto/Return/Stop.
 	"""
 	env.current_program()       # raises ERR:INVALID outside a program
-	if value:
+	if value is not None:
 		env.ans = value
-		for line in disp_lines(value, env.home.COLS):
-			env.home.disp(line)
-	env.console.pause(env.home, value)
+	env.io.pause(value)
 
 
 def _tokenize_input(text: str) -> list:
@@ -185,10 +175,10 @@ def _eval_input(tokens: list, env) -> object:
 
 
 def _input_one(env, prompt: str, var) -> None:
-	"""Read one value for `var`: console-read text, echo prompt+text onto the
-	home screen exactly as typed, then store it.  Shared by Input and Prompt —
-	using the same tokens for the echo and the storing means what's shown and
-	what's stored never disagree.
+	"""Read one value for `var` and store it.  Shared by Input and Prompt.
+
+	The device reads the text and (if it manages a screen) commits the typed line to
+	it; this just validates and stores.
 
 	A string variable takes the typed text as a literal string, verbatim — no
 	quotes, no expression evaluation (you can't type a quote-enclosed string
@@ -198,11 +188,9 @@ def _input_one(env, prompt: str, var) -> None:
 	Empty input is rejected: an entry that's blank (or only whitespace) re-prompts
 	rather than storing anything, so neither Input nor Prompt can yield a value.
 	"""
-	while not (text := env.console.read_value(prompt, env.home).strip()):
+	while not (text := env.io.read_value(prompt).strip()):
 		pass
 	tokens = _tokenize_input(text)
-	env.home.echo(encode(prompt) + b''.join(t.display for t in tokens))   # wraps, doesn't truncate
-	env.console.update(env.home)
 	if isinstance(var, StringVariable):
 		var.store(TiString(tokens))
 	else:
@@ -258,4 +246,4 @@ def menu_cmd(args: ArgParser):
 			break
 	args.end_paren_cmd()
 
-	program.goto(labels[args.env.console.choose(title, options)])
+	program.goto(labels[args.env.io.menu(title, options)])
