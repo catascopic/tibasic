@@ -9,34 +9,54 @@ from parser import Parser
 
 
 class Program:
-	"""
-	Wraps a stored token stream as an executable program.
+	"""A stored TI-BASIC program: a token stream with an optional name.
 
-	Owns the Parser (and thus the current execution position), the block
-	stack that tracks active For/While/Repeat/If-Then blocks, and the
-	per-execution flags used by control-flow commands.
-
-	Programs are pushed onto env.program_stack for the duration of their
-	execution so that control-flow commands can access the current program
-	via env.current_program().
+	The static, reusable form kept in env.programs.  Running it builds a fresh
+	Execution (one invocation's runtime state) and executes it; the same Program
+	can be run any number of times.
 	"""
 
-	def __init__(self, tokens: list, env: Environment):
-		self._parser = Parser(tokens, env)
+	def __init__(self, tokens: list, name: str | None = None):
+		self.tokens = tokens
+		self.name = name
+
+	def run(self, env: Environment) -> None:
+		"""Execute this program once in `env`."""
+		Execution(self, env).run()
+
+	def __repr__(self) -> str:
+		return f"Program({self.name!r}, {len(self.tokens)} tokens)"
+
+
+class Execution:
+	"""The runtime state of one program invocation.
+
+	Owns the Parser (and thus the current execution position), the block stack
+	that tracks active For/While/Repeat/If-Then blocks, and the control-flow
+	mechanics that act on them.
+
+	An Execution is pushed onto env.execution_stack for the duration of the
+	invocation, so control-flow commands can reach the current one via
+	env.current_execution(); a prgm-call stacks a new Execution on top.
+	"""
+
+	def __init__(self, program: Program, env: Environment):
+		self.program = program
+		self._parser = Parser(program.tokens, env)
 		self._env = env
 		self._block_stack: list[Block] = []
 
 	def run(self):
 		"""Execute all statements in the token stream until EOF."""
-		self._env.program_stack.append(self)
+		self._env.execution_stack.append(self)
 		try:
-			self._parser.run()
+			self._parser.parse()
 		except ReturnSignal:
 			pass
 		finally:
-			finished = self._env.program_stack.pop()
+			finished = self._env.execution_stack.pop()
 			if finished is not self:
-				raise ValueError(f"Program stack out of order: expected {self}; got {finished}")
+				raise ValueError(f"Execution stack out of order: expected {self}; got {finished}")
 
 	def push_block(self, block: 'Block'):
 		self._block_stack.append(block)

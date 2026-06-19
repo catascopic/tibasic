@@ -14,7 +14,7 @@ def run_with(src: str, inputs):
 	"""Run src with a ScriptedConsole feeding `inputs` to Input/Prompt."""
 	env = Environment()
 	env.console = ScriptedConsole(inputs=inputs)
-	env.run(toks(src))
+	env.submit(toks(src))
 	return env
 
 
@@ -22,7 +22,7 @@ def run_program(src: str, *, choices=(), inputs=()):
 	"""Run src as a program (so control-flow commands like Menu( have a context)."""
 	env = Environment()
 	env.console = ScriptedConsole(inputs=inputs, choices=choices)
-	Program(toks(src), env).run()
+	Program(toks(src)).run(env)
 	return env
 
 
@@ -229,7 +229,7 @@ class TestPause:
 		env = Environment()
 		env.console = ScriptedConsole()
 		env.ans = 99
-		Program(toks('Pause'), env).run()
+		Program(toks('Pause')).run(env)
 		assert env.ans == 99
 
 	def test_outside_program_raises(self):
@@ -356,7 +356,7 @@ class TestInput:
 	def test_prompt_passed_to_console(self):
 		env = Environment()
 		env.console = ScriptedConsole(inputs=['1'])
-		env.run(toks('Input "PICK",X'))
+		env.submit(toks('Input "PICK",X'))
 		# (ScriptedConsole ignores the prompt, but the command must not choke on it)
 		assert var(env, 'X') == 1
 

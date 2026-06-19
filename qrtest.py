@@ -12,7 +12,7 @@ def load(dir_):
 	for file in Path(dir_).iterdir():
 		if file.suffix == '.8xp':
 			prgm = ProgramFile.load(file)
-			env.programs[prgm.name] = prgm.tokens
+			env.programs[prgm.name] = Program(prgm.tokens, prgm.name)
 		if file.suffix == '.8xl':
 			lst = ListFile.load(file)
 			ti_list = TiList(lst.values)
@@ -27,7 +27,7 @@ env = load(r'enigma')
 env.console = TerminalConsole()
 
 def run(prgm_name):
-	env.run([get_token(0x5F), *(TEXT_INPUT[c] for c in prgm_name)])
+	env.submit([get_token(0x5F), *(TEXT_INPUT[c] for c in prgm_name)])
 
 
 run('ENIGMA3')

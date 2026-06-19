@@ -32,7 +32,7 @@ End
 
 env = Environment()
 env.console = TerminalConsole()
-Program(code, env).run()
+Program(code).run(env)
 
 from tifile import ProgramFile
 ProgramFile('MOVE', code).write('MOVE.8xp')

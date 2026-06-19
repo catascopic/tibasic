@@ -14,7 +14,7 @@ def freeform_env():
 
 
 def run(src, env):
-	env.run(toks(src))
+	env.submit(toks(src))
 	return env
 
 
@@ -41,13 +41,13 @@ class TestFreeFormOutput:
 class TestFreeFormPause:
 	def test_pause_prints_value_and_marker(self, capsys, monkeypatch):
 		monkeypatch.setattr('builtins.input', lambda *a: '')
-		Program(toks('Pause 5'), env := freeform_env()).run()
+		Program(toks('Pause 5')).run(env := freeform_env())
 		assert capsys.readouterr().out == '5\n[PAUSED]\n'
 		assert env.ans == 5
 
 	def test_bare_pause_just_blocks(self, capsys, monkeypatch):
 		monkeypatch.setattr('builtins.input', lambda *a: '')
-		Program(toks('Pause'), freeform_env()).run()
+		Program(toks('Pause')).run(freeform_env())
 		assert capsys.readouterr().out == '[PAUSED]\n'
 
 

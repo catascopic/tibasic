@@ -1,6 +1,6 @@
 """Tests for control-flow constructs executed inside a Program.
 
-Uses Program(toks(...), env).run() directly so that StopSignal propagates
+Uses Program(toks(...)).run(env) directly so that StopSignal propagates
 to the test rather than being swallowed by run_line.
 """
 
@@ -19,8 +19,8 @@ def run(src: str, env: Environment | None = None) -> Environment:
 	"""Build a token list from *src*, run inside a Program, return the environment."""
 	if env is None:
 		env = Environment()
-	env.programs['TEST'] = toks(src)
-	env.run(toks('prgm TEST'))
+	env.programs['TEST'] = Program(toks(src), 'TEST')
+	env.submit(toks('prgm TEST'))
 	return env
 
 
@@ -451,7 +451,7 @@ class TestLblGoto:
 		Goto Z
 		""")
 		with pytest.raises(LabelError) as exc_info:
-			Program(tokens, Environment()).run()
+			Program(tokens).run(Environment())
 		assert exc_info.value.pos == len(tokens) - 1
 
 
@@ -461,11 +461,11 @@ class TestReturn:
 
 	def test_exits_subprogram(self):
 		env = Environment()
-		env.programs['P'] = toks("""
+		env.programs['P'] = Program(toks("""
 		1@A
 		Return
 		99@A
-		""")
+		"""), 'P')
 		run("""
 		prgm P
 		2@B
@@ -476,17 +476,17 @@ class TestReturn:
 	def test_does_not_exit_caller(self):
 		# Return only exits the innermost program
 		env = Environment()
-		env.programs['I'] = toks("""
+		env.programs['I'] = Program(toks("""
 		1@A
 		Return
 		99@A
-		""")
-		env.programs['O'] = toks("""
+		"""), 'I')
+		env.programs['O'] = Program(toks("""
 		prgm I
 		2@B
 		Return
 		99@B
-		""")
+		"""), 'O')
 		run("""
 		prgm O
 		3@C
@@ -497,7 +497,7 @@ class TestReturn:
 
 	def test_return_doesnt_cancel_other_statements(self):
 		env = Environment()
-		env.programs['P'] = toks('Return')
+		env.programs['P'] = Program(toks('Return'), 'P')
 		calc("""
 		1@A
 		prgm P
@@ -522,7 +522,7 @@ class TestStop:
 
 	def test_stop_propagates_through_subprogram(self):
 		env = Environment()
-		env.programs['P'] = toks('Stop')
+		env.programs['P'] = Program(toks('Stop'), 'P')
 		run("""
 		1@A
 		prgm P
@@ -533,7 +533,7 @@ class TestStop:
 
 	def test_stop_does_cancel_other_statements(self):
 		env = Environment()
-		env.programs['P'] = toks('Stop')
+		env.programs['P'] = Program(toks('Stop'), 'P')
 		calc("""
 		1@A
 		prgm P

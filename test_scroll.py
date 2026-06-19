@@ -136,7 +136,7 @@ def _pause(value):
 	env.console = ScriptedConsole()
 	env.matrices[0].store(value) if isinstance(value, TiMatrix) else env.lists[0].store(value)
 	name = '[A]' if isinstance(value, TiMatrix) else 'L1'
-	Program(toks(f'Pause {name}'), env).run()
+	Program(toks(f'Pause {name}')).run(env)
 	return env
 
 

@@ -72,20 +72,20 @@ class Environment:
 		self.py    = RealVariable(1.0)  # P/Y (payments per year)
 		self.cy    = RealVariable(1.0)  # C/Y (compounding periods per year)
 		# Programs
-		self.programs: dict[str, list[Token]] = {}  # name -> token list for stored programs
-		self.program_stack: list[object] = []  # currently executing programs (innermost last)
+		self.programs: dict[str, "Program"] = {}      # name -> stored Program
+		self.execution_stack: list[object] = []       # in-flight Executions (innermost last)
 		# Internal data
 		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
 		self._nest_depth: dict[object, int] = defaultdict(lambda: 0)  # tracks nesting depth for ILLEGAL NEST guards
 
-	def run(self, tokens: list[Token]):
-		"""Runs a string of tokens as if from the home screen."""
+	def submit(self, tokens: list[Token]):
+		"""Interpret a token stream as if entered on the home screen."""
 		# TODO: Should there be some kind of flag that makes newline characters raise an error?
 		# On the calculator, it's impossible to get a newline character on the home screen (arguably that's what Enter does)
 		# And actually, maybe if you treat NEWLINE as pressing Enter, everything works as intended
 		from parser import Parser
 		try:
-			Parser(tokens, self).run()
+			Parser(tokens, self).parse()
 		except StopSignal:
 			# It's correct to catch here because doing `prgmTEST:1->A` (where TEST just runs Stop) will not reach the following store command.
 			pass
@@ -247,16 +247,16 @@ class Environment:
 	def __repr__(self):
 		return f"ENV({','.join(f"{name}={value!r}" for name, value in self._iter_values())})"
 
-	def current_program(self):
-		"""Return the innermost currently-executing Program.
+	def current_execution(self):
+		"""Return the innermost in-flight Execution.
 
 		Raises InvalidCommandError if called outside a program (e.g. from the
 		home screen), matching the calculator's ERR:INVALID for control-flow
 		commands like Return, Goto, and End.
 		"""
-		if not self.program_stack:
+		if not self.execution_stack:
 			raise InvalidCommandError("This command cannot be used outside a program")
-		return self.program_stack[-1]
+		return self.execution_stack[-1]
 
 	def print_screen(self):
 		pass

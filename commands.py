@@ -8,7 +8,7 @@ from preparse import (
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, StringVariable, py_int, require_string
-from errors import TiSyntaxError
+from errors import TiSyntaxError, UndefinedError
 
 ############
 # PROGRAMS #
@@ -16,7 +16,7 @@ from errors import TiSyntaxError
 
 @preparse_cmd
 def if_cmd(env: Env, cond: Real):
-	env.current_program().begin_if(bool(cond))
+	env.current_execution().begin_if(bool(cond))
 
 @no_arg_command
 def then_cmd(a: ArgParser):
@@ -27,58 +27,57 @@ def then_cmd(a: ArgParser):
 def else_cmd(env):
 	"""If we encounter Else this way, always skip the block.
 	(Else blocks are only executed when encountered while skipping an If-Then block.)"""
-	env.current_program().begin_else()
+	env.current_execution().begin_else()
 
 @preparse_cmd_func
 def for_cmd(env: Env, var: NumericVar, start: Real, end: Real, step: Real = 1.0):
-	env.current_program().begin_for(var, start, end, step)
+	env.current_execution().begin_for(var, start, end, step)
 
 @preparse_cmd
 def while_cmd(env: Env, condition: Thunk):
-	env.current_program().begin_while(condition)
+	env.current_execution().begin_while(condition)
 
 @preparse_cmd
 def repeat_cmd(env: Env, condition: Thunk):
-	env.current_program().begin_repeat(condition)
+	env.current_execution().begin_repeat(condition)
 
 @no_arg_command
 def end_cmd(env):
-	env.current_program().end_block()
+	env.current_execution().end_block()
 
 @preparse_cmd
 def lbl_cmd(env: Env, name: LabelName):
 	"""Lbl is a no-op at runtime; just verify the syntax and that we're in a program."""
-	env.current_program()  # raises if not in a program
+	env.current_execution()  # raises if not in a program
 
 @preparse_cmd
 def goto_cmd(env: Env, name: LabelName):
-	env.current_program().goto(name)
+	env.current_execution().goto(name)
 
 @preparse_cmd_func
 def is_gt_cmd(env: Env, var: NumericVar, threshold: Real):
-	env.current_program().is_gt(var, threshold)
+	env.current_execution().is_gt(var, threshold)
 
 @preparse_cmd_func
 def ds_lt_cmd(env: Env, var: NumericVar, threshold: Real):
-	env.current_program().ds_lt(var, threshold)
+	env.current_execution().ds_lt(var, threshold)
 
 @preparse_cmd
 def prgm(env: Env, name: ProgramName):
 	try:
-		prgm_code = env.programs[name]
+		program = env.programs[name]
 	except KeyError:
 		raise UndefinedError(f"Program not found: {name!r}")
-	from program import Program
-	Program(prgm_code, env).run()
+	program.run(env)
 
 @no_arg_command
 def return_cmd(env):
-	env.current_program()  # raises if not in a program
+	env.current_execution()  # raises if not in a program
 	raise ReturnSignal()
 
 @no_arg_command
 def stop_cmd(env):
-	env.current_program()  # raises if not in a program
+	env.current_execution()  # raises if not in a program
 	raise StopSignal()
 
 @preparse_bunch
@@ -145,7 +144,7 @@ def pause_cmd(env: Env, value: AnyValue = None):
 	The optional value is stored to Ans (a real quirk: no other command does this).
 	ERR:INVALID outside a program, like Goto/Return/Stop.
 	"""
-	env.current_program()       # raises ERR:INVALID outside a program
+	env.current_execution()       # raises ERR:INVALID outside a program
 	if value is not None:
 		env.ans = value
 	env.io.pause(value)
@@ -235,7 +234,7 @@ def menu_cmd(args: ArgParser):
 	option count isn't checked explicitly: expr()'s missing-argument error covers
 	zero options, and end_paren_cmd's leftover-token error covers more than seven.
 	"""
-	program = args.env.current_program()       # raises ERR:INVALID outside a program
+	program = args.env.current_execution()       # raises ERR:INVALID outside a program
 	title = str(require_string(args.expr()))
 	options: list[str] = []
 	labels: list[str] = []

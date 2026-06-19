@@ -39,4 +39,4 @@ Output( 6,1,"DONE
 
 env = Environment()
 env.console = TerminalConsole()
-Program(toks(PROGRAM), env).run()
+Program(toks(PROGRAM)).run(env)
