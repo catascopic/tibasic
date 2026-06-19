@@ -579,8 +579,8 @@ class Parser:
 				e.pos = self.pos - 1
 			raise
 
-	def run(self):
-		"""Execute all statements in the token stream until EOF."""
+	def parse(self):
+		"""Interpret every statement in the token stream until EOF."""
 		try:
 			while self.has_next:
 				self._exec_statement()
@@ -784,7 +784,7 @@ if __name__ == '__main__':
 	def test(*line):
 		tokens = toks(*line)
 		print('>>', ''.join(t.text for t in tokens))
-		env.run(tokens)
+		env.submit(tokens)
 		print('<<', env.ans)
 
 	env.angle_mode = 'DEG'

@@ -99,7 +99,7 @@ def calc(items, env: Environment | None = None):
 	"""Evaluate a token sequence and return Ans."""
 	if env is None:
 		env = Environment()
-	env.run(toks(items))
+	env.submit(toks(items))
 	return env.ans
 
 
@@ -107,7 +107,7 @@ def run(src: str, env: Environment | None = None) -> Environment:
 	"""Run a token sequence and return the environment (for side-effect inspection)."""
 	if env is None:
 		env = Environment()
-	env.run(toks(src))
+	env.submit(toks(src))
 	return env
 
 

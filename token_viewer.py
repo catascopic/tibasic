@@ -39,7 +39,7 @@ def _draw_token(env, tok, row: int, large: bool) -> None:
 	if large:
 		stmt += [NEG, DIGITS[1], COMMA]          # -1 selects the large font
 	stmt += _row_digits(row) + [COMMA, DIGITS[0], COMMA, STR_VAR]
-	env.run(stmt)
+	env.submit(stmt)
 
 
 def main() -> None:
