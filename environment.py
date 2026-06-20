@@ -10,6 +10,7 @@ from core import Variable, NumericVariable, RealVariable, ListVariable, UserList
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graph import Graph
+from plot import trace_curve, sample_function
 from iodevice import HomeScreenIO
 from terminal import ScriptedConsole
 from titoken import Token
@@ -163,13 +164,25 @@ class Environment:
 	# drawing command calls so the graph comes up with the functions under it.
 
 	def regraph(self):
-		"""Re-plot the current mode's selected, defined functions onto the graph.
+		"""Redraw the graph from scratch: clear it, then plot the current mode's
+		selected, defined functions.
 
-		Stub until function evaluation/plotting exists; the plotter will iterate
-		self.graph_functions.groups[self.graph_mode], keep the ones that are selected
-		and defined, evaluate them over the window, and draw to self.graph.
+		Only Function mode is plotted — parametric, polar, and sequence graphing
+		aren't implemented, so a selected function in those modes is silently skipped
+		(the screen just shows a cleared graph).  Axes, grid, and labels aren't drawn
+		yet either; this plots the curves only.
+
+		Each Yn is sampled column-by-column across the window and traced exactly like
+		DrawF (honoring Connected/Dot draw mode), reusing the shared plotter in plot.py.
+		As with DrawF, this leaves X (and Y) holding the last sampled point.
 		"""
-		pass
+		self.graph.clear()
+		if self.graph_mode is not GraphMode.FUNC:
+			return
+		for func in self.graph_functions.groups[GraphMode.FUNC]:
+			equation = func.equations[0].value
+			if func.selected and equation is not None:
+				trace_curve(self, sample_function(self, lambda eq=equation: eq.eval(self)))
 
 	def display_graph(self):
 		"""DispGraph — make the graph the active screen and re-plot the functions."""

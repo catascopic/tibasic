@@ -1,35 +1,43 @@
 import math
-from numbers import Number
 
 import distributions as dist
 from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command, TiCall
-from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
-from modes import DrawMode, Screen
+from errors import DataTypeError, DomainError
+from modes import Screen
 from graph import Graph
 from fonts import SMALL_FONT, LARGE_FONT
-from core import TiEquation, TiString, py_int
+from core import TiString, py_int
+from plot import (
+	MAX_ROW, MAX_COL, _round_half_up,
+	_x_to_col, _y_to_row, _col_to_x, _graph_to_pixel,
+	_bresenham, _in_bounds, _plot_segment,
+	sample_function as _function_sampler,
+	trace_curve as _trace_curve,
+)
 
 
 class _GraphDrawing(TiCall):
-	"""Wraps a drawing command so running it displays the graph first (regraphing on
-	the transition, so the active functions sit beneath the drawing).  Queries
-	(pxl-Test() and ClrDraw — which clears without displaying — are not wrapped."""
+	"""Wraps a drawing command so it brings up the graph *before* drawing — regraphing
+	the functions on the HOME→GRAPH transition so they sit beneath the new drawing
+	(regraph clears and re-plots, so it has to run first or it would erase the draw).
+
+	If the command then raises (e.g. bad arguments), the screen transition is rolled
+	back, so a draw that fails doesn't leave the graph showing.  Queries (pxl-Test()
+	and ClrDraw — which clears without displaying — are not wrapped."""
 
 	def __init__(self, inner: TiCall):
 		super().__init__(inner.func)
 		self._inner = inner
 
 	def call_with_parser(self, args):
-		result = self._inner.call_with_parser(args)
-		args.env.draw_to_graph()
-		return result
-
-# Pxl- commands address a narrower region than the full 64×96 LCD:
-# rows 0–62 (63 rows) and columns 0–94 (95 columns), inclusive.
-# The graph screen (used by point/graph commands) spans the same region.
-# 95 columns → 94 intervals; 63 rows → 62 intervals.
-MAX_ROW = 62
-MAX_COL = 94
+		env = args.env
+		prev_screen = env.screen
+		env.draw_to_graph()
+		try:
+			return self._inner.call_with_parser(args)
+		except Exception:
+			env.screen = prev_screen
+			raise
 
 # Pt-On/Off/Change mark pixel offsets (Δrow, Δcol) relative to centre.
 # mark 2/6 = 3×3 filled box (9 pixels)
@@ -38,86 +46,6 @@ MAX_COL = 94
 _CROSS  = ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1))
 _BOX    = ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1))
 _MARK_OFFSETS = {2.0: _BOX, 3.0: _CROSS, 6.0: _BOX, 7.0: _CROSS}
-
-
-def _round_half_up(value: float) -> int:
-	"""Round to the nearest integer with ties going up (x.5 → x+1).
-
-	The calculator rounds graph→pixel coordinates this way; Python's built-in
-	round() uses banker's rounding (round-half-to-even), which differs at .5.
-	"""
-	return math.floor(value + 0.5)
-
-
-def _x_to_col(env, x: float) -> int:
-	w = env.window
-	xmin = w.xmin.resolve()
-	xmax = w.xmax.resolve()
-	return _round_half_up((x - xmin) * MAX_COL / (xmax - xmin))
-
-
-def _y_to_row(env, y: float) -> int:
-	w = env.window
-	ymin = w.ymin.resolve()
-	ymax = w.ymax.resolve()
-	return _round_half_up((ymax - y) * MAX_ROW / (ymax - ymin))
-
-
-def _col_to_x(env, col: float) -> float:
-	"""Inverse of _x_to_col: the graph x-coordinate at the centre of a pixel column."""
-	w = env.window
-	xmin = w.xmin.resolve()
-	xmax = w.xmax.resolve()
-	return xmin + col * (xmax - xmin) / MAX_COL
-
-
-def _row_to_y(env, row: float) -> float:
-	"""Inverse of _y_to_row: the graph y-coordinate at the centre of a pixel row."""
-	w = env.window
-	ymin = w.ymin.resolve()
-	ymax = w.ymax.resolve()
-	return ymax - row * (ymax - ymin) / MAX_ROW
-
-
-def _graph_to_pixel(env, x: float, y: float) -> tuple[int, int]:
-	"""Translate graph coordinates to (row, column), without bounds checking.
-
-	Used by Line( so Bresenham's can run end-to-end and clip per pixel.
-	"""
-	return _y_to_row(env, y), _x_to_col(env, x)
-
-
-def _point_to_pixel(env, x: float, y: float):
-	"""Translate graph coordinates to (row, column), or None if off-screen.
-
-	Used by Pt- commands, which draw nothing when the point is out of range.
-	"""
-	row, col = _graph_to_pixel(env, x, y)
-	return (row, col) if 0 <= row <= MAX_ROW and 0 <= col <= MAX_COL else None
-
-
-def _bresenham(r0: int, c0: int, r1: int, c1: int):
-	"""Yield (row, col) for every pixel on the line from (r0,c0) to (r1,c1)."""
-	dr = abs(r1 - r0)
-	dc = abs(c1 - c0)
-	sr = 1 if r1 > r0 else -1
-	sc = 1 if c1 > c0 else -1
-	err = dr - dc
-	while True:
-		yield r0, c0
-		if r0 == r1 and c0 == c1:
-			break
-		e2 = 2 * err
-		if e2 > -dc:
-			err -= dc
-			r0 += sr
-		if e2 < dr:
-			err += dr
-			c0 += sc
-
-
-def _in_bounds(row, col):
-	return 0 <= row <= MAX_ROW and 0 <= col <= MAX_COL
 
 
 def _validate(row, col):
@@ -248,141 +176,8 @@ def circle(env: Env, x: Real, y: Real, r: Real, _fast: TiListComplex = None) -> 
 
 
 # ── Function graphing (DrawF / DrawInv) and distribution shading ────────────────
-
-# Errors the calculator silently swallows while evaluating a graphed expression:
-# the offending point is dropped rather than aborting the command.
-
-
-def _function_sampler(env, formula):
-	"""Return f(t): set X to t, evaluate *formula*, store the result in Y, return it.
-
-	X and Y are deliberately left holding their last values when the caller
-	finishes — DrawF/DrawInv/Tangent all "exit with the last coordinate stored".
-
-	Any complex result is skipped outright — the calculator does not graph points
-	whose Y value is complex, even if the imaginary part happens to be zero.
-	"""
-
-	def f(x):
-		env.x.value = x
-		try:
-			y = formula.eval()
-		except (
-			DataTypeError, DivideByZeroError, DomainError, IncrementError, 
-			NonRealAnsError, TiOverflowError, SingularMatrixError
-		):
-			return None
-		if not isinstance(y, float):
-			return None
-		env.y.value = y
-		return y
-
-	return f
-
-
-def _clip_segment(r0, c0, r1, c1):
-	"""Liang–Barsky clip of a segment to the screen rectangle [0,MAX_ROW]×[0,MAX_COL].
-
-	Returns integer endpoints (r0,c0,r1,c1) of the visible portion, or None if the
-	segment lies entirely outside.  Clipping first keeps Bresenham bounded even when
-	a near-vertical connecting line (e.g. across an asymptote) spans millions of rows.
-	"""
-	dr = r1 - r0
-	dc = c1 - c0
-	u1 = 0.0
-	u2 = 1.0
-	for pi, qi in ((-dc, c0), (dc, MAX_COL - c0), (-dr, r0), (dr, MAX_ROW - r0)):
-		if pi == 0:
-			if qi < 0:
-				return None  # parallel to a border and outside it
-		else:
-			t = qi / pi
-			if pi < 0:
-				if t > u2:
-					return None
-				u1 = max(u1, t)
-			else:
-				if t < u1:
-					return None
-				u2 = min(u2, t)
-	return (
-		round(r0 + u1 * dr),
-		round(c0 + u1 * dc),
-		round(r0 + u2 * dr),
-		round(c0 + u2 * dc),
-	)
-
-
-def _plot_segment(env, r0: int, c0: int, r1: int, c1: int, on: bool = True) -> None:
-	"""Clip a segment to the screen, then draw the visible portion with Bresenham."""
-	clipped = _clip_segment(r0, c0, r1, c1)
-	if clipped is None:
-		return
-	for r, c in _bresenham(*clipped):
-		if _in_bounds(r, c):
-			env.graph.set(r, c, on)
-
-
-def _trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
-	"""Sample f along one screen axis and plot the resulting curve.
-
-	axis='x': iterate pixel columns; f maps graph-x → graph-y  (DrawF).
-	axis='y': iterate pixel rows;    f maps graph-y → graph-x  (DrawInv).
-	Consecutive points are joined with line segments in Connected mode, or drawn
-	as single pixels in Dot mode.  Points that f skips (None) break the curve.
-
-	ΔX (or ΔY) is computed once before the loop, matching the TI-84's behaviour
-	of storing it as a window variable rather than recomputing per sample.
-	"""
-	connected = env.draw_mode is DrawMode.CONNECTED
-	prev = None
-	w = env.window
-	if not inv:
-		xmin = w.xmin.resolve()
-		delta = (w.xmax.resolve() - xmin) / MAX_COL   # ΔX, computed once
-		span = MAX_COL
-		def to_indep(i):
-			return xmin + i * delta
-		
-		def to_pixel(v, col):
-			return (_y_to_row(env, v), col)
-
-	else:
-		ymax = w.ymax.resolve()
-		delta = (ymax - w.ymin.resolve()) / MAX_ROW    # ΔY, computed once
-		span = MAX_ROW
-		def to_indep(i): 
-			return ymax - i * delta
-		
-		def to_pixel(v, row):
-			return (row, _x_to_col(env, v))
-
-	# Guard zone: how far off-screen a coordinate may be before we clamp it.
-	# Clamping both endpoints keeps Bresenham bounded near vertical asymptotes
-	# while leaving ordinarily off-screen points (e.g. row=63 when MAX_ROW=62)
-	# unclamped so the Bresenham path through the visible region is identical to
-	# what the TI produces by running Bresenham end-to-end with per-pixel clipping.
-
-	_GUARD = MAX_ROW + MAX_COL   # generous but finite
-	for i in range(span + 1):
-		value = f(to_indep(i))
-		if value is None:
-			prev = None
-			continue
-		row, col = to_pixel(value, i)
-		curr = (
-			max(-_GUARD, min(MAX_ROW + _GUARD, row)),
-			max(-_GUARD, min(MAX_COL + _GUARD, col)),
-		)
-		if connected and prev is not None:
-			for r, c in _bresenham(*prev, *curr):
-				if _in_bounds(r, c):
-					env.graph.set(r, c, on)
-
-		elif _in_bounds(row, col):
-			env.graph.set(row, col, on)
-
-		prev = curr
+# The curve sampler/tracer and coordinate math live in plot.py (shared with the
+# Y= function grapher, Environment.regraph).
 
 
 def _shade_under(env, f, lo: float, hi: float) -> None:
@@ -403,13 +198,13 @@ def _shade_under(env, f, lo: float, hi: float) -> None:
 @preparse_cmd
 def draw_f(env: Env, formula: Thunk) -> None:
 	"""DrawF expr — graph an expression in X as Y=f(X) (Func mode, regardless of mode)."""
-	_trace_curve(env, _function_sampler(env, formula))
+	_trace_curve(env, _function_sampler(env, formula.eval))
 
 
 @preparse_cmd
 def draw_inv(env: Env, formula: Thunk) -> None:
 	"""DrawInv expr — graph the inverse of expr: X becomes vertical, Y horizontal."""
-	_trace_curve(env, _function_sampler(env, formula), inv=True)
+	_trace_curve(env, _function_sampler(env, formula.eval), inv=True)
 
 
 @preparse_cmd_func
@@ -486,8 +281,8 @@ def shade(env: Env, lower: Thunk, upper: Thunk,
 	w = env.window
 	lo = w.xmin.resolve() if xleft is None else xleft
 	hi = w.xmax.resolve() if xright is None else xright
-	flo = _function_sampler(env, lower)
-	fhi = _function_sampler(env, upper)
+	flo = _function_sampler(env, lower.eval)
+	fhi = _function_sampler(env, upper.eval)
 	pat = max(1, min(4, py_int(pattern)))
 	res = py_int(patres)
 	if res < 0:
@@ -531,7 +326,7 @@ def tangent(env: Env, formula: Thunk, value: Real) -> None:
 	The slope is found numerically (central difference, matching nDeriv), and the
 	tangent line is drawn across the full window from Xmin to Xmax.
 	"""
-	f = _function_sampler(env, formula)
+	f = _function_sampler(env, formula.eval)
 	_trace_curve(env, f)
 	m = _numeric_derivative(f, value)
 	y0 = f(value)                 # evaluated last so X/Y exit holding the tangent point
