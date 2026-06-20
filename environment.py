@@ -10,7 +10,10 @@ from core import Variable, NumericVariable, RealVariable, ListVariable, UserList
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graph import Graph
-from plot import trace_curve, sample_function
+from plot import (
+	trace_curve, trace_parametric,
+	sample_function, sample_parametric, sample_polar,
+)
 from iodevice import HomeScreenIO
 from terminal import ScriptedConsole
 from titoken import Token
@@ -167,22 +170,55 @@ class Environment:
 		"""Redraw the graph from scratch: clear it, then plot the current mode's
 		selected, defined functions.
 
-		Only Function mode is plotted — parametric, polar, and sequence graphing
-		aren't implemented, so a selected function in those modes is silently skipped
-		(the screen just shows a cleared graph).  Axes, grid, and labels aren't drawn
-		yet either; this plots the curves only.
+		Function, parametric, and polar modes are plotted; sequence mode is not yet
+		(it needs an `n` accessor and recursive u(n-1) evaluation), so a SEQ graph just
+		comes up cleared.  Axes, grid, and labels aren't drawn yet either — curves only.
 
-		Each Yn is sampled column-by-column across the window and traced exactly like
-		DrawF (honoring Connected/Dot draw mode), reusing the shared plotter in plot.py.
-		As with DrawF, this leaves X (and Y) holding the last sampled point.
+		Each selected, defined function is traced through the shared plotters in plot.py,
+		honoring Connected/Dot draw mode.  As with DrawF, this leaves X/Y (and T or θ)
+		holding the last sampled point.
 		"""
 		self.graph.clear()
-		if self.graph_mode is not GraphMode.FUNC:
-			return
-		for func in self.graph_functions.groups[GraphMode.FUNC]:
+		plotter = {
+			GraphMode.FUNC: self._plot_functions,
+			GraphMode.PAR:  self._plot_parametric,
+			GraphMode.POL:  self._plot_polar,
+		}.get(self.graph_mode)
+		if plotter is not None:
+			plotter()
+
+	def _selected_functions(self, mode: GraphMode):
+		"""The GraphFunctions in `mode` that are turned on (FnOn/stored)."""
+		return [f for f in self.graph_functions.groups[mode] if f.selected]
+
+	def _plot_functions(self):
+		"""Func mode: each Yn sampled column-by-column as Y=f(X) (like DrawF)."""
+		for func in self._selected_functions(GraphMode.FUNC):
 			equation = func.equations[0].value
-			if func.selected and equation is not None:
+			if equation is not None:
 				trace_curve(self, sample_function(self, lambda eq=equation: eq.eval(self)))
+
+	def _plot_parametric(self):
+		"""Par mode: sweep T over [Tmin,Tmax] by Tstep, plotting (XnT(T), YnT(T)).
+		Both halves of the pair must be defined for the curve to plot."""
+		w = self.window
+		tmin, tmax, tstep = w.tmin.resolve(), w.tmax.resolve(), w.tstep.resolve()
+		for func in self._selected_functions(GraphMode.PAR):
+			x_eq, y_eq = func.equations[0].value, func.equations[1].value
+			if x_eq is not None and y_eq is not None:
+				point = sample_parametric(
+					self, lambda eq=x_eq: eq.eval(self), lambda eq=y_eq: eq.eval(self))
+				trace_parametric(self, point, tmin, tmax, tstep)
+
+	def _plot_polar(self):
+		"""Pol mode: sweep θ over [θmin,θmax] by θstep, plotting (r·cosθ, r·sinθ)."""
+		w = self.window
+		tmin, tmax, tstep = w.theta_min.resolve(), w.theta_max.resolve(), w.theta_step.resolve()
+		for func in self._selected_functions(GraphMode.POL):
+			r_eq = func.equations[0].value
+			if r_eq is not None:
+				point = sample_polar(self, lambda eq=r_eq: eq.eval(self))
+				trace_parametric(self, point, tmin, tmax, tstep)
 
 	def display_graph(self):
 		"""DispGraph — make the graph the active screen and re-plot the functions."""

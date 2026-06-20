@@ -1,5 +1,8 @@
-"""Function plotting: Environment.regraph draws the selected, defined Y= functions
-onto the graph (Func mode only), reusing the same tracer as DrawF."""
+"""Function plotting: Environment.regraph draws the selected, defined functions onto
+the graph, reusing the shared tracers in plot.py.  Func/parametric/polar are plotted;
+sequence isn't yet."""
+import math
+
 import pytest
 
 from environment import Environment
@@ -9,6 +12,11 @@ from test_tibasic import run, var
 
 def total_pixels(graph):
 	return sum(sum(row) for row in graph.buffer)
+
+
+def lit(env):
+	"""Set of (row, col) pixels that are on, across the drawable region."""
+	return {(r, c) for r in range(63) for c in range(95) if env.graph.get(r, c)}
 
 
 class TestDispGraphPlots:
@@ -90,3 +98,83 @@ class TestRegraphClears:
 		run('Pxl-On( 5,5', env)
 		assert env.graph.get(5, 5)               # the drawn pixel
 		assert env.graph.get(31, 0) and env.graph.get(31, 94)   # Y1=0 underneath
+
+
+def _par_env(x_expr, y_expr, tmin=0.0, tmax=10.0, tstep=0.1):
+	"""Parametric env: store X1T/Y1T (selecting the pair) and set the T sweep."""
+	env = run(f'"{x_expr}"@ X1t')
+	run(f'"{y_expr}"@ Y1t', env)
+	env.graph_mode = GraphMode.PAR
+	env.window.tmin.value = tmin
+	env.window.tmax.value = tmax
+	env.window.tstep.value = tstep
+	return env
+
+
+class TestParametric:
+	def test_plots_the_path(self):
+		# X1T=T, Y1T=T over T∈[0,10] traces y=x in the first quadrant on a ±10 window:
+		# (0,0)→centre pixel, (10,10)→top-right corner.
+		env = _par_env('T', 'T')
+		run('DispGraph', env)
+		assert env.graph.get(31, 47)
+		assert env.graph.get(0, 94)
+		assert not env.graph.get(62, 0)          # the third-quadrant arm is never swept
+
+	def test_both_halves_required(self):
+		# X1T defined but Y1T undefined → the pair doesn't plot.
+		env = run('"T"@ X1t')
+		env.graph_mode = GraphMode.PAR
+		env.window.tmin.value, env.window.tmax.value, env.window.tstep.value = 0, 10, 0.1
+		run('DispGraph', env)
+		assert total_pixels(env.graph) == 0
+
+	def test_zero_tstep_plots_nothing(self):
+		# Tstep≤0 graphs nothing rather than looping forever.
+		env = _par_env('T', 'T', tstep=0)
+		run('DispGraph', env)
+		assert total_pixels(env.graph) == 0
+
+	def test_leaves_t_at_last_sample(self):
+		env = _par_env('T', 'T', tmin=0, tmax=5, tstep=1)
+		run('DispGraph', env)
+		assert var(env, 'T') == 5
+
+
+class TestPolar:
+	def _circle_env(self, r_expr='5', step=0.02):
+		env = run(f'"{r_expr}"@ r1')
+		env.graph_mode = GraphMode.POL
+		env.window.theta_min.value = 0.0
+		env.window.theta_max.value = 2 * math.pi   # default angle mode is radians
+		env.window.theta_step.value = step
+		return env
+
+	def test_constant_r_is_a_circle(self):
+		# r=5 traces a circle of radius 5 about the origin: an outline, centre unlit,
+		# reaching both sides of the centre column.
+		env = self._circle_env()
+		run('DispGraph', env)
+		assert total_pixels(env.graph) > 0
+		assert not env.graph.get(31, 47)                       # hollow centre
+		assert any(env.graph.get(31, c) for c in range(48, 95))  # right of centre
+		assert any(env.graph.get(31, c) for c in range(0, 47))   # left of centre
+
+	def test_respects_angle_mode_degrees(self):
+		# In Degree mode the same θ window (0..2π≈6.28°) sweeps only a tiny arc, so the
+		# far-left side of the circle is never reached.
+		env = self._circle_env()
+		from modes import AngleMode
+		env.angle_mode = AngleMode.DEG
+		run('DispGraph', env)
+		assert not any(env.graph.get(31, c) for c in range(0, 24))
+
+
+class TestSequenceNotYet:
+	def test_sequence_mode_plots_nothing(self):
+		# Sequence graphing isn't implemented; the graph just comes up cleared.
+		env = Environment()
+		env.graph_mode = GraphMode.SEQ
+		run('FnOn', env)
+		run('DispGraph', env)
+		assert total_pixels(env.graph) == 0

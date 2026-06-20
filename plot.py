@@ -23,6 +23,12 @@ from modes import DrawMode
 MAX_ROW = 62
 MAX_COL = 94
 
+# Guard zone: how far off-screen a coordinate may be before a curve tracer clamps
+# it.  Clamping both endpoints keeps Bresenham bounded near vertical asymptotes (or
+# a parametric point that shoots far off screen) while still letting the visible
+# stretch of the connecting line draw correctly.
+_GUARD = MAX_ROW + MAX_COL   # generous but finite
+
 # Errors the calculator silently swallows while evaluating a graphed expression:
 # the offending point is dropped rather than aborting the command.
 _GRAPH_ERRORS = (
@@ -219,19 +225,116 @@ def trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
 		def to_pixel(v, row):
 			return (row, _x_to_col(env, v))
 
-	# Guard zone: how far off-screen a coordinate may be before we clamp it.
-	# Clamping both endpoints keeps Bresenham bounded near vertical asymptotes
-	# while leaving ordinarily off-screen points (e.g. row=63 when MAX_ROW=62)
-	# unclamped so the Bresenham path through the visible region is identical to
-	# what the TI produces by running Bresenham end-to-end with per-pixel clipping.
-
-	_GUARD = MAX_ROW + MAX_COL   # generous but finite
+	# Off-screen points (e.g. row=63 when MAX_ROW=62) are left unclamped to a pixel
+	# but bounded by _GUARD, so the Bresenham path through the visible region is
+	# identical to what the TI produces by running Bresenham end-to-end with
+	# per-pixel clipping.
 	for i in range(span + 1):
 		value = f(to_indep(i))
 		if value is None:
 			prev = None
 			continue
 		row, col = to_pixel(value, i)
+		curr = (
+			max(-_GUARD, min(MAX_ROW + _GUARD, row)),
+			max(-_GUARD, min(MAX_COL + _GUARD, col)),
+		)
+		if connected and prev is not None:
+			for r, c in _bresenham(*prev, *curr):
+				if _in_bounds(r, c):
+					env.graph.set(r, c, on)
+
+		elif _in_bounds(row, col):
+			env.graph.set(row, col, on)
+
+		prev = curr
+
+
+def _param_values(start: float, stop: float, step: float):
+	"""Yield parameter values start, start+step, … up to (and including) stop.
+
+	Used to sweep T (parametric) and θ (polar).  Empty if step ≤ 0 — the calculator
+	requires a positive Tstep/θstep and graphs nothing otherwise (rather than hang).
+	The small epsilon keeps a stop that should land exactly on a step (e.g. Tmax=2π
+	with a step that divides it) from being dropped to floating-point error.
+	"""
+	if step <= 0:
+		return
+	count = math.floor((stop - start) / step + 1e-9)
+	for i in range(count + 1):
+		yield start + i * step
+
+
+def sample_parametric(env, eval_x, eval_y):
+	"""Return point(t): set T to t, evaluate the X and Y equations, and return the
+	(x, y) graph coordinates — or None if either is undefined, non-real, or raises a
+	swallowed graph error.  Both halves must be defined for the point to plot.
+
+	T is set before either equation is evaluated; X and Y are left holding the last
+	point, mirroring how the calculator exits a graph with the trace coordinates set.
+	"""
+
+	def point(t):
+		env.t.value = t
+		try:
+			x = eval_x()
+			y = eval_y()
+		except _GRAPH_ERRORS:
+			return None
+		if not (isinstance(x, float) and isinstance(y, float)):
+			return None
+		env.x.value = x
+		env.y.value = y
+		return (x, y)
+
+	return point
+
+
+def sample_polar(env, eval_r):
+	"""Return point(θ): set θ to θ, evaluate r=f(θ), and return the (x, y) graph
+	coordinates of (r, θ) in the current angle mode — or None if r is undefined,
+	non-real, or raises a swallowed graph error.
+
+	θ is in the current angle mode (as the θmin/θmax/θstep window values are), so it
+	is converted to radians for the polar→rectangular conversion; the equation itself
+	already honors the angle mode when it evaluates.  θ, X, and Y are left holding the
+	last point.
+	"""
+
+	def point(theta):
+		env.theta.value = theta
+		try:
+			r = eval_r()
+		except _GRAPH_ERRORS:
+			return None
+		if not isinstance(r, float):
+			return None
+		angle = env.to_rad(theta)
+		x = r * math.cos(angle)
+		y = r * math.sin(angle)
+		env.x.value = x
+		env.y.value = y
+		return (x, y)
+
+	return point
+
+
+def trace_parametric(env, point, start: float, stop: float, step: float, on: bool = True) -> None:
+	"""Sweep a parameter from start to stop by step, plotting point(t) → (x, y) graph
+	coordinates (or None to break the curve).  Consecutive points are joined with line
+	segments in Connected mode, or drawn as single pixels in Dot mode.
+
+	This is the parameter-driven analogue of trace_curve: parametric and polar graphs
+	are a path traced as the parameter advances, rather than one y per pixel column.
+	"""
+	connected = env.draw_mode is DrawMode.CONNECTED
+	prev = None
+	for t in _param_values(start, stop, step):
+		xy = point(t)
+		if xy is None:
+			prev = None
+			continue
+		row, col = _graph_to_pixel(env, xy[0], xy[1])
 		curr = (
 			max(-_GUARD, min(MAX_ROW + _GUARD, row)),
 			max(-_GUARD, min(MAX_COL + _GUARD, col)),
