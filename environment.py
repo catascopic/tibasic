@@ -23,10 +23,13 @@ class Environment:
 		self.lists      = [ListVariable()     for _ in range(6)]   # L1–L6
 		self.matrices   = [MatrixVariable()   for _ in range(10)]  # [A]–[J]
 		self.strings    = [StringVariable()   for _ in range(10)]  # Str1–Str0
-		self.function   = [EquationVariable() for _ in range(10)]  # Y1–Y0
-		self.parametric = [EquationVariable() for _ in range(12)]  # X1T–Y6T
-		self.polar      = [EquationVariable() for _ in range(6)]   # r1–r6
-		self.sequence   = [EquationVariable() for _ in range(3)]   # u, v, w
+		# Graph equations and their on/off selection (see GraphFunctions).  The per-mode
+		# variable lists below are flat views the catalog tokens index into.
+		self.graph_functions = GraphFunctions()
+		self.function   = self.graph_functions.variables(GraphMode.FUNC)  # Y1–Y0
+		self.parametric = self.graph_functions.variables(GraphMode.PAR)   # X1T–Y6T
+		self.polar      = self.graph_functions.variables(GraphMode.POL)   # r1–r6
+		self.sequence   = self.graph_functions.variables(GraphMode.SEQ)   # u, v, w
 		self.user_lists = {}
 		# self.stat        = [None] * 0x3D # stat vars
 		self.n = NumericVariable()
@@ -388,6 +391,67 @@ class TableVars:
 		self.tbl_start = RealVariable()       # TblStart
 		self.delta_tbl = RealVariable(1.0)    # ΔTbl
 		self.tbl_input = ListVariable()       # TblInput — a 7-element list
+
+
+# ── Graph functions (the plottable equations + their on/off selection) ──────────
+
+class GraphFunction:
+	"""One selectable graph function: its equation variable(s) plus an on/off
+	`selected` flag.  Function-, polar-, and sequence-mode functions have a single
+	equation; a parametric function is an X/Y pair that shares this one flag, so
+	storing to either equation selects the pair together."""
+
+	def __init__(self, equation_count: int):
+		self.selected = False
+		# Storing to any of this function's equations selects it (Y1=… re-enables Y1),
+		# matching the calculator; the flag stays here, off the EquationVariable.
+		self.equations = [EquationVariable(on_store=self._select) for _ in range(equation_count)]
+
+	def _select(self) -> None:
+		self.selected = True
+
+
+class GraphFunctions:
+	"""All plottable equations, grouped by graph mode, each carrying its own on/off
+	state.  The graph (when displayed) plots the current mode's selected, defined
+	functions; selection is tracked here rather than on the equation variables, and
+	survives a mode switch (storing Y1 in Polar mode selects it for when you return
+	to Function mode).  FnOn/FnOff toggle the current mode's selection.
+	"""
+
+	# graph mode → (function count, equations per function)
+	_LAYOUT = {
+		GraphMode.FUNC: (10, 1),   # Y1–Y0
+		GraphMode.PAR:  (6, 2),    # X1T/Y1T – X6T/Y6T (pairs)
+		GraphMode.POL:  (6, 1),    # r1–r6
+		GraphMode.SEQ:  (3, 1),    # u, v, w
+	}
+
+	def __init__(self):
+		self.groups = {
+			mode: [GraphFunction(per_func) for _ in range(count)]
+			for mode, (count, per_func) in self._LAYOUT.items()
+		}
+
+	def variables(self, mode: GraphMode) -> list:
+		"""Flat list of a mode's equation variables, in token order (X1T, Y1T, X2T,
+		… for parametric) — the view the catalog tokens index into."""
+		return [eq for func in self.groups[mode] for eq in func.equations]
+
+	def set_selected(self, mode: GraphMode, on: bool, numbers=()) -> None:
+		"""FnOn/FnOff: select (on=True) or deselect the listed 1-based functions in
+		`mode`, or all of them when `numbers` is empty.  Number 0 means the 10th
+		function (Y0), matching the calculator's 1-9,0 numbering."""
+		funcs = self.groups[mode]
+		if not numbers:
+			for func in funcs:
+				func.selected = on
+			return
+		for n in numbers:
+			index = n - 1 if n >= 1 else 9        # FnOn 0 → the 10th function (Y0)
+			if not (0 <= index < len(funcs)):
+				raise DomainError(f"FnOn/FnOff: function number out of range: {n}")
+			funcs[index].selected = on
 
 
 class ReturnSignal(Exception):

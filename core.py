@@ -620,12 +620,25 @@ class StringVariable(Variable):
 
 
 class EquationVariable(Variable):
+	"""A graph equation (Y1, X1T, r1, u, …).  Its on/off selection lives outside the
+	variable (see environment.GraphFunctions); `on_store`, if given, is called after a
+	successful store so storing an equation can re-select its function, matching the
+	calculator."""
+
+	def __init__(self, on_store=None):
+		self._on_store = on_store
+
 	def normalize(self, value):
 		if isinstance(value, TiString):
 			return TiEquation(value.tokens)
 		if isinstance(value, TiEquation):
 			return value
 		raise DataTypeError(f"Expected equation or string, got {value!r}")
+
+	def store(self, new_value) -> None:
+		super().store(new_value)
+		if self._on_store is not None:
+			self._on_store()
 
 
 # ── Thunk ─────────────────────────────────────────────────────────────────────

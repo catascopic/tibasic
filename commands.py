@@ -135,6 +135,26 @@ def zoom_rcl(env):
 	env.zoom_recall()
 
 
+def _fn_select(env, on: bool, numbers):
+	"""Shared body of FnOn/FnOff: (de)select the given 1-based function numbers for the
+	current graph mode, or all of them when none are given."""
+	env.graph_functions.set_selected(env.graph_mode, on, [py_int(n) for n in numbers])
+
+
+@preparse_cmd
+def fn_on(env: Env, *numbers: Real):
+	"""FnOn [function#,...] — select (turn on) the listed functions in the current
+	graph mode, or all of them with no arguments."""
+	_fn_select(env, True, numbers)
+
+
+@preparse_cmd
+def fn_off(env: Env, *numbers: Real):
+	"""FnOff [function#,...] — deselect (turn off) the listed functions in the current
+	graph mode, or all of them with no arguments."""
+	_fn_select(env, False, numbers)
+
+
 @preparse_cmd
 def pause_cmd(env: Env, value: AnyValue = None):
 	"""Pause [value] — show value, then block until the user continues.
