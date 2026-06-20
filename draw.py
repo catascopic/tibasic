@@ -2,12 +2,27 @@ import math
 from numbers import Number
 
 import distributions as dist
-from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command
+from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command, TiCall
 from errors import DataTypeError, DivideByZeroError, DomainError, IncrementError, NonRealAnsError, TiOverflowError, SingularMatrixError
-from modes import DrawMode
+from modes import DrawMode, Screen
 from graph import Graph
 from fonts import SMALL_FONT, LARGE_FONT
 from core import TiEquation, TiString, py_int
+
+
+class _GraphDrawing(TiCall):
+	"""Wraps a drawing command so running it displays the graph first (regraphing on
+	the transition, so the active functions sit beneath the drawing).  Queries
+	(pxl-Test() and ClrDraw — which clears without displaying — are not wrapped."""
+
+	def __init__(self, inner: TiCall):
+		super().__init__(inner.func)
+		self._inner = inner
+
+	def call_with_parser(self, args):
+		result = self._inner.call_with_parser(args)
+		args.env.draw_to_graph()
+		return result
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
 # rows 0–62 (63 rows) and columns 0–94 (95 columns), inclusive.
@@ -134,7 +149,11 @@ def pxl_test(env: Env, row: Real, col: Real) -> float:
 
 @no_arg_command
 def clr_draw(env) -> None:
+	# ClrDraw clears the drawing but doesn't itself display the graph; it only
+	# regraphs the functions if the graph is already the screen being shown.
 	env.graph.clear()
+	if env.screen is Screen.GRAPH:
+		env.regraph()
 
 
 def _pt_action(env, x, y, mark, action) -> None:
@@ -632,3 +651,17 @@ def text(args):
 					graph.set(row + height, c, False)
 			next_col += 1
 		cur_col = next_col
+
+
+# Wrap every command that marks the graph so that running it displays the graph
+# (regraphing on the transition).  pxl-Test( is a query and ClrDraw clears without
+# displaying, so neither appears here.
+for _name in (
+	'pxl_on', 'pxl_off', 'pxl_change',
+	'pt_on', 'pt_off', 'pt_change',
+	'vertical', 'horizontal', 'line', 'circle',
+	'draw_f', 'draw_inv', 'tangent',
+	'shade', 'shade_norm', 'shade_t', 'shade_chi_sq', 'shade_f',
+	'text',
+):
+	globals()[_name] = _GraphDrawing(globals()[_name])

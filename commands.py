@@ -9,6 +9,7 @@ from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, StringVariable, py_int, require_string
 from errors import TiSyntaxError, UndefinedError
+from modes import Screen
 
 ############
 # PROGRAMS #
@@ -95,6 +96,7 @@ def disp(args: ArgParser):
 	"""Disp [value[,value...]] — show each value (no args just re-renders).  Every TI
 	data type is supported; how it's laid out is the device's call (the home screen
 	right-aligns numbers/lists/matrices, a matrix one line per row, strings left)."""
+	args.env.screen = Screen.HOME       # Disp brings up the home screen
 	io = args.env.io
 	if not args.has_next:
 		io.refresh()
@@ -114,13 +116,26 @@ def output(args: ArgParser):
 	col = py_int(args.expr())
 	value = args.expr()
 	args.end_paren_cmd()
+	args.env.screen = Screen.HOME       # Output( brings up the home screen
 	args.env.io.output(row, col, value)
 
 
 @no_arg_command
 def clr_home(env):
-	"""ClrHome — clear the text screen."""
+	"""ClrHome — clear the text screen.  Does not change which screen is displayed."""
 	env.io.clear_home()
+
+
+@no_arg_command
+def disp_graph(env):
+	"""DispGraph — display the graph screen, re-plotting the active functions."""
+	env.display_graph()
+
+
+@no_arg_command
+def disp_table(env):
+	"""DispTable — switch to the table screen (the table itself isn't implemented)."""
+	env.screen = Screen.TABLE
 
 
 @no_arg_command
@@ -207,6 +222,7 @@ def _input_one(env, prompt: str, var) -> None:
 	Empty input is rejected: an entry that's blank (or only whitespace) re-prompts
 	rather than storing anything, so neither Input nor Prompt can yield a value.
 	"""
+	env.screen = Screen.HOME            # Input/Prompt bring up the home screen
 	while not (text := env.io.read_value(prompt).strip()):
 		pass
 	tokens = _tokenize_input(text)

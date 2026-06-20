@@ -8,7 +8,7 @@ from typing import Any, ClassVar
 from core import TiList, is_complex_val
 from core import Variable, NumericVariable, RealVariable, ListVariable, UserList, MatrixVariable, StringVariable, EquationVariable, require_real, require_int, py_int
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
-from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder
+from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graph import Graph
 from iodevice import HomeScreenIO
 from terminal import ScriptedConsole
@@ -39,6 +39,7 @@ class Environment:
 		self.number_mode   = NumberMode.NORMAL
 		self.fix_digits    = None          # None = Float, 0–9 = Fix N
 		self.graph_mode    = GraphMode.FUNC
+		self.screen        = Screen.HOME   # which screen is currently displayed
 		self.complex_mode  = ComplexMode.REAL
 		self.draw_mode     = DrawMode.CONNECTED
 		self.graph_order   = GraphOrder.SEQUENTIAL
@@ -155,6 +156,32 @@ class Environment:
 
 	def set_random_seed(self, value):
 		random.seed(require_real(value))
+
+	# ── Graph display ────────────────────────────────────────────────────────────
+	# The graph is only (re)plotted when it's displayed — never eagerly.  display_graph
+	# is the explicit "show the graph" action (DispGraph); draw_to_graph is what a
+	# drawing command calls so the graph comes up with the functions under it.
+
+	def regraph(self):
+		"""Re-plot the current mode's selected, defined functions onto the graph.
+
+		Stub until function evaluation/plotting exists; the plotter will iterate
+		self.graph_functions.groups[self.graph_mode], keep the ones that are selected
+		and defined, evaluate them over the window, and draw to self.graph.
+		"""
+		pass
+
+	def display_graph(self):
+		"""DispGraph — make the graph the active screen and re-plot the functions."""
+		self.screen = Screen.GRAPH
+		self.regraph()
+
+	def draw_to_graph(self):
+		"""A drawing command is about to modify the graph: display it, re-plotting on
+		the transition so the functions sit beneath the drawing.  No re-plot if the
+		graph is already up — that would erase earlier drawing."""
+		if self.screen is not Screen.GRAPH:
+			self.display_graph()
 
 	# ── Zoom memory (ZoomSto / ZoomRcl) ──────────────────────────────────────────
 	# The Z-window system variables (ZXmin, Zθstep, …) are a saved snapshot of the
