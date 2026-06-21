@@ -358,3 +358,47 @@ class TestAxes:
 		run('DispGraph', env)
 		assert not any(all(env.graph.get(r, c) for c in range(95)) for r in range(63))
 		assert all(env.graph.get(r, 47) for r in range(63))   # y-axis still drawn
+
+
+class TestGrid:
+	"""GridOn plots a point at every (A·Xscl, B·Yscl).  Tests keep axes off to isolate
+	the grid; on the default ±10 window with Xscl=Yscl=1 the grid lands on integer
+	coordinates — e.g. (0,0)→(31,47), (5,5)→(16,71), (-5,-5)→(47,24)."""
+
+	@pytest.fixture
+	def env(self):
+		e = Environment()
+		e.grid_on = True   # axes already off via the module shim
+		return e
+
+	def test_grid_draws_scl_points(self, env):
+		run('DispGraph', env)
+		assert env.graph.get(31, 47)        # (0, 0)
+		assert env.graph.get(16, 71)        # (5, 5)
+		assert env.graph.get(47, 24)        # (-5, -5)
+		assert not env.graph.get(31, 48)    # column 48 (x≈0.2) is between grid points
+
+	def test_gridon_command_enables(self):
+		# End-to-end through the GridOn command rather than the flag.
+		env = Environment()
+		run('GridOn', env)
+		run('DispGraph', env)
+		assert env.graph.get(31, 47)
+
+	def test_spacing_follows_scl(self, env):
+		# Xscl=5 → grid columns only at multiples of 5; x=1 (column 52) drops out.
+		env.window.xscl.value = 5
+		run('DispGraph', env)
+		assert env.graph.get(31, 71)        # x=5 still a grid column
+		assert not env.graph.get(31, 52)    # x=1 no longer a grid column
+
+	def test_zero_scl_draws_nothing(self, env):
+		env.window.xscl.value = 0
+		run('DispGraph', env)
+		assert total_pixels(env.graph) == 0   # no division by zero, no grid
+
+	def test_off_by_default(self):
+		# A fresh environment has grid_on False (axes also off via the shim) → blank.
+		env = Environment()
+		run('DispGraph', env)
+		assert total_pixels(env.graph) == 0

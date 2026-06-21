@@ -422,3 +422,20 @@ def draw_axes(env, on: bool = True) -> None:
 				row = _y_to_row(env, y)
 				if 0 <= row <= MAX_ROW:
 					env.graph.set(row, axis_col + 1, on)
+
+
+def draw_grid(env, on: bool = True) -> None:
+	"""Plot a grid point at every (A·Xscl, B·Yscl) within the window (GridOn).
+
+	A and B range over the integers, so the grid spacing follows Xscl/Yscl exactly
+	as the axis tick marks do — the grid points sit on the tick rows and columns.
+	Nothing is drawn when Xscl or Yscl ≤ 0 (no infinite grid / division by zero).
+	"""
+	w = env.window
+	cols = [_x_to_col(env, x) for x in _axis_ticks(w.xmin.resolve(), w.xmax.resolve(), w.xscl.resolve())]
+	rows = [_y_to_row(env, y) for y in _axis_ticks(w.ymin.resolve(), w.ymax.resolve(), w.yscl.resolve())]
+	for row in rows:
+		if 0 <= row <= MAX_ROW:
+			for col in cols:
+				if 0 <= col <= MAX_COL:
+					env.graph.set(row, col, on)

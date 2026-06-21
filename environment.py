@@ -11,7 +11,7 @@ from errors import TiError, DataTypeError, DomainError, IllegalNestError, Invali
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graphscreen import GraphScreen
 from graph import (
-	trace_curve, trace_parametric, draw_axes,
+	trace_curve, trace_parametric, draw_axes, draw_grid,
 	sample_function, sample_parametric, sample_polar, sample_sequence,
 )
 from iodevice import HomeScreenIO
@@ -179,14 +179,16 @@ class Environment:
 
 		Function, parametric, polar, and sequence modes are all plotted (sequence uses
 		the default Time plot — Web and uv/vw/uvw phase plots aren't supported yet).
-		The axes (with Xscl/Yscl tick marks) are drawn first, beneath the curves, when
-		axes_on is set; grid and labels aren't drawn yet.
+		The grid (GridOn) and then the axes (with Xscl/Yscl tick marks) are drawn first,
+		beneath the curves, when grid_on / axes_on are set; labels aren't drawn.
 
 		Each selected, defined function is traced through the shared plotters in graph.py,
 		honoring Connected/Dot draw mode.  As with DrawF, this leaves X/Y (and T, θ, or n)
 		holding the last sampled point.
 		"""
 		self.graph.clear()
+		if self.grid_on:
+			draw_grid(self)
 		if self.axes_on:
 			draw_axes(self)
 		plotter = {
