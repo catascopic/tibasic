@@ -319,6 +319,27 @@ def sample_polar(env, eval_r):
 	return point
 
 
+def sample_sequence(env, index):
+	"""Return point(n): evaluate sequence u/v/w (index 0/1/2) at term n and return the
+	(n, value) graph coordinates for a Time plot — or None if the term is undefined,
+	non-real, or raises a swallowed graph error.  n, X, and Y are left at the last point.
+	"""
+
+	def point(n):
+		try:
+			y = env.eval_sequence(index, n)
+		except _GRAPH_ERRORS:
+			return None
+		if not isinstance(y, float):
+			return None
+		env.n.value = float(round(n))
+		env.x.value = float(n)
+		env.y.value = y
+		return (float(n), y)
+
+	return point
+
+
 def trace_parametric(env, point, start: float, stop: float, step: float, on: bool = True) -> None:
 	"""Sweep a parameter from start to stop by step, plotting point(t) → (x, y) graph
 	coordinates (or None to break the curve).  Consecutive points are joined with line

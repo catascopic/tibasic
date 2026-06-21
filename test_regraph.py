@@ -6,6 +6,7 @@ import math
 import pytest
 
 from environment import Environment
+from errors import DomainError
 from modes import GraphMode, DrawMode
 from test_tibasic import run, var
 
@@ -170,11 +171,107 @@ class TestPolar:
 		assert not any(env.graph.get(31, c) for c in range(0, 24))
 
 
-class TestSequenceNotYet:
-	def test_sequence_mode_plots_nothing(self):
-		# Sequence graphing isn't implemented; the graph just comes up cleared.
+def _seq_env(formula=None, initial=None, nmin=1, nmax=10):
+	"""Seq-mode env: optionally store u's recurrence and u(nMin) initial list, set n range."""
+	env = Environment()
+	if formula is not None:
+		run(f'"{formula}"@ u', env)
+	if initial is not None:
+		run(f'{{{",".join(map(str, initial))}}}@ u ( nMin )', env)
+	env.graph_mode = GraphMode.SEQ
+	env.window.n_min.value = nmin
+	env.window.n_max.value = nmax
+	env.window.plot_start.value = nmin
+	env.window.plot_step.value = 1
+	return env
+
+
+class TestSequenceEval:
+	def test_explicit_formula(self):
+		# u(n)=2n needs no initial values: it just reads the current n.
+		env = _seq_env('2n')
+		assert [env.eval_sequence(0, k) for k in range(1, 6)] == [2, 4, 6, 8, 10]
+
+	def test_recursive_fibonacci(self):
+		# u(n)=u(n-1)+u(n-2), u(nMin)={1,1}: the classic two-term recurrence.
+		env = _seq_env('u(n-1)+u(n-2)', initial=[1, 1])
+		assert [env.eval_sequence(0, k) for k in range(1, 9)] == [1, 1, 2, 3, 5, 8, 13, 21]
+
+	def test_initial_values_are_chronological(self):
+		# Element i of u(nMin) is the term at nMin+i (earliest first).
+		env = _seq_env(initial=[10, 20], nmin=1)
+		assert env.eval_sequence(0, 1) == 10
+		assert env.eval_sequence(0, 2) == 20
+
+	def test_scalar_initial_value(self):
+		# A single-term recurrence takes a scalar u(nMin) (wrapped as a 1-element list).
+		env = _seq_env('2u(n-1)', initial=[3])
+		assert [env.eval_sequence(0, k) for k in range(1, 5)] == [3, 6, 12, 24]
+
+	def test_cross_reference_between_sequences(self):
+		# v may reference u: v(n)=u(n-1)+1 with u(n)=n.
+		env = Environment()
+		run('"n"@ u', env)
+		run('"u(n-1)+1"@ v', env)
+		assert env.eval_sequence(1, 5) == 5     # u(4)+1
+
+	def test_self_reference_raises(self):
+		env = _seq_env('u(n)')
+		with pytest.raises(DomainError):
+			env.eval_sequence(0, 5)
+
+	def test_index_below_nmin_raises(self):
+		env = _seq_env('n', nmin=3)
+		with pytest.raises(DomainError):
+			env.eval_sequence(0, 2)
+
+	def test_store_selects_the_sequence(self):
+		# Storing the recurrence selects u, like any equation store.
+		env = run('"2n"@ u')
+		assert env.graph_functions.groups[GraphMode.SEQ][0].selected
+
+
+class TestSequencePlot:
+	def _window(self, env, lo=0, hi=11):
+		env.window.xmin.value, env.window.xmax.value = lo, hi
+		env.window.ymin.value, env.window.ymax.value = lo, hi
+
+	def test_time_plot_draws_points(self):
+		# u(n)=n over n=1..10: a Time plot rising from lower-left toward upper-right.
+		env = _seq_env('n')
+		self._window(env)
+		run('DispGraph', env)
+		assert total_pixels(env.graph) > 0
+
+	def test_plotstep_thins_the_plot(self):
+		# PlotStep=2 plots half as many terms as PlotStep=1 (counted in Dot mode).
+		env1 = _seq_env('n'); self._window(env1)
+		env1.draw_mode = DrawMode.DOT
+		run('DispGraph', env1)
+
+		env2 = _seq_env('n'); self._window(env2)
+		env2.draw_mode = DrawMode.DOT
+		env2.window.plot_step.value = 2
+		run('DispGraph', env2)
+
+		assert 0 < total_pixels(env2.graph) < total_pixels(env1.graph)
+
+	def test_unselected_not_plotted(self):
+		env = _seq_env('n'); self._window(env)
+		run('FnOff', env)
+		run('DispGraph', env)
+		assert total_pixels(env.graph) == 0
+
+	def test_undefined_sequence_mode_is_blank(self):
+		# Seq mode with nothing defined just comes up cleared.
 		env = Environment()
 		env.graph_mode = GraphMode.SEQ
 		run('FnOn', env)
 		run('DispGraph', env)
 		assert total_pixels(env.graph) == 0
+
+	def test_leaves_n_at_last_term(self):
+		env = _seq_env('n', nmax=7)
+		self._window(env)
+		run('DispGraph', env)
+		assert var(env, 'n') == 7

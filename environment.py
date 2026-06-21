@@ -12,11 +12,16 @@ from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, Graph
 from graph import Graph
 from plot import (
 	trace_curve, trace_parametric,
-	sample_function, sample_parametric, sample_polar,
+	sample_function, sample_parametric, sample_polar, sample_sequence,
 )
 from iodevice import HomeScreenIO
 from terminal import ScriptedConsole
 from titoken import Token
+
+
+# Sentinel parked in the sequence cache while a term is being computed; seeing it
+# again means the definition refers to itself (e.g. u(n)=u(n)).
+_SEQ_COMPUTING = object()
 
 
 class Environment:
@@ -83,6 +88,8 @@ class Environment:
 		self.programs: dict[str, "Program"] = {}      # name -> stored Program
 		self.execution_stack: list[object] = []       # in-flight Executions (innermost last)
 		# Internal data
+		self._seq_cache: dict = {}      # memoized sequence terms within one evaluation pass
+		self._seq_active = False        # True while a top-level sequence evaluation owns the cache
 		self._datetime_offset = timedelta(0)  # virtual_time = system_time + offset
 		self._nest_depth: dict[object, int] = defaultdict(lambda: 0)  # tracks nesting depth for ILLEGAL NEST guards
 
@@ -170,12 +177,12 @@ class Environment:
 		"""Redraw the graph from scratch: clear it, then plot the current mode's
 		selected, defined functions.
 
-		Function, parametric, and polar modes are plotted; sequence mode is not yet
-		(it needs an `n` accessor and recursive u(n-1) evaluation), so a SEQ graph just
-		comes up cleared.  Axes, grid, and labels aren't drawn yet either — curves only.
+		Function, parametric, polar, and sequence modes are all plotted (sequence uses
+		the default Time plot — Web and uv/vw/uvw phase plots aren't supported yet).
+		Axes, grid, and labels aren't drawn yet either — curves only.
 
 		Each selected, defined function is traced through the shared plotters in plot.py,
-		honoring Connected/Dot draw mode.  As with DrawF, this leaves X/Y (and T or θ)
+		honoring Connected/Dot draw mode.  As with DrawF, this leaves X/Y (and T, θ, or n)
 		holding the last sampled point.
 		"""
 		self.graph.clear()
@@ -183,6 +190,7 @@ class Environment:
 			GraphMode.FUNC: self._plot_functions,
 			GraphMode.PAR:  self._plot_parametric,
 			GraphMode.POL:  self._plot_polar,
+			GraphMode.SEQ:  self._plot_sequence,
 		}.get(self.graph_mode)
 		if plotter is not None:
 			plotter()
@@ -219,6 +227,88 @@ class Environment:
 			if r_eq is not None:
 				point = sample_polar(self, lambda eq=r_eq: eq.eval(self))
 				trace_parametric(self, point, tmin, tmax, tstep)
+
+	def _plot_sequence(self):
+		"""Seq mode, Time plot (the default): plot the point (n, s(n)) for each selected
+		sequence over n = PlotStart … nMax stepping by PlotStep.
+
+		Web and uv/vw/uvw phase plots aren't drawn — they'd need a Seq plot-type setting
+		the emulator doesn't model yet, so only the default Time plot is produced.  The
+		whole sweep shares one memo cache (see _sequence_pass) so a recursive sequence is
+		evaluated bottom-up rather than recomputed from nMin at every point.
+		"""
+		w = self.window
+		nmax, start, step = w.n_max.resolve(), w.plot_start.resolve(), w.plot_step.resolve()
+		with self._sequence_pass():
+			for index, func in enumerate(self.graph_functions.groups[GraphMode.SEQ]):
+				if func.selected and func.equations[0].value is not None:
+					trace_parametric(self, sample_sequence(self, index), start, nmax, step)
+
+	# ── Sequence evaluation (Seq mode u/v/w) ─────────────────────────────────────
+	# A sequence term is either an explicit initial value from its u(nMin) list or,
+	# beyond those, the recurrence formula evaluated with n bound to the index — which
+	# may refer back to earlier terms (u(n-1), v(n-2), …).  Terms are memoized within
+	# an evaluation pass so a recursive definition stays linear and self-reference is
+	# caught instead of recursing forever.
+
+	@contextmanager
+	def _sequence_pass(self):
+		"""Own a fresh memo cache for the duration of a top-level sequence evaluation,
+		shared by every nested term it pulls in.  A new top-level call starts clean, so
+		a redefined sequence is never read from a stale cache."""
+		top_level = not self._seq_active
+		if top_level:
+			self._seq_cache = {}
+			self._seq_active = True
+		try:
+			yield
+		finally:
+			if top_level:
+				self._seq_active = False
+
+	def eval_sequence(self, index: int, at):
+		"""Evaluate sequence 𝑢/𝑣/𝑤 (index 0/1/2) at term number `at`, rounded to an
+		integer n.  Returns the term's value; raises DomainError below nMin or on a
+		self-referential definition, and UndefinedError if the sequence has no formula
+		past its initial terms."""
+		with self._sequence_pass():
+			return self._eval_sequence(index, py_int(at))
+
+	def _eval_sequence(self, index: int, k: int):
+		func = self.graph_functions.groups[GraphMode.SEQ][index]
+		n_min = py_int(self.window.n_min.resolve())
+		if k < n_min:
+			raise DomainError(f"Sequence index {k} is below nMin ({n_min})")
+		# Initial terms come straight from the u(nMin) list (element i is the value at
+		# n_min + i — chronological order).
+		initial = func.initial
+		if initial is not None and k - n_min < len(initial.data):
+			return initial.data[k - n_min]
+		equation = func.equations[0].value
+		if equation is None:
+			raise UndefinedError(f"Sequence {'uvw'[index]} is not defined")
+		key = (index, k)
+		cache = self._seq_cache
+		if key in cache:
+			term = cache[key]
+			if term is _SEQ_COMPUTING:
+				raise DomainError(f"Sequence {'uvw'[index]} references itself at n={k}")
+			return term
+		cache[key] = _SEQ_COMPUTING
+		saved_n = self.n.value
+		self.n.value = float(k)
+		try:
+			term = equation.eval(self)
+		finally:
+			self.n.value = saved_n
+		cache[key] = term
+		return term
+
+	def store_sequence_initial(self, index: int, value) -> None:
+		"""Set sequence 𝑢/𝑣/𝑤's u(nMin) initial-value list ({…}→u(nMin)).  A scalar is
+		wrapped as a one-element list (a single initial term)."""
+		func = self.graph_functions.groups[GraphMode.SEQ][index]
+		func.initial = value if isinstance(value, TiList) else TiList([value])
 
 	def display_graph(self):
 		"""DispGraph — make the graph the active screen and re-plot the functions."""
@@ -482,6 +572,10 @@ class GraphFunction:
 		# Storing to any of this function's equations selects it (Y1=… re-enables Y1),
 		# matching the calculator; the flag stays here, off the EquationVariable.
 		self.equations = [EquationVariable(on_store=self._select) for _ in range(equation_count)]
+		# Seq mode only: the u(nMin) initial-value list (a TiList), defining the explicit
+		# starting terms a recursive sequence builds on.  None until set; unused by the
+		# other graph modes.
+		self.initial = None
 
 	def _select(self) -> None:
 		self.selected = True

@@ -139,6 +139,15 @@ class Token:
 	def is_equation_var(self) -> bool:
 		return 0x5E00 <= self.code <= 0x5EFF
 
+	def is_sequence_var(self) -> bool:
+		"""𝑢, 𝑣, 𝑤 — the Seq-mode equations, which are called as u(n) rather than
+		auto-evaluated like the other equation variables."""
+		return 0x5E80 <= self.code <= 0x5E82
+
+	def sequence_index(self) -> int:
+		"""0, 1, 2 for 𝑢, 𝑣, 𝑤 (into env.graph_functions.groups[GraphMode.SEQ])."""
+		return self.code - 0x5E80
+
 	def is_string_var(self) -> bool:
 		return 0xAA00 <= self.code <= 0xAAFF
 

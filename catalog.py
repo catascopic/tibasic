@@ -354,7 +354,7 @@ token(0x7E10, b'uvAxes')
 token(0x7E11, b'vwAxes')
 token(0x7E12, b'uwAxes')
 
-token(0x7F, b'\n')    # ▫
+token(0x7F, b'\x0a')    # ▫
 token(0x80, b'\x0b')  # ﹢
 token(0x81, b'\x0c')  # ·
 token(0x82, b'*',                       bp=(60, 61), op=ops.mul, typeable=True)

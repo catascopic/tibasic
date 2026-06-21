@@ -339,6 +339,18 @@ class Parser:
 				val = val[self.parse_matrix_indices()]
 			return val
 
+		if t.is_sequence_var():
+			# u(expr) evaluates the sequence at index expr (n-1, nMin, a literal, …);
+			# a bare u evaluates it at the current n.  Unlike other equation variables,
+			# a sequence isn't auto-evaluated — the parenthesized index is a call, not
+			# implicit multiplication.
+			if self.eat_if(L_PAREN):
+				index = self.parse_expr()
+				self.eat_if(R_PAREN)
+			else:
+				index = self.env.n.resolve()
+			return self.env.eval_sequence(t.sequence_index(), index)
+
 		if t.variable is not None:
 			value = t.variable(self.env).resolve()
 			if t.is_equation_var():
@@ -435,6 +447,15 @@ class Parser:
 				var.resolve()[self.parse_matrix_indices()] = value
 			else:
 				var.store(value)
+
+		elif t.is_sequence_var() and self.peek().code == L_PAREN:
+			# {…}→u(nMin): store the sequence's initial values.  The index in the
+			# parentheses is always nMin, so it's parsed and discarded; storing the
+			# bare formula (…→u, no parentheses) falls through to the variable branch.
+			self.advance()                # (
+			self.parse_expr()             # nMin — not used; storing sets the whole list
+			self.eat_if(R_PAREN)
+			self.env.store_sequence_initial(t.sequence_index(), value)
 
 		elif t.variable is not None:
 			t.variable(self.env).store(value)
