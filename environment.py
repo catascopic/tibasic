@@ -11,7 +11,7 @@ from errors import TiError, DataTypeError, DomainError, IllegalNestError, Invali
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graphscreen import GraphScreen
 from graph import (
-	trace_curve, trace_parametric,
+	trace_curve, trace_parametric, draw_axes,
 	sample_function, sample_parametric, sample_polar, sample_sequence,
 )
 from iodevice import HomeScreenIO
@@ -179,13 +179,16 @@ class Environment:
 
 		Function, parametric, polar, and sequence modes are all plotted (sequence uses
 		the default Time plot — Web and uv/vw/uvw phase plots aren't supported yet).
-		Axes, grid, and labels aren't drawn yet either — curves only.
+		The axes (with Xscl/Yscl tick marks) are drawn first, beneath the curves, when
+		axes_on is set; grid and labels aren't drawn yet.
 
-		Each selected, defined function is traced through the shared plotters in plot.py,
+		Each selected, defined function is traced through the shared plotters in graph.py,
 		honoring Connected/Dot draw mode.  As with DrawF, this leaves X/Y (and T, θ, or n)
 		holding the last sampled point.
 		"""
 		self.graph.clear()
+		if self.axes_on:
+			draw_axes(self)
 		plotter = {
 			GraphMode.FUNC: self._plot_functions,
 			GraphMode.PAR:  self._plot_parametric,
@@ -502,7 +505,7 @@ class Window:
 		'xmin', 'xmax', 'ymin', 'ymax', 'xscl', 'yscl', 'xres',
 		'tmin', 'tmax', 'tstep', 'theta_min', 'theta_max', 'theta_step',
 		'n_min', 'n_max', 'plot_start', 'plot_step',
-		'u_nmin', 'v_nmin', 'w_nmin', 'x_fact', 'y_fact',
+		'x_fact', 'y_fact',
 	)
 
 	def __init__(self):
@@ -529,10 +532,10 @@ class Window:
 		self.n_max      = _IntWindowVariable(10.0)
 		self.plot_start = RealVariable(1.0)
 		self.plot_step  = RealVariable(1.0)
-		# Recursive sequence initial conditions: u(nMin), v(nMin), w(nMin)
-		self.u_nmin     = RealVariable()
-		self.v_nmin     = RealVariable()
-		self.w_nmin     = RealVariable()
+		# Note: the recursive sequence initial conditions u(nMin)/v(nMin)/w(nMin) are
+		# NOT window variables — they're lists stored per sequence on GraphFunction.initial
+		# (set via {…}→u(nMin), read via u(nMin)), with no user-facing variable, mirroring
+		# how the calculator keeps them outside the addressable variable space.
 		# Zoom In/Out factors
 		self.x_fact     = _FactorVariable(4.0)
 		self.y_fact     = _FactorVariable(4.0)

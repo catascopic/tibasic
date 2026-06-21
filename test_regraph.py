@@ -1,14 +1,29 @@
 """Function plotting: Environment.regraph draws the selected, defined functions onto
-the graph, reusing the shared tracers in plot.py.  Func/parametric/polar are plotted;
-sequence isn't yet."""
+the graph, reusing the shared tracers in graph.py.  Func/parametric/polar/sequence
+are all plotted; the axes (drawn by regraph when axes_on) have their own tests in
+TestAxes at the bottom."""
 import math
 
 import pytest
 
-from environment import Environment
+from environment import Environment as _RealEnvironment
 from errors import DomainError
 from modes import GraphMode, DrawMode
-from test_tibasic import run, var
+from test_tibasic import run as _run, var
+
+
+# Most tests here check the plotted curves in isolation, so they default the axes
+# off (regraph draws axes + Xscl/Yscl ticks underneath when axes_on).  TestAxes
+# turns them back on to check the axes themselves.
+
+def Environment(*args, **kwargs):
+	env = _RealEnvironment(*args, **kwargs)
+	env.axes_on = False
+	return env
+
+
+def run(src, env=None):
+	return _run(src, env if env is not None else Environment())
 
 
 def total_pixels(graph):
@@ -275,3 +290,71 @@ class TestSequencePlot:
 		self._window(env)
 		run('DispGraph', env)
 		assert var(env, 'n') == 7
+
+
+class TestAxes:
+	"""regraph draws the axes (with Xscl/Yscl ticks) when axes_on is set.
+
+	On the default ±10 window the origin lands at pixel (row 31, col 47): the x-axis
+	is row 31, the y-axis is column 47.  Ticks sit one pixel toward the positive side
+	— row 30 above the x-axis, column 48 right of the y-axis.
+	"""
+
+	@pytest.fixture
+	def env(self):
+		e = Environment()
+		e.axes_on = True
+		return e
+
+	def test_axes_drawn_on_dispgraph(self, env):
+		run('DispGraph', env)
+		assert all(env.graph.get(31, c) for c in range(95))   # x-axis is the full row
+		assert all(env.graph.get(r, 47) for r in range(63))   # y-axis is the full column
+
+	def test_x_axis_ticks_sit_above_axis(self, env):
+		# Xscl=1, so x=5 (column 71) and x=-5 (column 24) get a tick on row 30.
+		run('DispGraph', env)
+		assert env.graph.get(30, 71)
+		assert env.graph.get(30, 24)
+		assert not env.graph.get(30, 49)   # column 49 is between ticks → blank
+
+	def test_y_axis_ticks_sit_right_of_axis(self, env):
+		# Yscl=1, so y=5 (row 16) and y=-5 (row 47) get a tick in column 48.
+		run('DispGraph', env)
+		assert env.graph.get(16, 48)
+		assert env.graph.get(47, 48)
+
+	def test_scl_controls_tick_spacing(self, env):
+		# With Xscl=5 only multiples of 5 are ticked: x=5 keeps its tick, x=1 loses it.
+		env.window.xscl.value = 5
+		run('DispGraph', env)
+		assert env.graph.get(30, 71)        # x=5 still ticked
+		assert not env.graph.get(30, 52)    # x=1 (column 52) no longer ticked
+
+	def test_zero_scl_draws_no_ticks(self, env):
+		# Xscl=0 must not hang or divide by zero — the axis is bare.
+		env.window.xscl.value = 0
+		run('DispGraph', env)
+		assert all(env.graph.get(31, c) for c in range(95))   # axis still there
+		assert not env.graph.get(30, 71)   # but the x=5 tick is gone
+		assert not env.graph.get(30, 24)   # and the x=-5 tick is gone
+
+	def test_axes_off_leaves_blank(self, env):
+		env.axes_on = False
+		run('DispGraph', env)
+		assert total_pixels(env.graph) == 0
+
+	def test_axes_redrawn_each_display(self, env):
+		run('DispGraph', env)
+		run('Pxl-On( 5,5', env)             # a stray pixel off the axes
+		assert env.graph.get(5, 5)
+		run('DispGraph', env)               # redraw: axes return, stray is cleared
+		assert not env.graph.get(5, 5)
+		assert all(env.graph.get(31, c) for c in range(95))
+
+	def test_x_axis_absent_when_zero_offscreen(self, env):
+		# Shift the window so y=0 is below it: no x-axis row, but the y-axis remains.
+		env.window.ymin.value, env.window.ymax.value = 1, 11
+		run('DispGraph', env)
+		assert not any(all(env.graph.get(r, c) for c in range(95)) for r in range(63))
+		assert all(env.graph.get(r, 47) for r in range(63))   # y-axis still drawn

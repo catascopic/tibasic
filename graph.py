@@ -369,3 +369,56 @@ def trace_parametric(env, point, start: float, stop: float, step: float, on: boo
 			env.graph.set(row, col, on)
 
 		prev = curr
+
+
+def _axis_ticks(lo: float, hi: float, scl: float):
+	"""Yield the tick coordinates in [lo, hi] at integer multiples of scl.
+
+	Nothing is produced when scl ≤ 0 (the calculator draws no tick marks rather
+	than dividing by zero).  Ticks are stepped as k·scl, not by repeated addition,
+	so they don't drift; the epsilon keeps an endpoint that should land exactly on
+	a multiple from being dropped to floating-point error.
+	"""
+	if scl <= 0:
+		return
+	k = math.ceil(lo / scl - 1e-9)
+	while True:
+		value = k * scl
+		if value > hi + 1e-9:
+			return
+		yield value
+		k += 1
+
+
+def draw_axes(env, on: bool = True) -> None:
+	"""Draw the x- and y-axes, with Xscl/Yscl tick marks, onto the graph.
+
+	Each axis is drawn only when its zero line falls within the window.  A tick is a
+	single pixel on the positive side of the axis — one row above the x-axis (toward
+	+y) and one column right of the y-axis (toward +x) — at every multiple of Xscl /
+	Yscl.  A tick at the origin coincides with the crossing axis line, so it is
+	harmless; ticks (or an axis edge) that fall off-screen are simply skipped.
+	"""
+	w = env.window
+	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
+	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
+	axis_row = _y_to_row(env, 0.0)   # the x-axis lies on row(y=0)
+	axis_col = _x_to_col(env, 0.0)   # the y-axis lies on col(x=0)
+
+	if 0 <= axis_row <= MAX_ROW:
+		for col in range(MAX_COL + 1):
+			env.graph.set(axis_row, col, on)
+		if axis_row - 1 >= 0:                 # tick marks above the x-axis
+			for x in _axis_ticks(xmin, xmax, w.xscl.resolve()):
+				col = _x_to_col(env, x)
+				if 0 <= col <= MAX_COL:
+					env.graph.set(axis_row - 1, col, on)
+
+	if 0 <= axis_col <= MAX_COL:
+		for row in range(MAX_ROW + 1):
+			env.graph.set(row, axis_col, on)
+		if axis_col + 1 <= MAX_COL:           # tick marks right of the y-axis
+			for y in _axis_ticks(ymin, ymax, w.yscl.resolve()):
+				row = _y_to_row(env, y)
+				if 0 <= row <= MAX_ROW:
+					env.graph.set(row, axis_col + 1, on)

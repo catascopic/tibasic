@@ -2,14 +2,34 @@
 
 import pytest
 
-from environment import Environment
+from environment import Environment as _RealEnvironment
 from graphscreen import GraphScreen
 from errors import ArgumentError, DomainError
 from modes import DrawMode
-from test_tibasic import calc, run, toks, var
+from test_tibasic import calc as _calc, run as _run, toks, var
 from test_program import run as run_program
 from fonts import SMALL_FONT, LARGE_FONT
 from draw import MAX_ROW, MAX_COL
+
+
+# These tests check the pixel output of the drawing primitives in isolation, so
+# they run with the axes turned off — drawing brings up the graph (regraph), which
+# now draws the axes and Xscl/Yscl ticks underneath.  (Axes are covered by their own
+# tests in test_regraph.py.)  This shim defaults every environment here to axes_on
+# = False without touching each call site.
+
+def Environment(*args, **kwargs):
+	env = _RealEnvironment(*args, **kwargs)
+	env.axes_on = False
+	return env
+
+
+def calc(items, env=None):
+	return _calc(items, env if env is not None else Environment())
+
+
+def run(src, env=None):
+	return _run(src, env if env is not None else Environment())
 
 
 def _col_count(env, col):
