@@ -4,10 +4,10 @@ import distributions as dist
 from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command, TiCall
 from errors import DataTypeError, DomainError
 from modes import Screen
-from graph import Graph
+from graphscreen import GraphScreen
 from fonts import SMALL_FONT, LARGE_FONT
 from core import TiString, py_int
-from plot import (
+from graph import (
 	MAX_ROW, MAX_COL, _round_half_up,
 	_x_to_col, _y_to_row, _col_to_x, _graph_to_pixel,
 	_bresenham, _in_bounds, _plot_segment,
@@ -101,17 +101,17 @@ def _pt_action(env, x, y, mark, action) -> None:
 
 @preparse_cmd_func
 def pt_on(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
-	_pt_action(env, x, y, mark, Graph.set)
+	_pt_action(env, x, y, mark, GraphScreen.set)
 
 
 @preparse_cmd_func
 def pt_off(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
-	_pt_action(env, x, y, mark, Graph.set_off)
+	_pt_action(env, x, y, mark, GraphScreen.set_off)
 
 
 @preparse_cmd_func
 def pt_change(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
-	_pt_action(env, x, y, mark, Graph.toggle)
+	_pt_action(env, x, y, mark, GraphScreen.toggle)
 
 
 @preparse_cmd

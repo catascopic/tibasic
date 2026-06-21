@@ -9,8 +9,8 @@ from core import TiList, is_complex_val
 from core import Variable, NumericVariable, RealVariable, ListVariable, UserList, MatrixVariable, StringVariable, EquationVariable, require_real, require_int, py_int
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
-from graph import Graph
-from plot import (
+from graphscreen import GraphScreen
+from graph import (
 	trace_curve, trace_parametric,
 	sample_function, sample_parametric, sample_polar, sample_sequence,
 )
@@ -71,7 +71,7 @@ class Environment:
 		# implemented, but programs can still store to and read these back.
 		self.table = TableVars()
 		# LCD pixel buffer (used by Pxl-/Pt-/Line/etc. drawing commands)
-		self.graph = Graph()
+		self.graph = GraphScreen()
 		# Text I/O device.  Commands talk to it semantically (io.disp/output/pause/…);
 		# it owns how that's realized — the default is the faithful 8×16 home screen
 		# painted by a Console backend (see iodevice.HomeScreenIO).

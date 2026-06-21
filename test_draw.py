@@ -3,7 +3,7 @@
 import pytest
 
 from environment import Environment
-from graph import Graph
+from graphscreen import GraphScreen
 from errors import ArgumentError, DomainError
 from modes import DrawMode
 from test_tibasic import calc, run, toks, var
@@ -19,44 +19,44 @@ def _col_count(env, col):
 
 # ── Graph class ───────────────────────────────────────────────────────────────
 
-def total_pixels(graph: Graph):
+def total_pixels(graph: GraphScreen):
 	return sum(sum(row) for row in graph.buffer)
 
 
 class TestGraph:
 
 	def test_starts_blank(self):
-		s = Graph()
+		s = GraphScreen()
 		assert total_pixels(s) == 0
 
 	def test_set_get(self):
-		s = Graph()
+		s = GraphScreen()
 		s.set(3, 5)  # (row, column)
 		assert s.get(3, 5)
 		assert not s.get(5, 3)  # (row, column) order matters
 
 	def test_set_off(self):
-		s = Graph()
+		s = GraphScreen()
 		s.set(3, 5, True)
 		s.set(3, 5, False)
 		assert not s.get(3, 5)
 
 	def test_toggle(self):
-		s = Graph()
+		s = GraphScreen()
 		s.toggle(3, 5)
 		assert s.get(3, 5)
 		s.toggle(3, 5)
 		assert not s.get(3, 5)
 
 	def test_clear(self):
-		s = Graph()
+		s = GraphScreen()
 		s.set(0, 0)
 		s.set(63, 95)
 		s.clear()
 		assert total_pixels(s) == 0
 
 	def test_corners_addressable(self):
-		s = Graph()
+		s = GraphScreen()
 		s.set(0, 0)
 		s.set(63, 95)  # last row, last column of the full buffer
 		assert s.get(0, 0)
