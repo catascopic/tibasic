@@ -682,6 +682,98 @@ class TestSigmaInt:
 		assert sint == approx(expected, rel=1e-6)
 
 
+class TestTVM:
+	"""TVM solver — each tvm_* recovers one variable from the others.
+
+	Same 30-year mortgage as the bal/Σ tests: PV=100000, I%=8/12 per month,
+	N=360, FV=0, with the exact PMT≈-733.76.  The fixture is a fully consistent
+	TVM state, so any of the five solvers should return its scenario value.
+	"""
+	R   = (8 / 12) / 100
+	N   = 360
+	PV  = 100_000
+	PMT = -PV * R / (1 - (1 + R) ** -N)   # exact payment for FV=0
+
+	@pytest.fixture
+	def env(self):
+		e = Environment()
+		e.i_pct.value = 8 / 12
+		e.n_tvm.value = self.N
+		e.pv.value    = self.PV
+		e.pmt.value   = self.PMT
+		return e
+
+	# ── bare form: read the stored finance variables ──
+
+	def test_pmt_bare(self, env):
+		assert calc('tvm_Pmt', env) == approx(self.PMT)
+
+	def test_pmt_known_value(self, env):
+		assert calc('tvm_Pmt', env) == approx(-733.76, rel=1e-3)
+
+	def test_pv_bare(self, env):
+		assert calc('tvm_PV', env) == approx(self.PV)
+
+	def test_fv_bare_is_zero(self, env):
+		assert calc('tvm_FV', env) == approx(0, abs=1e-6)
+
+	def test_n_bare(self, env):
+		assert calc('tvm_N', env) == approx(self.N)
+
+	def test_i_pct_bare(self, env):
+		assert calc('tvm_I%', env) == approx(8 / 12)
+
+	# ── zero-interest limit ──
+
+	def test_zero_interest_n(self):
+		e = Environment()
+		e.i_pct.value, e.pv.value, e.pmt.value = 0, 1200, -100
+		assert calc('tvm_N', e) == approx(12)
+
+	def test_zero_interest_pmt(self):
+		e = Environment()
+		e.i_pct.value, e.pv.value, e.n_tvm.value = 0, 1200, 12
+		assert calc('tvm_Pmt', e) == approx(-100)
+
+	# ── called form: arguments overwrite the stored variables first ──
+
+	def test_called_form_overwrites_variables(self):
+		e = Environment()
+		result = calc('tvm_Pmt ( 360,8/12,100000,0', e)
+		assert result == approx(self.PMT)
+		assert e.n_tvm.value == 360
+		assert e.i_pct.value == approx(8 / 12)
+		assert e.pv.value == 100_000
+		assert e.fv.value == 0
+
+	def test_called_form_empty_parens_uses_stored(self, env):
+		# tvm_Pmt() with no arguments is identical to the bare form.
+		assert calc('tvm_Pmt ( )', env) == approx(self.PMT)
+
+	def test_pmt_then_pv_roundtrip(self):
+		e = Environment()
+		e.i_pct.value, e.n_tvm.value, e.pv.value = 8 / 12, 360, 100_000
+		e.pmt.value = calc('tvm_Pmt', e)
+		e.pv.value = 0                       # clear so tvm_PV must recompute it
+		assert calc('tvm_PV', e) == approx(100_000)
+
+	# ── wiring / errors ──
+
+	def test_bare_and_called_are_both_wired(self):
+		# The point of the nullary+function pairing: every tvm_* token carries both
+		# a bare form (nullary) and a called form (function).
+		for code in range(0xBB20, 0xBB25):
+			t = catalog.get_token(code)
+			assert t.nullary is not None and t.function is not None
+
+	def test_pmt_zero_n_raises(self):
+		# N defaults to 0 → no periods to spread the payment over.
+		e = Environment()
+		e.i_pct.value, e.pv.value = 5, 1000
+		with pytest.raises(DomainError):
+			calc('tvm_Pmt', e)
+
+
 # ── Complex numbers ───────────────────────────────────────────────────────────
 
 class TestComplex:

@@ -30,6 +30,7 @@ def run(prgm_name):
 	env.submit([get_token(0x5F), *(TEXT_INPUT[c] for c in prgm_name)])
 
 
-run('ENIGMA3')
+run('QR')
+env.graph.disp()
 # env.graph.save('qr.bmp', 3)
 # env.dump()

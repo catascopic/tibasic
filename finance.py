@@ -2,9 +2,11 @@
 
   npv(      irr(      bal(      ΣPrn(     ΣInt(
   ►Nom(     ►Eff(     dbd(
+  tvm_Pmt   tvm_I%    tvm_PV    tvm_N     tvm_FV
 """
 
 import builtins
+import math
 from datetime import date
 
 from core import TiList, require_list
@@ -185,3 +187,158 @@ def nom(eff_rate: VectorizedReal, cp: VectorizedReal):
 	if eff_rate <= -100:
 		raise DomainError("►Nom: effective rate must be > -100%")
 	return 100 * cp * ((eff_rate / 100 + 1) ** (1 / cp) - 1)
+
+
+# ── TVM solver (tvm_Pmt, tvm_I%, tvm_PV, tvm_N, tvm_FV) ───────────────────────
+# Each solves the time-value-of-money equation for one variable given the other
+# six.  All five share the "bare-or-called" token shape: used bare (tvm_Pmt) they
+# read the stored finance variables; called (tvm_Pmt(N,I%,PV,FV,P/Y,C/Y)) the
+# optional arguments first overwrite those variables, then the value is computed.
+# The bare form is wired as the token's `nullary`, the called form as its
+# `function` — see Token in titoken.py.
+#
+# Like _bal above, I% is the rate *per period* (periodic rate = I%/100); P/Y and
+# C/Y are accepted and stored for signature compatibility but are not folded into
+# the rate, and payments are end-of-period.  The governing equation is
+#     0 = PV + PMT·(1 − (1+r)^(−N))/r + FV·(1+r)^(−N)     (r ≠ 0)
+#     0 = PV + PMT·N + FV                                  (r = 0)
+# The computed result is returned but not stored back into its own variable.
+
+
+def _factors(r: float, n: float) -> tuple[float, float]:
+	"""Discount factor v=(1+r)^(−N) and end-of-period annuity factor a=(1−v)/r.
+
+	At r=0 the annuity factor's removable singularity is replaced by its limit, N
+	(with v=1), so the three closed-form solvers below need no separate r=0 branch.
+	"""
+	if r == 0:
+		return 1.0, n
+	v = (1 + r) ** -n
+	return v, (1 - v) / r
+
+
+def tvm_pmt_value(env) -> float:
+	"""Payment amount from the stored finance variables (the bare tvm_Pmt)."""
+	v, a = _factors(env.i_pct.resolve() / 100, env.n_tvm.resolve())
+	if a == 0:
+		raise DomainError("tvm_Pmt: N must be nonzero")
+	return -(env.pv.resolve() + env.fv.resolve() * v) / a
+
+
+def tvm_pv_value(env) -> float:
+	"""Present value from the stored finance variables (the bare tvm_PV)."""
+	v, a = _factors(env.i_pct.resolve() / 100, env.n_tvm.resolve())
+	return -(env.pmt.resolve() * a + env.fv.resolve() * v)
+
+
+def tvm_fv_value(env) -> float:
+	"""Future value from the stored finance variables (the bare tvm_FV)."""
+	v, a = _factors(env.i_pct.resolve() / 100, env.n_tvm.resolve())
+	return -(env.pv.resolve() + env.pmt.resolve() * a) / v
+
+
+def tvm_n_value(env) -> float:
+	"""Number of payment periods from the stored finance variables (the bare tvm_N)."""
+	r = env.i_pct.resolve() / 100
+	pv, pmt, fv = env.pv.resolve(), env.pmt.resolve(), env.fv.resolve()
+	if r == 0:
+		if pmt == 0:
+			raise DomainError("tvm_N: PMT must be nonzero when I%=0")
+		return -(pv + fv) / pmt
+	# (1+r)^N = (PMT − FV·r) / (PMT + PV·r); the ratio must be positive to take a log.
+	num = pmt - fv * r
+	den = pmt + pv * r
+	if den == 0 or num / den <= 0:
+		raise DomainError("tvm_N: no solution for these values")
+	return math.log(num / den) / math.log(1 + r)
+
+
+def tvm_i_pct_value(env) -> float:
+	"""Periodic interest rate (percent) from the stored finance variables (bare tvm_I%).
+
+	I% has no closed form, so the TVM residual is bracketed (scanning outward from
+	just above −100% per period, widening the step) and then bisected.
+	"""
+	n, pv, pmt, fv = env.n_tvm.resolve(), env.pv.resolve(), env.pmt.resolve(), env.fv.resolve()
+
+	def f(r):
+		if builtins.abs(r) < 1e-12:
+			return pv + pmt * n + fv
+		v = (1 + r) ** -n
+		return pv + pmt * (1 - v) / r + fv * v
+
+	# Start just inside the rate that would overflow (1+r)^(−N); for the usual N>0
+	# that is exp(−700/N)−1, comfortably below any real financial rate.
+	r_min = math.exp(-700 / n) - 1 if n > 0 else -0.999999
+	prev_r, prev_f = r_min, f(r_min)
+	step = 1e-4
+	bracket = None
+	while prev_r < 100:
+		r = prev_r + step
+		fr = f(r)
+		if prev_f == 0:
+			return prev_r * 100
+		if (prev_f < 0) != (fr < 0):
+			bracket = (prev_r, r)
+			break
+		prev_r, prev_f, step = r, fr, step * 1.05
+	if bracket is None:
+		raise DomainError("tvm_I%: no solution found (ERR:NO SIGN CHG)")
+
+	lo, hi = bracket
+	f_lo = f(lo)
+	for _ in range(200):
+		mid = (lo + hi) / 2
+		f_mid = f(mid)
+		if builtins.abs(f_mid) < 1e-12 or (hi - lo) < 1e-15:
+			return mid * 100
+		if (f_lo < 0) != (f_mid < 0):
+			hi = mid
+		else:
+			lo, f_lo = mid, f_mid
+	return (lo + hi) / 2 * 100
+
+
+def _apply_tvm(env, *, n=None, i_pct=None, pv=None, pmt=None, fv=None, py=None, cy=None) -> None:
+	"""Overwrite the stored finance variables with any explicitly-passed arguments."""
+	for value, variable in (
+		(n, env.n_tvm), (i_pct, env.i_pct), (pv, env.pv),
+		(pmt, env.pmt), (fv, env.fv), (py, env.py), (cy, env.cy),
+	):
+		if value is not None:
+			variable.store(value)
+
+
+@preparse_func
+def tvm_pmt(env: Env, n: Real = None, i_pct: Real = None, pv: Real = None, fv: Real = None, py: Real = None, cy: Real = None):
+	"""tvm_Pmt([N,I%,PV,FV,P/Y,C/Y]) — payment amount."""
+	_apply_tvm(env, n=n, i_pct=i_pct, pv=pv, fv=fv, py=py, cy=cy)
+	return tvm_pmt_value(env)
+
+
+@preparse_func
+def tvm_i_pct(env: Env, n: Real = None, pv: Real = None, pmt: Real = None, fv: Real = None, py: Real = None, cy: Real = None):
+	"""tvm_I%([N,PV,PMT,FV,P/Y,C/Y]) — interest rate per period (percent)."""
+	_apply_tvm(env, n=n, pv=pv, pmt=pmt, fv=fv, py=py, cy=cy)
+	return tvm_i_pct_value(env)
+
+
+@preparse_func
+def tvm_pv(env: Env, n: Real = None, i_pct: Real = None, pmt: Real = None, fv: Real = None, py: Real = None, cy: Real = None):
+	"""tvm_PV([N,I%,PMT,FV,P/Y,C/Y]) — present value."""
+	_apply_tvm(env, n=n, i_pct=i_pct, pmt=pmt, fv=fv, py=py, cy=cy)
+	return tvm_pv_value(env)
+
+
+@preparse_func
+def tvm_n(env: Env, i_pct: Real = None, pv: Real = None, pmt: Real = None, fv: Real = None, py: Real = None, cy: Real = None):
+	"""tvm_N([I%,PV,PMT,FV,P/Y,C/Y]) — number of payment periods."""
+	_apply_tvm(env, i_pct=i_pct, pv=pv, pmt=pmt, fv=fv, py=py, cy=cy)
+	return tvm_n_value(env)
+
+
+@preparse_func
+def tvm_fv(env: Env, n: Real = None, i_pct: Real = None, pv: Real = None, pmt: Real = None, py: Real = None, cy: Real = None):
+	"""tvm_FV([N,I%,PV,PMT,P/Y,C/Y]) — future value."""
+	_apply_tvm(env, n=n, i_pct=i_pct, pv=pv, pmt=pmt, py=py, cy=cy)
+	return tvm_fv_value(env)
