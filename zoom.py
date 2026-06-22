@@ -20,12 +20,8 @@ to stat plots) is not here — it needs StatPlot, which isn't implemented.
 import math
 
 from preparse import no_arg_command
-from modes import AngleMode, GraphMode
-from errors import WindowRangeError
-from graph import (
-	MAX_ROW, MAX_COL, _param_values,
-	sample_function, sample_parametric, sample_polar, sample_sequence,
-)
+from modes import AngleMode
+from graph import MAX_ROW, MAX_COL
 
 
 def _set_x(env, xmin, xmax):
@@ -45,19 +41,7 @@ def z_standard(env):
 	_set_x(env, -10, 10)
 	_set_y(env, -10, 10)
 	w.xscl.value, w.yscl.value = 1.0, 1.0
-	# 2π / π⁄24 in Radian mode become 360 / 7.5 in Degree mode (Tmax, Tstep, θ…).
-	full = 2 * math.pi if env.angle_mode is AngleMode.RAD else 360.0
-	step = math.pi / 24 if env.angle_mode is AngleMode.RAD else 7.5
-	mode = env.graph_mode
-	if mode is GraphMode.FUNC:
-		w.xres.value = 1.0
-	elif mode is GraphMode.PAR:
-		w.tmin.value, w.tmax.value, w.tstep.value = 0.0, full, step
-	elif mode is GraphMode.POL:
-		w.theta_min.value, w.theta_max.value, w.theta_step.value = 0.0, full, step
-	elif mode is GraphMode.SEQ:
-		w.n_min.value, w.n_max.value = 1.0, 10.0
-		w.plot_start.value, w.plot_step.value = 1.0, 1.0
+	env.graph_mode_handler.standard_window(env)   # mode-specific vars: Xres / T… / θ… / n…
 	env.display_graph()
 
 
@@ -140,72 +124,16 @@ def zoom_out(env):
 
 # ── ZoomFit (fit the window to the graphed functions) ────────────────────────
 
-def _func_y_values(env):
-	"""Every finite Y of the selected Func-mode equations across Xmin..Xmax."""
-	w = env.window
-	xmin = w.xmin.resolve()
-	delta = (w.xmax.resolve() - xmin) / MAX_COL
-	ys = []
-	for func in env.graph_functions.groups[GraphMode.FUNC]:
-		eq = func.equations[0].value
-		if func.selected and eq is not None:
-			f = sample_function(env, lambda eq=eq: eq.eval(env))
-			ys += [y for i in range(MAX_COL + 1) if (y := f(xmin + i * delta)) is not None]
-	return ys
-
-
-def _collect(point, start, stop, step):
-	"""Every finite (x, y) of a parameter-swept curve."""
-	return [xy for t in _param_values(start, stop, step) if (xy := point(t)) is not None]
-
-
-def _swept_points(env):
-	"""Every finite (x, y) of the selected curves in the current non-Func mode."""
-	w = env.window
-	mode = env.graph_mode
-	pts = []
-	if mode is GraphMode.PAR:
-		start, stop, step = w.tmin.resolve(), w.tmax.resolve(), w.tstep.resolve()
-		for func in env.graph_functions.groups[GraphMode.PAR]:
-			x_eq, y_eq = func.equations[0].value, func.equations[1].value
-			if func.selected and x_eq is not None and y_eq is not None:
-				point = sample_parametric(env, lambda e=x_eq: e.eval(env), lambda e=y_eq: e.eval(env))
-				pts += _collect(point, start, stop, step)
-	elif mode is GraphMode.POL:
-		start, stop, step = w.theta_min.resolve(), w.theta_max.resolve(), w.theta_step.resolve()
-		for func in env.graph_functions.groups[GraphMode.POL]:
-			r_eq = func.equations[0].value
-			if func.selected and r_eq is not None:
-				point = sample_polar(env, lambda e=r_eq: e.eval(env))
-				pts += _collect(point, start, stop, step)
-	elif mode is GraphMode.SEQ:
-		start, stop, step = w.plot_start.resolve(), w.n_max.resolve(), w.plot_step.resolve()
-		with env._sequence_pass():
-			for index, func in enumerate(env.graph_functions.groups[GraphMode.SEQ]):
-				if func.selected and func.equations[0].value is not None:
-					pts += _collect(sample_sequence(env, index), start, stop, step)
-	return pts
-
-
 @no_arg_command
 def zoom_fit(env):
 	"""ZoomFit — set the window to the smallest one holding every plotted point.
 
-	In Func mode only Ymin/Ymax change (fit over the current Xmin..Xmax); in the
-	parameter-swept modes both X and Y are fit over the range of T, θ, or n.  Raises
-	ERR:WINDOW RANGE when there's nothing to fit or the range collapses to a point.
+	The per-mode extent (and the ERR:WINDOW RANGE check) lives on the graph-mode
+	handler: Func fits only Ymin/Ymax over the current Xmin..Xmax, while the
+	parameter-swept modes fit both axes over the range of T, θ, or n (see graphmodes.py).
 	"""
-	if env.graph_mode is GraphMode.FUNC:
-		ys = _func_y_values(env)
-		if not ys or min(ys) == max(ys):
-			raise WindowRangeError("ZoomFit: no Y range to fit")
-		_set_y(env, min(ys), max(ys))
-	else:
-		pts = _swept_points(env)
-		xs = [x for x, _ in pts]
-		ys = [y for _, y in pts]
-		if not pts or min(xs) == max(xs) or min(ys) == max(ys):
-			raise WindowRangeError("ZoomFit: no range to fit")
-		_set_x(env, min(xs), max(xs))
-		_set_y(env, min(ys), max(ys))
+	xmin, xmax, ymin, ymax = env.graph_mode_handler.fit_bounds(env)
+	if xmin is not None:           # None → leave the x-range alone (Func mode)
+		_set_x(env, xmin, xmax)
+	_set_y(env, ymin, ymax)
 	env.display_graph()

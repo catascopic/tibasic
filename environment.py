@@ -10,10 +10,8 @@ from core import Variable, NumericVariable, RealVariable, ListVariable, UserList
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graphscreen import GraphScreen
-from graph import (
-	trace_curve, trace_parametric, draw_axes, draw_grid,
-	sample_function, sample_parametric, sample_polar, sample_sequence,
-)
+from graph import draw_axes, draw_grid
+from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
 from iodevice import HomeScreenIO
 from terminal import ScriptedConsole
 from titoken import Token
@@ -191,63 +189,13 @@ class Environment:
 			draw_grid(self)
 		if self.axes_on:
 			draw_axes(self)
-		plotter = {
-			GraphMode.FUNC: self._plot_functions,
-			GraphMode.PAR:  self._plot_parametric,
-			GraphMode.POL:  self._plot_polar,
-			GraphMode.SEQ:  self._plot_sequence,
-		}.get(self.graph_mode)
-		if plotter is not None:
-			plotter()
+		self.graph_mode_handler.plot(self)
 
-	def _selected_functions(self, mode: GraphMode):
-		"""The GraphFunctions in `mode` that are turned on (FnOn/stored)."""
-		return [f for f in self.graph_functions.groups[mode] if f.selected]
-
-	def _plot_functions(self):
-		"""Func mode: each Yn sampled column-by-column as Y=f(X) (like DrawF)."""
-		for func in self._selected_functions(GraphMode.FUNC):
-			equation = func.equations[0].value
-			if equation is not None:
-				trace_curve(self, sample_function(self, lambda eq=equation: eq.eval(self)))
-
-	def _plot_parametric(self):
-		"""Par mode: sweep T over [Tmin,Tmax] by Tstep, plotting (XnT(T), YnT(T)).
-		Both halves of the pair must be defined for the curve to plot."""
-		w = self.window
-		tmin, tmax, tstep = w.tmin.resolve(), w.tmax.resolve(), w.tstep.resolve()
-		for func in self._selected_functions(GraphMode.PAR):
-			x_eq, y_eq = func.equations[0].value, func.equations[1].value
-			if x_eq is not None and y_eq is not None:
-				point = sample_parametric(
-					self, lambda eq=x_eq: eq.eval(self), lambda eq=y_eq: eq.eval(self))
-				trace_parametric(self, point, tmin, tmax, tstep)
-
-	def _plot_polar(self):
-		"""Pol mode: sweep θ over [θmin,θmax] by θstep, plotting (r·cosθ, r·sinθ)."""
-		w = self.window
-		tmin, tmax, tstep = w.theta_min.resolve(), w.theta_max.resolve(), w.theta_step.resolve()
-		for func in self._selected_functions(GraphMode.POL):
-			r_eq = func.equations[0].value
-			if r_eq is not None:
-				point = sample_polar(self, lambda eq=r_eq: eq.eval(self))
-				trace_parametric(self, point, tmin, tmax, tstep)
-
-	def _plot_sequence(self):
-		"""Seq mode, Time plot (the default): plot the point (n, s(n)) for each selected
-		sequence over n = PlotStart … nMax stepping by PlotStep.
-
-		Web and uv/vw/uvw phase plots aren't drawn — they'd need a Seq plot-type setting
-		the emulator doesn't model yet, so only the default Time plot is produced.  The
-		whole sweep shares one memo cache (see _sequence_pass) so a recursive sequence is
-		evaluated bottom-up rather than recomputed from nMin at every point.
-		"""
-		w = self.window
-		nmax, start, step = w.n_max.resolve(), w.plot_start.resolve(), w.plot_step.resolve()
-		with self._sequence_pass():
-			for index, func in enumerate(self.graph_functions.groups[GraphMode.SEQ]):
-				if func.selected and func.equations[0].value is not None:
-					trace_parametric(self, sample_sequence(self, index), start, nmax, step)
+	@property
+	def graph_mode_handler(self):
+		"""The strategy object for the current graph mode (see graphmodes.py).  Owns
+		plotting, the ZoomFit extent, and the ZStandard reset of mode-specific vars."""
+		return GRAPH_MODE_HANDLERS[self.graph_mode]
 
 	# ── Sequence evaluation (Seq mode u/v/w) ─────────────────────────────────────
 	# A sequence term is either an explicit initial value from its u(nMin) list or,
@@ -280,16 +228,16 @@ class Environment:
 			return self._eval_sequence(index, py_int(at))
 
 	def _eval_sequence(self, index: int, k: int):
-		func = self.graph_functions.groups[GraphMode.SEQ][index]
+		gf = self.graph_functions
 		n_min = py_int(self.window.n_min.resolve())
 		if k < n_min:
 			raise DomainError(f"Sequence index {k} is below nMin ({n_min})")
 		# Initial terms come straight from the u(nMin) list (element i is the value at
 		# n_min + i — chronological order).
-		initial = func.initial
+		initial = gf.initial[index]
 		if initial is not None and k - n_min < len(initial.data):
 			return initial.data[k - n_min]
-		equation = func.equations[0].value
+		equation = gf.equations[GraphMode.SEQ][index].value
 		if equation is None:
 			raise UndefinedError(f"Sequence {'uvw'[index]} is not defined")
 		key = (index, k)
@@ -312,8 +260,7 @@ class Environment:
 	def store_sequence_initial(self, index: int, value) -> None:
 		"""Set sequence 𝑢/𝑣/𝑤's u(nMin) initial-value list ({…}→u(nMin)).  A scalar is
 		wrapped as a one-element list (a single initial term)."""
-		func = self.graph_functions.groups[GraphMode.SEQ][index]
-		func.initial = value if isinstance(value, TiList) else TiList([value])
+		self.graph_functions.initial[index] = value if isinstance(value, TiList) else TiList([value])
 
 	def display_graph(self):
 		"""DispGraph — make the graph the active screen and re-plot the functions."""
@@ -535,7 +482,7 @@ class Window:
 		self.plot_start = RealVariable(1.0)
 		self.plot_step  = RealVariable(1.0)
 		# Note: the recursive sequence initial conditions u(nMin)/v(nMin)/w(nMin) are
-		# NOT window variables — they're lists stored per sequence on GraphFunction.initial
+		# NOT window variables — they're lists stored per sequence in GraphFunctions.initial
 		# (set via {…}→u(nMin), read via u(nMin)), with no user-facing variable, mirroring
 		# how the calculator keeps them outside the addressable variable space.
 		# Zoom In/Out factors
@@ -566,67 +513,74 @@ class TableVars:
 
 # ── Graph functions (the plottable equations + their on/off selection) ──────────
 
-class GraphFunction:
-	"""One selectable graph function: its equation variable(s) plus an on/off
-	`selected` flag.  Function-, polar-, and sequence-mode functions have a single
-	equation; a parametric function is an X/Y pair that shares this one flag, so
-	storing to either equation selects the pair together."""
-
-	def __init__(self, equation_count: int):
-		self.selected = False
-		# Storing to any of this function's equations selects it (Y1=… re-enables Y1),
-		# matching the calculator; the flag stays here, off the EquationVariable.
-		self.equations = [EquationVariable(on_store=self._select) for _ in range(equation_count)]
-		# Seq mode only: the u(nMin) initial-value list (a TiList), defining the explicit
-		# starting terms a recursive sequence builds on.  None until set; unused by the
-		# other graph modes.
-		self.initial = None
-
-	def _select(self) -> None:
-		self.selected = True
-
-
 class GraphFunctions:
-	"""All plottable equations, grouped by graph mode, each carrying its own on/off
-	state.  The graph (when displayed) plots the current mode's selected, defined
-	functions; selection is tracked here rather than on the equation variables, and
-	survives a mode switch (storing Y1 in Polar mode selects it for when you return
-	to Function mode).  FnOn/FnOff toggle the current mode's selection.
+	"""All plottable equations and their on/off selection, per graph mode.
+
+	Each mode keeps a flat list of EquationVariables in token order (Y1–Y0; X1T, Y1T,
+	X2T, …; r1–r6; u, v, w) — the view the catalog tokens index into — plus a list of
+	`selected` flags, one per *function*.  A function owns `equations_per_function`
+	consecutive equations: 1 for Func/Polar/Seq, 2 for a parametric X/Y pair.  So a
+	parametric pair shares one flag (storing to either half, or FnOn/FnOff on it, moves
+	the one flag), with no per-equation flags to keep in sync.
+
+	Selection lives here rather than on the EquationVariables, so it survives a mode
+	switch (storing Y1 in Polar mode selects it for when you return to Function mode).
+	Per-mode layout (function count, equations per function) comes from the graph-mode
+	handlers (see graphmodes.py), keeping all mode-shape knowledge in one place.
 	"""
 
-	# graph mode → (function count, equations per function)
-	_LAYOUT = {
-		GraphMode.FUNC: (10, 1),   # Y1–Y0
-		GraphMode.PAR:  (6, 2),    # X1T/Y1T – X6T/Y6T (pairs)
-		GraphMode.POL:  (6, 1),    # r1–r6
-		GraphMode.SEQ:  (3, 1),    # u, v, w
-	}
-
 	def __init__(self):
-		self.groups = {
-			mode: [GraphFunction(per_func) for _ in range(count)]
-			for mode, (count, per_func) in self._LAYOUT.items()
-		}
+		self.equations = {}      # mode -> flat list of EquationVariable (token order)
+		self.selected = {}       # mode -> list[bool], one flag per function
+		for mode, handler in GRAPH_MODE_HANDLERS.items():
+			stride = handler.equations_per_function
+			self.selected[mode] = [False] * handler.function_count
+			self.equations[mode] = [
+				EquationVariable(on_store=self._selector(mode, i // stride))
+				for i in range(handler.function_count * stride)
+			]
+		# Recursive-sequence initial values u(nMin)/v(nMin)/w(nMin): a TiList per
+		# sequence (index 0/1/2), or None.  No user variable / token addresses these —
+		# they live here, set via {…}→u(nMin) and read via u(nMin).
+		self.initial = [None, None, None]
+
+	def _selector(self, mode, func_index):
+		"""The on_store callback for an equation: select the function it belongs to."""
+		def select():
+			self.selected[mode][func_index] = True
+		return select
 
 	def variables(self, mode: GraphMode) -> list:
-		"""Flat list of a mode's equation variables, in token order (X1T, Y1T, X2T,
-		… for parametric) — the view the catalog tokens index into."""
-		return [eq for func in self.groups[mode] for eq in func.equations]
+		"""Flat list of a mode's equation variables, in token order — the view the
+		catalog tokens index into."""
+		return self.equations[mode]
+
+	def selected_defined(self, mode: GraphMode):
+		"""Yield (function index, [equation values]) for each selected function whose
+		equations are *all* defined.  The all-defined rule means a parametric pair only
+		plots when both halves are set, with no mode-specific check."""
+		stride = GRAPH_MODE_HANDLERS[mode].equations_per_function
+		eqs = self.equations[mode]
+		for f, sel in enumerate(self.selected[mode]):
+			if sel:
+				values = [eqs[f * stride + k].value for k in range(stride)]
+				if all(v is not None for v in values):
+					yield f, values
 
 	def set_selected(self, mode: GraphMode, on: bool, numbers=()) -> None:
 		"""FnOn/FnOff: select (on=True) or deselect the listed 1-based functions in
 		`mode`, or all of them when `numbers` is empty.  Number 0 means the 10th
 		function (Y0), matching the calculator's 1-9,0 numbering."""
-		funcs = self.groups[mode]
+		flags = self.selected[mode]
 		if not numbers:
-			for func in funcs:
-				func.selected = on
+			for i in range(len(flags)):
+				flags[i] = on
 			return
 		for n in numbers:
 			index = n - 1 if n >= 1 else 9        # FnOn 0 → the 10th function (Y0)
-			if not (0 <= index < len(funcs)):
+			if not (0 <= index < len(flags)):
 				raise DomainError(f"FnOn/FnOff: function number out of range: {n}")
-			funcs[index].selected = on
+			flags[index] = on
 
 
 class ReturnSignal(Exception):

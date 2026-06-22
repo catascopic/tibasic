@@ -145,7 +145,7 @@ class Token:
 		return 0x5E80 <= self.code <= 0x5E82
 
 	def sequence_index(self) -> int:
-		"""0, 1, 2 for 𝑢, 𝑣, 𝑤 (into env.graph_functions.groups[GraphMode.SEQ])."""
+		"""0, 1, 2 for 𝑢, 𝑣, 𝑤 (the sequence index into env.graph_functions, SEQ mode)."""
 		return self.code - 0x5E80
 
 	def is_string_var(self) -> bool:

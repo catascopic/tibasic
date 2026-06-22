@@ -11,7 +11,7 @@ FUNC, PAR, POL, SEQ = GraphMode.FUNC, GraphMode.PAR, GraphMode.POL, GraphMode.SE
 
 
 def selected(env, mode):
-	return [f.selected for f in env.graph_functions.groups[mode]]
+	return list(env.graph_functions.selected[mode])
 
 
 class TestDefaults:
@@ -46,8 +46,8 @@ class TestStoreSelects:
 	def test_parametric_pair_shares_one_flag(self):
 		x_env = run('"T"@ X1t')                  # store the X half
 		y_env = run('"T"@ Y1t')                  # store the Y half
-		assert x_env.graph_functions.groups[PAR][0].selected
-		assert y_env.graph_functions.groups[PAR][0].selected
+		assert x_env.graph_functions.selected[PAR][0]
+		assert y_env.graph_functions.selected[PAR][0]
 
 
 class TestFnOnOff:
