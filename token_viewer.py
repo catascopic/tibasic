@@ -34,7 +34,7 @@ def _row_digits(row: int) -> list:
 
 def _draw_token(env, tok, row: int, large: bool) -> None:
 	"""Draw one token at (row, 0) via Text(, reading it from a string variable."""
-	STR_VAR.variable(env).value = TiString([tok])
+	STR_VAR.accessor.set(env, TiString([tok]))
 	stmt = [TEXT]
 	if large:
 		stmt += [NEG, DIGITS[1], COMMA]          # -1 selects the large font

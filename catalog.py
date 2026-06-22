@@ -1,5 +1,4 @@
 import math
-from operator import attrgetter
 from collections.abc import Callable
 from io import BytesIO
 
@@ -7,6 +6,12 @@ from environment import Environment
 from parser import ArgParser
 from preparse import special_func
 from titoken import Token
+from accessors import (
+	Accessor, NumericVar, MatrixVar, ListVar, StringVar,
+	ComputedAccessor, LegacyAccessor, RandAccessor,
+	WindowVar, XresVar, IntWindowVar, FactorWindowVar, DeltaWindowVar,
+	EnvVar, TableVar,
+)
 import commands as cmds
 import distributions as dist
 import draw
@@ -82,8 +87,9 @@ def read_token(f: BytesIO) -> Token:
 		raise ValueError(f"Invalid token code: 0x{code:0{4 if code > 0xFF else 2}X}")
 
 
-def _make_accessor(table: str, index: int):
-	return lambda env: getattr(env, table)[index]
+def _make_accessor(table: str, index: int) -> Accessor:
+	"""LegacyAccessor for equation variable tables (function/parametric/polar/sequence)."""
+	return LegacyAccessor(lambda env: getattr(env, table)[index])
 
 
 def token(
@@ -98,9 +104,18 @@ def token(
 	cmd:  Callable | None = None,
 	res:  Callable | None = None,
 	cnv:  Callable | None = None,
-	var:  Callable | None = None,
+	var=None,
 ) -> Token:
-	t = Token(code, display, bp, op, post, func, cmd, res, cnv, var)
+	# `res` (a 0-arg query: π, getKey, …) and `var` describe how the token reaches the
+	# environment; both collapse to a single Accessor.  `var` may already be an Accessor
+	# (from _make_accessor) or a bare (env)->Variable callable, which we wrap in the
+	# LegacyAccessor bridge.
+	accessor = None
+	if res is not None:
+		accessor = ComputedAccessor(res)
+	elif var is not None:
+		accessor = var if isinstance(var, Accessor) else LegacyAccessor(var)
+	t = Token(code, display, bp, op, post, func, cmd, accessor, cnv)
 	_set_token(t)
 	ALL_TOKENS.append(t)
 	if typeable:
@@ -169,17 +184,17 @@ token(0x40, b' and ',                   bp=(30, 31), op=ops.and_)
 
 # A - Z, θ
 for _i in range(26):
-	token(0x41 + _i, bytes([0x41 + _i]), var=_make_accessor('numerics', _i), typeable=True)
+	token(0x41 + _i, bytes([0x41 + _i]), var=NumericVar(chr(0x41 + _i)), typeable=True)
 
-token(0x5B, b'\x5b', var=_make_accessor('numerics', 26), typeable=True)
+token(0x5B, b'\x5b', var=NumericVar('theta'), typeable=True)
 
 # [A] - [J]
 for _i in range(10):
-	token(0x5C00 | _i, bytes([0xC1, 0x41 + _i, 0x5D]), var=_make_accessor('matrices', _i))
+	token(0x5C00 | _i, bytes([0xC1, 0x41 + _i, 0x5D]), var=MatrixVar(chr(0x41 + _i)))
 
 # L₁ - L₆
 for _i in range(6):
-	token(0x5D00 | _i, bytes([0x4C, 0x81 + _i]), var=_make_accessor('lists', _i))
+	token(0x5D00 | _i, bytes([0x4C, 0x81 + _i]), var=ListVar(_i))
 
 # Y₁ - Y₀
 for _i in range(10):
@@ -239,7 +254,7 @@ token(0x621D, b'x\x83')     # x₃
 token(0x621E, b'y\x81')     # y₁
 token(0x621F, b'y\x82')     # y₂
 token(0x6220, b'y\x83')     # y₃
-token(0x6221, b'\x01',                  var=attrgetter('n'))  # 𝑛
+token(0x6221, b'\x01',                  var=EnvVar('n'))      # 𝑛
 token(0x6222, b'p')
 token(0x6223, b'z')
 token(0x6224, b't')
@@ -268,42 +283,36 @@ token(0x623A, b'df')        # Error df
 token(0x623B, b'SS')        # Error SS
 token(0x623C, b'MS')        # Error MS
 
-def _window_getter(attr: str):
-	return lambda env: getattr(env.window, attr)
-
-def _table_getter(attr: str):
-	return lambda env: getattr(env.table, attr)
-
-token(0x6302, b'Xscl',                  var=_window_getter('xscl'))
-token(0x6303, b'Yscl',                  var=_window_getter('yscl'))
-token(0x630A, b'Xmin',                  var=_window_getter('xmin'))
-token(0x630B, b'Xmax',                  var=_window_getter('xmax'))
-token(0x630C, b'Ymin',                  var=_window_getter('ymin'))
-token(0x630D, b'Ymax',                  var=_window_getter('ymax'))
-token(0x630E, b'Tmin',                  var=_window_getter('tmin'))
-token(0x630F, b'Tmax',                  var=_window_getter('tmax'))
-token(0x6310, b'\x5bmin',               var=_window_getter('theta_min'))   # θmin
-token(0x6311, b'\x5bmax',               var=_window_getter('theta_max'))   # θmax
-token(0x631A, b'TblStart',              var=_table_getter('tbl_start'))
-token(0x631B, b'PlotStart',             var=_window_getter('plot_start'))
-token(0x631D, b'nMax',                  var=_window_getter('n_max'))
-token(0x631F, b'nMin',                  var=_window_getter('n_min'))
-token(0x6321, b'\xbeTbl',               var=_table_getter('delta_tbl'))    # ΔTbl
-token(0x6322, b'Tstep',                 var=_window_getter('tstep'))
-token(0x6323, b'\x5bstep',              var=_window_getter('theta_step'))  # θstep
-token(0x6326, b'\xbeX',                 var=_window_getter('delta_x'))     # ΔX
-token(0x6327, b'\xbeY',                 var=_window_getter('delta_y'))     # ΔY
-token(0x6328, b'XFact',                 var=_window_getter('x_fact'))
-token(0x6329, b'YFact',                 var=_window_getter('y_fact'))
-token(0x6334, b'PlotStep',              var=_window_getter('plot_step'))
-token(0x6336, b'Xres',                  var=_window_getter('xres'))
-token(0x632B, b'\xdd',                  var=attrgetter('n_tvm'))  # 𝐍
-token(0x632C, b'I%',                    var=attrgetter('i_pct'))
-token(0x632D, b'PV',                    var=attrgetter('pv'))
-token(0x632E, b'PMT',                   var=attrgetter('pmt'))
-token(0x632F, b'FV',                    var=attrgetter('fv'))
-token(0x6330, b'P/Y',                   var=attrgetter('py'))
-token(0x6331, b'C/Y',                   var=attrgetter('cy'))
+token(0x6302, b'Xscl',                  var=WindowVar('xscl'))
+token(0x6303, b'Yscl',                  var=WindowVar('yscl'))
+token(0x630A, b'Xmin',                  var=WindowVar('xmin'))
+token(0x630B, b'Xmax',                  var=WindowVar('xmax'))
+token(0x630C, b'Ymin',                  var=WindowVar('ymin'))
+token(0x630D, b'Ymax',                  var=WindowVar('ymax'))
+token(0x630E, b'Tmin',                  var=WindowVar('tmin'))
+token(0x630F, b'Tmax',                  var=WindowVar('tmax'))
+token(0x6310, b'\x5bmin',               var=WindowVar('theta_min'))    # θmin
+token(0x6311, b'\x5bmax',               var=WindowVar('theta_max'))    # θmax
+token(0x631A, b'TblStart',              var=TableVar('tbl_start'))
+token(0x631B, b'PlotStart',             var=WindowVar('plot_start'))
+token(0x631D, b'nMax',                  var=IntWindowVar('n_max'))
+token(0x631F, b'nMin',                  var=IntWindowVar('n_min'))
+token(0x6321, b'\xbeTbl',               var=TableVar('delta_tbl'))       # ΔTbl
+token(0x6322, b'Tstep',                 var=WindowVar('tstep'))
+token(0x6323, b'\x5bstep',              var=WindowVar('theta_step'))    # θstep
+token(0x6326, b'\xbeX',                 var=DeltaWindowVar('xmin', 'xmax', 94))  # ΔX
+token(0x6327, b'\xbeY',                 var=DeltaWindowVar('ymin', 'ymax', 62))  # ΔY
+token(0x6328, b'XFact',                 var=FactorWindowVar('x_fact'))
+token(0x6329, b'YFact',                 var=FactorWindowVar('y_fact'))
+token(0x6334, b'PlotStep',              var=WindowVar('plot_step'))
+token(0x6336, b'Xres',                  var=XresVar('xres'))
+token(0x632B, b'\xdd',                  var=EnvVar('n_tvm'))     # 𝐍
+token(0x632C, b'I%',                    var=EnvVar('i_pct'))
+token(0x632D, b'PV',                    var=EnvVar('pv'))
+token(0x632E, b'PMT',                   var=EnvVar('pmt'))
+token(0x632F, b'FV',                    var=EnvVar('fv'))
+token(0x6330, b'P/Y',                   var=EnvVar('py'))
+token(0x6331, b'C/Y',                   var=EnvVar('cy'))
 
 token(0x64, b'Radian',                  cmd=modecmds.radian)
 token(0x65, b'Degree',                  cmd=modecmds.degree)
@@ -401,9 +410,9 @@ token(0xA9, b'DrawF ',                  cmd=draw.draw_f)
 
 # Str1 - Str0
 for _i in range(10):
-	token(0xAA00 | _i, b'Str' + bytes([0x30 + (_i + 1) % 10]), var=_make_accessor('strings', _i))
+	token(0xAA00 | _i, b'Str' + bytes([0x30 + (_i + 1) % 10]), var=StringVar(_i))
 
-token(tk.RAND, b'rand',                 res=Environment.rand, func=timath.rand_list)
+token(tk.RAND, b'rand',                 var=RandAccessor(), func=timath.rand_list)
 token(0xAC, b'\xc4',                    res=lambda env: math.pi, typeable=True)  # π
 token(0xAD, b'getKey',                  res=Environment.get_key)
 token(tk.APOS, b"'",                    typeable=True)

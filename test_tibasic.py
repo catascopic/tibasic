@@ -120,9 +120,9 @@ def var(env: Environment, name: str):
 	if name.startswith('$'):
 		return env.user_lists[name[1:]]
 	tok = lookup[name]
-	if tok.variable is None:
+	if tok.accessor is None:
 		raise TypeError(f"{name!r} is not a variable")
-	return tok.variable(env).value
+	return tok.accessor.get(env)
 
 
 @pytest.fixture
@@ -1964,7 +1964,7 @@ class TestEquationVars:
 	def test_returns_string_var(self):
 		# An equation that references a string variable returns a TiString
 		env = self._env(Y1='Str1')
-		env.strings[0].value = TiString.from_str('hello')
+		env.strings[0] = TiString.from_str('hello')
 		result = calc('Y1', env)
 		assert isinstance(result, TiString)
 		assert str(result) == 'hello'

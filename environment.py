@@ -5,13 +5,16 @@ from contextlib import contextmanager
 from datetime import datetime, date, timedelta
 from typing import Any, ClassVar
 
+import math as _math
+
 from core import TiList, is_complex_val
-from core import Variable, NumericVariable, RealVariable, ListVariable, UserList, MatrixVariable, StringVariable, EquationVariable, require_real, require_int, py_int
+from core import ListVariable, EquationVariable, require_real, require_int, py_int
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graphscreen import GraphScreen
 from graph import draw_axes, draw_grid
 from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
+from accessors import NumericVar
 from iodevice import HomeScreenIO
 from terminal import ScriptedConsole
 from titoken import Token
@@ -22,14 +25,51 @@ from titoken import Token
 _SEQ_COMPUTING = object()
 
 
+_NUMERIC_NAMES = tuple(chr(0x41 + i) for i in range(26)) + ('theta',)
+_MATRIX_NAMES  = tuple(chr(0x41 + i) for i in range(10))   # A–J
+
+
+class NumericVars:
+	"""Storage for the real/complex variables A–Z and θ: a fixed set of named slots,
+	None until assigned.  This is *just the data* — the access logic (auto-init, type
+	checks) lives in accessors.NumericVar — so a value can be read directly as
+	env.numerics.A (or env.numerics.theta), which is handy in tests."""
+
+	__slots__ = _NUMERIC_NAMES
+
+	def __init__(self):
+		for name in self.__slots__:
+			setattr(self, name, None)
+
+	def __repr__(self):
+		live = {n: getattr(self, n) for n in self.__slots__ if getattr(self, n) is not None}
+		return f"NumericVars({live})"
+
+
+class MatrixVars:
+	"""Storage for matrix variables [A]–[J]: a fixed set of named slots, None until
+	assigned.  Access logic (UndefinedError on resolve, deep-copy on store) lives in
+	accessors.MatrixVar; env.matrices.A reads the raw TiMatrix | None directly."""
+
+	__slots__ = _MATRIX_NAMES
+
+	def __init__(self):
+		for name in self.__slots__:
+			setattr(self, name, None)
+
+	def __repr__(self):
+		live = {n: getattr(self, n) for n in self.__slots__ if getattr(self, n) is not None}
+		return f"MatrixVars({live})"
+
+
 class Environment:
 
 	def __init__(self, console=None):
 		# VARIABLES
-		self.numerics   = [NumericVariable()  for _ in range(27)]  # A–Z, θ
-		self.lists      = [ListVariable()     for _ in range(6)]   # L1–L6
-		self.matrices   = [MatrixVariable()   for _ in range(10)]  # [A]–[J]
-		self.strings    = [StringVariable()   for _ in range(10)]  # Str1–Str0
+		self.numerics   = NumericVars()     # A–Z, θ  (named slots, None until assigned)
+		self.matrices   = MatrixVars()      # [A]–[J] (named slots, None until assigned)
+		self.lists      = [None] * 6        # L1–L6  (TiList | None)
+		self.strings    = [None] * 10       # Str1–Str0 (TiString | None)
 		# Graph equations and their on/off selection (see GraphFunctions).  The per-mode
 		# variable lists below are flat views the catalog tokens index into.
 		self.graph_functions = GraphFunctions()
@@ -39,7 +79,7 @@ class Environment:
 		self.sequence   = self.graph_functions.variables(GraphMode.SEQ)   # u, v, w
 		self.user_lists = {}
 		# self.stat        = [None] * 0x3D # stat vars
-		self.n = NumericVariable()
+		self.n: float = 0.0
 		self.ans = 0
 		# MODES
 		self.angle_mode    = AngleMode.RAD
@@ -75,13 +115,13 @@ class Environment:
 		# painted by a Console backend (see iodevice.HomeScreenIO).
 		self.io = HomeScreenIO(console or ScriptedConsole())
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
-		self.n_tvm = RealVariable()   # 𝐍 (number of payments)
-		self.i_pct = RealVariable()   # I% (interest rate per period, as percentage)
-		self.pv    = RealVariable()   # PV (present value)
-		self.pmt   = RealVariable()   # PMT (payment amount)
-		self.fv    = RealVariable()   # FV (future value)
-		self.py    = RealVariable(1.0)  # P/Y (payments per year)
-		self.cy    = RealVariable(1.0)  # C/Y (compounding periods per year)
+		self.n_tvm: float = 0.0   # 𝐍 (number of payments)
+		self.i_pct: float = 0.0   # I% (interest rate per period, as percentage)
+		self.pv:    float = 0.0   # PV (present value)
+		self.pmt:   float = 0.0   # PMT (payment amount)
+		self.fv:    float = 0.0   # FV (future value)
+		self.py:    float = 1.0   # P/Y (payments per year)
+		self.cy:    float = 1.0   # C/Y (compounding periods per year)
 		# Programs
 		self.programs: dict[str, "Program"] = {}      # name -> stored Program
 		self.execution_stack: list[object] = []       # in-flight Executions (innermost last)
@@ -141,21 +181,24 @@ class Environment:
 	def console(self, value):
 		self.io = HomeScreenIO(value)
 		
+	# X/Y/T/θ are ordinary numeric variables; these return a bound Reference (which
+	# mirrors the old Variable surface — .value, .resolve(), .scoped()) so the graphers
+	# and CALC commands can read/write them without knowing the storage layout.
 	@property
-	def x(self) -> Variable:
-		return self.numerics[23]
+	def x(self):
+		return NumericVar('X').reference(self)
 
 	@property
-	def y(self) -> Variable:
-		return self.numerics[24]
+	def y(self):
+		return NumericVar('Y').reference(self)
 
 	@property
-	def t(self) -> Variable:
-		return self.numerics[19]
+	def t(self):
+		return NumericVar('T').reference(self)
 
 	@property
-	def theta(self) -> Variable:
-		return self.numerics[26]
+	def theta(self):
+		return NumericVar('theta').reference(self)
 
 	def guard_real(self, inputs, result):
 		"""Raise NonRealAnsError if real-mode is active and a real-input operation produced a complex result."""
@@ -229,7 +272,7 @@ class Environment:
 
 	def _eval_sequence(self, index: int, k: int):
 		gf = self.graph_functions
-		n_min = py_int(self.window.n_min.resolve())
+		n_min = py_int(self.window.n_min)
 		if k < n_min:
 			raise DomainError(f"Sequence index {k} is below nMin ({n_min})")
 		# Initial terms come straight from the u(nMin) list (element i is the value at
@@ -248,12 +291,12 @@ class Environment:
 				raise DomainError(f"Sequence {'uvw'[index]} references itself at n={k}")
 			return term
 		cache[key] = _SEQ_COMPUTING
-		saved_n = self.n.value
-		self.n.value = float(k)
+		saved_n = self.n
+		self.n = float(k)
 		try:
 			term = equation.eval(self)
 		finally:
-			self.n.value = saved_n
+			self.n = saved_n
 		cache[key] = term
 		return term
 
@@ -347,16 +390,20 @@ class Environment:
 		# this doesn't depend on catalog's token tables.  Order/spelling mirror the
 		# TI charset: A–Z then θ; L₁–L₆ (subscript digits); [A]–[J]; Str1–Str0.
 		numeric_names = [chr(0x41 + i) for i in range(26)] + ['θ']
-		named = (
-			zip(numeric_names, self.numerics),
-			((f"L{chr(0x2081 + i)}", var) for i, var in enumerate(self.lists)),
-			((f"[{chr(0x41 + i)}]",  var) for i, var in enumerate(self.matrices)),
-			((f"Str{(i + 1) % 10}",  var) for i, var in enumerate(self.strings)),
-		)
-		for group in named:
-			for name, var in group:
-				if var.value is not None:
-					yield name, var.value
+		for disp, attr in zip(numeric_names, _NUMERIC_NAMES):
+			value = getattr(self.numerics, attr)
+			if value is not None:
+				yield disp, value
+		for i, val in enumerate(self.lists):
+			if val is not None:
+				yield f"L{chr(0x2081 + i)}", val
+		for name in _MATRIX_NAMES:
+			val = getattr(self.matrices, name)
+			if val is not None:
+				yield f"[{name}]", val
+		for i, val in enumerate(self.strings):
+			if val is not None:
+				yield f"Str{(i + 1) % 10}", val
 		for name, lst in self.user_lists.items():
 			yield f"${name}", lst
 		yield "Ans", self.ans
@@ -385,71 +432,18 @@ class Environment:
 
 # ── Window variables ──────────────────────────────────────────────────────────
 
-class _DeltaVariable(RealVariable):
-	"""ΔX / ΔY — not stored, but derived from the window bounds as
-	(hi − lo) / divisions.  Storing one adjusts `hi` (keeping `lo` and the pixel
-	count fixed) so the relation holds, matching the calculator.
-
-	Holds a back-reference to its Window so it can read `lo` and write `hi`; this
-	is the only window variable that touches its siblings, so it's the only one
-	that needs the reference.
-	"""
-
-	def __init__(self, window: "Window", lo_attr: str, hi_attr: str, divisions: int):
-		self.window = window
-		self.lo_attr = lo_attr
-		self.hi_attr = hi_attr
-		self.divisions = divisions
-
-	def resolve(self):
-		lo = getattr(self.window, self.lo_attr).resolve()
-		hi = getattr(self.window, self.hi_attr).resolve()
-		return (hi - lo) / self.divisions
-
-	def store(self, new_value) -> None:
-		delta = require_real(new_value)
-		lo = getattr(self.window, self.lo_attr).resolve()
-		getattr(self.window, self.hi_attr).store(lo + self.divisions * delta)
-
-
-class _IntWindowVariable(RealVariable):
-	"""A window variable constrained to whole numbers (nMin, nMax)."""
-
-	def normalize(self, value):
-		return require_int(value)
-
-
-class _XresVariable(RealVariable):
-	"""Xres — Function-graph resolution; an integer 1–8."""
-
-	def normalize(self, value):
-		v = require_int(value)
-		if not (1 <= v <= 8):
-			raise DomainError(f"Xres must be an integer 1-8, got {v:g}")
-		return v
-
-
-class _FactorVariable(RealVariable):
-	"""XFact / YFact — Zoom In/Out scaling factors; must be ≥ 1."""
-
-	def normalize(self, value):
-		v = require_real(value)
-		if v < 1:
-			raise DomainError(f"Zoom factor must be ≥ 1, got {v:g}")
-		return v
-
-
 class Window:
-	"""The TI graph/window variables — everything that defines a graphing setup.
+	"""The TI graph/window variables — plain floats.
 
-	Most are plain RealVariables; the ones with side effects use the variable
-	subclasses above (ΔX/ΔY derived, Xres/nMin/nMax integers, XFact/YFact ≥ 1).
-	`copy()` snapshots it for the Zoom memory (see Environment.zoom_store).
+	Most variables are plain float | None (None = unset); the validation logic for
+	the special ones (Xres, nMin/nMax, XFact/YFact, ΔX/ΔY) lives in the accessor
+	subclasses in accessors.py and is enforced only on the TI-BASIC store path.
+	Internal Python code (zoom.py, graphmodes.py) reads and writes them directly.
+
+	ΔX and ΔY are computed properties, not stored: they follow from the x/y bounds
+	and the pixel grid (94 column intervals / 62 row intervals).
 	"""
 
-	# The independently-stored variables — what copy() snapshots.  ΔX/ΔY are
-	# omitted: they're derived from the bounds, so a snapshot of the bounds carries
-	# them implicitly.
 	_STORED = (
 		'xmin', 'xmax', 'ymin', 'ymax', 'xscl', 'yscl', 'xres',
 		'tmin', 'tmax', 'tstep', 'theta_min', 'theta_max', 'theta_step',
@@ -459,45 +453,45 @@ class Window:
 
 	def __init__(self):
 		# Screen bounds and axis scales
-		self.xmin       = RealVariable(-10.0)
-		self.xmax       = RealVariable(10.0)
-		self.ymin       = RealVariable(-10.0)
-		self.ymax       = RealVariable(10.0)
-		self.xscl       = RealVariable(1.0)
-		self.yscl       = RealVariable(1.0)
-		self.xres       = _XresVariable(1.0)
-		# ΔX/ΔY: derived from the bounds (94 columns / 62 rows of intervals)
-		self.delta_x    = _DeltaVariable(self, 'xmin', 'xmax', 94)
-		self.delta_y    = _DeltaVariable(self, 'ymin', 'ymax', 62)
-		# Parametric (T) and polar (θ) sweep ranges
-		self.tmin       = RealVariable()
-		self.tmax       = RealVariable()
-		self.tstep      = RealVariable()
-		self.theta_min  = RealVariable()
-		self.theta_max  = RealVariable()
-		self.theta_step = RealVariable()
-		# Sequence (n) range — integers — and which n values are graphed
-		self.n_min      = _IntWindowVariable(1.0)
-		self.n_max      = _IntWindowVariable(10.0)
-		self.plot_start = RealVariable(1.0)
-		self.plot_step  = RealVariable(1.0)
-		# Note: the recursive sequence initial conditions u(nMin)/v(nMin)/w(nMin) are
-		# NOT window variables — they're lists stored per sequence in GraphFunctions.initial
-		# (set via {…}→u(nMin), read via u(nMin)), with no user-facing variable, mirroring
-		# how the calculator keeps them outside the addressable variable space.
+		self.xmin       = -10.0
+		self.xmax       =  10.0
+		self.ymin       = -10.0
+		self.ymax       =  10.0
+		self.xscl       =  1.0
+		self.yscl       =  1.0
+		self.xres       =  1.0
+		# Parametric (T) sweep range
+		self.tmin       =  0.0
+		self.tmax       =  2 * _math.pi
+		self.tstep      =  _math.pi / 24
+		# Polar (θ) sweep range
+		self.theta_min  =  0.0
+		self.theta_max  =  2 * _math.pi
+		self.theta_step =  _math.pi / 24
+		# Sequence (n) range — stored as int-valued floats
+		self.n_min      =  1.0
+		self.n_max      = 10.0
+		self.plot_start =  1.0
+		self.plot_step  =  1.0
 		# Zoom In/Out factors
-		self.x_fact     = _FactorVariable(4.0)
-		self.y_fact     = _FactorVariable(4.0)
+		self.x_fact     =  4.0
+		self.y_fact     =  4.0
+
+	@property
+	def delta_x(self) -> float:
+		"""ΔX — the graph width per pixel column: (Xmax − Xmin) / 94."""
+		return (self.xmax - self.xmin) / 94
+
+	@property
+	def delta_y(self) -> float:
+		"""ΔY — the graph height per pixel row: (Ymax − Ymin) / 62."""
+		return (self.ymax - self.ymin) / 62
 
 	def copy(self) -> "Window":
-		"""A snapshot of the stored window variables (for ZoomSto/ZoomRcl).
-
-		Copies raw values, not the Variable objects, so the clone's derived ΔX/ΔY
-		stay bound to the clone rather than the original.
-		"""
+		"""Snapshot all stored window variables (for ZoomSto/ZoomRcl)."""
 		clone = Window()
 		for name in self._STORED:
-			getattr(clone, name).value = getattr(self, name).value
+			setattr(clone, name, getattr(self, name))
 		return clone
 
 
@@ -506,8 +500,8 @@ class TableVars:
 	only so programs can store to and read them back."""
 
 	def __init__(self):
-		self.tbl_start = RealVariable()       # TblStart
-		self.delta_tbl = RealVariable(1.0)    # ΔTbl
+		self.tbl_start: float | None = None   # TblStart
+		self.delta_tbl: float = 1.0           # ΔTbl
 		self.tbl_input = ListVariable()       # TblInput — a 7-element list
 
 

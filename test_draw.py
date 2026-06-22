@@ -201,8 +201,8 @@ class TestPointOn:
 	def test_round_half_up_lands_on_higher_column(self):
 		# Window 0..188 makes column = x / 2, so x=1 -> 0.5 -> rounds up to 1
 		env = Environment()
-		env.window.xmin.value = 0
-		env.window.xmax.value = 188
+		env.window.xmin = 0
+		env.window.xmax = 188
 		run('Pt-On( 1,0', env)
 		assert env.graph.get(31, 1)
 		assert not env.graph.get(31, 0)
@@ -210,8 +210,8 @@ class TestPointOn:
 	def test_round_half_up_again(self):
 		# x=3 -> 1.5 -> rounds up to 2
 		env = Environment()
-		env.window.xmin.value = 0
-		env.window.xmax.value = 188
+		env.window.xmin = 0
+		env.window.xmax = 188
 		run('Pt-On( 3,0', env)
 		assert env.graph.get(31, 2)
 		assert not env.graph.get(31, 1)
@@ -484,10 +484,10 @@ class TestCircle:
 		# Topmost point:   col = 47, row = 31-6 = 25.
 		# These differ → it is actually an ellipse, not a circle.
 		env = Environment()
-		env.window.xmin.value = 0
-		env.window.xmax.value = 20
-		env.window.ymin.value = 0
-		env.window.ymax.value = 20
+		env.window.xmin = 0
+		env.window.xmax = 20
+		env.window.ymin = 0
+		env.window.ymax = 20
 		run('Circle( 10,10,2', env)
 		# Rightmost pixel column should be further from centre than topmost pixel row.
 		import math
@@ -608,8 +608,8 @@ class TestDrawInv:
 class TestShadeDistributions:
 	def _bell_window(self):
 		env = Environment()
-		env.window.xmin.value, env.window.xmax.value = -4, 4
-		env.window.ymin.value, env.window.ymax.value = 0, 0.5
+		env.window.xmin, env.window.xmax = -4, 4
+		env.window.ymin, env.window.ymax = 0, 0.5
 		return env
 
 	def test_shadenorm_fills_interval(self):
@@ -631,23 +631,23 @@ class TestShadeDistributions:
 	def test_shadenorm_with_mean_and_sd(self):
 		# Non-standard normal: just verify it draws and shades without error.
 		env = Environment()
-		env.window.xmin.value, env.window.xmax.value = 0, 20
-		env.window.ymin.value, env.window.ymax.value = 0, 0.2
+		env.window.xmin, env.window.xmax = 0, 20
+		env.window.ymin, env.window.ymax = 0, 0.2
 		run('ShadeNorm( 5,15,10,2.5', env)
 		assert total_pixels(env.graph) > 0
 
 	def test_shade_t_fills_interval(self):
 		env = Environment()
-		env.window.xmin.value, env.window.xmax.value = -4, 4
-		env.window.ymin.value, env.window.ymax.value = 0, 0.5
+		env.window.xmin, env.window.xmax = -4, 4
+		env.window.ymin, env.window.ymax = 0, 0.5
 		run('Shade_t( ~1,1,5', env)
 		assert _col_count(env, 47) > 20
 		assert _col_count(env, 90) < 5
 
 	def test_shade_chi_sq_draws_and_shades(self):
 		env = Environment()
-		env.window.xmin.value, env.window.xmax.value = 0, 10
-		env.window.ymin.value, env.window.ymax.value = 0, 0.3
+		env.window.xmin, env.window.xmax = 0, 10
+		env.window.ymin, env.window.ymax = 0, 0.3
 		run('Shadeχ²( 0,4,3', env)
 		assert total_pixels(env.graph) > 0
 		# A column inside the shaded region is fuller than one past the upper bound.
@@ -657,8 +657,8 @@ class TestShadeDistributions:
 
 	def test_shade_f_draws_and_shades(self):
 		env = Environment()
-		env.window.xmin.value, env.window.xmax.value = 0, 5
-		env.window.ymin.value, env.window.ymax.value = 0, 1
+		env.window.xmin, env.window.xmax = 0, 5
+		env.window.ymin, env.window.ymax = 0, 1
 		run('Shade𝐅( 0,2,3,10', env)
 		assert total_pixels(env.graph) > 0
 		inside = _col_count(env, _x_col(env, 1))

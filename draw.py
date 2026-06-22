@@ -158,10 +158,10 @@ def circle(env: Env, x: Real, y: Real, r: Real, _fast: TiListComplex = None) -> 
 	Negative radius is treated as its absolute value.  Off-screen pixels are clipped.
 	"""
 	w = env.window
-	xmin = w.xmin.resolve()
-	xmax = w.xmax.resolve()
-	ymin = w.ymin.resolve()
-	ymax = w.ymax.resolve()
+	xmin = w.xmin
+	xmax = w.xmax
+	ymin = w.ymin
+	ymax = w.ymax
 	cy, cx = _graph_to_pixel(env, x, y)
 	rx = abs(r) * MAX_COL / (xmax - xmin)
 	ry = abs(r) * MAX_ROW / (ymax - ymin)
@@ -279,8 +279,8 @@ def shade(env: Env, lower: Thunk, upper: Thunk,
 	one blank pixel between each bar, 8 leaves eight.
 	"""
 	w = env.window
-	lo = w.xmin.resolve() if xleft is None else xleft
-	hi = w.xmax.resolve() if xright is None else xright
+	lo = w.xmin if xleft is None else xleft
+	hi = w.xmax if xright is None else xright
 	flo = _function_sampler(env, lower.eval)
 	fhi = _function_sampler(env, upper.eval)
 	pat = max(1, min(4, py_int(pattern)))
@@ -333,7 +333,7 @@ def tangent(env: Env, formula: Thunk, value: Real) -> None:
 	if m is None or y0 is None:
 		return
 	w = env.window
-	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
+	xmin, xmax = w.xmin, w.xmax
 	tan = lambda x: y0 + m * (x - value)
 	r0, c0 = _graph_to_pixel(env, xmin, tan(xmin))
 	r1, c1 = _graph_to_pixel(env, xmax, tan(xmax))

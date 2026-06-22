@@ -17,7 +17,7 @@ def load(dir_):
 			lst = ListFile.load(file)
 			ti_list = TiList(lst.values)
 			if lst.name.isdigit():
-				env.lists[int(lst.name)].value = ti_list
+				env.lists[int(lst.name)] = ti_list
 			else:
 				env.user_lists[lst.name] = ti_list
 	return env

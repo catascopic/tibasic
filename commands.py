@@ -7,7 +7,7 @@ from preparse import (
 )
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
-from core import TiString, StringVariable, py_int, require_string
+from core import TiString, py_int, require_string
 from errors import TiSyntaxError, UndefinedError
 from modes import Screen
 
@@ -226,7 +226,7 @@ def _input_one(env, prompt: str, var) -> None:
 	while not (text := env.io.read_value(prompt).strip()):
 		pass
 	tokens = _tokenize_input(text)
-	if isinstance(var, StringVariable):
+	if var.accessor.kind == 'string':   # a string var keeps the raw text, no eval
 		var.store(TiString(tokens))
 	else:
 		var.store(_eval_input(tokens, env))

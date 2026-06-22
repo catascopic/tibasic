@@ -134,7 +134,10 @@ class TestRender:
 def _pause(value):
 	env = Environment()
 	env.console = ScriptedConsole()
-	env.matrices[0].store(value) if isinstance(value, TiMatrix) else env.lists[0].store(value)
+	if isinstance(value, TiMatrix):
+		env.matrices.A = value
+	else:
+		env.lists[0] = value
 	name = '[A]' if isinstance(value, TiMatrix) else 'L1'
 	Program(toks(f'Pause {name}')).run(env)
 	return env

@@ -13,6 +13,7 @@ from titoken import (
 )
 from environment import Environment
 from core import Variable, Thunk, UserList, py_int, require_num, require_real
+from accessors import LegacyAccessor
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError
 
 
@@ -318,23 +319,24 @@ class Parser:
 					return ans[self.parse_matrix_indices()]
 			return ans
 
-		if t.nullary is not None:
-			if self.peek().code == L_PAREN and t.function is not None:
-				self.advance()
-				return self._call_function(t)
-			return t.nullary(self.env)
-
 		if t.function is not None:
+			# A bare-or-called token (rand) has both an accessor and a function: bare it
+			# resolves; with a '(' it calls.  A plain function token (sin(, …) has its '('
+			# baked in, so it always calls with no extra paren to consume.
+			if t.accessor is not None:
+				if self.peek().code != L_PAREN:
+					return t.accessor.resolve(self.env)
+				self.advance()
 			return self._call_function(t)
 
 		if t.is_list_var():
-			return self.parse_list_atom(t.variable(self.env))
+			return self.parse_list_atom(t.accessor.reference(self.env))
 
 		if t.code == LIST_PREFIX:
 			return self.parse_list_atom(self.parse_user_list())
 
 		if t.is_matrix_var():
-			val = t.variable(self.env).resolve()
+			val = t.accessor.resolve(self.env)
 			if self.eat_if(L_PAREN):
 				val = val[self.parse_matrix_indices()]
 			return val
@@ -348,11 +350,11 @@ class Parser:
 				index = self.parse_expr()
 				self.eat_if(R_PAREN)
 			else:
-				index = self.env.n.resolve()
+				index = self.env.n
 			return self.env.eval_sequence(t.sequence_index(), index)
 
-		if t.variable is not None:
-			value = t.variable(self.env).resolve()
+		if t.accessor is not None:
+			value = t.accessor.resolve(self.env)
 			if t.is_equation_var():
 				value = value.eval(self.env)
 			return value
@@ -436,35 +438,33 @@ class Parser:
 		t = self.advance()
 
 		if t.is_list_var():
-			self.parse_store_list(t.variable(self.env), value)
+			self.parse_store_list(t.accessor.reference(self.env), value)
 
 		elif t.code == LIST_PREFIX:
 			self.parse_store_list(self.parse_user_list(), value)
 
 		elif t.is_matrix_var():
-			var = t.variable(self.env)
+			ref = t.accessor.reference(self.env)
 			if self.eat_if(L_PAREN):
-				var.resolve()[self.parse_matrix_indices()] = value
+				ref.resolve()[self.parse_matrix_indices()] = value
 			else:
-				var.store(value)
+				ref.store(value)
 
 		elif t.is_sequence_var() and self.peek().code == L_PAREN:
 			# {…}→u(nMin): store the sequence's initial values.  The index in the
 			# parentheses is always nMin, so it's parsed and discarded; storing the
-			# bare formula (…→u, no parentheses) falls through to the variable branch.
+			# bare formula (…→u, no parentheses) falls through to the accessor branch.
 			self.advance()                # (
 			self.parse_expr()             # nMin — not used; storing sets the whole list
 			self.eat_if(R_PAREN)
 			self.env.store_sequence_initial(t.sequence_index(), value)
 
-		elif t.variable is not None:
-			t.variable(self.env).store(value)
+		elif t.accessor is not None:
+			# Plain variable, finance var, or rand (RandAccessor.store seeds the RNG).
+			t.accessor.store(self.env, value)
 
 		elif t.code == DIM:
 			self.parse_store_dim(value)
-
-		elif t.code == RAND:
-			self.env.set_random_seed(value)
 
 		else:
 			raise TiSyntaxError(f"Invalid store target: {t}")
@@ -492,7 +492,7 @@ class Parser:
 				var.value.set_dim(value)
 		elif t.is_matrix_var():
 			self.advance()
-			var = t.variable(self.env)
+			var = t.accessor.reference(self.env)
 			if var.value is None:
 				var.value = TiMatrix.alloc(value)
 			else:
@@ -506,11 +506,14 @@ class Parser:
 		if t.code == LIST_PREFIX:
 			return self.parse_user_list()
 		if t.is_list_var():
-			return t.variable(self.env)
+			return t.accessor.reference(self.env)
 		raise TiSyntaxError(f"Expected a list variable, got {t}")
 
 	def parse_user_list(self):
-		return UserList(self.env, self.read_name(5))
+		# Bridge to the existing UserList Variable (dict-backed by name) via a Reference,
+		# so user lists share the same accessor/Reference surface as everything else.
+		name = self.read_name(5)
+		return LegacyAccessor(lambda env: UserList(env, name)).reference(self.env)
 
 	# SKIPPING
 
@@ -672,35 +675,35 @@ class ArgParser:
 		return self._parser.capture()
 
 	@_parse_arg
-	def numeric_var(self) -> Variable:
+	def numeric_var(self) -> "Reference":
 		t = self._parser.advance()
 		if not t.is_numeric_var():
 			raise DataTypeError(f"Expected a numeric variable, got {t}")
-		return t.variable(self.env)
+		return t.accessor.reference(self.env)
 
 	@_parse_arg
-	def list_var(self) -> Variable:
+	def list_var(self) -> "Reference":
 		return self._parser.parse_list_var()
 
 	@_parse_arg
-	def matrix_var(self) -> Variable:
+	def matrix_var(self) -> "Reference":
 		t = self._parser.advance()
 		if t.is_matrix_var():
-			return t.variable(self.env)
+			return t.accessor.reference(self.env)
 		raise DataTypeError(f"Expected a matrix variable, got {t}")
 
 	@_parse_arg
-	def string_var(self) -> Variable:
+	def string_var(self) -> "Reference":
 		t = self._parser.advance()
 		if t.is_string_var():
-			return t.variable(self.env)
+			return t.accessor.reference(self.env)
 		raise DataTypeError(f"Expected a string variable, got {t}")
 
 	@_parse_arg
-	def equation_var(self) -> Variable:
+	def equation_var(self) -> "Reference":
 		t = self._parser.advance()
 		if t.is_equation_var():
-			return t.variable(self.env)
+			return t.accessor.reference(self.env)
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
 	@_parse_arg
@@ -714,11 +717,11 @@ class ArgParser:
 		return self._parser.parse_list_var()
 
 	@_parse_arg
-	def any_var(self) -> Variable:
+	def any_var(self) -> "Reference":
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
 		t = self._parser.advance()
-		if t.variable is not None:
-			return t.variable(self.env)
+		if t.accessor is not None:
+			return t.accessor.reference(self.env)
 		if t.code == LIST_PREFIX:
 			return self._parser.parse_user_list()
 		raise TiSyntaxError(f"Expected a variable, got {t}")

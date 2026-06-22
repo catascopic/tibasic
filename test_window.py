@@ -16,11 +16,11 @@ TBL_START        = 0x631A
 
 def store(env, code, value):
 	"""Store through the exact path the parser uses for `value→var`."""
-	get_token(code).variable(env).store(value)
+	get_token(code).accessor.store(env, value)
 
 
 def resolve(env, code):
-	return get_token(code).variable(env).resolve()
+	return get_token(code).accessor.resolve(env)
 
 
 class TestDeltaDerived:
@@ -34,21 +34,21 @@ class TestDeltaDerived:
 
 	def test_tracks_live_bounds(self):
 		env = Environment()
-		env.window.xmin.store(0.0)
-		env.window.xmax.store(94.0)
+		env.window.xmin = 0.0
+		env.window.xmax = 94.0
 		assert resolve(env, DELTA_X) == pytest.approx(1.0)
 
 	def test_store_delta_x_moves_xmax_only(self):
 		env = Environment()
 		store(env, DELTA_X, 1.0)                      # xmax := xmin + 94·ΔX
-		assert env.window.xmax.resolve() == pytest.approx(-10 + 94)
-		assert env.window.xmin.resolve() == -10        # lower bound untouched
+		assert env.window.xmax == pytest.approx(-10 + 94)
+		assert env.window.xmin == -10                  # lower bound untouched
 
 	def test_store_delta_y_moves_ymax_only(self):
 		env = Environment()
 		store(env, DELTA_Y, 2.0)
-		assert env.window.ymax.resolve() == pytest.approx(-10 + 62 * 2)
-		assert env.window.ymin.resolve() == -10
+		assert env.window.ymax == pytest.approx(-10 + 62 * 2)
+		assert env.window.ymin == -10
 
 	def test_round_trips(self):
 		env = Environment()
@@ -105,42 +105,43 @@ class TestZoomFactors:
 class TestZoomMemory:
 	def test_sto_then_rcl_restores_window(self):
 		env = Environment()
-		env.window.xmax.store(50.0)
+		env.window.xmax = 50.0
 		run('ZoomSto', env)
-		env.window.xmax.store(99.0)
+		env.window.xmax = 99.0
 		run('ZoomRcl', env)
-		assert env.window.xmax.resolve() == 50.0
+		assert env.window.xmax == 50.0
 
 	def test_rcl_restores_derived_delta(self):
 		env = Environment()
-		env.window.xmin.store(0.0)
-		env.window.xmax.store(94.0)   # ΔX = 1
+		env.window.xmin = 0.0
+		env.window.xmax = 94.0   # ΔX = 1
 		run('ZoomSto', env)
-		env.window.xmax.store(10.0)
+		env.window.xmax = 10.0
 		run('ZoomRcl', env)
 		assert resolve(env, DELTA_X) == pytest.approx(1.0)
 
 	def test_store_snapshot_is_independent(self):
 		env = Environment()
-		env.window.xmax.store(50.0)
+		env.window.xmax = 50.0
 		run('ZoomSto', env)
-		env.window.xmax.store(99.0)
-		assert env.zoom_window.xmax.resolve() == 50.0   # snapshot unchanged
+		env.window.xmax = 99.0
+		assert env.zoom_window.xmax == 50.0   # snapshot unchanged
 
-	def test_copy_excludes_derived_but_recomputes(self):
+	def test_copy_is_independent(self):
 		w = Window()
-		w.xmin.store(0.0)
-		w.xmax.store(62.0)
+		w.xmin = 0.0
+		w.xmax = 62.0
 		clone = w.copy()
-		assert clone.delta_x.resolve() == pytest.approx(62 / 94)
-		assert clone.delta_x.window is clone        # bound to the clone, not the original
+		assert clone.delta_x == pytest.approx(62 / 94)
+		w.xmax = 200.0                          # mutate original
+		assert clone.delta_x == pytest.approx(62 / 94)  # clone unaffected
 
 
 class TestTableVarsSeparated:
 	def test_table_token_routes_to_table_not_window(self):
 		env = Environment()
 		store(env, TBL_START, 5.0)
-		assert env.table.tbl_start.resolve() == 5.0
+		assert env.table.tbl_start == 5.0
 		assert not hasattr(env.window, 'tbl_start')
 
 	def test_tbl_input_is_a_list_slot(self):

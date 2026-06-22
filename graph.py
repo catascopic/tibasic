@@ -48,32 +48,24 @@ def _round_half_up(value: float) -> int:
 
 def _x_to_col(env, x: float) -> int:
 	w = env.window
-	xmin = w.xmin.resolve()
-	xmax = w.xmax.resolve()
-	return _round_half_up((x - xmin) * MAX_COL / (xmax - xmin))
+	return _round_half_up((x - w.xmin) * MAX_COL / (w.xmax - w.xmin))
 
 
 def _y_to_row(env, y: float) -> int:
 	w = env.window
-	ymin = w.ymin.resolve()
-	ymax = w.ymax.resolve()
-	return _round_half_up((ymax - y) * MAX_ROW / (ymax - ymin))
+	return _round_half_up((w.ymax - y) * MAX_ROW / (w.ymax - w.ymin))
 
 
 def _col_to_x(env, col: float) -> float:
 	"""Inverse of _x_to_col: the graph x-coordinate at the centre of a pixel column."""
 	w = env.window
-	xmin = w.xmin.resolve()
-	xmax = w.xmax.resolve()
-	return xmin + col * (xmax - xmin) / MAX_COL
+	return w.xmin + col * (w.xmax - w.xmin) / MAX_COL
 
 
 def _row_to_y(env, row: float) -> float:
 	"""Inverse of _y_to_row: the graph y-coordinate at the centre of a pixel row."""
 	w = env.window
-	ymin = w.ymin.resolve()
-	ymax = w.ymax.resolve()
-	return ymax - row * (ymax - ymin) / MAX_ROW
+	return w.ymax - row * (w.ymax - w.ymin) / MAX_ROW
 
 
 def _graph_to_pixel(env, x: float, y: float) -> tuple[int, int]:
@@ -206,8 +198,8 @@ def trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
 	prev = None
 	w = env.window
 	if not inv:
-		xmin = w.xmin.resolve()
-		delta = (w.xmax.resolve() - xmin) / MAX_COL   # ΔX, computed once
+		xmin = w.xmin
+		delta = (w.xmax - xmin) / MAX_COL   # ΔX, computed once
 		span = MAX_COL
 		def to_indep(i):
 			return xmin + i * delta
@@ -216,8 +208,8 @@ def trace_curve(env, f, inv: bool = False, on: bool = True) -> None:
 			return (_y_to_row(env, v), col)
 
 	else:
-		ymax = w.ymax.resolve()
-		delta = (ymax - w.ymin.resolve()) / MAX_ROW    # ΔY, computed once
+		ymax = w.ymax
+		delta = (ymax - w.ymin) / MAX_ROW    # ΔY, computed once
 		span = MAX_ROW
 		def to_indep(i):
 			return ymax - i * delta
@@ -332,7 +324,7 @@ def sample_sequence(env, index):
 			return None
 		if not isinstance(y, float):
 			return None
-		env.n.value = float(round(n))
+		env.n = float(round(n))
 		env.x.value = float(n)
 		env.y.value = y
 		return (float(n), y)
@@ -400,8 +392,6 @@ def draw_axes(env, on: bool = True) -> None:
 	harmless; ticks (or an axis edge) that fall off-screen are simply skipped.
 	"""
 	w = env.window
-	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
-	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
 	axis_row = _y_to_row(env, 0.0)   # the x-axis lies on row(y=0)
 	axis_col = _x_to_col(env, 0.0)   # the y-axis lies on col(x=0)
 
@@ -409,7 +399,7 @@ def draw_axes(env, on: bool = True) -> None:
 		for col in range(MAX_COL + 1):
 			env.graph.set(axis_row, col, on)
 		if axis_row - 1 >= 0:                 # tick marks above the x-axis
-			for x in _axis_ticks(xmin, xmax, w.xscl.resolve()):
+			for x in _axis_ticks(w.xmin, w.xmax, w.xscl):
 				col = _x_to_col(env, x)
 				if 0 <= col <= MAX_COL:
 					env.graph.set(axis_row - 1, col, on)
@@ -418,7 +408,7 @@ def draw_axes(env, on: bool = True) -> None:
 		for row in range(MAX_ROW + 1):
 			env.graph.set(row, axis_col, on)
 		if axis_col + 1 <= MAX_COL:           # tick marks right of the y-axis
-			for y in _axis_ticks(ymin, ymax, w.yscl.resolve()):
+			for y in _axis_ticks(w.ymin, w.ymax, w.yscl):
 				row = _y_to_row(env, y)
 				if 0 <= row <= MAX_ROW:
 					env.graph.set(row, axis_col + 1, on)
@@ -432,8 +422,8 @@ def draw_grid(env, on: bool = True) -> None:
 	Nothing is drawn when Xscl or Yscl ≤ 0 (no infinite grid / division by zero).
 	"""
 	w = env.window
-	cols = [_x_to_col(env, x) for x in _axis_ticks(w.xmin.resolve(), w.xmax.resolve(), w.xscl.resolve())]
-	rows = [_y_to_row(env, y) for y in _axis_ticks(w.ymin.resolve(), w.ymax.resolve(), w.yscl.resolve())]
+	cols = [_x_to_col(env, x) for x in _axis_ticks(w.xmin, w.xmax, w.xscl)]
+	rows = [_y_to_row(env, y) for y in _axis_ticks(w.ymin, w.ymax, w.yscl)]
 	for row in rows:
 		if 0 <= row <= MAX_ROW:
 			for col in cols:

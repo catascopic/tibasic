@@ -106,11 +106,10 @@ class Token:
 	bp: tuple[int, int] | None = None
 	operator:  Callable | None = None  # (lhs, rhs) -> value
 	postfix:   Callable | None = None  # (operand) -> value (prefix or postfix)
-	function:  Callable | None = None  # (ArgParser) -> value; a call.  Set whenever the display ends in '(' — sin(, round(, npv( — where the '(' is part of the token.  When `nullary` is set too, this is instead the *called* form of a bare-or-called token (see nullary). #
+	function:  Callable | None = None  # (ArgParser) -> value; a call.  Set whenever the display ends in '(' — sin(, round(, npv( — where the '(' is part of the token.  When `accessor` is also set the token is bare-or-called: a trailing '(' selects `function`, otherwise `accessor.resolve` (e.g. rand / rand(n)).
 	command:   Callable | None = None  # (ArgParser) -> None for command tokens
-	nullary:   Callable | None = None  # (env) -> value for a token used bare, with no arguments (π, 𝑒, getKey, rand).  If `function` is also present the token is bare-or-called: a trailing '(' selects `function`, otherwise `nullary` — e.g. rand / rand(n), tvm_Pmt / tvm_Pmt(N,I%,PV,FV,P/Y,C/Y). #
+	accessor:  "Accessor | None" = None  # how this symbol reads/writes the environment (variables, π, rand, getKey, window vars …): resolve() for a bare reference, store() as a store target, reference() to bind it for a command.  See accessors.py.
 	converter: Callable | None = None  # (value) -> value for ►DMS, ►Dec, ►Frac and others
-	variable:  Callable | None = None  # (env) -> Variable for variable tokens
 
 	@property
 	def text(self) -> str:
@@ -162,7 +161,7 @@ class Token:
 
 	def can_start_atom(self) -> bool:
 		return bool(
-			self.is_digit() or self.variable or self.nullary or self.function
+			self.is_digit() or self.accessor or self.function
 			or self.code in {L_PAREN, L_BRACE, L_BRACKET, QUOTE, DOT, SCI_E, NEG, LIST_PREFIX, ANS}
 		)
 

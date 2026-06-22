@@ -588,16 +588,16 @@ class TestBal:
 	@pytest.fixture
 	def mortgage(self):
 		env = Environment()
-		env.pv.value    = 100_000
-		env.i_pct.value = 8 / 12           # monthly rate as percentage
-		env.n_tvm.value = 360
+		env.pv    = 100_000
+		env.i_pct = 8 / 12           # monthly rate as percentage
+		env.n_tvm = 360
 		# Exact PMT for zero FV
-		r = env.i_pct.value / 100
-		env.pmt.value = -env.pv.value * r / (1 - (1 + r) ** -env.n_tvm.value)
+		r = env.i_pct / 100
+		env.pmt = -env.pv * r / (1 - (1 + r) ** -env.n_tvm)
 		return env
 
 	def test_bal_zero_is_pv(self, mortgage):
-		assert calc('bal( 0', mortgage) == approx(mortgage.pv.value)
+		assert calc('bal( 0', mortgage) == approx(mortgage.pv)
 
 	def test_bal_180(self, mortgage):
 		# After 15 years (180 payments) — docs quote ~$76781.55
@@ -613,9 +613,9 @@ class TestBal:
 
 	def test_bal_zero_interest(self):
 		env = Environment()
-		env.pv.value    = 1200
-		env.i_pct.value = 0
-		env.pmt.value   = -100
+		env.pv    = 1200
+		env.i_pct = 0
+		env.pmt   = -100
 		assert calc('bal( 6', env) == approx(600)
 
 	def test_bal_with_rounding(self, mortgage):
@@ -628,11 +628,11 @@ class TestSigmaPrn:
 	@pytest.fixture
 	def mortgage(self):
 		env = Environment()
-		env.pv.value    = 100_000
-		env.i_pct.value = 8 / 12
-		env.n_tvm.value = 360
-		r = env.i_pct.value / 100
-		env.pmt.value = -env.pv.value * r / (1 - (1 + r) ** -env.n_tvm.value)
+		env.pv    = 100_000
+		env.i_pct = 8 / 12
+		env.n_tvm = 360
+		r = env.i_pct / 100
+		env.pmt = -env.pv * r / (1 - (1 + r) ** -env.n_tvm)
 		return env
 
 	def test_sigma_prn_first_60(self, mortgage):
@@ -649,18 +649,18 @@ class TestSigmaPrn:
 	def test_sigma_prn_full_term(self, mortgage):
 		# Principal paid over all 360 payments should equal -PV
 		sprn = calc('Σprn( 1,360', mortgage)
-		assert sprn == approx(-mortgage.pv.value, rel=1e-6)
+		assert sprn == approx(-mortgage.pv, rel=1e-6)
 
 
 class TestSigmaInt:
 	@pytest.fixture
 	def mortgage(self):
 		env = Environment()
-		env.pv.value    = 100_000
-		env.i_pct.value = 8 / 12
-		env.n_tvm.value = 360
-		r = env.i_pct.value / 100
-		env.pmt.value = -env.pv.value * r / (1 - (1 + r) ** -env.n_tvm.value)
+		env.pv    = 100_000
+		env.i_pct = 8 / 12
+		env.n_tvm = 360
+		r = env.i_pct / 100
+		env.pmt = -env.pv * r / (1 - (1 + r) ** -env.n_tvm)
 		return env
 
 	def test_sigma_int_first_60(self, mortgage):
@@ -672,13 +672,13 @@ class TestSigmaInt:
 		n1, n2 = 1, 60
 		sprn = calc('Σprn( 1,60', mortgage)
 		sint = calc('ΣInt( 1,60', mortgage)
-		total_pmt = n2 * mortgage.pmt.value  # 60 payments
+		total_pmt = n2 * mortgage.pmt  # 60 payments
 		assert sprn + sint == approx(total_pmt, rel=1e-8)
 
 	def test_sigma_int_full_term(self, mortgage):
 		# Total interest = total paid - principal = 360*PMT - (-PV) = 360*PMT + PV
 		sint = calc('ΣInt( 1,360', mortgage)
-		expected = 360 * mortgage.pmt.value + mortgage.pv.value  # negative (outflow)
+		expected = 360 * mortgage.pmt + mortgage.pv  # negative (outflow)
 		assert sint == approx(expected, rel=1e-6)
 
 
@@ -697,10 +697,10 @@ class TestTVM:
 	@pytest.fixture
 	def env(self):
 		e = Environment()
-		e.i_pct.value = 8 / 12
-		e.n_tvm.value = self.N
-		e.pv.value    = self.PV
-		e.pmt.value   = self.PMT
+		e.i_pct = 8 / 12
+		e.n_tvm = self.N
+		e.pv    = self.PV
+		e.pmt   = self.PMT
 		return e
 
 	# ── bare form: read the stored finance variables ──
@@ -727,12 +727,12 @@ class TestTVM:
 
 	def test_zero_interest_n(self):
 		e = Environment()
-		e.i_pct.value, e.pv.value, e.pmt.value = 0, 1200, -100
+		e.i_pct, e.pv, e.pmt = 0, 1200, -100
 		assert calc('tvm_N', e) == approx(12)
 
 	def test_zero_interest_pmt(self):
 		e = Environment()
-		e.i_pct.value, e.pv.value, e.n_tvm.value = 0, 1200, 12
+		e.i_pct, e.pv, e.n_tvm = 0, 1200, 12
 		assert calc('tvm_Pmt', e) == approx(-100)
 
 	# ── called form: arguments overwrite the stored variables first ──
@@ -741,10 +741,10 @@ class TestTVM:
 		e = Environment()
 		result = calc('tvm_Pmt ( 360,8/12,100000,0', e)
 		assert result == approx(self.PMT)
-		assert e.n_tvm.value == 360
-		assert e.i_pct.value == approx(8 / 12)
-		assert e.pv.value == 100_000
-		assert e.fv.value == 0
+		assert e.n_tvm == 360
+		assert e.i_pct == approx(8 / 12)
+		assert e.pv == 100_000
+		assert e.fv == 0
 
 	def test_called_form_empty_parens_uses_stored(self, env):
 		# tvm_Pmt() with no arguments is identical to the bare form.
@@ -752,9 +752,9 @@ class TestTVM:
 
 	def test_pmt_then_pv_roundtrip(self):
 		e = Environment()
-		e.i_pct.value, e.n_tvm.value, e.pv.value = 8 / 12, 360, 100_000
-		e.pmt.value = calc('tvm_Pmt', e)
-		e.pv.value = 0                       # clear so tvm_PV must recompute it
+		e.i_pct, e.n_tvm, e.pv = 8 / 12, 360, 100_000
+		e.pmt = calc('tvm_Pmt', e)
+		e.pv = 0                       # clear so tvm_PV must recompute it
 		assert calc('tvm_PV', e) == approx(100_000)
 
 	# ── wiring / errors ──
@@ -764,12 +764,12 @@ class TestTVM:
 		# a bare form (nullary) and a called form (function).
 		for code in range(0xBB20, 0xBB25):
 			t = catalog.get_token(code)
-			assert t.nullary is not None and t.function is not None
+			assert t.accessor is not None and t.function is not None
 
 	def test_pmt_zero_n_raises(self):
 		# N defaults to 0 → no periods to spread the payment over.
 		e = Environment()
-		e.i_pct.value, e.pv.value = 5, 1000
+		e.i_pct, e.pv = 5, 1000
 		with pytest.raises(DomainError):
 			calc('tvm_Pmt', e)
 

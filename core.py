@@ -536,35 +536,6 @@ class Variable(ABC):
 		return f"{type(self).__name__}({self.value})"
 
 
-class NumericVariable(Variable):
-	def __init__(self, default=None):
-		# float(default), not the bare value: TI has no int type, so a caller
-		# passing a plain Python int literal (RealVariable(1), say) must not
-		# leave one sitting in TI memory — every numeric variable is a float.
-		self.value = None if default is None else float(default)
-
-	def resolve(self):
-		if self.value is None:
-			self.value = 0.0
-		return self.value
-
-	def normalize(self, value):
-		return require_num(value)
-
-	@contextmanager
-	def scoped(self):
-		saved = self.resolve()
-		try:
-			yield
-		finally:
-			self.value = saved
-
-
-class RealVariable(NumericVariable):
-	def normalize(self, value):
-		return require_real(value)
-
-
 class ListVariable(Variable):
 	def resolve(self):
 		lst = super().resolve()
@@ -607,16 +578,6 @@ class UserList(ListVariable):
 		if not lst.data:
 			raise InvalidDimError("empty list")
 		return lst
-
-
-class MatrixVariable(Variable):
-	def normalize(self, value):
-		return require_matrix(value).copy()
-
-
-class StringVariable(Variable):
-	def normalize(self, value):
-		return require_string(value)
 
 
 class EquationVariable(Variable):

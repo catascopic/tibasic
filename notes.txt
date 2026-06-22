@@ -1,3 +1,16 @@
+elif t.is_sequence_var()
+
+remove get/set from accessor
+
+if var.accessor.kind == 'string'
+
+Can we remove the value property of reference?
+
+LegacyAccessor
+
+give variable holders repr methods to make env's repr easier
+
+
 Graph aren't regraphed every time graph is displayed. There should be a boolean flag in GraphScreen that starts as False and resets to False every time ClrDraw is called or a function changes. Whenever all functions finish graphing, this flag is set to True.
 
 I think I want to redo the variable system again! Originally I was using a flyweight system as I think I told you about, before moving to the current system. The old system was annoying because you kept having to pass env to every get/set call, but the current system is also annoying because you have to remember to do `.value` everywhere! Take a look at the zoom module, it's full of .values. Here's my new idea: basically, we'll unify nullaries and variables and also make a generic store-target and "callable with explicit parentheses" API. What pushed me over the edge was seeing how much code is muddied by .value, but also realizing that not just Sequence variables can be called with parentheses, but all types. It makes perfect sense that you can do Y1(5) instead of having to store 5 to X and then call Y1! Also, I've always felt like there could be a common pattern for how pi evaluates to 3.14... and variables also evaluate to a value.

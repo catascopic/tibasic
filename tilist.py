@@ -240,9 +240,9 @@ def clr_list(first: ListVar, *rest_vars: ListVar):
 @no_arg_command
 def clr_all_lists(env):
 	"""ClrAllLists — set every defined list (L1–L6 and user lists) to empty."""
-	for list_var in env.lists:
-		if list_var.value is not None:
-			list_var.value.clear()
+	for lst in env.lists:
+		if lst is not None:
+			lst.clear()
 	for lst in env.user_lists.values():
 		lst.clear()
 
@@ -255,6 +255,6 @@ def set_up_editor(env: Env, *list_vars: ListVarPrefixOptional):
 			if var.value is None:
 				var.value = TiList([])
 	else:
-		for var in env.lists:
-			if var.value is None:
-				var.value = TiList([])
+		for i in range(len(env.lists)):
+			if env.lists[i] is None:
+				env.lists[i] = TiList([])

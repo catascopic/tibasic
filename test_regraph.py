@@ -121,9 +121,9 @@ def _par_env(x_expr, y_expr, tmin=0.0, tmax=10.0, tstep=0.1):
 	env = run(f'"{x_expr}"@ X1t')
 	run(f'"{y_expr}"@ Y1t', env)
 	env.graph_mode = GraphMode.PAR
-	env.window.tmin.value = tmin
-	env.window.tmax.value = tmax
-	env.window.tstep.value = tstep
+	env.window.tmin = tmin
+	env.window.tmax = tmax
+	env.window.tstep = tstep
 	return env
 
 
@@ -141,7 +141,7 @@ class TestParametric:
 		# X1T defined but Y1T undefined → the pair doesn't plot.
 		env = run('"T"@ X1t')
 		env.graph_mode = GraphMode.PAR
-		env.window.tmin.value, env.window.tmax.value, env.window.tstep.value = 0, 10, 0.1
+		env.window.tmin, env.window.tmax, env.window.tstep = 0, 10, 0.1
 		run('DispGraph', env)
 		assert total_pixels(env.graph) == 0
 
@@ -161,9 +161,9 @@ class TestPolar:
 	def _circle_env(self, r_expr='5', step=0.02):
 		env = run(f'"{r_expr}"@ r1')
 		env.graph_mode = GraphMode.POL
-		env.window.theta_min.value = 0.0
-		env.window.theta_max.value = 2 * math.pi   # default angle mode is radians
-		env.window.theta_step.value = step
+		env.window.theta_min = 0.0
+		env.window.theta_max = 2 * math.pi   # default angle mode is radians
+		env.window.theta_step = step
 		return env
 
 	def test_constant_r_is_a_circle(self):
@@ -194,10 +194,10 @@ def _seq_env(formula=None, initial=None, nmin=1, nmax=10):
 	if initial is not None:
 		run(f'{{{",".join(map(str, initial))}}}@ u ( nMin )', env)
 	env.graph_mode = GraphMode.SEQ
-	env.window.n_min.value = nmin
-	env.window.n_max.value = nmax
-	env.window.plot_start.value = nmin
-	env.window.plot_step.value = 1
+	env.window.n_min = nmin
+	env.window.n_max = nmax
+	env.window.plot_start = nmin
+	env.window.plot_step = 1
 	return env
 
 
@@ -248,8 +248,8 @@ class TestSequenceEval:
 
 class TestSequencePlot:
 	def _window(self, env, lo=0, hi=11):
-		env.window.xmin.value, env.window.xmax.value = lo, hi
-		env.window.ymin.value, env.window.ymax.value = lo, hi
+		env.window.xmin, env.window.xmax = lo, hi
+		env.window.ymin, env.window.ymax = lo, hi
 
 	def test_time_plot_draws_points(self):
 		# u(n)=n over n=1..10: a Time plot rising from lower-left toward upper-right.
@@ -266,7 +266,7 @@ class TestSequencePlot:
 
 		env2 = _seq_env('n'); self._window(env2)
 		env2.draw_mode = DrawMode.DOT
-		env2.window.plot_step.value = 2
+		env2.window.plot_step = 2
 		run('DispGraph', env2)
 
 		assert 0 < total_pixels(env2.graph) < total_pixels(env1.graph)
@@ -326,14 +326,14 @@ class TestAxes:
 
 	def test_scl_controls_tick_spacing(self, env):
 		# With Xscl=5 only multiples of 5 are ticked: x=5 keeps its tick, x=1 loses it.
-		env.window.xscl.value = 5
+		env.window.xscl = 5
 		run('DispGraph', env)
 		assert env.graph.get(30, 71)        # x=5 still ticked
 		assert not env.graph.get(30, 52)    # x=1 (column 52) no longer ticked
 
 	def test_zero_scl_draws_no_ticks(self, env):
 		# Xscl=0 must not hang or divide by zero — the axis is bare.
-		env.window.xscl.value = 0
+		env.window.xscl = 0
 		run('DispGraph', env)
 		assert all(env.graph.get(31, c) for c in range(95))   # axis still there
 		assert not env.graph.get(30, 71)   # but the x=5 tick is gone
@@ -354,7 +354,7 @@ class TestAxes:
 
 	def test_x_axis_absent_when_zero_offscreen(self, env):
 		# Shift the window so y=0 is below it: no x-axis row, but the y-axis remains.
-		env.window.ymin.value, env.window.ymax.value = 1, 11
+		env.window.ymin, env.window.ymax = 1, 11
 		run('DispGraph', env)
 		assert not any(all(env.graph.get(r, c) for c in range(95)) for r in range(63))
 		assert all(env.graph.get(r, 47) for r in range(63))   # y-axis still drawn
@@ -387,13 +387,13 @@ class TestGrid:
 
 	def test_spacing_follows_scl(self, env):
 		# Xscl=5 → grid columns only at multiples of 5; x=1 (column 52) drops out.
-		env.window.xscl.value = 5
+		env.window.xscl = 5
 		run('DispGraph', env)
 		assert env.graph.get(31, 71)        # x=5 still a grid column
 		assert not env.graph.get(31, 52)    # x=1 no longer a grid column
 
 	def test_zero_scl_draws_nothing(self, env):
-		env.window.xscl.value = 0
+		env.window.xscl = 0
 		run('DispGraph', env)
 		assert total_pixels(env.graph) == 0   # no division by zero, no grid
 

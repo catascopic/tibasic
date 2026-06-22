@@ -25,13 +25,13 @@ from graph import MAX_ROW, MAX_COL
 
 
 def _set_x(env, xmin, xmax):
-	env.window.xmin.value = float(xmin)
-	env.window.xmax.value = float(xmax)
+	env.window.xmin = float(xmin)
+	env.window.xmax = float(xmax)
 
 
 def _set_y(env, ymin, ymax):
-	env.window.ymin.value = float(ymin)
-	env.window.ymax.value = float(ymax)
+	env.window.ymin = float(ymin)
+	env.window.ymax = float(ymax)
 
 
 # ── Fixed / friendly windows ─────────────────────────────────────────────────
@@ -41,8 +41,8 @@ def z_standard(env):
 	"""ZStandard — reset the window to its defaults for the current graph mode."""
 	_set_x(env, -10, 10)
 	_set_y(env, -10, 10)
-	env.window.xscl.value = 1.0
-	env.window.yscl.value = 1.0
+	env.window.xscl = 1.0
+	env.window.yscl = 1.0
 	env.graph_mode_handler.standard_window(env)   # mode-specific vars: Xres / T… / θ… / n…
 	env.display_graph()
 
@@ -52,8 +52,8 @@ def z_decimal(env):
 	"""ZDecimal — friendly window where adjacent pixels differ by 0.1."""
 	_set_x(env, -4.7, 4.7)
 	_set_y(env, -3.1, 3.1)
-	env.window.xscl.value = 1.0
-	env.window.yscl.value = 1.0
+	env.window.xscl = 1.0
+	env.window.yscl = 1.0
 	env.display_graph()
 
 
@@ -63,12 +63,12 @@ def z_trig(env):
 	w = env.window
 	if env.angle_mode is AngleMode.RAD:
 		_set_x(env, -47 / 24 * math.pi, 47 / 24 * math.pi)
-		w.xscl.value = math.pi / 2
+		w.xscl = math.pi / 2
 	else:
 		_set_x(env, -352.5, 352.5)
-		w.xscl.value = 90.0
+		w.xscl = 90.0
 	_set_y(env, -4, 4)
-	w.yscl.value = 1.0
+	w.yscl = 1.0
 	env.display_graph()
 
 
@@ -76,11 +76,11 @@ def z_trig(env):
 def z_integer(env):
 	"""ZInteger — recentre on the (rounded) current centre with ΔX=ΔY=1, Xscl=Yscl=10."""
 	w = env.window
-	xc = round((w.xmin.resolve() + w.xmax.resolve()) / 2)
-	yc = round((w.ymin.resolve() + w.ymax.resolve()) / 2)
+	xc = round((w.xmin + w.xmax) / 2)
+	yc = round((w.ymin + w.ymax) / 2)
 	_set_x(env, xc - MAX_COL // 2, xc + MAX_COL // 2)   # span 94 → ΔX = 1
 	_set_y(env, yc - MAX_ROW // 2, yc + MAX_ROW // 2)   # span 62 → ΔY = 1
-	w.xscl.value, w.yscl.value = 10.0, 10.0
+	w.xscl, w.yscl = 10.0, 10.0
 	env.display_graph()
 
 
@@ -90,8 +90,8 @@ def z_integer(env):
 def z_square(env):
 	"""ZSquare — grow the narrower axis so ΔX=ΔY, keeping the centre and the scales."""
 	w = env.window
-	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
-	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
+	xmin, xmax = w.xmin, w.xmax
+	ymin, ymax = w.ymin, w.ymax
 	# Match the larger pixel size, so the window only ever grows (never shrinks).
 	delta = max((xmax - xmin) / MAX_COL, (ymax - ymin) / MAX_ROW)
 	xc, yc = (xmin + xmax) / 2, (ymin + ymax) / 2
@@ -103,8 +103,8 @@ def z_square(env):
 def _scale(env, fx, fy):
 	"""Scale the window about its centre by factors fx (width) and fy (height)."""
 	w = env.window
-	xmin, xmax = w.xmin.resolve(), w.xmax.resolve()
-	ymin, ymax = w.ymin.resolve(), w.ymax.resolve()
+	xmin, xmax = w.xmin, w.xmax
+	ymin, ymax = w.ymin, w.ymax
 	xc, yc = (xmin + xmax) / 2, (ymin + ymax) / 2
 	hx, hy = (xmax - xmin) / 2 * fx, (ymax - ymin) / 2 * fy
 	_set_x(env, xc - hx, xc + hx)
@@ -115,13 +115,13 @@ def _scale(env, fx, fy):
 @no_arg_command
 def zoom_in(env):
 	"""Zoom In — shrink the window about its centre: width÷XFact, height÷YFact."""
-	_scale(env, 1 / env.window.x_fact.resolve(), 1 / env.window.y_fact.resolve())
+	_scale(env, 1 / env.window.x_fact, 1 / env.window.y_fact)
 
 
 @no_arg_command
 def zoom_out(env):
 	"""Zoom Out — grow the window about its centre: width×XFact, height×YFact."""
-	_scale(env, env.window.x_fact.resolve(), env.window.y_fact.resolve())
+	_scale(env, env.window.x_fact, env.window.y_fact)
 
 
 # ── ZoomFit (fit the window to the graphed functions) ────────────────────────
