@@ -132,3 +132,9 @@ class ToleranceError(TiError):
 	"""ERR:TOL NOT MET — an iterative routine could not reach the requested
 	tolerance (e.g. fMin/fMax)."""
 	code = 'TOL NOT MET'
+
+
+class WindowRangeError(TiError):
+	"""ERR:WINDOW RANGE — the graphing window is invalid (Xmin ≥ Xmax, Ymin ≥ Ymax),
+	or a zoom produced an empty range (e.g. ZoomFit on a constant function)."""
+	code = 'WINDOW RANGE'

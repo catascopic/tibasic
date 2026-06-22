@@ -19,6 +19,7 @@ import timath
 import tistring
 import titime
 import titoken as tk
+import zoom
 
 
 from preparse import special_func
@@ -361,15 +362,15 @@ token(0x82, b'*',                       bp=(60, 61), op=ops.mul, typeable=True)
 token(0x83, b'/',                       bp=(60, 61), op=ops.div, typeable=True)
 token(0x84, b'Trace')
 token(0x85, b'ClrDraw',                 cmd=draw.clr_draw)
-token(0x86, b'ZStandard')
-token(0x87, b'ZTrig')
+token(0x86, b'ZStandard',               cmd=zoom.z_standard)
+token(0x87, b'ZTrig',                   cmd=zoom.z_trig)
 token(0x88, b'ZBox')
-token(0x89, b'Zoom In')
-token(0x8A, b'Zoom Out')
-token(0x8B, b'ZSquare')
-token(0x8C, b'ZInteger')
+token(0x89, b'Zoom In',                 cmd=zoom.zoom_in)
+token(0x8A, b'Zoom Out',                cmd=zoom.zoom_out)
+token(0x8B, b'ZSquare',                 cmd=zoom.z_square)
+token(0x8C, b'ZInteger',                cmd=zoom.z_integer)
 token(0x8D, b'ZPrevious')
-token(0x8E, b'ZDecimal')
+token(0x8E, b'ZDecimal',                cmd=zoom.z_decimal)
 token(0x8F, b'ZoomStat')
 token(0x90, b'ZoomRcl',                 cmd=cmds.zoom_rcl)
 token(0x91, b'PrintScreen')
@@ -513,7 +514,7 @@ token(0xBB59, b'ANOVA(')
 token(0xBB5A, b'ModBoxplot')
 token(0xBB5B, b'NormProbPlot')
 token(0xBB64, b'G-T')
-token(0xBB65, b'ZoomFit')
+token(0xBB65, b'ZoomFit',               cmd=zoom.zoom_fit)
 token(0xBB66, b'DiagnosticOn',          cmd=modecmds.diagnostic_on)
 token(0xBB67, b'DiagnosticOff',         cmd=modecmds.diagnostic_off)
 token(0xBB68, b'Archive ')
