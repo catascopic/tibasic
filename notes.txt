@@ -19,6 +19,8 @@ Code for flyweight accessor:
 
 This way, Xscl/Yscl/Xmax/Ymax wouldn't need any special handling, they'd just have a custom store method. In fact, they could even be virtual properties on the window object with getters and setters there, to ensure they never desynchronize even when they're set using the `set` method instead of `store`.
 
+One problem is that currently, lists and user lists can essentially use the same logic for storing. We might need to make some kind of proxy object for user lists.
+ 
 What do you think of all this? It would be a big change. Are there any parts that you'd do differently?
 
 
