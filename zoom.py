@@ -25,11 +25,13 @@ from graph import MAX_ROW, MAX_COL
 
 
 def _set_x(env, xmin, xmax):
-	env.window.xmin.value, env.window.xmax.value = float(xmin), float(xmax)
+	env.window.xmin.value = float(xmin)
+	env.window.xmax.value = float(xmax)
 
 
 def _set_y(env, ymin, ymax):
-	env.window.ymin.value, env.window.ymax.value = float(ymin), float(ymax)
+	env.window.ymin.value = float(ymin)
+	env.window.ymax.value = float(ymax)
 
 
 # ── Fixed / friendly windows ─────────────────────────────────────────────────
@@ -37,10 +39,10 @@ def _set_y(env, ymin, ymax):
 @no_arg_command
 def z_standard(env):
 	"""ZStandard — reset the window to its defaults for the current graph mode."""
-	w = env.window
 	_set_x(env, -10, 10)
 	_set_y(env, -10, 10)
-	w.xscl.value, w.yscl.value = 1.0, 1.0
+	env.window.xscl.value = 1.0
+	env.window.yscl.value = 1.0
 	env.graph_mode_handler.standard_window(env)   # mode-specific vars: Xres / T… / θ… / n…
 	env.display_graph()
 
@@ -48,10 +50,10 @@ def z_standard(env):
 @no_arg_command
 def z_decimal(env):
 	"""ZDecimal — friendly window where adjacent pixels differ by 0.1."""
-	w = env.window
 	_set_x(env, -4.7, 4.7)
 	_set_y(env, -3.1, 3.1)
-	w.xscl.value, w.yscl.value = 1.0, 1.0
+	env.window.xscl.value = 1.0
+	env.window.yscl.value = 1.0
 	env.display_graph()
 
 
