@@ -7,7 +7,7 @@ import math
 import pytest
 
 from environment import Environment as _RealEnvironment
-from errors import DomainError
+from errors import DomainError, InvalidDimError
 from graph import eval_sequence
 from modes import GraphMode, DrawMode
 from test_tibasic import run as _run, var
@@ -240,6 +240,11 @@ class TestSequenceEval:
 		env = _seq_env('n', nmin=3)
 		with pytest.raises(DomainError):
 			eval_sequence(env,0, 2)
+
+	def test_initial_list_too_long_raises(self):
+		env = Environment()
+		with pytest.raises(InvalidDimError):
+			run('{1,2,3}@ u(nMin)', env)
 
 	def test_store_selects_the_sequence(self):
 		# Storing the recurrence selects u, like any equation store.

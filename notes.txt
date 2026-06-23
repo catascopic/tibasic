@@ -1,4 +1,4 @@
-It turns out u/v/w(nMin) must be at most two elements; trying to store a larger list results in InvalidDim.
+
 
 get rid of sequence cache, create a new one every time a sequence is evaluated
 I think the way it should work is, if the user calls u(10), it should evaluate every item in the sequence form nMin to n, then return the result.

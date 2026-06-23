@@ -617,7 +617,12 @@ class SequenceInitialVar(Deletable, Accessor):
 		env.sequence[self.index].initial = value
 
 	def store(self, env, value):
-		env.sequence[self.index].initial = value if isinstance(value, TiList) else TiList([value])
+		if isinstance(value, TiList):
+			if len(value.data) > 2:
+				raise InvalidDimError("u/v/w(nMin) list may have at most 2 elements")
+		else:
+			value = TiList([require_real(value)])
+		env.sequence[self.index].initial = value
 
 	def __repr__(self):
 		return f"SequenceInitialVar({self.index})"

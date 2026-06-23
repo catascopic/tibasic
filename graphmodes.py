@@ -25,10 +25,10 @@ def _trig_window(env):
 
 
 class GraphModeHandler:
-	"""Strategy for one graphing mode.  Subclasses supply `_fns` and `standard_window`;
+	"""Strategy for one graphing mode.  Subclasses supply `_functions` and `standard_window`;
 	`plot`, `fit_bounds`, and `set_selected` are implemented here or on SweptMode."""
 
-	def _fns(self, env) -> list:
+	def _functions(self, env) -> list:
 		"""The list of function data objects for this mode."""
 		raise NotImplementedError
 
@@ -42,7 +42,7 @@ class GraphModeHandler:
 	def set_selected(self, env, on: bool, numbers=()) -> None:
 		"""FnOn/FnOff: select or deselect the listed 1-based functions, or all when
 		`numbers` is empty.  Number 0 means the last function, matching 1-9,0 numbering."""
-		fns = self._fns(env)
+		fns = self._functions(env)
 		indices = range(len(fns)) if not numbers else [
 			(n - 1 if n >= 1 else len(fns) - 1) for n in numbers
 		]
@@ -54,7 +54,7 @@ class GraphModeHandler:
 	def plot(self, env) -> None:
 		"""Draw all selected, defined functions onto env.graph."""
 		with self._pass(env):
-			for fn in self._fns(env):
+			for fn in self._functions(env):
 				if fn.selected and fn.is_defined():
 					fn.plot(env)
 
@@ -70,7 +70,7 @@ class GraphModeHandler:
 class FuncMode(GraphModeHandler):
 	"""Function mode: each Yn is sampled column-by-column as Y=f(X)."""
 
-	def _fns(self, env):
+	def _functions(self, env):
 		return env.function
 
 	def fit_bounds(self, env):
@@ -87,14 +87,14 @@ class FuncMode(GraphModeHandler):
 class SweptMode(GraphModeHandler):
 	"""Parametric, Polar, and Sequence modes: a path traced as a parameter advances.
 
-	Subclasses supply only `_fns`, `standard_window`, and optionally `_pass`;
+	Subclasses supply only `_functions`, `standard_window`, and optionally `_pass`;
 	`fit_bounds` is shared here since all three modes return an (x, y) bounding box.
 	"""
 
 	def fit_bounds(self, env):
 		pts = []
 		with self._pass(env):
-			for fn in self._fns(env):
+			for fn in self._functions(env):
 				if fn.selected and fn.is_defined():
 					pts += fn.fit_points(env)
 		xs = [x for x, _ in pts]
@@ -107,7 +107,7 @@ class SweptMode(GraphModeHandler):
 class ParMode(SweptMode):
 	"""Parametric mode: sweep T, plotting (XnT(T), YnT(T))."""
 
-	def _fns(self, env):
+	def _functions(self, env):
 		return env.parametric
 
 	def standard_window(self, env):
@@ -119,7 +119,7 @@ class ParMode(SweptMode):
 class PolMode(SweptMode):
 	"""Polar mode: sweep θ, plotting (r·cosθ, r·sinθ)."""
 
-	def _fns(self, env):
+	def _functions(self, env):
 		return env.polar
 
 	def standard_window(self, env):
@@ -135,7 +135,7 @@ class SeqMode(SweptMode):
 	is evaluated bottom-up rather than recomputed at every point.
 	"""
 
-	def _fns(self, env):
+	def _functions(self, env):
 		return env.sequence
 
 	def _pass(self, env):
