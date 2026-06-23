@@ -16,6 +16,7 @@ Every symbol has a dedicated accessor type — numeric, matrix, list, string,
 user-list, equation, sequence, window, TVM, and table variables — so values live
 directly in the Environment with no wrapper objects.
 """
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
 from core import require_num, require_matrix, require_list, require_string, require_real, require_int, py_int
@@ -24,7 +25,7 @@ from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, 
 from modes import GraphMode
 
 
-class Accessor:
+class Accessor(ABC):
 	"""Stateless description of how to access one symbol.  Subclasses override the
 	pieces that differ; the defaults make a read-only value (store raises).
 
@@ -43,19 +44,24 @@ class Accessor:
 	kind = None        # discriminator for callers that branch on type (e.g. Input: 'string')
 	invocable = False  # True ⇒ a trailing '(' is a call/index (see invoke), not implicit mult
 
+	def get(self):
+		raise ValueError(f"cannot set {self}")
+
+	def set(self, value):
+		raise ValueError(f"cannot get {self}")
+	
+	@abstractmethod
 	def resolve(self, env):
-		raise NotImplementedError
+		pass
 
 	def store(self, env, value):
-		raise TiSyntaxError("Invalid store target")
+		raise TiSyntaxError(f"Cannot store to {self}")
 
 	def invoke(self, arg_parser):
-		"""Read with a parenthesised argument; the parser has already eaten the '('.
-		Only invocable accessors implement this."""
-		raise NotImplementedError(f"{type(self).__name__} is not invocable")
+		raise TiSyntaxError(f"Cannot invoke {self}")
 
 	def delete(self, env):
-		pass
+		raise TiSyntaxError(f"Cannot delete {self}")
 
 	def reference(self, env) -> "Reference":
 		return Reference(env, self)
@@ -86,14 +92,6 @@ class Reference:
 
 	def set(self, value):
 		self.accessor.set(self.env, value)
-
-	@property
-	def value(self):
-		return self.accessor.get(self.env)
-
-	@value.setter
-	def value(self, new_value):
-		self.accessor.set(self.env, new_value)
 
 	@contextmanager
 	def scoped(self):

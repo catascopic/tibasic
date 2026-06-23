@@ -1,3 +1,7 @@
+Great. Do you think we could have Ans use a special accessor?
+
+Static access to equations shouldn't require using graph mode
+
 u(nMin) as store target: accepts number or list
 
 fix zoomsto variables
