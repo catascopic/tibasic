@@ -183,7 +183,7 @@ class Environment:
 		self.io = HomeScreenIO(value)
 		
 	# X/Y/T/θ are ordinary numeric variables; these return a bound Reference (which
-	# exposes .value, .resolve(), .scoped()) so the graphers and CALC commands can
+	# exposes .get()/.set(), .resolve(), .scoped()) so the graphers and CALC commands can
 	# read/write them without knowing the storage layout.
 	@property
 	def x(self):

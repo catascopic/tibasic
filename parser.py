@@ -453,12 +453,13 @@ class Parser:
 	def parse_store_list(self, var: Reference, value):
 		if self.eat_if(L_PAREN):
 			index = self.parse_list_index()
-			if var.value is None:
+			lst = var.get()
+			if lst is None:
 				lst = TiList()
 				lst[index] = value
-				var.value = lst
+				var.set(lst)
 			else:
-				var.value[index] = value
+				lst[index] = value
 			self.eat_if(R_PAREN)
 		else:
 			var.store(value)
@@ -467,17 +468,19 @@ class Parser:
 		t = self.peek()
 		if t.is_list_var() or t.code == LIST_PREFIX:
 			var = self.parse_list_var()
-			if var.value is None:
-				var.value = TiList.alloc(value)
+			current = var.get()
+			if current is None:
+				var.set(TiList.alloc(value))
 			else:
-				var.value.set_dim(value)
+				current.set_dim(value)
 		elif t.is_matrix_var():
 			self.advance()
 			var = t.accessor.reference(self.env)
-			if var.value is None:
-				var.value = TiMatrix.alloc(value)
+			current = var.get()
+			if current is None:
+				var.set(TiMatrix.alloc(value))
 			else:
-				var.value.set_dim(value)
+				current.set_dim(value)
 		else:
 			raise TiSyntaxError(f"Invalid store-to-dim target: {t}")
 		self.eat_if(R_PAREN)

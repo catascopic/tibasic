@@ -128,9 +128,9 @@ def cbrt(x: Vectorized):
 @preparse_func
 def n_deriv(env: Env, formula: Thunk, var: NumericVar, val: Real, h: Real = 0.001) -> float:
 	with env.nest_guard(n_deriv, max_depth=1), var.scoped():
-		var.value = val + h
+		var.set(val + h)
 		fwd = formula.eval()
-		var.value = val - h
+		var.set(val - h)
 		bwd = formula.eval()
 	return (fwd - bwd) / (2 * h)
 
@@ -176,7 +176,7 @@ def _adaptive_gk15(f, lo, hi, tol, depth=0):
 def fn_int(env: Env, formula: Thunk, var: NumericVar, lo: Real, hi: Real, tol: Real = 1e-5) -> float:
 	with env.nest_guard('fnInt'), var.scoped():
 		def f(x):
-			var.value = x
+			var.set(x)
 			return formula.eval()
 		return _adaptive_gk15(f, lo, hi, tol)
 
@@ -187,7 +187,7 @@ def sigma(env: Env, formula: Thunk, var: NumericVar, start: Real, end: Real) -> 
 	n = start
 	with env.nest_guard(sigma), var.scoped():
 		while n <= end:
-			var.value = n
+			var.set(n)
 			total += formula.eval()
 			n += 1
 	return total
@@ -200,7 +200,7 @@ def sigma(env: Env, formula: Thunk, var: NumericVar, start: Real, end: Real) -> 
 def _real_of(env, formula, var):
 	"""Build f(x): set `var` to x, evaluate the expression, require a real result."""
 	def f(x):
-		var.value = x
+		var.set(x)
 		return require_real(formula.eval())
 	return f
 

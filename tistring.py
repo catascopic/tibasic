@@ -62,10 +62,10 @@ def equ_to_string(equ_var: EquationVar, str_var: StringVar) -> None:
 	equ = equ_var.get()
 	if equ is None:
 		raise UndefinedError("Equation is not defined")
-	str_var.value = TiString(equ.tokens)
+	str_var.set(TiString(equ.tokens))
 
 
 @preparse_cmd_func
 def string_to_equ(string: TiString, equ_var: EquationVar) -> None:
 	"""String►Equ(str_expr, equvar) — parse a string value into an equation variable."""
-	equ_var.value = TiEquation(require_string(string).tokens)
+	equ_var.set(TiEquation(require_string(string).tokens))

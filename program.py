@@ -94,7 +94,7 @@ class Execution:
 		self.push_block(RepeatBlock(self._parser.pos, condition))
 
 	def begin_for(self, var: Reference, start: float, end: float, step: float):
-		var.value = start
+		var.set(start)
 		if check_for_condition(start, end, step):
 			self.push_block(ForBlock(self._parser.pos, var, end, step))
 		else:
@@ -110,13 +110,15 @@ class Execution:
 			self._block_stack.pop()
 
 	def is_gt(self, var: Reference, threshold: float):
-		var.value = require_real(var.resolve()) + 1
-		if var.value > threshold:
+		new = require_real(var.resolve()) + 1
+		var.set(new)
+		if new > threshold:
 			self._parser.skip_statement()
 
 	def ds_lt(self, var: Reference, threshold: float):
-		var.value = require_real(var.resolve()) - 1
-		if var.value < threshold:
+		new = require_real(var.resolve()) - 1
+		var.set(new)
+		if new < threshold:
 			self._parser.skip_statement()
 
 	def goto(self, name: str):
@@ -171,8 +173,9 @@ class ForBlock(LoopBlock):
 	step: float
 
 	def on_end(self):
-		self.var.value = self.var.resolve() + self.step
-		return check_for_condition(self.var.value, self.end, self.step)
+		new = self.var.resolve() + self.step
+		self.var.set(new)
+		return check_for_condition(new, self.end, self.step)
 
 
 @dataclass

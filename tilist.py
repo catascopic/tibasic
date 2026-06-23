@@ -51,7 +51,7 @@ def sort_d(main_var: ListVar, *dep_vars: ListVar):
 def dim(args: ArgParser):
 	if args.peek().is_list_start():
 		var = args.list_var()
-		val = var.value
+		val = var.get()
 		if val is None:
 			raise UndefinedError("Undefined list variable")
 		args.end_func()
@@ -104,7 +104,7 @@ def seq(env: Env, formula: Thunk, var: NumericVar, start: Real, end: Real, step:
 
 	with env.nest_guard(seq), var.scoped():
 		while op(n, end):
-			var.value = n
+			var.set(n)
 			result.append(formula.eval())
 			n += step
 
@@ -232,7 +232,7 @@ def stddev(lst: TiList, freqlist: TiList = None):
 def clr_list(first: ListVar, *rest_vars: ListVar):
 	"""ClrList list[, list, ...] — clear each named list to empty; silently skip nonexistent lists."""
 	for var in (first, *rest_vars):
-		lst = var.value
+		lst = var.get()
 		if lst is not None:
 			lst.clear()
 
@@ -252,8 +252,8 @@ def set_up_editor(env: Env, *list_vars: ListVarPrefixOptional):
 	"""SetUpEditor [list, ...] — ensure lists exist, creating empty ones as needed."""
 	if list_vars:
 		for var in list_vars:
-			if var.value is None:
-				var.value = TiList([])
+			if var.get() is None:
+				var.set(TiList([]))
 	else:
 		for i in range(len(env.lists)):
 			if env.lists[i] is None:

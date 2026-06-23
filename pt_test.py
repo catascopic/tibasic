@@ -62,8 +62,8 @@ def _normalize(s: str) -> str:
 
 def _window_info(env) -> str:
 	w = env.window
-	return (f"Window: x=[{w.xmin.value}, {w.xmax.value}]  "
-	        f"y=[{w.ymin.value}, {w.ymax.value}]")
+	return (f"Window: x=[{w.xmin}, {w.xmax}]  "
+	        f"y=[{w.ymin}, {w.ymax}]")
 
 
 def _print_commands() -> None:

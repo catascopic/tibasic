@@ -170,14 +170,14 @@ def sample_function(env, evaluate):
 	"""
 
 	def f(x):
-		env.x.value = x
+		env.numerics.X = x
 		try:
 			y = evaluate()
 		except _GRAPH_ERRORS:
 			return None
 		if not isinstance(y, float):
 			return None
-		env.y.value = y
+		env.numerics.Y = y
 		return y
 
 	return f
@@ -267,7 +267,7 @@ def sample_parametric(env, eval_x, eval_y):
 	"""
 
 	def point(t):
-		env.t.value = t
+		env.numerics.T = t
 		try:
 			x = eval_x()
 			y = eval_y()
@@ -275,8 +275,8 @@ def sample_parametric(env, eval_x, eval_y):
 			return None
 		if not (isinstance(x, float) and isinstance(y, float)):
 			return None
-		env.x.value = x
-		env.y.value = y
+		env.numerics.X = x
+		env.numerics.Y = y
 		return (x, y)
 
 	return point
@@ -294,7 +294,7 @@ def sample_polar(env, eval_r):
 	"""
 
 	def point(theta):
-		env.theta.value = theta
+		env.numerics.theta = theta
 		try:
 			r = eval_r()
 		except _GRAPH_ERRORS:
@@ -304,8 +304,8 @@ def sample_polar(env, eval_r):
 		angle = env.to_rad(theta)
 		x = r * math.cos(angle)
 		y = r * math.sin(angle)
-		env.x.value = x
-		env.y.value = y
+		env.numerics.X = x
+		env.numerics.Y = y
 		return (x, y)
 
 	return point
@@ -325,8 +325,8 @@ def sample_sequence(env, index):
 		if not isinstance(y, float):
 			return None
 		env.n = float(round(n))
-		env.x.value = float(n)
-		env.y.value = y
+		env.numerics.X = float(n)
+		env.numerics.Y = y
 		return (float(n), y)
 
 	return point

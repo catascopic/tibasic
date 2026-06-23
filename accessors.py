@@ -30,8 +30,8 @@ class Accessor(ABC):
 	pieces that differ; the defaults make a read-only value (store raises).
 
 	`resolve`/`store` are the validating, user-facing operations (auto-init, type
-	checks); `get`/`set` are the raw, unchecked accessors used internally (e.g. by
-	`scoped`).  By default `get`/`set` fall back to `resolve`/`store`.
+	checks); `_get`/`_set` are the raw, unchecked accessors used internally by
+	`Reference` (e.g. by `scoped`).
 
 	A symbol is read in expression context as either `resolve` or `invoke`:
 	`invocable` accessors (lists, matrices, equations, sequences) own a trailing
@@ -44,11 +44,11 @@ class Accessor(ABC):
 	kind = None        # discriminator for callers that branch on type (e.g. Input: 'string')
 	invocable = False  # True ⇒ a trailing '(' is a call/index (see invoke), not implicit mult
 
-	def get(self):
-		raise ValueError(f"cannot set {self}")
+	def _get(self, env):
+		raise NotImplementedError(f"{type(self).__name__} does not support _get")
 
-	def set(self, value):
-		raise ValueError(f"cannot get {self}")
+	def _set(self, env, value):
+		raise NotImplementedError(f"{type(self).__name__} does not support _set")
 	
 	@abstractmethod
 	def resolve(self, env):
@@ -88,10 +88,10 @@ class Reference:
 		self.accessor.delete(self.env)
 
 	def get(self):
-		return self.accessor.get(self.env)
+		return self.accessor._get(self.env)
 
 	def set(self, value):
-		self.accessor.set(self.env, value)
+		self.accessor._set(self.env, value)
 
 	@contextmanager
 	def scoped(self):
@@ -101,7 +101,7 @@ class Reference:
 		try:
 			yield
 		finally:
-			self.accessor.set(self.env, saved)
+			self.accessor._set(self.env, saved)
 
 	def __repr__(self):
 		return f"Reference({self.accessor!r})"
@@ -119,24 +119,24 @@ class NumericVar(Accessor):
 	def __init__(self, name: str):
 		self.name = name
 
-	def get(self, env):
+	def _get(self, env):
 		return getattr(env.numerics, self.name)
 
-	def set(self, env, value):
+	def _set(self, env, value):
 		setattr(env.numerics, self.name, value)
 
 	def resolve(self, env):
-		value = self.get(env)
+		value = self._get(env)
 		if value is None:
 			value = 0.0
-			self.set(env, value)
+			self._set(env, value)
 		return value
 
 	def store(self, env, value):
-		self.set(env, require_num(value))
+		self._set(env, require_num(value))
 
 	def delete(self, env):
-		self.set(env, None)
+		self._set(env, None)
 
 	def __repr__(self):
 		return f"NumericVar({self.name!r})"
@@ -179,10 +179,10 @@ class UserListVar(Accessor):
 	def __init__(self, name: str):
 		self.name = name
 
-	def get(self, env):
+	def _get(self, env):
 		return env.user_lists.get(self.name)
 
-	def set(self, env, value):
+	def _set(self, env, value):
 		env.user_lists[self.name] = value
 
 	def resolve(self, env):
@@ -196,12 +196,12 @@ class UserListVar(Accessor):
 
 	def store(self, env, value):
 		lst = require_list(value)
-		current = self.get(env)
+		current = self._get(env)
 		was_complex = current is not None and current.is_complex
 		new_value = lst.copy()
 		if was_complex:
 			new_value._upgrade_to_complex()
-		self.set(env, new_value)
+		self._set(env, new_value)
 
 	def invoke(self, arg_parser):
 		index = py_int(arg_parser.expr(), InvalidDimError)
@@ -228,20 +228,20 @@ class MatrixVar(Accessor):
 	def __init__(self, name: str):
 		self.name = name
 
-	def get(self, env):
+	def _get(self, env):
 		return getattr(env.matrices, self.name)
 
-	def set(self, env, value):
+	def _set(self, env, value):
 		setattr(env.matrices, self.name, value)
 
 	def resolve(self, env):
-		value = self.get(env)
+		value = self._get(env)
 		if value is None:
 			raise UndefinedError(f"[{self.name}] is not defined")
 		return value
 
 	def store(self, env, value):
-		self.set(env, require_matrix(value).copy())
+		self._set(env, require_matrix(value).copy())
 
 	def invoke(self, arg_parser):
 		row = py_int(arg_parser.expr(), InvalidDimError)
@@ -250,7 +250,7 @@ class MatrixVar(Accessor):
 		return self.resolve(arg_parser.env)[(row, col)]
 
 	def delete(self, env):
-		self.set(env, None)
+		self._set(env, None)
 
 	def __repr__(self):
 		return f"MatrixVar({self.name!r})"
@@ -269,14 +269,14 @@ class ListVar(Accessor):
 	def __init__(self, index: int):
 		self.index = index
 
-	def get(self, env):
+	def _get(self, env):
 		return env.lists[self.index]
 
-	def set(self, env, value):
+	def _set(self, env, value):
 		env.lists[self.index] = value
 
 	def resolve(self, env):
-		value = self.get(env)
+		value = self._get(env)
 		if value is None:
 			raise UndefinedError(f"L{self.index + 1} is not defined")
 		if not value.data:
@@ -285,12 +285,12 @@ class ListVar(Accessor):
 
 	def store(self, env, value):
 		lst = require_list(value)
-		current = self.get(env)
+		current = self._get(env)
 		was_complex = current is not None and current.is_complex
 		new_value = lst.copy()
 		if was_complex:
 			new_value._upgrade_to_complex()
-		self.set(env, new_value)
+		self._set(env, new_value)
 
 	def invoke(self, arg_parser):
 		index = py_int(arg_parser.expr(), InvalidDimError)
@@ -298,7 +298,7 @@ class ListVar(Accessor):
 		return self.resolve(arg_parser.env)[index]
 
 	def delete(self, env):
-		self.set(env, None)
+		self._set(env, None)
 
 	def __repr__(self):
 		return f"ListVar({self.index!r})"
@@ -317,23 +317,23 @@ class StringVar(Accessor):
 	def __init__(self, index: int):
 		self.index = index
 
-	def get(self, env):
+	def _get(self, env):
 		return env.strings[self.index]
 
-	def set(self, env, value):
+	def _set(self, env, value):
 		env.strings[self.index] = value
 
 	def resolve(self, env):
-		value = self.get(env)
+		value = self._get(env)
 		if value is None:
 			raise UndefinedError(f"Str{(self.index + 1) % 10} is not defined")
 		return value
 
 	def store(self, env, value):
-		self.set(env, require_string(value))
+		self._set(env, require_string(value))
 
 	def delete(self, env):
-		self.set(env, None)
+		self._set(env, None)
 
 	def __repr__(self):
 		return f"StringVar({self.index!r})"
@@ -354,20 +354,20 @@ class WindowVar(Accessor):
 		self.attr = attr
 		self.target = target
 
-	def get(self, env):
+	def _get(self, env):
 		return getattr(getattr(env, self.target), self.attr)
 
-	def set(self, env, value):
+	def _set(self, env, value):
 		setattr(getattr(env, self.target), self.attr, value)
 
 	def resolve(self, env):
-		v = self.get(env)
+		v = self._get(env)
 		if v is None:
 			raise UndefinedError(f"Window variable {self.attr!r} is not defined")
 		return v
 
 	def store(self, env, value):
-		self.set(env, require_real(value))
+		self._set(env, require_real(value))
 
 	def __repr__(self):
 		return f"WindowVar({self.attr!r}, {self.target!r})"
@@ -380,14 +380,14 @@ class XresVar(WindowVar):
 		v = require_int(value)
 		if not (1 <= v <= 8):
 			raise DomainError(f"Xres must be an integer 1-8, got {v:g}")
-		self.set(env, v)
+		self._set(env, v)
 
 
 class IntWindowVar(WindowVar):
 	"""nMin, nMax — window variables constrained to whole numbers."""
 
 	def store(self, env, value):
-		self.set(env, require_int(value))
+		self._set(env, require_int(value))
 
 
 class FactorWindowVar(WindowVar):
@@ -397,7 +397,7 @@ class FactorWindowVar(WindowVar):
 		v = require_real(value)
 		if v < 1:
 			raise DomainError(f"Zoom factor must be ≥ 1, got {v:g}")
-		self.set(env, v)
+		self._set(env, v)
 
 
 class DeltaWindowVar(Accessor):
@@ -436,20 +436,20 @@ class EnvVar(Accessor):
 	def __init__(self, attr: str):
 		self.attr = attr
 
-	def get(self, env):
+	def _get(self, env):
 		return getattr(env, self.attr)
 
-	def set(self, env, value):
+	def _set(self, env, value):
 		setattr(env, self.attr, value)
 
 	def resolve(self, env):
-		v = self.get(env)
+		v = self._get(env)
 		if v is None:
 			raise UndefinedError(f"{self.attr!r} is not defined")
 		return v
 
 	def store(self, env, value):
-		self.set(env, require_real(value))
+		self._set(env, require_real(value))
 
 	def __repr__(self):
 		return f"EnvVar({self.attr!r})"
@@ -463,20 +463,20 @@ class TableVar(Accessor):
 	def __init__(self, attr: str):
 		self.attr = attr
 
-	def get(self, env):
+	def _get(self, env):
 		return getattr(env.table, self.attr)
 
-	def set(self, env, value):
+	def _set(self, env, value):
 		setattr(env.table, self.attr, value)
 
 	def resolve(self, env):
-		v = self.get(env)
+		v = self._get(env)
 		if v is None:
 			raise UndefinedError(f"Table variable {self.attr!r} is not defined")
 		return v
 
 	def store(self, env, value):
-		self.set(env, require_real(value))
+		self._set(env, require_real(value))
 
 	def __repr__(self):
 		return f"TableVar({self.attr!r})"
@@ -510,14 +510,14 @@ class EquationVar(Accessor):
 		self.eq_index = eq_index
 		self.func_index = func_index
 
-	def get(self, env):
+	def _get(self, env):
 		return env.graph_functions.equations[self.mode][self.eq_index]
 
-	def set(self, env, value):
+	def _set(self, env, value):
 		env.graph_functions.equations[self.mode][self.eq_index] = value
 
 	def resolve(self, env):
-		eq = self.get(env)
+		eq = self._get(env)
 		if eq is None:
 			raise UndefinedError("Equation is not defined")
 		return eq.eval(env)
@@ -535,11 +535,11 @@ class EquationVar(Accessor):
 			env.numerics.X = saved_x
 
 	def store(self, env, value):
-		self.set(env, _normalize_eq(value))
+		self._set(env, _normalize_eq(value))
 		env.graph_functions.selected[self.mode][self.func_index] = True
 
 	def delete(self, env):
-		self.set(env, None)
+		self._set(env, None)
 
 	def __repr__(self):
 		return f"EquationVar({self.mode.name}, {self.eq_index}, {self.func_index})"
@@ -560,10 +560,10 @@ class SequenceVar(Accessor):
 	def __init__(self, seq_index: int):
 		self.seq_index = seq_index
 
-	def get(self, env):
+	def _get(self, env):
 		return env.graph_functions.equations[GraphMode.SEQ][self.seq_index]
 
-	def set(self, env, value):
+	def _set(self, env, value):
 		env.graph_functions.equations[GraphMode.SEQ][self.seq_index] = value
 
 	def resolve(self, env):
@@ -576,7 +576,7 @@ class SequenceVar(Accessor):
 		return arg_parser.env.eval_sequence(self.seq_index, n)
 
 	def store(self, env, value):
-		self.set(env, _normalize_eq(value))
+		self._set(env, _normalize_eq(value))
 		env.graph_functions.selected[GraphMode.SEQ][self.seq_index] = True
 
 	def store_initial(self, env, value):
@@ -584,7 +584,7 @@ class SequenceVar(Accessor):
 		env.store_sequence_initial(self.seq_index, value)
 
 	def delete(self, env):
-		self.set(env, None)
+		self._set(env, None)
 
 	def __repr__(self):
 		return f"SequenceVar({self.seq_index})"

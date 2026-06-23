@@ -122,7 +122,7 @@ def var(env: Environment, name: str):
 	tok = lookup[name]
 	if tok.accessor is None:
 		raise TypeError(f"{name!r} is not a variable")
-	return tok.accessor.get(env)
+	return tok.accessor.reference(env).get()
 
 
 @pytest.fixture
@@ -1917,7 +1917,7 @@ class TestEquationVars:
 	def test_eval_single_var(self):
 		# Y1 = X; X = 5 → Y1 evaluates to 5
 		env = self._env(Y1='X')
-		env.x.value = 5.0
+		env.numerics.X = 5.0
 		assert calc('Y1', env) == 5
 
 	def test_eval_constant_formula(self):
@@ -1928,13 +1928,13 @@ class TestEquationVars:
 	def test_eval_in_arithmetic(self):
 		# Y1 = X; expression Y1 * 2 with X = 3 → 6
 		env = self._env(Y1='X')
-		env.x.value = 3.0
+		env.numerics.X = 3.0
 		assert calc('Y1 * 2', env) == 6
 
 	def test_eval_complex_formula(self):
 		# Y1 = X ^ 2 + 1; X = 4 → 17
 		env = self._env(Y1='X ^ 2 + 1')
-		env.x.value = 4.0
+		env.numerics.X = 4.0
 		assert calc('Y1', env) == 17
 
 	# ── Chaining ─────────────────────────────────────────────────────────────
@@ -1942,20 +1942,20 @@ class TestEquationVars:
 	def test_chain_two_deep(self):
 		# Y1 = Y2; Y2 = X; X = 7 → Y1 evaluates to 7
 		env = self._env(Y1='Y2', Y2='X')
-		env.x.value = 7.0
+		env.numerics.X = 7.0
 		assert calc('Y1', env) == 7
 
 	def test_chain_with_operations(self):
 		# Y1 = Y2 + 1; Y2 = 3 * X; X = 2 → Y1 = 7
 		env = self._env(Y1='Y2 + 1', Y2='3 * X')
-		env.x.value = 2.0
+		env.numerics.X = 2.0
 		assert calc('Y1', env) == 7
 
 	def test_chain_nine_deep(self):
 		# Y1 → Y2 → … → Y9 → X; X = 42 → Y1 evaluates to 42
 		env = self._env(Y1='Y2', Y2='Y3', Y3='Y4', Y4='Y5',
 		                Y5='Y6', Y6='Y7', Y7='Y8', Y8='Y9', Y9='X')
-		env.x.value = 42.0
+		env.numerics.X = 42.0
 		assert calc('Y1', env) == 42
 
 	# ── Non-numeric return values ─────────────────────────────────────────────

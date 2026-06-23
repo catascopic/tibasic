@@ -135,7 +135,7 @@ def list_to_matr(args: ArgParser) -> None:
 		if args.peek().is_matrix_var():
 			mat_var = args.matrix_var()
 			break
-	mat_var.value = TiMatrix([list(row) for row in zip_longest(*(lst.data for lst in list_vals), fillvalue=0.0)])
+	mat_var.set(TiMatrix([list(row) for row in zip_longest(*(lst.data for lst in list_vals), fillvalue=0.0)]))
 	args.end_paren_cmd()
 
 
@@ -149,12 +149,12 @@ def matr_to_list(args: ArgParser) -> None:
 		while args.has_next:
 			list_vars.append(args.list_var())
 		for var, col_data in zip(list_vars, zip(*mat.data)):
-			var.value = TiList(list(col_data))
+			var.set(TiList(list(col_data)))
 	else:
 		col = py_int(args.expr()) - 1
 		if not (0 <= col < mat.cols):
 			raise InvalidDimError(
 				f"Matr►list: column {col + 1} out of range for {mat.rows}×{mat.cols} matrix"
 			)
-		args.list_var().value = TiList([mat.data[r][col] for r in range(mat.rows)])
+		args.list_var().set(TiList([mat.data[r][col] for r in range(mat.rows)]))
 	args.end_paren_cmd()
