@@ -192,7 +192,7 @@ def _seq_env(formula=None, initial=None, nmin=1, nmax=10):
 	if formula is not None:
 		run(f'"{formula}"@ u', env)
 	if initial is not None:
-		run(f'{{{",".join(map(str, initial))}}}@ u ( nMin )', env)
+		run(f'{{{",".join(map(str, initial))}}}@ u(nMin)', env)
 	env.graph_mode = GraphMode.SEQ
 	env.window.n_min = nmin
 	env.window.n_max = nmax

@@ -22,6 +22,8 @@ from contextlib import contextmanager
 from core import require_num, require_matrix, require_list, require_string, require_real, require_int, py_int
 from core import TiString, TiEquation
 from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, DataTypeError
+
+
 class Accessor(ABC):
 	"""Stateless description of how to access one symbol.  Subclasses override the
 	pieces that differ; the defaults make a read-only value (store raises).
@@ -110,9 +112,9 @@ class Reference:
 
 	@contextmanager
 	def scoped(self):
-		"""Save the value, run the block, restore it — for fnInt/solve/Σ/… which bind
-		the variable while evaluating a formula."""
-		saved = self.resolve()
+		"""Save the raw value, run the block, restore it — for temporarily binding a
+		variable while evaluating a sub-expression (fnInt, solve, Σ, …)."""
+		saved = self.accessor._get(self.env)
 		try:
 			yield
 		finally:
@@ -475,6 +477,18 @@ def _normalize_eq(value) -> TiEquation:
 	raise DataTypeError(f"Expected equation or string, got {value!r}")
 
 
+@contextmanager
+def scoped_numeric(env, name: str, value):
+	"""Temporarily set numeric variable `name` to `value`, restoring it on exit."""
+	
+	saved = getattr(env.numerics, name)
+	setattr(env.numerics, name, value)
+	try:
+		yield
+	finally:
+		saved = setattr(env.numerics, name, saved)
+
+
 class EquationVar(Deletable, Accessor):
 	"""A graph equation (Y1–Y0, X1T/Y1T–X6T/Y6T, r1–r6).
 
@@ -510,12 +524,8 @@ class EquationVar(Deletable, Accessor):
 		x = arg_parser.expr()
 		arg_parser.end_func()
 		env = arg_parser.env
-		saved_x = env.numerics.X
-		env.numerics.X = require_num(x)
-		try:
+		with scoped_numeric(env, 'X', require_num(x)):
 			return self.resolve(env)
-		finally:
-			env.numerics.X = saved_x
 
 	def store(self, env, value):
 		self._set(env, _normalize_eq(value))
@@ -561,8 +571,7 @@ class SequenceVar(Deletable, Accessor):
 
 	Reading it as a value (`resolve`) evaluates the sequence at the current n;
 	`u(n)` evaluates at an explicit index.  The raw `TiEquation` is reachable
-	through `get`/`set`; `store_initial` handles the `{…}→u(nMin)` initial-value
-	store path.
+	through `_get`/`_set`.
 	"""
 
 	__slots__ = ('seq_index',)
@@ -590,9 +599,27 @@ class SequenceVar(Deletable, Accessor):
 		self._set(env, _normalize_eq(value))
 		env.sequence[self.seq_index].selected = True
 
-	def store_initial(self, env, value):
-		"""Handle `{…}→u(nMin)`: store the sequence's initial-value list."""
+	def __repr__(self):
+		return f"SequenceVar({self.seq_index})"
+
+
+class SequenceInitialVar(Deletable, Accessor):
+	"""The u(nMin)/v(nMin)/w(nMin) token — stores and reads the initial-value list
+	for a recursive sequence."""
+
+	__slots__ = ('seq_index',)
+
+	def __init__(self, seq_index: int):
+		self.seq_index = seq_index
+
+	def _get(self, env):
+		return env.sequence_initial[self.seq_index]
+
+	def _set(self, env, value):
+		env.sequence_initial[self.seq_index] = value
+
+	def store(self, env, value):
 		env.store_sequence_initial(self.seq_index, value)
 
 	def __repr__(self):
-		return f"SequenceVar({self.seq_index})"
+		return f"SequenceInitialVar({self.seq_index})"

@@ -136,7 +136,6 @@ class Token:
 		return 0x5C00 <= self.code <= 0x5CFF
 
 	def is_sequence_var(self) -> bool:
-		"""𝑢, 𝑣, 𝑤 — handled via SequenceVar.store_initial when `(nMin)` follows a store."""
 		return 0x5E80 <= self.code <= 0x5E82
 
 	def is_string_var(self) -> bool:

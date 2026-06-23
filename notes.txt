@@ -1,14 +1,11 @@
-Great. Do you think we could have Ans use a special accessor?
+seq: sample_sequence index
 
-Static access to equations shouldn't require using graph mode
+Kill Window, fix zoomsto variables
+
+We can get rid of this branch in parser, right? `elif t.is_sequence_var() and self.peek().code == L_PAREN:`
+SequenceVars should work automatically with resolve/invoke, right?
 
 u(nMin) as store target: accepts number or list
-
-fix zoomsto variables
-
-elif t.is_sequence_var() and self.peek().code == L_PAREN:
-
-Should invoke take an argparser? That way matrices could parse two args
 
 elif t.is_sequence_var()
 

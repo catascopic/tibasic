@@ -40,7 +40,7 @@ class GraphStyle(Enum):
 @dataclass
 class FuncData:
 	"""One Y= function slot: equation, on/off, style.  Knows how to plot itself."""
-	equation: 'TiEquation | None' = None
+	equation: TiEquation | None = None
 	selected: bool = False
 	style: GraphStyle = GraphStyle.LINE
 
@@ -64,8 +64,8 @@ class FuncData:
 @dataclass
 class ParData:
 	"""One parametric pair (XnT + YnT): both halves, shared on/off and style."""
-	x_eq: 'TiEquation | None' = None
-	y_eq: 'TiEquation | None' = None
+	x_eq: TiEquation | None = None
+	y_eq: TiEquation | None = None
 	selected: bool = False
 	style: GraphStyle = GraphStyle.LINE
 
@@ -90,7 +90,7 @@ class ParData:
 @dataclass
 class PolarData:
 	"""One polar equation slot (r=): equation, on/off, style."""
-	equation: 'TiEquation | None' = None
+	equation: TiEquation | None = None
 	selected: bool = False
 	style: GraphStyle = GraphStyle.LINE
 
@@ -116,7 +116,7 @@ class PolarData:
 class SeqData:
 	"""One sequence slot (u/v/w): index, equation, on/off, style."""
 	seq_index: int
-	equation: 'TiEquation | None' = None
+	equation: TiEquation | None = None
 	selected: bool = False
 	style: GraphStyle = GraphStyle.LINE
 

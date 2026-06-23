@@ -10,7 +10,7 @@ from accessors import (
 	NumericVar, MatrixVar, ListVar, StringVar,
 	ComputedAccessor, RandAccessor,
 	WindowVar, XresVar, IntWindowVar, FactorWindowVar, DeltaWindowVar,
-	EnvVar, TableVar, EquationVar, ParEquationVar, SequenceVar,
+	EnvVar, TableVar, EquationVar, ParEquationVar, SequenceVar, SequenceInitialVar,
 )
 import commands as cmds
 import distributions as dist
@@ -283,12 +283,12 @@ token(0x6300, b'ZXscl',                 var=WindowVar('xscl', 'zoom_window'))
 token(0x6301, b'ZYscl',                 var=WindowVar('yscl', 'zoom_window'))
 token(0x6302, b'Xscl',                  var=WindowVar('xscl'))
 token(0x6303, b'Yscl',                  var=WindowVar('yscl'))
-token(0x6304, b'\x02(nMin)')            # u(nMin)
-token(0x6305, b'\x03(nMin)')            # v(nMin)
-token(0x6306, b'\x02(n-1)')             # u(n-1)
-token(0x6307, b'\x03(n-1)')             # v(n-1)
-token(0x6308, b'Z\x02(nMin)')           # Zu(nMin)
-token(0x6309, b'Z\x03(nMin)')           # Zv(nMin)
+token(0x6304, b'\x02(nMin)', var=SequenceInitialVar(0))   # u(nMin)
+token(0x6305, b'\x03(nMin)', var=SequenceInitialVar(1))   # v(nMin)
+token(0x6306, b'\x02(n-1)',  var=ComputedAccessor(lambda env: env.eval_sequence(0, env.n - 1)))  # u(n-1)
+token(0x6307, b'\x03(n-1)',  var=ComputedAccessor(lambda env: env.eval_sequence(1, env.n - 1)))  # v(n-1)
+token(0x6308, b'Z\x02(nMin)', var=SequenceInitialVar(0))  # Zu(nMin) — same slot, zoom-window alias
+token(0x6309, b'Z\x03(nMin)', var=SequenceInitialVar(1))  # Zv(nMin)
 token(0x630A, b'Xmin',                  var=WindowVar('xmin'))
 token(0x630B, b'Xmax',                  var=WindowVar('xmax'))
 token(0x630C, b'Ymin',                  var=WindowVar('ymin'))
@@ -329,8 +329,8 @@ token(0x632E, b'PMT',                   var=EnvVar('pmt'))
 token(0x632F, b'FV',                    var=EnvVar('fv'))
 token(0x6330, b'P/Y',                   var=EnvVar('py'))
 token(0x6331, b'C/Y',                   var=EnvVar('cy'))
-token(0x6332, b'\x04(nMin)')            # w(nMin)
-token(0x6333, b'Z\x04(nMin)')           # Zw(nMin)
+token(0x6332, b'\x04(nMin)', var=SequenceInitialVar(2))   # w(nMin)
+token(0x6333, b'Z\x04(nMin)', var=SequenceInitialVar(2))  # Zw(nMin)
 token(0x6334, b'PlotStep',              var=WindowVar('plot_step'))
 token(0x6335, b'ZPlotStep',             var=WindowVar('plot_step', 'zoom_window'))
 token(0x6336, b'Xres',                  var=XresVar('xres'))

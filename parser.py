@@ -431,15 +431,6 @@ class Parser:
 			else:
 				ref.store(value)
 
-		elif t.is_sequence_var() and self.peek().code == L_PAREN:
-			# {…}→u(nMin): store the sequence's initial values.  The index in the
-			# parentheses is always nMin, so it's parsed and discarded; storing the
-			# bare formula (…→u, no parentheses) falls through to the accessor branch.
-			self.advance()                # (
-			self.parse_expr()             # nMin — not used; storing sets the whole list
-			self.eat_if(R_PAREN)
-			t.accessor.store_initial(self.env, value)
-
 		elif t.accessor is not None:
 			# Plain variable, finance var, or rand (RandAccessor.store seeds the RNG).
 			t.accessor.store(self.env, value)
