@@ -16,7 +16,7 @@ Every symbol has a dedicated accessor type — numeric, matrix, list, string,
 user-list, equation, sequence, window, TVM, and table variables — so values live
 directly in the Environment with no wrapper objects.
 """
-from abc import ABC, abstractmethod
+from abc import ABC
 from contextlib import contextmanager
 
 from core import require_num, require_matrix, require_list, require_string, require_real, require_int, py_int
@@ -46,10 +46,19 @@ class Accessor(ABC):
 
 	def _set(self, env, value):
 		raise NotImplementedError(f"{type(self).__name__} does not support _set")
-	
-	@abstractmethod
+
+	@property
+	def label(self) -> str:
+		"""Human-readable name for error messages; defaults to the repr."""
+		return repr(self)
+
 	def resolve(self, env):
-		pass
+		"""Read the value, erroring if the slot is empty.  Subclasses with auto-init
+		(NumericVar), extra validation (ListVar), or computed values (rand, ΔX) override."""
+		value = self._get(env)
+		if value is None:
+			raise UndefinedError(f"{self.label} is not defined")
+		return value
 
 	def store(self, env, value):
 		raise TiSyntaxError(f"Cannot store to {self}")
@@ -62,6 +71,15 @@ class Accessor(ABC):
 
 	def reference(self, env) -> "Reference":
 		return Reference(env, self)
+
+
+class Deletable:
+	"""Mixin for accessors whose `DelVar` clears the slot to its undefined state —
+	`None`.  List it before `Accessor` in the bases so this `delete` overrides the
+	base's raising one (e.g. `class StringVar(Deletable, Accessor)`)."""
+
+	def delete(self, env):
+		self._set(env, None)
 
 
 class Reference:
@@ -104,7 +122,7 @@ class Reference:
 		return f"Reference({self.accessor!r})"
 
 
-class NumericVar(Accessor):
+class NumericVar(Deletable, Accessor):
 	"""A real/complex variable A–Z, θ — a named slot in env.numerics (NumericVars).
 
 	An undefined numeric reads as 0 (and is initialized to 0 on first resolve),
@@ -131,9 +149,6 @@ class NumericVar(Accessor):
 
 	def store(self, env, value):
 		self._set(env, require_num(value))
-
-	def delete(self, env):
-		self._set(env, None)
 
 	def __repr__(self):
 		return f"NumericVar({self.name!r})"
@@ -176,6 +191,10 @@ class UserListVar(Accessor):
 	def __init__(self, name: str):
 		self.name = name
 
+	@property
+	def label(self):
+		return f"user list {self.name!r}"
+
 	def _get(self, env):
 		return env.user_lists.get(self.name)
 
@@ -183,22 +202,13 @@ class UserListVar(Accessor):
 		env.user_lists[self.name] = value
 
 	def resolve(self, env):
-		try:
-			value = env.user_lists[self.name]
-		except KeyError:
-			raise UndefinedError(f"User list {self.name!r} is not defined")
+		value = super().resolve(env)      # errors if undefined
 		if not value.data:
 			raise InvalidDimError("empty list")
 		return value
 
 	def store(self, env, value):
-		lst = require_list(value)
-		current = self._get(env)
-		was_complex = current is not None and current.is_complex
-		new_value = lst.copy()
-		if was_complex:
-			new_value._upgrade_to_complex()
-		self._set(env, new_value)
+		self._set(env, require_list(value).copy())
 
 	def invoke(self, arg_parser):
 		index = py_int(arg_parser.expr(), InvalidDimError)
@@ -212,7 +222,7 @@ class UserListVar(Accessor):
 		return f"UserListVar({self.name!r})"
 
 
-class MatrixVar(Accessor):
+class MatrixVar(Deletable, Accessor):
 	"""A matrix variable [A]–[J] — a named slot in env.matrices (MatrixVars).
 
 	Undefined matrices raise UndefinedError on resolve; `store` deep-copies so the
@@ -225,17 +235,15 @@ class MatrixVar(Accessor):
 	def __init__(self, name: str):
 		self.name = name
 
+	@property
+	def label(self):
+		return f"[{self.name}]"
+
 	def _get(self, env):
 		return getattr(env.matrices, self.name)
 
 	def _set(self, env, value):
 		setattr(env.matrices, self.name, value)
-
-	def resolve(self, env):
-		value = self._get(env)
-		if value is None:
-			raise UndefinedError(f"[{self.name}] is not defined")
-		return value
 
 	def store(self, env, value):
 		self._set(env, require_matrix(value).copy())
@@ -246,14 +254,11 @@ class MatrixVar(Accessor):
 		arg_parser.end_func()
 		return self.resolve(arg_parser.env)[(row, col)]
 
-	def delete(self, env):
-		self._set(env, None)
-
 	def __repr__(self):
 		return f"MatrixVar({self.name!r})"
 
 
-class ListVar(Accessor):
+class ListVar(Deletable, Accessor):
 	"""A built-in list L1–L6 — a 0-based slot in env.lists (list[TiList | None]).
 
 	Preserves the complex flag of the previous value on store, matching the
@@ -266,6 +271,10 @@ class ListVar(Accessor):
 	def __init__(self, index: int):
 		self.index = index
 
+	@property
+	def label(self):
+		return f"L{self.index + 1}"
+
 	def _get(self, env):
 		return env.lists[self.index]
 
@@ -273,35 +282,24 @@ class ListVar(Accessor):
 		env.lists[self.index] = value
 
 	def resolve(self, env):
-		value = self._get(env)
-		if value is None:
-			raise UndefinedError(f"L{self.index + 1} is not defined")
+		value = super().resolve(env)      # errors if undefined
 		if not value.data:
 			raise InvalidDimError("empty list")
 		return value
 
 	def store(self, env, value):
-		lst = require_list(value)
-		current = self._get(env)
-		was_complex = current is not None and current.is_complex
-		new_value = lst.copy()
-		if was_complex:
-			new_value._upgrade_to_complex()
-		self._set(env, new_value)
+		self._set(env, require_list(value).copy())
 
 	def invoke(self, arg_parser):
 		index = py_int(arg_parser.expr(), InvalidDimError)
 		arg_parser.end_func()
 		return self.resolve(arg_parser.env)[index]
 
-	def delete(self, env):
-		self._set(env, None)
-
 	def __repr__(self):
 		return f"ListVar({self.index!r})"
 
 
-class StringVar(Accessor):
+class StringVar(Deletable, Accessor):
 	"""A string variable Str1–Str0 — a 0-based slot in env.strings (list[TiString | None]).
 
 	`kind = 'string'` lets Input/Prompt store the raw typed text rather than
@@ -314,23 +312,18 @@ class StringVar(Accessor):
 	def __init__(self, index: int):
 		self.index = index
 
+	@property
+	def label(self):
+		return f"Str{(self.index + 1) % 10}"
+
 	def _get(self, env):
 		return env.strings[self.index]
 
 	def _set(self, env, value):
 		env.strings[self.index] = value
 
-	def resolve(self, env):
-		value = self._get(env)
-		if value is None:
-			raise UndefinedError(f"Str{(self.index + 1) % 10} is not defined")
-		return value
-
 	def store(self, env, value):
 		self._set(env, require_string(value))
-
-	def delete(self, env):
-		self._set(env, None)
 
 	def __repr__(self):
 		return f"StringVar({self.index!r})"
@@ -351,17 +344,15 @@ class WindowVar(Accessor):
 		self.attr = attr
 		self.target = target
 
+	@property
+	def label(self):
+		return f"window variable {self.attr!r}"
+
 	def _get(self, env):
 		return getattr(getattr(env, self.target), self.attr)
 
 	def _set(self, env, value):
 		setattr(getattr(env, self.target), self.attr, value)
-
-	def resolve(self, env):
-		v = self._get(env)
-		if v is None:
-			raise UndefinedError(f"Window variable {self.attr!r} is not defined")
-		return v
 
 	def store(self, env, value):
 		self._set(env, require_real(value))
@@ -433,17 +424,15 @@ class EnvVar(Accessor):
 	def __init__(self, attr: str):
 		self.attr = attr
 
+	@property
+	def label(self):
+		return repr(self.attr)
+
 	def _get(self, env):
 		return getattr(env, self.attr)
 
 	def _set(self, env, value):
 		setattr(env, self.attr, value)
-
-	def resolve(self, env):
-		v = self._get(env)
-		if v is None:
-			raise UndefinedError(f"{self.attr!r} is not defined")
-		return v
 
 	def store(self, env, value):
 		self._set(env, require_real(value))
@@ -460,17 +449,15 @@ class TableVar(Accessor):
 	def __init__(self, attr: str):
 		self.attr = attr
 
+	@property
+	def label(self):
+		return f"table variable {self.attr!r}"
+
 	def _get(self, env):
 		return getattr(env.table, self.attr)
 
 	def _set(self, env, value):
 		setattr(env.table, self.attr, value)
-
-	def resolve(self, env):
-		v = self._get(env)
-		if v is None:
-			raise UndefinedError(f"Table variable {self.attr!r} is not defined")
-		return v
 
 	def store(self, env, value):
 		self._set(env, require_real(value))
@@ -488,7 +475,7 @@ def _normalize_eq(value) -> TiEquation:
 	raise DataTypeError(f"Expected equation or string, got {value!r}")
 
 
-class EquationVar(Accessor):
+class EquationVar(Deletable, Accessor):
 	"""A graph equation (Y1–Y0, X1T/Y1T–X6T/Y6T, r1–r6).
 
 	An equation is not one of TI's runtime value types, so reading it as a value
@@ -534,9 +521,6 @@ class EquationVar(Accessor):
 		self._set(env, _normalize_eq(value))
 		getattr(env, self.attr)[self.index].selected = True
 
-	def delete(self, env):
-		self._set(env, None)
-
 	def __repr__(self):
 		return f"EquationVar({self.attr!r}, {self.index})"
 
@@ -572,7 +556,7 @@ class ParEquationVar(EquationVar):
 		return f"ParEquationVar({self.index}, {half})"
 
 
-class SequenceVar(Accessor):
+class SequenceVar(Deletable, Accessor):
 	"""A recursive sequence variable 𝑢/𝑣/𝑤.
 
 	Reading it as a value (`resolve`) evaluates the sequence at the current n;
@@ -609,9 +593,6 @@ class SequenceVar(Accessor):
 	def store_initial(self, env, value):
 		"""Handle `{…}→u(nMin)`: store the sequence's initial-value list."""
 		env.store_sequence_initial(self.seq_index, value)
-
-	def delete(self, env):
-		self._set(env, None)
 
 	def __repr__(self):
 		return f"SequenceVar({self.seq_index})"

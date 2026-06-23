@@ -838,14 +838,14 @@ class TestComplexList:
 		assert all(isinstance(x, complex) for x in lst.data)
 		assert lst.data == [1+0j, 2+0j, 1j]
 
-	def test_sticky_after_real_store(self):
-		# Once complex, storing a real list still keeps all elements complex
+	def test_real_store_clears_complex_flag(self):
+		# Storing a real list overwrites the complex flag — the new value's type wins
 		env = run('{1,i}@ L1')
 		run('{3,4}@ L1', env)
 		lst = var(env, 'L1')
-		assert lst.is_complex
-		assert all(isinstance(x, complex) for x in lst.data)
-		assert lst.data == [3+0j, 4+0j]
+		assert not lst.is_complex
+		assert all(isinstance(x, float) for x in lst.data)
+		assert lst.data == [3.0, 4.0]
 
 	def test_set_dim_zero_does_not_reset(self):
 		# 0→dim(L1) clears elements but leaves the complex flag intact
