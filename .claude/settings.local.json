@@ -71,7 +71,8 @@
       "Bash(PYTHONIOENCODING=utf-8 python junk/gen_displaybytes.py)",
       "Bash(python -c \"import draw; help\\(draw.text\\)\")",
       "mcp__visualize__read_me",
-      "PowerShell(python C:\\\\Users\\\\Max\\\\Documents\\\\code\\\\tibasic\\\\_tmp_listtest.py)"
+      "PowerShell(python C:\\\\Users\\\\Max\\\\Documents\\\\code\\\\tibasic\\\\_tmp_listtest.py)",
+      "Bash(python -X utf8 -c ' *)"
     ]
   }
 }

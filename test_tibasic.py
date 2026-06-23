@@ -507,6 +507,12 @@ class TestParserFeatures:
 		env = run('3@A')
 		assert calc('A', env) == 3
 
+	def test_numeric_var_implicit_mul(self):
+		# A(expr) is implicit multiplication, not a call — the accessor's invoke must
+		# leave the '(' for parse_expr rather than consuming it like a list/equation.
+		env = run('2@A')
+		assert calc('A(3+4)', env) == 14
+
 	def test_ans(self):
 		env = run('5')
 		run('Ans +1', env)

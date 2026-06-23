@@ -22,6 +22,7 @@ from core import require_num, require_matrix, require_list, require_string, requ
 from core import TiString, TiEquation
 from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, DataTypeError
 from modes import GraphMode
+from titoken import R_PAREN
 
 
 class Accessor:
@@ -32,15 +33,16 @@ class Accessor:
 	checks); `get`/`set` are the raw, unchecked accessors used internally (e.g. by
 	`scoped`).  By default `get`/`set` fall back to `resolve`/`store`.
 
-	`invoke(env, *args)` is the expression-context read: `resolve(env)` plus an
-	optional call argument.  The default ignores args and returns `resolve(env)`;
-	equation and sequence accessors override it so `Y1(x)` / `u(n)` resolve at an
-	explicit argument.  Set `invocable = True` on any subclass that wants the
-	parser to look for a trailing `(expr)`.
+	A symbol is read in expression context as either `resolve` or `invoke`:
+	`invocable` accessors (lists, matrices, equations, sequences) own a trailing
+	parenthesised argument — `L1(2)`, `[A](r,c)`, `Y1(x)`, `u(n)` — which the parser
+	routes to `invoke(parser)` with the `(` already eaten.  Every other symbol is
+	read with `resolve`, so a following `(` stays implicit multiplication (`A(2)`
+	== A·2).
 	"""
 
-	kind = None       # discriminator for callers that branch on type (e.g. Input: 'string')
-	invocable = False # True for EquationVar and SequenceVar: parser checks for (arg)
+	kind = None        # discriminator for callers that branch on type (e.g. Input: 'string')
+	invocable = False  # True ⇒ a trailing '(' is a call/index (see invoke), not implicit mult
 
 	def resolve(self, env):
 		raise NotImplementedError
@@ -48,8 +50,10 @@ class Accessor:
 	def store(self, env, value):
 		raise TiSyntaxError("Invalid store target")
 
-	def invoke(self, env, *args):
-		return self.resolve(env)
+	def invoke(self, parser):
+		"""Read with a parenthesised argument; the parser has already eaten the '('.
+		Only invocable accessors implement this."""
+		raise NotImplementedError(f"{type(self).__name__} is not invocable")
 
 	def delete(self, env):
 		pass
@@ -173,6 +177,7 @@ class UserListVar(Accessor):
 	"""
 
 	__slots__ = ('name',)
+	invocable = True
 
 	def __init__(self, name: str):
 		self.name = name
@@ -201,6 +206,10 @@ class UserListVar(Accessor):
 			new_value._upgrade_to_complex()
 		self.set(env, new_value)
 
+	def invoke(self, parser):
+		# The '(' is already eaten; parse_list_index reads the index and the ')'.
+		return self.resolve(parser.env)[parser.parse_list_index()]
+
 	def delete(self, env):
 		env.user_lists.pop(self.name, None)
 
@@ -216,6 +225,7 @@ class MatrixVar(Accessor):
 	"""
 
 	__slots__ = ('name',)
+	invocable = True
 
 	def __init__(self, name: str):
 		self.name = name
@@ -235,6 +245,10 @@ class MatrixVar(Accessor):
 	def store(self, env, value):
 		self.set(env, require_matrix(value).copy())
 
+	def invoke(self, parser):
+		# The '(' is already eaten; parse_matrix_indices reads the indices and the ')'.
+		return self.resolve(parser.env)[parser.parse_matrix_indices()]
+
 	def delete(self, env):
 		self.set(env, None)
 
@@ -250,6 +264,7 @@ class ListVar(Accessor):
 	"""
 
 	__slots__ = ('index',)
+	invocable = True
 
 	def __init__(self, index: int):
 		self.index = index
@@ -276,6 +291,10 @@ class ListVar(Accessor):
 		if was_complex:
 			new_value._upgrade_to_complex()
 		self.set(env, new_value)
+
+	def invoke(self, parser):
+		# The '(' is already eaten; parse_list_index reads the index and the ')'.
+		return self.resolve(parser.env)[parser.parse_list_index()]
 
 	def delete(self, env):
 		self.set(env, None)
@@ -472,11 +491,11 @@ class EquationVar(Accessor):
 	"""A graph equation (Y1–Y0, X1T/Y1T–X6T/Y6T, r1–r6).
 
 	An equation is not one of TI's runtime value types, so reading it as a value
-	(`resolve`) evaluates the formula at the current X.  `invoke(env, x_val)` is
-	function composition — resolve with X temporarily set to x_val.  The raw
-	`TiEquation` is reachable only through `get`/`set`, which is why copying a
-	formula out (Equ►String) needs a dedicated command.  `store` normalises a
-	string/equation and selects the function.
+	(`resolve`) evaluates the formula at the current X.  `Y1(x)` is function
+	composition — resolve with X temporarily set to x.  The raw `TiEquation` is
+	reachable only through `get`/`set`, which is why copying a formula out
+	(Equ►String) needs a dedicated command.  `store` normalises a string/equation
+	and selects the function.
 	"""
 
 	__slots__ = ('mode', 'eq_index', 'func_index')
@@ -499,11 +518,13 @@ class EquationVar(Accessor):
 			raise UndefinedError("Equation is not defined")
 		return eq.eval(env)
 
-	def invoke(self, env, *args):
-		if not args:
-			return self.resolve(env)
+	def invoke(self, parser):
+		# The '(' is already eaten: Y1(x) composes by resolving with X set to x.
+		x = parser.parse_expr()
+		parser.eat_if(R_PAREN)
+		env = parser.env
 		saved_x = env.numerics.X
-		env.numerics.X = require_num(args[0])
+		env.numerics.X = require_num(x)
 		try:
 			return self.resolve(env)
 		finally:
@@ -524,9 +545,9 @@ class SequenceVar(Accessor):
 	"""A recursive sequence variable 𝑢/𝑣/𝑤.
 
 	Reading it as a value (`resolve`) evaluates the sequence at the current n;
-	`invoke(env, n_val)` evaluates at an explicit index.  The raw `TiEquation` is
-	reachable through `get`/`set`; `store_initial` handles the `{…}→u(nMin)`
-	initial-value store path.
+	`u(n)` evaluates at an explicit index.  The raw `TiEquation` is reachable
+	through `get`/`set`; `store_initial` handles the `{…}→u(nMin)` initial-value
+	store path.
 	"""
 
 	__slots__ = ('seq_index',)
@@ -544,10 +565,11 @@ class SequenceVar(Accessor):
 	def resolve(self, env):
 		return env.eval_sequence(self.seq_index, env.n)
 
-	def invoke(self, env, *args):
-		if not args:
-			return self.resolve(env)
-		return env.eval_sequence(self.seq_index, args[0])
+	def invoke(self, parser):
+		# The '(' is already eaten: u(n) evaluates at the explicit index n.
+		n = parser.parse_expr()
+		parser.eat_if(R_PAREN)
+		return parser.env.eval_sequence(self.seq_index, n)
 
 	def store(self, env, value):
 		self.set(env, _normalize_eq(value))

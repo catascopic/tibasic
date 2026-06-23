@@ -1,3 +1,9 @@
+u(nMin) as store target: accepts number or list
+
+fix zoomsto variables
+
+elif t.is_sequence_var() and self.peek().code == L_PAREN:
+
 Should invoke take an argparser? That way matrices could parse two args
 
 elif t.is_sequence_var()

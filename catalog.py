@@ -279,8 +279,16 @@ token(0x623A, b'df')        # Error df
 token(0x623B, b'SS')        # Error SS
 token(0x623C, b'MS')        # Error MS
 
+token(0x6300, b'ZXscl')
+token(0x6301, b'ZYscl')
 token(0x6302, b'Xscl',                  var=WindowVar('xscl'))
 token(0x6303, b'Yscl',                  var=WindowVar('yscl'))
+token(0x6304, b'\x02(nMin)')            # u(nMin)
+token(0x6305, b'\x03(nMin)')            # v(nMin)
+token(0x6306, b'\x02(n-1)')             # u(n-1)
+token(0x6307, b'\x03(n-1)')             # v(n-1)
+token(0x6308, b'Z\x02(nMin)')           # Zu(nMin)
+token(0x6309, b'Z\x03(nMin)')           # Zv(nMin)
 token(0x630A, b'Xmin',                  var=WindowVar('xmin'))
 token(0x630B, b'Xmax',                  var=WindowVar('xmax'))
 token(0x630C, b'Ymin',                  var=WindowVar('ymin'))
@@ -289,19 +297,31 @@ token(0x630E, b'Tmin',                  var=WindowVar('tmin'))
 token(0x630F, b'Tmax',                  var=WindowVar('tmax'))
 token(0x6310, b'\x5bmin',               var=WindowVar('theta_min'))    # θmin
 token(0x6311, b'\x5bmax',               var=WindowVar('theta_max'))    # θmax
+token(0x6312, b'ZXmin')
+token(0x6313, b'ZXmax')
+token(0x6314, b'ZYmin')
+token(0x6315, b'ZYmax')
+token(0x6316, b'Z\x5bmin')              # Zθmin
+token(0x6317, b'Z\x5bmax')              # Zθmax
+token(0x6318, b'ZTmin')
+token(0x6319, b'ZTmax')
 token(0x631A, b'TblStart',              var=TableVar('tbl_start'))
 token(0x631B, b'PlotStart',             var=WindowVar('plot_start'))
+token(0x631C, b'ZPlotStart')
 token(0x631D, b'nMax',                  var=IntWindowVar('n_max'))
+token(0x631E, b'ZnMax')
 token(0x631F, b'nMin',                  var=IntWindowVar('n_min'))
+token(0x6320, b'ZnMin')
 token(0x6321, b'\xbeTbl',               var=TableVar('delta_tbl'))       # ΔTbl
 token(0x6322, b'Tstep',                 var=WindowVar('tstep'))
 token(0x6323, b'\x5bstep',              var=WindowVar('theta_step'))    # θstep
+token(0x6324, b'ZTstep')
+token(0x6325, b'Z\x5bstep')             # Zθstep
 token(0x6326, b'\xbeX',                 var=DeltaWindowVar('xmin', 'xmax', 94))  # ΔX
 token(0x6327, b'\xbeY',                 var=DeltaWindowVar('ymin', 'ymax', 62))  # ΔY
 token(0x6328, b'XFact',                 var=FactorWindowVar('x_fact'))
 token(0x6329, b'YFact',                 var=FactorWindowVar('y_fact'))
-token(0x6334, b'PlotStep',              var=WindowVar('plot_step'))
-token(0x6336, b'Xres',                  var=XresVar('xres'))
+token(0x632A, b'TblInput')
 token(0x632B, b'\xdd',                  var=EnvVar('n_tvm'))     # 𝐍
 token(0x632C, b'I%',                    var=EnvVar('i_pct'))
 token(0x632D, b'PV',                    var=EnvVar('pv'))
@@ -309,6 +329,14 @@ token(0x632E, b'PMT',                   var=EnvVar('pmt'))
 token(0x632F, b'FV',                    var=EnvVar('fv'))
 token(0x6330, b'P/Y',                   var=EnvVar('py'))
 token(0x6331, b'C/Y',                   var=EnvVar('cy'))
+token(0x6332, b'\x04(nMin)')            # w(nMin)
+token(0x6333, b'Z\x04(nMin)')           # Zw(nMin)
+token(0x6334, b'PlotStep',              var=WindowVar('plot_step'))
+token(0x6335, b'ZPlotStep')
+token(0x6336, b'Xres',                  var=XresVar('xres'))
+token(0x6337, b'ZXres')
+token(0x6338, b'TraceStep')
+
 
 token(0x64, b'Radian',                  cmd=modecmds.radian)
 token(0x65, b'Degree',                  cmd=modecmds.degree)
@@ -316,7 +344,6 @@ token(0x66, b'Normal',                  cmd=modecmds.normal)
 token(0x67, b'Sci',                     cmd=modecmds.sci)
 token(0x68, b'Eng',                     cmd=modecmds.eng)
 token(0x69, b'Float',                   cmd=modecmds.float_)
-
 token(0x6A, b'=',                       bp=(40, 41), op=ops.eq,  typeable=True)
 token(0x6B, b'<',                       bp=(40, 41), op=ops.lt,  typeable=True)
 token(0x6C, b'>',                       bp=(40, 41), op=ops.gt,  typeable=True)
@@ -326,7 +353,6 @@ token(0x6F, b'\x18',                    bp=(40, 41), op=ops.ne,  typeable=True) 
 token(0x70, b'+',                       bp=(50, 51), op=ops.add, typeable=True)
 token(0x71, b'-',                       bp=(50, 51), op=ops.sub, typeable=True)
 token(tk.ANS, b'Ans')                   # Handled as special case in parser
-
 token(0x73, b'Fix',                     cmd=modecmds.fix)
 token(0x74, b'Horiz')
 token(0x75, b'Full')

@@ -13,7 +13,7 @@ from titoken import (
 )
 from environment import Environment
 from core import Thunk, py_int, require_num, require_real
-from accessors import Reference, UserListVar
+from accessors import Reference, UserListVar, EquationVar, SequenceVar
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError
 
 
@@ -329,33 +329,25 @@ class Parser:
 				self.advance()
 			return self._call_function(t)
 
-		if t.is_list_var():
-			return self.parse_list_atom(t.accessor.reference(self.env))
-
+		# A user list's accessor is name-dependent, so it's built from the following
+		# name; every other variable carries its accessor on the token.
 		if t.code == LIST_PREFIX:
-			return self.parse_list_atom(self.parse_user_list())
-
-		if t.is_matrix_var():
-			val = t.accessor.resolve(self.env)
-			if self.eat_if(L_PAREN):
-				val = val[self.parse_matrix_indices()]
-			return val
+			return self._read_accessor(UserListVar(self.read_name(5)))
 
 		if t.accessor is not None:
-			if t.accessor.invocable and self.eat_if(L_PAREN):
-				arg = self.parse_expr()
-				self.eat_if(R_PAREN)
-				return t.accessor.invoke(self.env, arg)
-			return t.accessor.invoke(self.env)
+			return self._read_accessor(t.accessor)
 
 		raise TiSyntaxError(f"Unexpected token in expression: {t}")
 
-	def parse_list_atom(self, var):
-		value = var.resolve()
-		if self.eat_if(L_PAREN):
-			value = value[self.parse_list_index()]
-		return value
-	
+	def _read_accessor(self, acc):
+		"""Read an accessor as an atom.  An invocable accessor (list/matrix/equation/
+		sequence) consumes a trailing '(arg)' via invoke; anything else resolves, leaving
+		a following '(' for implicit multiplication.  Order matters: `invocable` is tested
+		before eat_if so a plain variable never has its '(' eaten."""
+		if acc.invocable and self.eat_if(L_PAREN):
+			return acc.invoke(self)
+		return acc.resolve(self.env)
+
 	def parse_indices(self, count):
 		args = ArgParser(self)
 		indices = tuple(py_int(args.expr(), InvalidDimError) for _ in range(count))
@@ -691,7 +683,7 @@ class ArgParser:
 	@_parse_arg
 	def equation_var(self) -> "Reference":
 		t = self._parser.advance()
-		if t.accessor is not None and t.accessor.invocable:
+		if isinstance(t.accessor, (EquationVar, SequenceVar)):
 			return t.accessor.reference(self.env)
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
@@ -802,8 +794,7 @@ if __name__ == '__main__':
 
 	env.angle_mode = 'DEG'
 
-	test('{1,2,3@ L1')
-	test('1@ L1 (1,2')
+	test('pi (2)')
 
 	# test(3,STORE,(0x5C,0),'(2,1')
 	env.dump()
