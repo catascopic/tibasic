@@ -34,24 +34,20 @@ _EQ_ATTR_FOR_MODE = {
 	GraphMode.SEQ:  'sequence',
 }
 
-# Maps each window attr to the set of graph modes where changing it invalidates the graph.
-_ALL_MODES = frozenset({GraphMode.FUNC, GraphMode.PAR, GraphMode.POL, GraphMode.SEQ})
-_WINDOW_ATTR_MODES: dict[str, frozenset] = {
-	'xmin': _ALL_MODES, 'xmax': _ALL_MODES,
-	'ymin': _ALL_MODES, 'ymax': _ALL_MODES,
-	'xscl': _ALL_MODES, 'yscl': _ALL_MODES,
-	'xres':        frozenset({GraphMode.FUNC}),
-	'tmin':        frozenset({GraphMode.PAR}),
-	'tmax':        frozenset({GraphMode.PAR}),
-	'tstep':       frozenset({GraphMode.PAR}),
-	'theta_min':   frozenset({GraphMode.POL}),
-	'theta_max':   frozenset({GraphMode.POL}),
-	'theta_step':  frozenset({GraphMode.POL}),
-	'n_min':       frozenset({GraphMode.SEQ}),
-	'n_max':       frozenset({GraphMode.SEQ}),
-	'plot_start':  frozenset({GraphMode.SEQ}),
-	'plot_step':   frozenset({GraphMode.SEQ}),
+# Window attrs that invalidate the graph per mode.  Shared viewport vars (xmin/xmax/…)
+# appear in every mode; parameter/trig/sequence vars appear only in their own mode.
+_SHARED = frozenset({'xmin', 'xmax', 'ymin', 'ymax', 'xscl', 'yscl'})
+_WINDOW_MODE_ATTRS: dict[GraphMode, frozenset] = {
+	GraphMode.FUNC: _SHARED | {'xres'},
+	GraphMode.PAR:  _SHARED | {'tmin', 'tmax', 'tstep'},
+	GraphMode.POL:  _SHARED | {'theta_min', 'theta_max', 'theta_step'},
+	GraphMode.SEQ:  _SHARED | {'n_min', 'n_max', 'plot_start', 'plot_step'},
 }
+
+
+def _window_affects_graph(env, attr: str) -> bool:
+	"""True if `attr` is a window variable whose value affects the current graph mode."""
+	return attr in _WINDOW_MODE_ATTRS.get(env.graph_mode, frozenset())
 
 
 class Accessor(ABC):
@@ -386,8 +382,7 @@ class WindowVar(Accessor):
 		setattr(env.window, self.attr, value)
 		
 	def _store_check_valid(self, env, value):
-		modes = _WINDOW_ATTR_MODES.get(self.attr)
-		if modes and env.graph_mode in modes and value != self._get(env):
+		if _window_affects_graph(env, self.attr) and value != self._get(env):
 			env.graph.valid = False
 		self._set(env, value)
 
@@ -448,8 +443,7 @@ class DeltaWindowVar(Accessor):
 		delta = require_real(value)
 		lo = getattr(env.window, self.lo_attr)
 		new_hi = lo + self.divisions * delta
-		modes = _WINDOW_ATTR_MODES.get(self.hi_attr)
-		if modes and env.graph_mode in modes and new_hi != getattr(env.window, self.hi_attr):
+		if _window_affects_graph(env, self.hi_attr) and new_hi != getattr(env.window, self.hi_attr):
 			env.graph.valid = False
 		setattr(env.window, self.hi_attr, new_hi)
 
