@@ -57,26 +57,24 @@ class FuncData:
 @dataclass
 class ParData:
 	"""One parametric pair (XnT + YnT): both halves, shared on/off and style."""
-	x_eq: TiEquation | None = None
-	y_eq: TiEquation | None = None
+	x: TiEquation | None = None
+	y: TiEquation | None = None
 	selected: bool = False
 	style: GraphStyle = GraphStyle.LINE
 
 	def is_defined(self) -> bool:
-		return self.x_eq is not None and self.y_eq is not None
+		return self.x is not None and self.y is not None
 
 	def plot(self, env) -> None:
 		w = env.window
-		x_eq, y_eq = self.x_eq, self.y_eq
 		trace_parametric(env,
-			sample_parametric(env, lambda: x_eq.eval(env), lambda: y_eq.eval(env)),
+			sample_parametric(env, lambda: self.x.eval(env), lambda: self.y.eval(env)),
 			w.tmin, w.tmax, w.tstep)
 
 	def fit_points(self, env) -> list:
 		"""(x, y) pairs sampled over T, for ZoomFit."""
 		w = env.window
-		x_eq, y_eq = self.x_eq, self.y_eq
-		point = sample_parametric(env, lambda: x_eq.eval(env), lambda: y_eq.eval(env))
+		point = sample_parametric(env, lambda: self.x.eval(env), lambda: self.x.eval(env))
 		return [xy for t in _param_values(w.tmin, w.tmax, w.tstep) if (xy := point(t)) is not None]
 
 
@@ -107,9 +105,9 @@ class PolarData:
 
 @dataclass
 class SeqData:
-	"""One sequence slot (u/v/w): index, equation, on/off, style."""
-	seq_index: int
+	"""One sequence slot (u/v/w): name, equation, initial values, on/off, style."""
 	equation: TiEquation | None = None
+	initial: TiList | None = None
 	selected: bool = False
 	style: GraphStyle = GraphStyle.LINE
 
@@ -119,13 +117,13 @@ class SeqData:
 	def plot(self, env) -> None:
 		w = env.window
 		trace_parametric(env,
-			sample_sequence(env, self.seq_index),
+			sample_sequence(env, self),
 			w.plot_start, w.n_max, w.plot_step)
 
 	def fit_points(self, env) -> list:
 		"""(x, y) pairs sampled over n, for ZoomFit."""
 		w = env.window
-		point = sample_sequence(env, self.seq_index)
+		point = sample_sequence(env, self)
 		return [xy for t in _param_values(w.plot_start, w.n_max, w.plot_step) if (xy := point(t)) is not None]
 
 
@@ -451,31 +449,29 @@ def eval_sequence(env, index: int, at):
 	self-referential definition, and UndefinedError if the sequence has no formula
 	past its initial terms."""
 	with sequence_pass(env):
-		return _eval_sequence(env, index, py_int(at))
+		return _eval_sequence(env, env.sequence[index], py_int(at))
 
 
-def _eval_sequence(env, index: int, k: int):
+def _eval_sequence(env, seq: SeqData, n: int):
 	n_min = py_int(env.window.n_min)
-	if k < n_min:
-		raise DomainError(f"Sequence index {k} is below nMin ({n_min})")
-	initial = env.sequence_initial[index]
-	if initial is not None and k - n_min < len(initial.data):
-		return initial.data[k - n_min]
-	equation = env.sequence[index].equation
-	if equation is None:
-		raise UndefinedError(f"Sequence {'uvw'[index]} is not defined")
-	key = (index, k)
+	if n < n_min:
+		raise DomainError(f"Sequence index {n} is below nMin ({n_min})")
+	if seq.initial is not None and n - n_min < len(seq.initial.data):
+		return seq.initial.data[n - n_min]
+	if seq.equation is None:
+		raise UndefinedError(f"Sequence {seq.equation} is not defined")
+	key = (id(seq), n)
 	cache = env._seq_cache
 	if key in cache:
 		term = cache[key]
 		if term is _SEQ_COMPUTING:
-			raise DomainError(f"Sequence {'uvw'[index]} references itself at n={k}")
+			raise DomainError(f"Sequence {seq.equation} references itself at n={n}")
 		return term
 	cache[key] = _SEQ_COMPUTING
 	saved_n = env.n
-	env.n = float(k)
+	env.n = float(n)
 	try:
-		term = equation.eval(env)
+		term = seq.equation.eval(env)
 	finally:
 		env.n = saved_n
 	cache[key] = term
@@ -485,18 +481,19 @@ def _eval_sequence(env, index: int, k: int):
 def store_sequence_initial(env, index: int, value) -> None:
 	"""Set sequence u/v/w's u(nMin) initial-value list ({…}→u(nMin)).  A scalar is
 	wrapped as a one-element list (a single initial term)."""
-	env.sequence_initial[index] = value if isinstance(value, TiList) else TiList([value])
+	env.sequence[index].initial = value if isinstance(value, TiList) else TiList([value])
 
 
-def sample_sequence(env, index):
-	"""Return point(n): evaluate sequence u/v/w (index 0/1/2) at term n and return the
-	(n, value) graph coordinates for a Time plot — or None if the term is undefined,
-	non-real, or raises a swallowed graph error.  n, X, and Y are left at the last point.
+def sample_sequence(env, seq: 'SeqData'):
+	"""Return point(n): evaluate the given SeqData at term n and return the (n, value)
+	graph coordinates for a Time plot — or None if the term is undefined, non-real, or
+	raises a swallowed graph error.  n, X, and Y are left at the last point.
 	"""
 
 	def point(n):
 		try:
-			y = eval_sequence(env, index, n)
+			with sequence_pass(env):
+				y = _eval_sequence(env, seq, py_int(n))
 		except _GRAPH_ERRORS:
 			return None
 		if not isinstance(y, float):

@@ -19,8 +19,8 @@ directly in the Environment with no wrapper objects.
 from abc import ABC
 from contextlib import contextmanager
 
+from core import TiList, TiString, TiEquation
 from core import require_num, require_matrix, require_list, require_string, require_real, require_int, py_int
-from core import TiString, TiEquation
 from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, DataTypeError
 
 
@@ -332,35 +332,34 @@ class StringVar(Deletable, Accessor):
 
 
 class WindowVar(Accessor):
-	"""A plain real-valued window variable (Xmin, Tmax, …) — a named float attr on a
-	Window held by env.  `target` names that Window: 'window' for the live settings,
-	'zoom_window' for the ZoomSto snapshot's Z-variables (ZXmin, ZTmax, …).
+	"""A plain real-valued window variable (Xmin, ZXmin, Tmax, …) — a named float
+	attr on env.window.  Z-variables (ZXmin, ZTmax, …) use the z-prefixed attr name
+	directly (e.g. WindowVar('zxmin')).
 
-	`resolve` raises UndefinedError for variables that were never assigned (tmin, tstep,
-	etc. on a fresh env without ZStandard); `store` enforces require_real.
+	`resolve` raises UndefinedError for variables that were never assigned (Z-vars
+	before ZoomSto, etc.); `store` enforces require_real.
 	"""
 
-	__slots__ = ('attr', 'target')
+	__slots__ = ('attr',)
 
-	def __init__(self, attr: str, target: str = 'window'):
+	def __init__(self, attr: str):
 		self.attr = attr
-		self.target = target
 
 	@property
 	def label(self):
 		return f"window variable {self.attr!r}"
 
 	def _get(self, env):
-		return getattr(getattr(env, self.target), self.attr)
+		return getattr(env.window, self.attr)
 
 	def _set(self, env, value):
-		setattr(getattr(env, self.target), self.attr, value)
+		setattr(env.window, self.attr, value)
 
 	def store(self, env, value):
 		self._set(env, require_real(value))
 
 	def __repr__(self):
-		return f"WindowVar({self.attr!r}, {self.target!r})"
+		return f"WindowVar({self.attr!r})"
 
 
 class XresVar(WindowVar):
@@ -489,7 +488,7 @@ def scoped_numeric(env, name: str, value):
 		saved = setattr(env.numerics, name, saved)
 
 
-class EquationVar(Deletable, Accessor):
+class EquationVar(ABC, Deletable, Accessor):
 	"""A graph equation (Y1–Y0, X1T/Y1T–X6T/Y6T, r1–r6).
 
 	An equation is not one of TI's runtime value types, so reading it as a value
@@ -502,6 +501,7 @@ class EquationVar(Deletable, Accessor):
 
 	__slots__ = ('attr', 'index')
 	invocable = True
+	indep = None
 
 	def __init__(self, attr: str, index: int):
 		self.attr = attr
@@ -524,7 +524,7 @@ class EquationVar(Deletable, Accessor):
 		x = arg_parser.expr()
 		arg_parser.end_func()
 		env = arg_parser.env
-		with scoped_numeric(env, 'X', require_num(x)):
+		with scoped_numeric(env, self.indep, require_num(x)):
 			return self.resolve(env)
 
 	def store(self, env, value):
@@ -533,6 +533,10 @@ class EquationVar(Deletable, Accessor):
 
 	def __repr__(self):
 		return f"EquationVar({self.attr!r}, {self.index})"
+
+
+class FuncEquationVar(EquationVar):
+	indep = 'X'
 
 
 class ParEquationVar(EquationVar):
@@ -544,82 +548,59 @@ class ParEquationVar(EquationVar):
 	selects the pair.
 	"""
 
-	__slots__ = ('is_x',)
+	__slots__ = ('half',)
+	indep = 'T'
 
-	def __init__(self, index: int, is_x: bool):
+	def __init__(self, index: int, half: str):
 		super().__init__('parametric', index)
-		self.is_x = is_x
+		self.half = half
 
 	def _get(self, env):
-		fn = env.parametric[self.index]
-		return fn.x_eq if self.is_x else fn.y_eq
+		return getattr(env.parametric[self.index], self.half)
 
 	def _set(self, env, value):
-		fn = env.parametric[self.index]
-		if self.is_x:
-			fn.x_eq = value
-		else:
-			fn.y_eq = value
+		return getattr(env.parametric[self.index], self.half, value)
 
 	def __repr__(self):
-		half = 'x' if self.is_x else 'y'
 		return f"ParEquationVar({self.index}, {half})"
 
 
-class SequenceVar(Deletable, Accessor):
+class PolarEquationVar(EquationVar):
+	indep = 'theta'
+
+
+class SequenceVar(EquationVar):
 	"""A recursive sequence variable 𝑢/𝑣/𝑤.
 
 	Reading it as a value (`resolve`) evaluates the sequence at the current n;
 	`u(n)` evaluates at an explicit index.  The raw `TiEquation` is reachable
 	through `_get`/`_set`.
 	"""
-
-	__slots__ = ('seq_index',)
-	invocable = True
-
-	def __init__(self, seq_index: int):
-		self.seq_index = seq_index
-
-	def _get(self, env):
-		return env.sequence[self.seq_index].equation
-
-	def _set(self, env, value):
-		env.sequence[self.seq_index].equation = value
-
-	def resolve(self, env):
-		return env.eval_sequence(self.seq_index, env.n)
-
+	
 	def invoke(self, arg_parser):
-		# The '(' is already eaten: u(n) evaluates at the explicit index n.
-		n = arg_parser.expr()
-		arg_parser.end_func()
-		return arg_parser.env.eval_sequence(self.seq_index, n)
-
-	def store(self, env, value):
-		self._set(env, _normalize_eq(value))
-		env.sequence[self.seq_index].selected = True
+		"""TODO: independent var not in numerics"""
 
 	def __repr__(self):
-		return f"SequenceVar({self.seq_index})"
+		return f"SequenceVar({chr(0x75 + self.index)})"
 
 
 class SequenceInitialVar(Deletable, Accessor):
 	"""The u(nMin)/v(nMin)/w(nMin) token — stores and reads the initial-value list
 	for a recursive sequence."""
 
-	__slots__ = ('seq_index',)
+	__slots__ = ('index',)
 
-	def __init__(self, seq_index: int):
-		self.seq_index = seq_index
+	def __init__(self, index: int):
+		self.index = index
 
 	def _get(self, env):
-		return env.sequence_initial[self.seq_index]
+		return env.sequence[self.index].initial
 
 	def _set(self, env, value):
-		env.sequence_initial[self.seq_index] = value
+		env.sequence[self.index].initial = value
 
 	def store(self, env, value):
-		env.store_sequence_initial(self.seq_index, value)
+		env.sequence[self.index].initial = value if isinstance(value, TiList) else TiList([value])
 
 	def __repr__(self):
-		return f"SequenceInitialVar({self.seq_index})"
+		return f"SequenceInitialVar({self.index})"

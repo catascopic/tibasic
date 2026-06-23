@@ -68,17 +68,13 @@ class Environment:
 		self.matrices   = MatrixVars()      # [A]–[J] (named slots, None until assigned)
 		self.lists      = [None] * 6        # L1–L6  (TiList | None)
 		self.strings    = [None] * 10       # Str1–Str0 (TiString | None)
-		# Plottable functions, one slot per selectable entry.  Each carries its equation,
-		# on/off selection flag, and draw style, and knows how to plot itself.
-		self.function   = [FuncData()    for _ in range(10)]     # Y1–Y0
-		self.parametric = [ParData()     for _ in range(6)]      # X1T/Y1T – X6T/Y6T
-		self.polar      = [PolarData()   for _ in range(6)]      # r1–r6
-		self.sequence   = [SeqData(i)    for i in range(3)]      # u, v, w
-		self.sequence_initial: list = [None, None, None]         # u/v/w(nMin) lists
+		self.function   = [FuncData()  for _ in range(10)]  # Y1–Y0
+		self.parametric = [ParData()   for _ in range(6)]   # X1T/Y1T – X6T/Y6T
+		self.polar      = [PolarData() for _ in range(6)]   # r1–r6
+		self.sequence   = [SeqData()   for _ in range(3)]   # u, v, w
 		self.user_lists = {}
-		# self.stat        = [None] * 0x3D # stat vars
-		self.n: float = 0.0
-		self.ans = 0
+		self.n = 0.0
+		self.ans = 0.0
 		# MODES
 		self.angle_mode    = AngleMode.RAD
 		self.number_mode   = NumberMode.NORMAL
@@ -98,12 +94,7 @@ class Environment:
 		self.dt_fmt        = 1
 		self.tm_fmt        = 12
 		self.clock_on      = True
-		# Window / graphing variables (Xscl, Xmin, Xmax, …) and the ZoomSto snapshot.
-		# The snapshot is a second Window whose fields ARE the Z-window system variables
-		# (ZXmin, ZTmax, …): the Z-tokens read/write it directly (see catalog), and
-		# ZoomSto/ZoomRcl copy between the two.
 		self.window = Window()
-		self.zoom_window = Window()
 		# Table-screen variables (TblStart, ΔTbl, TblInput).  The table itself isn't
 		# implemented, but programs can still store to and read these back.
 		self.table = TableVars()
@@ -179,25 +170,6 @@ class Environment:
 	@console.setter
 	def console(self, value):
 		self.io = HomeScreenIO(value)
-		
-	# X/Y/T/θ are ordinary numeric variables; these return a bound Reference (which
-	# exposes .get()/.set(), .resolve(), .scoped()) so the graphers and CALC commands can
-	# read/write them without knowing the storage layout.
-	@property
-	def x(self):
-		return NumericVar('X').reference(self)
-
-	@property
-	def y(self):
-		return NumericVar('Y').reference(self)
-
-	@property
-	def t(self):
-		return NumericVar('T').reference(self)
-
-	@property
-	def theta(self):
-		return NumericVar('theta').reference(self)
 
 	def guard_real(self, inputs, result):
 		"""Raise NonRealAnsError if real-mode is active and a real-input operation produced a complex result."""
@@ -242,9 +214,6 @@ class Environment:
 	def eval_sequence(self, index: int, at):
 		return _eval_seq(self, index, at)
 
-	def store_sequence_initial(self, index: int, value) -> None:
-		_store_seq_initial(self, index, value)
-
 	def display_graph(self):
 		"""DispGraph — make the graph the active screen and re-plot the functions."""
 		self.screen = Screen.GRAPH
@@ -257,17 +226,17 @@ class Environment:
 		if self.screen is not Screen.GRAPH:
 			self.display_graph()
 
-	# ── Zoom memory (ZoomSto / ZoomRcl) ──────────────────────────────────────────
-	# zoom_window holds the Z-window system variables (ZXmin, Zθstep, …); ZoomSto
-	# copies the live window into them and ZoomRcl copies them back.
-
 	def zoom_store(self):
-		"""ZoomSto — copy the current window into the Z-window variables."""
-		self.zoom_window = self.window.copy()
+		"""ZoomSto — copy the live window variables into the Z-window variables."""
+		w = self.window
+		for name in Window._ZOOM_VARS:
+			setattr(w, 'z' + name, getattr(w, name))
 
 	def zoom_recall(self):
-		"""ZoomRcl — restore the window from the Z-window variables."""
-		self.window = self.zoom_window.copy()
+		"""ZoomRcl — restore the live window variables from the Z-window variables."""
+		w = self.window
+		for name in Window._ZOOM_VARS:
+			setattr(w, name, getattr(w, 'z' + name))
 
 	# ── Virtual clock ────────────────────────────────────────────────────────────
 
@@ -384,11 +353,12 @@ class Window:
 	and the pixel grid (94 column intervals / 62 row intervals).
 	"""
 
-	_STORED = (
+	# Variable names that ZoomSto/ZoomRcl copies between the live window and
+	# the Z-vars (the subset with Z-token counterparts in the catalog).
+	_ZOOM_VARS = (
 		'xmin', 'xmax', 'ymin', 'ymax', 'xscl', 'yscl', 'xres',
 		'tmin', 'tmax', 'tstep', 'theta_min', 'theta_max', 'theta_step',
 		'n_min', 'n_max', 'plot_start', 'plot_step',
-		'x_fact', 'y_fact',
 	)
 
 	def __init__(self):
@@ -416,6 +386,10 @@ class Window:
 		# Zoom In/Out factors
 		self.x_fact     =  4.0
 		self.y_fact     =  4.0
+		# Z-variables (ZXmin, ZXmax, …) — initialized to the same defaults as the
+		# regular window vars so ZoomRcl works sensibly before the first ZoomSto.
+		for _name in self._ZOOM_VARS:
+			setattr(self, 'z' + _name, getattr(self, _name))
 
 	@property
 	def delta_x(self) -> float:
@@ -426,13 +400,6 @@ class Window:
 	def delta_y(self) -> float:
 		"""ΔY — the graph height per pixel row: (Ymax − Ymin) / 62."""
 		return (self.ymax - self.ymin) / 62
-
-	def copy(self) -> "Window":
-		"""Snapshot all stored window variables (for ZoomSto/ZoomRcl)."""
-		clone = Window()
-		for name in self._STORED:
-			setattr(clone, name, getattr(self, name))
-		return clone
 
 
 class TableVars:

@@ -1,3 +1,14 @@
+EquationVar should be an ABC
+make FuncVar, ParVar, PolVar, SeqVar
+
+
+get rid of sequence cache, create a new one every time a sequence is evaluated
+I think the way it should work is, if the user calls u(10), it should evaluate every item in the sequence form nMin to n, then return the result.
+
+merge graphmodes into graph
+
+_eval_sequence: use context manager
+
 seq: sample_sequence index
 
 Kill Window, fix zoomsto variables

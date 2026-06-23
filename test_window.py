@@ -1,7 +1,7 @@
 """Window/graphing variable side effects and the Zoom memory."""
 import pytest
 
-from environment import Environment, Window, TableVars
+from environment import Environment, TableVars
 from catalog import get_token
 from errors import DomainError
 from test_tibasic import run
@@ -127,21 +127,11 @@ class TestZoomMemory:
 		env.window.xmax = 50.0
 		run('ZoomSto', env)
 		env.window.xmax = 99.0
-		assert env.zoom_window.xmax == 50.0   # snapshot unchanged
-
-	def test_copy_is_independent(self):
-		w = Window()
-		w.xmin = 0.0
-		w.xmax = 62.0
-		clone = w.copy()
-		assert clone.delta_x == pytest.approx(62 / 94)
-		w.xmax = 200.0                          # mutate original
-		assert clone.delta_x == pytest.approx(62 / 94)  # clone unaffected
+		assert env.window.zxmax == 50.0   # z-var unchanged after live window mutated
 
 
 class TestZWindowVars:
-	"""The Z-window system variables are real, addressable variables backed by the
-	ZoomSto snapshot (env.zoom_window)."""
+	"""The Z-window system variables are real, addressable variables on env.window."""
 
 	def test_zoomsto_populates_z_vars(self):
 		env = Environment()
@@ -150,10 +140,10 @@ class TestZWindowVars:
 		assert resolve(env, ZXMIN) == -3.0
 		assert resolve(env, ZXMAX) == 7.0
 
-	def test_store_to_z_var_hits_zoom_window(self):
+	def test_store_to_z_var_hits_window(self):
 		env = Environment()
 		store(env, ZXMIN, 12.0)
-		assert env.zoom_window.xmin == 12.0
+		assert env.window.zxmin == 12.0
 		assert env.window.xmin == -10.0          # live window untouched
 
 	def test_zoomrcl_restores_from_z_vars(self):

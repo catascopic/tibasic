@@ -197,8 +197,8 @@ for _i in range(10):
 
 # X₁ₜ/Y₁ₜ - X₆ₜ/Y₆ₜ  (Parametric mode: pairs share one index)
 for _i in range(6):
-	token(0x5E20 + _i * 2,     bytes([0x58, 0x81 + _i, 0x0D]), var=ParEquationVar(_i, is_x=True))
-	token(0x5E20 + _i * 2 + 1, bytes([0x59, 0x81 + _i, 0x0D]), var=ParEquationVar(_i, is_x=False))
+	token(0x5E20 + _i * 2,     bytes([0x58, 0x81 + _i, 0x0D]), var=ParEquationVar(_i, half='x'))
+	token(0x5E20 + _i * 2 + 1, bytes([0x59, 0x81 + _i, 0x0D]), var=ParEquationVar(_i, half='y'))
 
 # r₁ - r₆  (Polar mode)
 for _i in range(6):
@@ -279,16 +279,16 @@ token(0x623A, b'df')        # Error df
 token(0x623B, b'SS')        # Error SS
 token(0x623C, b'MS')        # Error MS
 
-token(0x6300, b'ZXscl',                 var=WindowVar('xscl', 'zoom_window'))
-token(0x6301, b'ZYscl',                 var=WindowVar('yscl', 'zoom_window'))
+token(0x6300, b'ZXscl',                 var=WindowVar('zxscl'))
+token(0x6301, b'ZYscl',                 var=WindowVar('zyscl'))
 token(0x6302, b'Xscl',                  var=WindowVar('xscl'))
 token(0x6303, b'Yscl',                  var=WindowVar('yscl'))
-token(0x6304, b'\x02(nMin)', var=SequenceInitialVar(0))   # u(nMin)
-token(0x6305, b'\x03(nMin)', var=SequenceInitialVar(1))   # v(nMin)
-token(0x6306, b'\x02(n-1)',  var=ComputedAccessor(lambda env: env.eval_sequence(0, env.n - 1)))  # u(n-1)
-token(0x6307, b'\x03(n-1)',  var=ComputedAccessor(lambda env: env.eval_sequence(1, env.n - 1)))  # v(n-1)
-token(0x6308, b'Z\x02(nMin)', var=SequenceInitialVar(0))  # Zu(nMin) — same slot, zoom-window alias
-token(0x6309, b'Z\x03(nMin)', var=SequenceInitialVar(1))  # Zv(nMin)
+token(0x6304, b'\x02(nMin)',            var=SequenceInitialVar(0))   # u(nMin)
+token(0x6305, b'\x03(nMin)',            var=SequenceInitialVar(1))   # v(nMin)
+token(0x6306, b'\x02(n-1)')             # u(n-1)
+token(0x6307, b'\x03(n-1)')             # v(n-1)
+token(0x6308, b'Z\x02(nMin)',           var=SequenceInitialVar(0))  # Zu(nMin) — same slot, zoom-window alias
+token(0x6309, b'Z\x03(nMin)',           var=SequenceInitialVar(1))  # Zv(nMin)
 token(0x630A, b'Xmin',                  var=WindowVar('xmin'))
 token(0x630B, b'Xmax',                  var=WindowVar('xmax'))
 token(0x630C, b'Ymin',                  var=WindowVar('ymin'))
@@ -297,26 +297,26 @@ token(0x630E, b'Tmin',                  var=WindowVar('tmin'))
 token(0x630F, b'Tmax',                  var=WindowVar('tmax'))
 token(0x6310, b'\x5bmin',               var=WindowVar('theta_min'))    # θmin
 token(0x6311, b'\x5bmax',               var=WindowVar('theta_max'))    # θmax
-token(0x6312, b'ZXmin',                 var=WindowVar('xmin', 'zoom_window'))
-token(0x6313, b'ZXmax',                 var=WindowVar('xmax', 'zoom_window'))
-token(0x6314, b'ZYmin',                 var=WindowVar('ymin', 'zoom_window'))
-token(0x6315, b'ZYmax',                 var=WindowVar('ymax', 'zoom_window'))
-token(0x6316, b'Z\x5bmin',              var=WindowVar('theta_min', 'zoom_window'))   # Zθmin
-token(0x6317, b'Z\x5bmax',              var=WindowVar('theta_max', 'zoom_window'))   # Zθmax
-token(0x6318, b'ZTmin',                 var=WindowVar('tmin', 'zoom_window'))
-token(0x6319, b'ZTmax',                 var=WindowVar('tmax', 'zoom_window'))
+token(0x6312, b'ZXmin',                 var=WindowVar('zxmin'))
+token(0x6313, b'ZXmax',                 var=WindowVar('zxmax'))
+token(0x6314, b'ZYmin',                 var=WindowVar('zymin'))
+token(0x6315, b'ZYmax',                 var=WindowVar('zymax'))
+token(0x6316, b'Z\x5bmin',              var=WindowVar('ztheta_min'))   # Zθmin
+token(0x6317, b'Z\x5bmax',              var=WindowVar('ztheta_max'))   # Zθmax
+token(0x6318, b'ZTmin',                 var=WindowVar('ztmin'))
+token(0x6319, b'ZTmax',                 var=WindowVar('ztmax'))
 token(0x631A, b'TblStart',              var=TableVar('tbl_start'))
 token(0x631B, b'PlotStart',             var=WindowVar('plot_start'))
-token(0x631C, b'ZPlotStart',            var=WindowVar('plot_start', 'zoom_window'))
+token(0x631C, b'ZPlotStart',            var=WindowVar('zplot_start'))
 token(0x631D, b'nMax',                  var=IntWindowVar('n_max'))
-token(0x631E, b'ZnMax',                 var=IntWindowVar('n_max', 'zoom_window'))
+token(0x631E, b'ZnMax',                 var=IntWindowVar('zn_max'))
 token(0x631F, b'nMin',                  var=IntWindowVar('n_min'))
-token(0x6320, b'ZnMin',                 var=IntWindowVar('n_min', 'zoom_window'))
+token(0x6320, b'ZnMin',                 var=IntWindowVar('zn_min'))
 token(0x6321, b'\xbeTbl',               var=TableVar('delta_tbl'))       # ΔTbl
 token(0x6322, b'Tstep',                 var=WindowVar('tstep'))
 token(0x6323, b'\x5bstep',              var=WindowVar('theta_step'))    # θstep
-token(0x6324, b'ZTstep',                var=WindowVar('tstep', 'zoom_window'))
-token(0x6325, b'Z\x5bstep',             var=WindowVar('theta_step', 'zoom_window'))  # Zθstep
+token(0x6324, b'ZTstep',                var=WindowVar('ztstep'))
+token(0x6325, b'Z\x5bstep',             var=WindowVar('ztheta_step'))  # Zθstep
 token(0x6326, b'\xbeX',                 var=DeltaWindowVar('xmin', 'xmax', 94))  # ΔX
 token(0x6327, b'\xbeY',                 var=DeltaWindowVar('ymin', 'ymax', 62))  # ΔY
 token(0x6328, b'XFact',                 var=FactorWindowVar('x_fact'))
@@ -332,9 +332,9 @@ token(0x6331, b'C/Y',                   var=EnvVar('cy'))
 token(0x6332, b'\x04(nMin)', var=SequenceInitialVar(2))   # w(nMin)
 token(0x6333, b'Z\x04(nMin)', var=SequenceInitialVar(2))  # Zw(nMin)
 token(0x6334, b'PlotStep',              var=WindowVar('plot_step'))
-token(0x6335, b'ZPlotStep',             var=WindowVar('plot_step', 'zoom_window'))
+token(0x6335, b'ZPlotStep',             var=WindowVar('zplot_step'))
 token(0x6336, b'Xres',                  var=XresVar('xres'))
-token(0x6337, b'ZXres',                 var=XresVar('xres', 'zoom_window'))
+token(0x6337, b'ZXres',                 var=XresVar('zxres'))
 token(0x6338, b'TraceStep')
 
 
