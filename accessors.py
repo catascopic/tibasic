@@ -23,6 +23,35 @@ from core import TiList, TiString, TiEquation
 from core import require_num, require_matrix, require_list, require_string, require_real, require_int, py_int
 from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, DataTypeError
 from graph import eval_sequence
+from modes import GraphMode
+
+
+# Maps each graph mode to the equation-list attr whose changes matter in that mode.
+_EQ_ATTR_FOR_MODE = {
+	GraphMode.FUNC: 'function',
+	GraphMode.PAR:  'parametric',
+	GraphMode.POL:  'polar',
+	GraphMode.SEQ:  'sequence',
+}
+
+# Maps each window attr to the set of graph modes where changing it invalidates the graph.
+_ALL_MODES = frozenset({GraphMode.FUNC, GraphMode.PAR, GraphMode.POL, GraphMode.SEQ})
+_WINDOW_ATTR_MODES: dict[str, frozenset] = {
+	'xmin': _ALL_MODES, 'xmax': _ALL_MODES,
+	'ymin': _ALL_MODES, 'ymax': _ALL_MODES,
+	'xscl': _ALL_MODES, 'yscl': _ALL_MODES,
+	'xres':        frozenset({GraphMode.FUNC}),
+	'tmin':        frozenset({GraphMode.PAR}),
+	'tmax':        frozenset({GraphMode.PAR}),
+	'tstep':       frozenset({GraphMode.PAR}),
+	'theta_min':   frozenset({GraphMode.POL}),
+	'theta_max':   frozenset({GraphMode.POL}),
+	'theta_step':  frozenset({GraphMode.POL}),
+	'n_min':       frozenset({GraphMode.SEQ}),
+	'n_max':       frozenset({GraphMode.SEQ}),
+	'plot_start':  frozenset({GraphMode.SEQ}),
+	'plot_step':   frozenset({GraphMode.SEQ}),
+}
 
 
 class Accessor(ABC):
@@ -355,9 +384,15 @@ class WindowVar(Accessor):
 
 	def _set(self, env, value):
 		setattr(env.window, self.attr, value)
+		
+	def _store_check_valid(self, env, value):
+		modes = _WINDOW_ATTR_MODES.get(self.attr)
+		if modes and env.graph_mode in modes and value != self._get(env):
+			env.graph.valid = False
+		self._set(env, value)
 
 	def store(self, env, value):
-		self._set(env, require_real(value))
+		self._store_check_valid(env, require_real(value))
 
 	def __repr__(self):
 		return f"WindowVar({self.attr!r})"
@@ -367,17 +402,17 @@ class XresVar(WindowVar):
 	"""Xres — function-graph resolution; a whole number 1–8."""
 
 	def store(self, env, value):
-		v = require_int(value)
-		if not (1 <= v <= 8):
-			raise DomainError(f"Xres must be an integer 1-8, got {v:g}")
-		self._set(env, v)
+		require_int(value)
+		if not (1 <= value <= 8):
+			raise DomainError(f"Xres must be an integer 1-8, got {value:g}")
+		self._store_check_valid(env, value)
 
 
 class IntWindowVar(WindowVar):
 	"""nMin, nMax — window variables constrained to whole numbers."""
 
 	def store(self, env, value):
-		self._set(env, require_int(value))
+		self._store_check_valid(env, require_int(value))
 
 
 class FactorWindowVar(WindowVar):
@@ -412,7 +447,11 @@ class DeltaWindowVar(Accessor):
 	def store(self, env, value):
 		delta = require_real(value)
 		lo = getattr(env.window, self.lo_attr)
-		setattr(env.window, self.hi_attr, lo + self.divisions * delta)
+		new_hi = lo + self.divisions * delta
+		modes = _WINDOW_ATTR_MODES.get(self.hi_attr)
+		if modes and env.graph_mode in modes and new_hi != getattr(env.window, self.hi_attr):
+			env.graph.valid = False
+		setattr(env.window, self.hi_attr, new_hi)
 
 	def __repr__(self):
 		return f"DeltaWindowVar({self.lo_attr!r}, {self.hi_attr!r}, {self.divisions})"
@@ -529,8 +568,12 @@ class EquationVar(Deletable, Accessor):
 			return self.resolve(env)
 
 	def store(self, env, value):
-		self._set(env, _normalize_eq(value))
+		new_eq = _normalize_eq(value)
+		old_eq = self._get(env)
 		getattr(env, self.attr)[self.index].selected = True
+		if new_eq != old_eq and _EQ_ATTR_FOR_MODE.get(env.graph_mode) == self.attr:
+			env.graph.valid = False
+		self._set(env, new_eq)
 
 	def __repr__(self):
 		return f"EquationVar({self.attr!r}, {self.index})"
@@ -622,6 +665,8 @@ class SequenceInitialVar(Deletable, Accessor):
 				raise InvalidDimError("u/v/w(nMin) list may have at most 2 elements")
 		else:
 			value = TiList([require_real(value)])
+		if value != env.sequence[self.index].initial and env.graph_mode is GraphMode.SEQ:
+			env.graph.valid = False
 		env.sequence[self.index].initial = value
 
 	def __repr__(self):

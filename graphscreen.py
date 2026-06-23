@@ -27,6 +27,7 @@ class GraphScreen:
 
 	def __init__(self):
 		self.buffer = tuple(bytearray(COLS) for _ in range(ROWS))
+		self.valid = False
 
 	def get(self, row: int, col: int) -> bool:
 		return bool(self.buffer[row][col])
@@ -43,6 +44,7 @@ class GraphScreen:
 	def clear(self) -> None:
 		for row in self.buffer:
 			row.__init__(COLS)  # hack?
+		self.valid = False
 
 	def save(self, path, pixel_size: int = 1) -> None:
 		"""Save the graph buffer as a monochrome BMP.

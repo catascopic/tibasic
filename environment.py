@@ -78,7 +78,7 @@ class Environment:
 		self.angle_mode    = AngleMode.RAD
 		self.number_mode   = NumberMode.NORMAL
 		self.fix_digits    = None          # None = Float, 0–9 = Fix N
-		self.graph_mode    = GraphMode.FUNC
+		self._graph_mode   = GraphMode.FUNC   # backing field; use the property after init
 		self.screen        = Screen.HOME   # which screen is currently displayed
 		self.complex_mode  = ComplexMode.REAL
 		self.draw_mode     = DrawMode.CONNECTED
@@ -153,6 +153,16 @@ class Environment:
 	def real_only(self):
 		return self.complex_mode is ComplexMode.REAL
 
+	@property
+	def graph_mode(self):
+		return self._graph_mode
+
+	@graph_mode.setter
+	def graph_mode(self, value):
+		if value is not self._graph_mode:
+			self.graph.valid = False
+		self._graph_mode = value
+
 	# ── I/O convenience accessors ────────────────────────────────────────────────
 	# The home-screen device exposes its grid and Console backend; these shortcuts
 	# let callers reach them (and swap the Console) without going through .io.  They
@@ -203,6 +213,7 @@ class Environment:
 		if self.axes_on:
 			draw_axes(self)
 		self.graph_mode_handler.plot(self)
+		self.graph.valid = True
 
 	@property
 	def graph_mode_handler(self):
@@ -211,16 +222,18 @@ class Environment:
 		return GRAPH_MODE_HANDLERS[self.graph_mode]
 
 	def display_graph(self):
-		"""DispGraph — make the graph the active screen and re-plot the functions."""
+		"""DispGraph — make the graph the active screen and re-plot the functions if stale."""
 		self.screen = Screen.GRAPH
-		self.regraph()
+		if not self.graph.valid:
+			self.regraph()
 
 	def draw_to_graph(self):
-		"""A drawing command is about to modify the graph: display it, re-plotting on
-		the transition so the functions sit beneath the drawing.  No re-plot if the
-		graph is already up — that would erase earlier drawing."""
-		if self.screen is not Screen.GRAPH:
-			self.display_graph()
+		"""A drawing command is about to modify the graph: display it, re-plotting if stale
+		so the functions sit beneath the drawing.  No re-plot if the graph is already
+		current — that would erase earlier drawing."""
+		self.screen = Screen.GRAPH
+		if not self.graph.valid:
+			self.regraph()
 
 	def zoom_store(self):
 		"""ZoomSto — copy the live window variables into the Z-window variables."""

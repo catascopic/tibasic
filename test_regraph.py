@@ -99,12 +99,13 @@ class TestSelectionAndDefinition:
 
 class TestRegraphClears:
 	def test_regraph_starts_from_a_blank_graph(self):
-		# A manual draw made while on the graph is erased by the next full redraw.
+		# A manual draw is erased when the graph is invalidated and redrawn.
 		env = run('"X²"@ Y1')
 		run('DispGraph', env)
 		run('Pxl-On( 0,0', env)                  # a stray pixel on top of the curve
 		assert env.graph.get(0, 0)
-		run('DispGraph', env)                    # redraw from the functions
+		env.graph.valid = False                  # invalidate so the next DispGraph redraws
+		run('DispGraph', env)
 		assert not env.graph.get(0, 0)
 		assert env.graph.get(31, 47)             # the curve is still there
 
@@ -350,10 +351,11 @@ class TestAxes:
 		run('DispGraph', env)
 		assert total_pixels(env.graph) == 0
 
-	def test_axes_redrawn_each_display(self, env):
+	def test_axes_redrawn_on_invalidation(self, env):
 		run('DispGraph', env)
 		run('Pxl-On( 5,5', env)             # a stray pixel off the axes
 		assert env.graph.get(5, 5)
+		env.graph.valid = False              # invalidate so the next DispGraph redraws
 		run('DispGraph', env)               # redraw: axes return, stray is cleared
 		assert not env.graph.get(5, 5)
 		assert all(env.graph.get(31, c) for c in range(95))

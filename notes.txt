@@ -1,4 +1,4 @@
-
+seq: shared method that returns list of sequence items
 
 get rid of sequence cache, create a new one every time a sequence is evaluated
 I think the way it should work is, if the user calls u(10), it should evaluate every item in the sequence form nMin to n, then return the result.
@@ -9,31 +9,10 @@ _eval_sequence: use context manager
 
 seq: sample_sequence index
 
-Kill Window, fix zoomsto variables
-
-We can get rid of this branch in parser, right? `elif t.is_sequence_var() and self.peek().code == L_PAREN:`
-SequenceVars should work automatically with resolve/invoke, right?
-
-u(nMin) as store target: accepts number or list
-
-elif t.is_sequence_var()
-
-remove get/set from accessor
-
-if var.accessor.kind == 'string'
-
-Can we remove the value property of reference?
-
-LegacyAccessor
-
-give variable holders repr methods to make env's repr easier
-
-move eval_sequence and stuff to other module
-
 
 Graph aren't regraphed every time graph is displayed. There should be a boolean flag in GraphScreen that starts as False and resets to False every time ClrDraw is called or a function changes. Whenever all functions finish graphing, this flag is set to True.
 
-
+Note that the flag shouldn't be reset if a function that's not part of the current mode gets modified. It also should be reset when the mode changes.
 
 
 Timer-based indicator

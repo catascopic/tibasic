@@ -24,6 +24,7 @@ def graph_env():
 	"""An environment already showing the graph (as if a draw/DispGraph ran)."""
 	env = Environment()
 	env.screen = GRAPH
+	env.graph.valid = True
 	return env
 
 
