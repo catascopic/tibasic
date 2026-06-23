@@ -74,7 +74,7 @@ class ParData:
 	def fit_points(self, env) -> list:
 		"""(x, y) pairs sampled over T, for ZoomFit."""
 		w = env.window
-		point = sample_parametric(env, lambda: self.x.eval(env), lambda: self.x.eval(env))
+		point = sample_parametric(env, lambda: self.x.eval(env), lambda: self.y.eval(env))
 		return [xy for t in _param_values(w.tmin, w.tmax, w.tstep) if (xy := point(t)) is not None]
 
 
@@ -459,13 +459,15 @@ def _eval_sequence(env, seq: SeqData, n: int):
 	if seq.initial is not None and n - n_min < len(seq.initial.data):
 		return seq.initial.data[n - n_min]
 	if seq.equation is None:
-		raise UndefinedError(f"Sequence {seq.equation} is not defined")
+		seq_name = 'uvw'[env.sequence.index(seq)]
+		raise UndefinedError(f"Sequence {seq_name} is not defined")
 	key = (id(seq), n)
 	cache = env._seq_cache
 	if key in cache:
 		term = cache[key]
 		if term is _SEQ_COMPUTING:
-			raise DomainError(f"Sequence {seq.equation} references itself at n={n}")
+			seq_name = 'uvw'[env.sequence.index(seq)]
+			raise DomainError(f"Sequence {seq_name} references itself at n={n}")
 		return term
 	cache[key] = _SEQ_COMPUTING
 	saved_n = env.n

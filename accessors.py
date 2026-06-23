@@ -22,6 +22,7 @@ from contextlib import contextmanager
 from core import TiList, TiString, TiEquation
 from core import require_num, require_matrix, require_list, require_string, require_real, require_int, py_int
 from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, DataTypeError
+from graph import eval_sequence
 
 
 class Accessor(ABC):
@@ -488,7 +489,7 @@ def scoped_numeric(env, name: str, value):
 		saved = setattr(env.numerics, name, saved)
 
 
-class EquationVar(ABC, Deletable, Accessor):
+class EquationVar(Deletable, Accessor):
 	"""A graph equation (Y1–Y0, X1T/Y1T–X6T/Y6T, r1–r6).
 
 	An equation is not one of TI's runtime value types, so reading it as a value
@@ -536,7 +537,11 @@ class EquationVar(ABC, Deletable, Accessor):
 
 
 class FuncEquationVar(EquationVar):
+	__slots__ = ()
 	indep = 'X'
+
+	def __init__(self, index: int):
+		super().__init__('function', index)
 
 
 class ParEquationVar(EquationVar):
@@ -553,20 +558,24 @@ class ParEquationVar(EquationVar):
 
 	def __init__(self, index: int, half: str):
 		super().__init__('parametric', index)
-		self.half = half
+		self.half = half   # 'x' or 'y'
 
 	def _get(self, env):
 		return getattr(env.parametric[self.index], self.half)
 
 	def _set(self, env, value):
-		return getattr(env.parametric[self.index], self.half, value)
+		setattr(env.parametric[self.index], self.half, value)
 
 	def __repr__(self):
-		return f"ParEquationVar({self.index}, {half})"
+		return f"ParEquationVar({self.index}, {self.half!r})"
 
 
 class PolarEquationVar(EquationVar):
+	__slots__ = ()
 	indep = 'theta'
+
+	def __init__(self, index: int):
+		super().__init__('polar', index)
 
 
 class SequenceVar(EquationVar):
@@ -576,9 +585,17 @@ class SequenceVar(EquationVar):
 	`u(n)` evaluates at an explicit index.  The raw `TiEquation` is reachable
 	through `_get`/`_set`.
 	"""
-	
+
+	def __init__(self, index: int):
+		super().__init__('sequence', index)
+
+	def resolve(self, env):
+		return eval_sequence(env, self.index, env.n)
+
 	def invoke(self, arg_parser):
-		"""TODO: independent var not in numerics"""
+		n = arg_parser.expr()
+		arg_parser.end_func()
+		return eval_sequence(arg_parser.env, self.index, n)
 
 	def __repr__(self):
 		return f"SequenceVar({chr(0x75 + self.index)})"

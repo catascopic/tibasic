@@ -8,6 +8,7 @@ import pytest
 
 from environment import Environment as _RealEnvironment
 from errors import DomainError
+from graph import eval_sequence
 from modes import GraphMode, DrawMode
 from test_tibasic import run as _run, var
 
@@ -205,40 +206,40 @@ class TestSequenceEval:
 	def test_explicit_formula(self):
 		# u(n)=2n needs no initial values: it just reads the current n.
 		env = _seq_env('2n')
-		assert [env.eval_sequence(0, k) for k in range(1, 6)] == [2, 4, 6, 8, 10]
+		assert [eval_sequence(env,0, k) for k in range(1, 6)] == [2, 4, 6, 8, 10]
 
 	def test_recursive_fibonacci(self):
 		# u(n)=u(n-1)+u(n-2), u(nMin)={1,1}: the classic two-term recurrence.
 		env = _seq_env('u(n-1)+u(n-2)', initial=[1, 1])
-		assert [env.eval_sequence(0, k) for k in range(1, 9)] == [1, 1, 2, 3, 5, 8, 13, 21]
+		assert [eval_sequence(env,0, k) for k in range(1, 9)] == [1, 1, 2, 3, 5, 8, 13, 21]
 
 	def test_initial_values_are_chronological(self):
 		# Element i of u(nMin) is the term at nMin+i (earliest first).
 		env = _seq_env(initial=[10, 20], nmin=1)
-		assert env.eval_sequence(0, 1) == 10
-		assert env.eval_sequence(0, 2) == 20
+		assert eval_sequence(env,0, 1) == 10
+		assert eval_sequence(env,0, 2) == 20
 
 	def test_scalar_initial_value(self):
 		# A single-term recurrence takes a scalar u(nMin) (wrapped as a 1-element list).
 		env = _seq_env('2u(n-1)', initial=[3])
-		assert [env.eval_sequence(0, k) for k in range(1, 5)] == [3, 6, 12, 24]
+		assert [eval_sequence(env,0, k) for k in range(1, 5)] == [3, 6, 12, 24]
 
 	def test_cross_reference_between_sequences(self):
 		# v may reference u: v(n)=u(n-1)+1 with u(n)=n.
 		env = Environment()
 		run('"n"@ u', env)
 		run('"u(n-1)+1"@ v', env)
-		assert env.eval_sequence(1, 5) == 5     # u(4)+1
+		assert eval_sequence(env,1, 5) == 5     # u(4)+1
 
 	def test_self_reference_raises(self):
 		env = _seq_env('u(n)')
 		with pytest.raises(DomainError):
-			env.eval_sequence(0, 5)
+			eval_sequence(env,0, 5)
 
 	def test_index_below_nmin_raises(self):
 		env = _seq_env('n', nmin=3)
 		with pytest.raises(DomainError):
-			env.eval_sequence(0, 2)
+			eval_sequence(env,0, 2)
 
 	def test_store_selects_the_sequence(self):
 		# Storing the recurrence selects u, like any equation store.

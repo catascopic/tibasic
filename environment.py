@@ -14,7 +14,6 @@ from graphscreen import GraphScreen
 from graph import (
 	draw_axes, draw_grid,
 	GraphStyle, FuncData, ParData, PolarData, SeqData,
-	eval_sequence as _eval_seq, store_sequence_initial as _store_seq_initial,
 )
 from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
 from accessors import NumericVar
@@ -210,9 +209,6 @@ class Environment:
 		"""The strategy object for the current graph mode (see graphmodes.py).  Owns
 		plotting, the ZoomFit extent, and the ZStandard reset of mode-specific vars."""
 		return GRAPH_MODE_HANDLERS[self.graph_mode]
-
-	def eval_sequence(self, index: int, at):
-		return _eval_seq(self, index, at)
 
 	def display_graph(self):
 		"""DispGraph — make the graph the active screen and re-plot the functions."""

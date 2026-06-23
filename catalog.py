@@ -10,7 +10,7 @@ from accessors import (
 	NumericVar, MatrixVar, ListVar, StringVar,
 	ComputedAccessor, RandAccessor,
 	WindowVar, XresVar, IntWindowVar, FactorWindowVar, DeltaWindowVar,
-	EnvVar, TableVar, EquationVar, ParEquationVar, SequenceVar, SequenceInitialVar,
+	EnvVar, TableVar, EquationVar, FuncEquationVar, ParEquationVar, PolarEquationVar, SequenceVar, SequenceInitialVar,
 )
 import commands as cmds
 import distributions as dist
@@ -193,7 +193,7 @@ for _i in range(6):
 
 # Y₁ - Y₀  (Function mode)
 for _i in range(10):
-	token(0x5E10 + _i, bytes([0x59, 0x80 + (_i + 1) % 10]), var=EquationVar('function', _i))
+	token(0x5E10 + _i, bytes([0x59, 0x80 + (_i + 1) % 10]), var=FuncEquationVar(_i))
 
 # X₁ₜ/Y₁ₜ - X₆ₜ/Y₆ₜ  (Parametric mode: pairs share one index)
 for _i in range(6):
@@ -202,7 +202,7 @@ for _i in range(6):
 
 # r₁ - r₆  (Polar mode)
 for _i in range(6):
-	token(0x5E40 + _i, bytes([0x72, 0x81 + _i]), var=EquationVar('polar', _i))
+	token(0x5E40 + _i, bytes([0x72, 0x81 + _i]), var=PolarEquationVar(_i))
 
 # 𝑢, 𝑣, 𝑤  (Sequence mode)
 for _i in range(3):
