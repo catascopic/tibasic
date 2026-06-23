@@ -1,19 +1,137 @@
 """Shared graph-plotting math: graph⇄pixel coordinate mapping, line rasterization,
-and curve tracing.
+curve tracing, function/sequence data objects, and sequence evaluation.
 
 Two subsystems use this: the Draw commands (DrawF/DrawInv/Tangent/Shade…, see draw.py)
 and the function grapher (Environment.regraph, which plots the selected Y= functions).
 Everything here takes the environment as a parameter and reads only env.window /
-env.graph / env.draw_mode, so this module stays free of the
+env.graph / env.draw_mode / env.sequence*, so this module stays free of the
 preparse⇄environment import cycle (it imports nothing from either)."""
 
 import math
+from contextlib import contextmanager
+from dataclasses import dataclass
+from enum import Enum
 
+from core import TiEquation, TiList, py_int
 from errors import (
 	DataTypeError, DivideByZeroError, DomainError, IncrementError,
-	NonRealAnsError, TiOverflowError, SingularMatrixError,
+	NonRealAnsError, TiOverflowError, SingularMatrixError, UndefinedError,
 )
 from modes import DrawMode
+
+
+class GraphStyle(Enum):
+	LINE        = 'line'
+	THICK       = 'thick'
+	SHADE_ABOVE = 'shade_above'
+	SHADE_BELOW = 'shade_below'
+	TRACE       = 'trace'
+	ANIMATE     = 'animate'
+	DOT         = 'dot'
+
+
+@dataclass
+class FuncData:
+	"""One Y= function slot: equation, on/off, style.  Knows how to plot itself."""
+	equation: TiEquation | None = None
+	selected: bool = False
+	style: GraphStyle = GraphStyle.LINE
+
+	def is_defined(self) -> bool:
+		return self.equation is not None
+
+	def plot(self, env) -> None:
+		eq = self.equation
+		trace_curve(env, sample_function(env, lambda: eq.eval(env)))
+
+	def fit_points(self, env) -> list:
+		"""Y values sampled across the current X window, for ZoomFit."""
+		w = env.window
+		xmin = w.xmin
+		delta = (w.xmax - xmin) / MAX_COL
+		eq = self.equation
+		f = sample_function(env, lambda: eq.eval(env))
+		return [y for i in range(MAX_COL + 1) if (y := f(xmin + i * delta)) is not None]
+
+
+@dataclass
+class ParData:
+	"""One parametric pair (XnT + YnT): both halves, shared on/off and style."""
+	x_eq: TiEquation | None = None
+	y_eq: TiEquation | None = None
+	selected: bool = False
+	style: GraphStyle = GraphStyle.LINE
+
+	def is_defined(self) -> bool:
+		return self.x_eq is not None and self.y_eq is not None
+
+	def plot(self, env) -> None:
+		w = env.window
+		x_eq, y_eq = self.x_eq, self.y_eq
+		trace_parametric(env,
+			sample_parametric(env, lambda: x_eq.eval(env), lambda: y_eq.eval(env)),
+			w.tmin, w.tmax, w.tstep)
+
+	def fit_points(self, env) -> list:
+		"""(x, y) pairs sampled over T, for ZoomFit."""
+		w = env.window
+		x_eq, y_eq = self.x_eq, self.y_eq
+		point = sample_parametric(env, lambda: x_eq.eval(env), lambda: y_eq.eval(env))
+		return [xy for t in _param_values(w.tmin, w.tmax, w.tstep) if (xy := point(t)) is not None]
+
+
+@dataclass
+class PolarData:
+	"""One polar equation slot (r=): equation, on/off, style."""
+	equation: TiEquation | None = None
+	selected: bool = False
+	style: GraphStyle = GraphStyle.LINE
+
+	def is_defined(self) -> bool:
+		return self.equation is not None
+
+	def plot(self, env) -> None:
+		w = env.window
+		eq = self.equation
+		trace_parametric(env,
+			sample_polar(env, lambda: eq.eval(env)),
+			w.theta_min, w.theta_max, w.theta_step)
+
+	def fit_points(self, env) -> list:
+		"""(x, y) pairs sampled over θ, for ZoomFit."""
+		w = env.window
+		eq = self.equation
+		point = sample_polar(env, lambda: eq.eval(env))
+		return [xy for t in _param_values(w.theta_min, w.theta_max, w.theta_step) if (xy := point(t)) is not None]
+
+
+@dataclass
+class SeqData:
+	"""One sequence slot (u/v/w): index, equation, on/off, style."""
+	seq_index: int
+	equation: TiEquation | None = None
+	selected: bool = False
+	style: GraphStyle = GraphStyle.LINE
+
+	def is_defined(self) -> bool:
+		return self.equation is not None
+
+	def plot(self, env) -> None:
+		w = env.window
+		trace_parametric(env,
+			sample_sequence(env, self.seq_index),
+			w.plot_start, w.n_max, w.plot_step)
+
+	def fit_points(self, env) -> list:
+		"""(x, y) pairs sampled over n, for ZoomFit."""
+		w = env.window
+		point = sample_sequence(env, self.seq_index)
+		return [xy for t in _param_values(w.plot_start, w.n_max, w.plot_step) if (xy := point(t)) is not None]
+
+
+# Sentinel parked in the sequence cache while a term is being computed; seeing it
+# again means the definition refers to itself (e.g. u(n)=u(n)).
+_SEQ_COMPUTING = object()
 
 
 # Pxl- commands address a narrower region than the full 64×96 LCD:
@@ -311,6 +429,65 @@ def sample_polar(env, eval_r):
 	return point
 
 
+@contextmanager
+def sequence_pass(env):
+	"""Own a fresh memo cache for the duration of a top-level sequence evaluation,
+	shared by every nested term it pulls in.  A new top-level call starts clean, so
+	a redefined sequence is never read from a stale cache."""
+	top_level = not env._seq_active
+	if top_level:
+		env._seq_cache = {}
+		env._seq_active = True
+	try:
+		yield
+	finally:
+		if top_level:
+			env._seq_active = False
+
+
+def eval_sequence(env, index: int, at):
+	"""Evaluate sequence u/v/w (index 0/1/2) at term number `at`, rounded to an
+	integer n.  Returns the term's value; raises DomainError below nMin or on a
+	self-referential definition, and UndefinedError if the sequence has no formula
+	past its initial terms."""
+	with sequence_pass(env):
+		return _eval_sequence(env, index, py_int(at))
+
+
+def _eval_sequence(env, index: int, k: int):
+	n_min = py_int(env.window.n_min)
+	if k < n_min:
+		raise DomainError(f"Sequence index {k} is below nMin ({n_min})")
+	initial = env.sequence_initial[index]
+	if initial is not None and k - n_min < len(initial.data):
+		return initial.data[k - n_min]
+	equation = env.sequence[index].equation
+	if equation is None:
+		raise UndefinedError(f"Sequence {'uvw'[index]} is not defined")
+	key = (index, k)
+	cache = env._seq_cache
+	if key in cache:
+		term = cache[key]
+		if term is _SEQ_COMPUTING:
+			raise DomainError(f"Sequence {'uvw'[index]} references itself at n={k}")
+		return term
+	cache[key] = _SEQ_COMPUTING
+	saved_n = env.n
+	env.n = float(k)
+	try:
+		term = equation.eval(env)
+	finally:
+		env.n = saved_n
+	cache[key] = term
+	return term
+
+
+def store_sequence_initial(env, index: int, value) -> None:
+	"""Set sequence u/v/w's u(nMin) initial-value list ({…}→u(nMin)).  A scalar is
+	wrapped as a one-element list (a single initial term)."""
+	env.sequence_initial[index] = value if isinstance(value, TiList) else TiList([value])
+
+
 def sample_sequence(env, index):
 	"""Return point(n): evaluate sequence u/v/w (index 0/1/2) at term n and return the
 	(n, value) graph coordinates for a Time plot — or None if the term is undefined,
@@ -319,7 +496,7 @@ def sample_sequence(env, index):
 
 	def point(n):
 		try:
-			y = env.eval_sequence(index, n)
+			y = eval_sequence(env, index, n)
 		except _GRAPH_ERRORS:
 			return None
 		if not isinstance(y, float):

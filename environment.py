@@ -1,144 +1,26 @@
 import math
 import random
-from collections import defaultdict, deque
+from collections import defaultdict
 from contextlib import contextmanager
-from dataclasses import dataclass, field
-from datetime import datetime, date, timedelta
-from enum import Enum
-from typing import Any, ClassVar
+from datetime import datetime, timedelta
 
 import math as _math
 
-from core import TiList, TiEquation, is_complex_val
+from core import TiList, is_complex_val
 from core import require_real, require_int, py_int
-from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
+from errors import DataTypeError, IllegalNestError, InvalidCommandError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graphscreen import GraphScreen
 from graph import (
 	draw_axes, draw_grid,
-	trace_curve, trace_parametric,
-	sample_function, sample_parametric, sample_polar, sample_sequence,
-	_param_values, MAX_COL,
+	GraphStyle, FuncData, ParData, PolarData, SeqData,
+	eval_sequence as _eval_seq, store_sequence_initial as _store_seq_initial,
 )
 from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
 from accessors import NumericVar
 from iodevice import HomeScreenIO
 from terminal import ScriptedConsole
 from titoken import Token
-
-
-class GraphStyle(Enum):
-	LINE        = 'line'
-	THICK       = 'thick'
-	SHADE_ABOVE = 'shade_above'
-	SHADE_BELOW = 'shade_below'
-	TRACE       = 'trace'
-	ANIMATE     = 'animate'
-	DOT         = 'dot'
-
-
-@dataclass
-class FuncData:
-	"""One Y= function slot: equation, on/off, style.  Knows how to plot itself."""
-	equation: TiEquation | None = None
-	selected: bool = False
-	style: GraphStyle = GraphStyle.LINE
-
-	def is_defined(self) -> bool:
-		return self.equation is not None
-
-	def plot(self, env) -> None:
-		eq = self.equation
-		trace_curve(env, sample_function(env, lambda: eq.eval(env)))
-
-	def fit_points(self, env) -> list:
-		"""Y values sampled across the current X window, for ZoomFit."""
-		w = env.window
-		xmin = w.xmin
-		delta = (w.xmax - xmin) / MAX_COL
-		eq = self.equation
-		f = sample_function(env, lambda: eq.eval(env))
-		return [y for i in range(MAX_COL + 1) if (y := f(xmin + i * delta)) is not None]
-
-
-@dataclass
-class ParData:
-	"""One parametric pair (XnT + YnT): both halves, shared on/off and style."""
-	x_eq: TiEquation | None = None
-	y_eq: TiEquation | None = None
-	selected: bool = False
-	style: GraphStyle = GraphStyle.LINE
-
-	def is_defined(self) -> bool:
-		return self.x_eq is not None and self.y_eq is not None
-
-	def plot(self, env) -> None:
-		w = env.window
-		x_eq, y_eq = self.x_eq, self.y_eq
-		trace_parametric(env,
-			sample_parametric(env, lambda: x_eq.eval(env), lambda: y_eq.eval(env)),
-			w.tmin, w.tmax, w.tstep)
-
-	def fit_points(self, env) -> list:
-		"""(x, y) pairs sampled over T, for ZoomFit."""
-		w = env.window
-		x_eq, y_eq = self.x_eq, self.y_eq
-		point = sample_parametric(env, lambda: x_eq.eval(env), lambda: y_eq.eval(env))
-		return [xy for t in _param_values(w.tmin, w.tmax, w.tstep) if (xy := point(t)) is not None]
-
-
-@dataclass
-class PolarData:
-	"""One polar equation slot (r=): equation, on/off, style."""
-	equation: TiEquation | None = None
-	selected: bool = False
-	style: GraphStyle = GraphStyle.LINE
-
-	def is_defined(self) -> bool:
-		return self.equation is not None
-
-	def plot(self, env) -> None:
-		w = env.window
-		eq = self.equation
-		trace_parametric(env,
-			sample_polar(env, lambda: eq.eval(env)),
-			w.theta_min, w.theta_max, w.theta_step)
-
-	def fit_points(self, env) -> list:
-		"""(x, y) pairs sampled over θ, for ZoomFit."""
-		w = env.window
-		eq = self.equation
-		point = sample_polar(env, lambda: eq.eval(env))
-		return [xy for t in _param_values(w.theta_min, w.theta_max, w.theta_step) if (xy := point(t)) is not None]
-
-
-@dataclass
-class SeqData:
-	"""One sequence slot (u/v/w): index, equation, on/off, style."""
-	seq_index: int
-	equation: TiEquation | None = None
-	selected: bool = False
-	style: GraphStyle = GraphStyle.LINE
-
-	def is_defined(self) -> bool:
-		return self.equation is not None
-
-	def plot(self, env) -> None:
-		w = env.window
-		trace_parametric(env,
-			sample_sequence(env, self.seq_index),
-			w.plot_start, w.n_max, w.plot_step)
-
-	def fit_points(self, env) -> list:
-		"""(x, y) pairs sampled over n, for ZoomFit."""
-		w = env.window
-		point = sample_sequence(env, self.seq_index)
-		return [xy for t in _param_values(w.plot_start, w.n_max, w.plot_step) if (xy := point(t)) is not None]
-
-
-# Sentinel parked in the sequence cache while a term is being computed; seeing it
-# again means the definition refers to itself (e.g. u(n)=u(n)).
-_SEQ_COMPUTING = object()
 
 
 _NUMERIC_NAMES = tuple(chr(0x41 + i) for i in range(26)) + ('theta',)
@@ -357,69 +239,11 @@ class Environment:
 		plotting, the ZoomFit extent, and the ZStandard reset of mode-specific vars."""
 		return GRAPH_MODE_HANDLERS[self.graph_mode]
 
-	# ── Sequence evaluation (Seq mode u/v/w) ─────────────────────────────────────
-	# A sequence term is either an explicit initial value from its u(nMin) list or,
-	# beyond those, the recurrence formula evaluated with n bound to the index — which
-	# may refer back to earlier terms (u(n-1), v(n-2), …).  Terms are memoized within
-	# an evaluation pass so a recursive definition stays linear and self-reference is
-	# caught instead of recursing forever.
-
-	@contextmanager
-	def _sequence_pass(self):
-		"""Own a fresh memo cache for the duration of a top-level sequence evaluation,
-		shared by every nested term it pulls in.  A new top-level call starts clean, so
-		a redefined sequence is never read from a stale cache."""
-		top_level = not self._seq_active
-		if top_level:
-			self._seq_cache = {}
-			self._seq_active = True
-		try:
-			yield
-		finally:
-			if top_level:
-				self._seq_active = False
-
 	def eval_sequence(self, index: int, at):
-		"""Evaluate sequence 𝑢/𝑣/𝑤 (index 0/1/2) at term number `at`, rounded to an
-		integer n.  Returns the term's value; raises DomainError below nMin or on a
-		self-referential definition, and UndefinedError if the sequence has no formula
-		past its initial terms."""
-		with self._sequence_pass():
-			return self._eval_sequence(index, py_int(at))
-
-	def _eval_sequence(self, index: int, k: int):
-		n_min = py_int(self.window.n_min)
-		if k < n_min:
-			raise DomainError(f"Sequence index {k} is below nMin ({n_min})")
-		# Initial terms come straight from the u(nMin) list (element i is the value at
-		# n_min + i — chronological order).
-		initial = self.sequence_initial[index]
-		if initial is not None and k - n_min < len(initial.data):
-			return initial.data[k - n_min]
-		equation = self.sequence[index].equation
-		if equation is None:
-			raise UndefinedError(f"Sequence {'uvw'[index]} is not defined")
-		key = (index, k)
-		cache = self._seq_cache
-		if key in cache:
-			term = cache[key]
-			if term is _SEQ_COMPUTING:
-				raise DomainError(f"Sequence {'uvw'[index]} references itself at n={k}")
-			return term
-		cache[key] = _SEQ_COMPUTING
-		saved_n = self.n
-		self.n = float(k)
-		try:
-			term = equation.eval(self)
-		finally:
-			self.n = saved_n
-		cache[key] = term
-		return term
+		return _eval_seq(self, index, at)
 
 	def store_sequence_initial(self, index: int, value) -> None:
-		"""Set sequence 𝑢/𝑣/𝑤's u(nMin) initial-value list ({…}→u(nMin)).  A scalar is
-		wrapped as a one-element list (a single initial term)."""
-		self.sequence_initial[index] = value if isinstance(value, TiList) else TiList([value])
+		_store_seq_initial(self, index, value)
 
 	def display_graph(self):
 		"""DispGraph — make the graph the active screen and re-plot the functions."""

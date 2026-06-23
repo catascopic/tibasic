@@ -6,12 +6,13 @@ parallel 4-way branches in environment.py and zoom.py.  The handlers are statele
 singletons (see HANDLERS); all mutable state stays on the environment.
 
 Plotting and point sampling live on the individual function data objects (FuncData,
-ParData, PolarData, SeqData in environment.py).  Each handler just iterates its list,
+ParData, PolarData, SeqData in graph.py).  Each handler just iterates its list,
 delegates to the function objects, and handles the mode-specific window reset.
 """
 import math
 from contextlib import nullcontext
 
+from graph import sequence_pass
 from modes import GraphMode, AngleMode
 from errors import WindowRangeError, DomainError
 
@@ -138,7 +139,7 @@ class SeqMode(SweptMode):
 		return env.sequence
 
 	def _pass(self, env):
-		return env._sequence_pass()
+		return sequence_pass(env)
 
 	def standard_window(self, env):
 		w = env.window
