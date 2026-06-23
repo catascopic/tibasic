@@ -24,13 +24,24 @@ def _trig_window(env):
 	return 360.0, 7.5
 
 
+_VIEWPORT_ATTRS = frozenset({'xmin', 'xmax', 'ymin', 'ymax', 'xscl', 'yscl'})
+
+
 class GraphModeHandler:
-	"""Strategy for one graphing mode.  Subclasses supply `_functions` and `standard_window`;
-	`plot`, `fit_bounds`, and `set_selected` are implemented here or on SweptMode."""
+	"""Strategy for one graphing mode.  Subclasses supply `eq_attr`, `window_attrs`,
+	and `standard_window`; `plot`, `fit_bounds`, and `set_selected` are implemented
+	here or on SweptMode.
+
+	`eq_attr` names the Environment list that holds this mode's function data objects
+	(e.g. `'function'` for Func, `'parametric'` for Par).  `window_attrs` is the set
+	of Window attribute names whose values affect the graph in this mode.
+	"""
+
+	eq_attr: str = ''
+	window_attrs: frozenset = frozenset()
 
 	def _functions(self, env) -> list:
-		"""The list of function data objects for this mode."""
-		raise NotImplementedError
+		return getattr(env, self.eq_attr)
 
 	def _pass(self, env):
 		"""Context manager wrapping the full plot/fit sweep (SeqMode uses a memo cache)."""
@@ -70,11 +81,11 @@ class GraphModeHandler:
 class FuncMode(GraphModeHandler):
 	"""Function mode: each Yn is sampled column-by-column as Y=f(X)."""
 
-	def _functions(self, env):
-		return env.function
+	eq_attr = 'function'
+	window_attrs = _VIEWPORT_ATTRS | {'xres'}
 
 	def fit_bounds(self, env):
-		ys = [y for fn in env.function if fn.selected and fn.is_defined()
+		ys = [y for fn in self._functions(env) if fn.selected and fn.is_defined()
 		        for y in fn.fit_points(env)]
 		if not ys or min(ys) == max(ys):
 			raise WindowRangeError("ZoomFit: no Y range to fit")
@@ -87,8 +98,9 @@ class FuncMode(GraphModeHandler):
 class SweptMode(GraphModeHandler):
 	"""Parametric, Polar, and Sequence modes: a path traced as a parameter advances.
 
-	Subclasses supply only `_functions`, `standard_window`, and optionally `_pass`;
-	`fit_bounds` is shared here since all three modes return an (x, y) bounding box.
+	Subclasses supply only `eq_attr`, `window_attrs`, `standard_window`, and optionally
+	`_pass`; `fit_bounds` is shared here since all three modes return an (x, y) bounding
+	box.
 	"""
 
 	def fit_bounds(self, env):
@@ -107,8 +119,8 @@ class SweptMode(GraphModeHandler):
 class ParMode(SweptMode):
 	"""Parametric mode: sweep T, plotting (XnT(T), YnT(T))."""
 
-	def _functions(self, env):
-		return env.parametric
+	eq_attr = 'parametric'
+	window_attrs = _VIEWPORT_ATTRS | {'tmin', 'tmax', 'tstep'}
 
 	def standard_window(self, env):
 		w = env.window
@@ -119,8 +131,8 @@ class ParMode(SweptMode):
 class PolMode(SweptMode):
 	"""Polar mode: sweep θ, plotting (r·cosθ, r·sinθ)."""
 
-	def _functions(self, env):
-		return env.polar
+	eq_attr = 'polar'
+	window_attrs = _VIEWPORT_ATTRS | {'theta_min', 'theta_max', 'theta_step'}
 
 	def standard_window(self, env):
 		w = env.window
@@ -135,8 +147,8 @@ class SeqMode(SweptMode):
 	is evaluated bottom-up rather than recomputed at every point.
 	"""
 
-	def _functions(self, env):
-		return env.sequence
+	eq_attr = 'sequence'
+	window_attrs = _VIEWPORT_ATTRS | {'n_min', 'n_max', 'plot_start', 'plot_step'}
 
 	def _pass(self, env):
 		return sequence_pass(env)

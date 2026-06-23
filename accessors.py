@@ -26,28 +26,9 @@ from graph import eval_sequence
 from modes import GraphMode
 
 
-# Maps each graph mode to the equation-list attr whose changes matter in that mode.
-_EQ_ATTR_FOR_MODE = {
-	GraphMode.FUNC: 'function',
-	GraphMode.PAR:  'parametric',
-	GraphMode.POL:  'polar',
-	GraphMode.SEQ:  'sequence',
-}
-
-# Window attrs that invalidate the graph per mode.  Shared viewport vars (xmin/xmax/…)
-# appear in every mode; parameter/trig/sequence vars appear only in their own mode.
-_SHARED = frozenset({'xmin', 'xmax', 'ymin', 'ymax', 'xscl', 'yscl'})
-_WINDOW_MODE_ATTRS: dict[GraphMode, frozenset] = {
-	GraphMode.FUNC: _SHARED | {'xres'},
-	GraphMode.PAR:  _SHARED | {'tmin', 'tmax', 'tstep'},
-	GraphMode.POL:  _SHARED | {'theta_min', 'theta_max', 'theta_step'},
-	GraphMode.SEQ:  _SHARED | {'n_min', 'n_max', 'plot_start', 'plot_step'},
-}
-
-
 def _window_affects_graph(env, attr: str) -> bool:
 	"""True if `attr` is a window variable whose value affects the current graph mode."""
-	return attr in _WINDOW_MODE_ATTRS.get(env.graph_mode, frozenset())
+	return attr in env.graph_mode_handler.window_attrs
 
 
 class Accessor(ABC):
@@ -535,7 +516,7 @@ class EquationVar(Deletable, Accessor):
 
 	__slots__ = ('attr', 'index')
 	invocable = True
-	indep = None
+	graph_var = None
 
 	def __init__(self, attr: str, index: int):
 		self.attr = attr
@@ -558,14 +539,14 @@ class EquationVar(Deletable, Accessor):
 		x = arg_parser.expr()
 		arg_parser.end_func()
 		env = arg_parser.env
-		with scoped_numeric(env, self.indep, require_num(x)):
+		with scoped_numeric(env, self.graph_var, require_num(x)):
 			return self.resolve(env)
 
 	def store(self, env, value):
 		new_eq = _normalize_eq(value)
 		old_eq = self._get(env)
 		getattr(env, self.attr)[self.index].selected = True
-		if new_eq != old_eq and _EQ_ATTR_FOR_MODE.get(env.graph_mode) == self.attr:
+		if new_eq != old_eq and env.graph_mode_handler.eq_attr == self.attr:
 			env.graph.valid = False
 		self._set(env, new_eq)
 
@@ -575,7 +556,7 @@ class EquationVar(Deletable, Accessor):
 
 class FuncEquationVar(EquationVar):
 	__slots__ = ()
-	indep = 'X'
+	graph_var = 'X'
 
 	def __init__(self, index: int):
 		super().__init__('function', index)
@@ -591,7 +572,7 @@ class ParEquationVar(EquationVar):
 	"""
 
 	__slots__ = ('half',)
-	indep = 'T'
+	graph_var = 'T'
 
 	def __init__(self, index: int, half: str):
 		super().__init__('parametric', index)
@@ -609,7 +590,7 @@ class ParEquationVar(EquationVar):
 
 class PolarEquationVar(EquationVar):
 	__slots__ = ()
-	indep = 'theta'
+	graph_var = 'theta'
 
 	def __init__(self, index: int):
 		super().__init__('polar', index)
@@ -659,7 +640,7 @@ class SequenceInitialVar(Deletable, Accessor):
 				raise InvalidDimError("u/v/w(nMin) list may have at most 2 elements")
 		else:
 			value = TiList([require_real(value)])
-		if value != env.sequence[self.index].initial and env.graph_mode is GraphMode.SEQ:
+		if value is not env.sequence[self.index].initial and env.graph_mode is not GraphMode.SEQ:
 			env.graph.valid = False
 		env.sequence[self.index].initial = value
 
