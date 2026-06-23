@@ -100,9 +100,10 @@ class Environment:
 		self.dt_fmt        = 1
 		self.tm_fmt        = 12
 		self.clock_on      = True
-		# Window / graphing variables (Xscl, Xmin, Xmax, …) plus the hidden Z-copy
-		# that ZoomSto/ZoomRcl snapshot and restore (the "Z" system vars aren't
-		# separate variables — they're a saved Window).
+		# Window / graphing variables (Xscl, Xmin, Xmax, …) and the ZoomSto snapshot.
+		# The snapshot is a second Window whose fields ARE the Z-window system variables
+		# (ZXmin, ZTmax, …): the Z-tokens read/write it directly (see catalog), and
+		# ZoomSto/ZoomRcl copy between the two.
 		self.window = Window()
 		self.zoom_window = Window()
 		# Table-screen variables (TblStart, ΔTbl, TblInput).  The table itself isn't
@@ -318,15 +319,15 @@ class Environment:
 			self.display_graph()
 
 	# ── Zoom memory (ZoomSto / ZoomRcl) ──────────────────────────────────────────
-	# The Z-window system variables (ZXmin, Zθstep, …) are a saved snapshot of the
-	# whole window rather than separate variables.
+	# zoom_window holds the Z-window system variables (ZXmin, Zθstep, …); ZoomSto
+	# copies the live window into them and ZoomRcl copies them back.
 
 	def zoom_store(self):
-		"""ZoomSto — save the current window into the Zoom memory."""
+		"""ZoomSto — copy the current window into the Z-window variables."""
 		self.zoom_window = self.window.copy()
 
 	def zoom_recall(self):
-		"""ZoomRcl — restore the window saved by the last ZoomSto."""
+		"""ZoomRcl — restore the window from the Z-window variables."""
 		self.window = self.zoom_window.copy()
 
 	# ── Virtual clock ────────────────────────────────────────────────────────────

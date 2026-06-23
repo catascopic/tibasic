@@ -18,11 +18,10 @@ directly in the Environment with no wrapper objects.
 """
 from contextlib import contextmanager
 
-from core import require_num, require_matrix, require_list, require_string, require_real, require_int
+from core import require_num, require_matrix, require_list, require_string, require_real, require_int, py_int
 from core import TiString, TiEquation
 from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, DataTypeError
 from modes import GraphMode
-from titoken import R_PAREN
 
 
 class Accessor:
@@ -50,7 +49,7 @@ class Accessor:
 	def store(self, env, value):
 		raise TiSyntaxError("Invalid store target")
 
-	def invoke(self, parser):
+	def invoke(self, arg_parser):
 		"""Read with a parenthesised argument; the parser has already eaten the '('.
 		Only invocable accessors implement this."""
 		raise NotImplementedError(f"{type(self).__name__} is not invocable")
@@ -206,9 +205,10 @@ class UserListVar(Accessor):
 			new_value._upgrade_to_complex()
 		self.set(env, new_value)
 
-	def invoke(self, parser):
-		# The '(' is already eaten; parse_list_index reads the index and the ')'.
-		return self.resolve(parser.env)[parser.parse_list_index()]
+	def invoke(self, arg_parser):
+		index = py_int(arg_parser.expr(), InvalidDimError)
+		arg_parser.end_func()
+		return self.resolve(arg_parser.env)[index]
 
 	def delete(self, env):
 		env.user_lists.pop(self.name, None)
@@ -245,9 +245,11 @@ class MatrixVar(Accessor):
 	def store(self, env, value):
 		self.set(env, require_matrix(value).copy())
 
-	def invoke(self, parser):
-		# The '(' is already eaten; parse_matrix_indices reads the indices and the ')'.
-		return self.resolve(parser.env)[parser.parse_matrix_indices()]
+	def invoke(self, arg_parser):
+		row = py_int(arg_parser.expr(), InvalidDimError)
+		col = py_int(arg_parser.expr(), InvalidDimError)
+		arg_parser.end_func()
+		return self.resolve(arg_parser.env)[(row, col)]
 
 	def delete(self, env):
 		self.set(env, None)
@@ -292,9 +294,10 @@ class ListVar(Accessor):
 			new_value._upgrade_to_complex()
 		self.set(env, new_value)
 
-	def invoke(self, parser):
-		# The '(' is already eaten; parse_list_index reads the index and the ')'.
-		return self.resolve(parser.env)[parser.parse_list_index()]
+	def invoke(self, arg_parser):
+		index = py_int(arg_parser.expr(), InvalidDimError)
+		arg_parser.end_func()
+		return self.resolve(arg_parser.env)[index]
 
 	def delete(self, env):
 		self.set(env, None)
@@ -339,22 +342,25 @@ class StringVar(Accessor):
 
 
 class WindowVar(Accessor):
-	"""A plain real-valued window variable (Xmin, Tmax, …) — a named float attr on env.window.
+	"""A plain real-valued window variable (Xmin, Tmax, …) — a named float attr on a
+	Window held by env.  `target` names that Window: 'window' for the live settings,
+	'zoom_window' for the ZoomSto snapshot's Z-variables (ZXmin, ZTmax, …).
 
 	`resolve` raises UndefinedError for variables that were never assigned (tmin, tstep,
 	etc. on a fresh env without ZStandard); `store` enforces require_real.
 	"""
 
-	__slots__ = ('attr',)
+	__slots__ = ('attr', 'target')
 
-	def __init__(self, attr: str):
+	def __init__(self, attr: str, target: str = 'window'):
 		self.attr = attr
+		self.target = target
 
 	def get(self, env):
-		return getattr(env.window, self.attr)
+		return getattr(getattr(env, self.target), self.attr)
 
 	def set(self, env, value):
-		setattr(env.window, self.attr, value)
+		setattr(getattr(env, self.target), self.attr, value)
 
 	def resolve(self, env):
 		v = self.get(env)
@@ -366,7 +372,7 @@ class WindowVar(Accessor):
 		self.set(env, require_real(value))
 
 	def __repr__(self):
-		return f"WindowVar({self.attr!r})"
+		return f"WindowVar({self.attr!r}, {self.target!r})"
 
 
 class XresVar(WindowVar):
@@ -518,11 +524,11 @@ class EquationVar(Accessor):
 			raise UndefinedError("Equation is not defined")
 		return eq.eval(env)
 
-	def invoke(self, parser):
+	def invoke(self, arg_parser):
 		# The '(' is already eaten: Y1(x) composes by resolving with X set to x.
-		x = parser.parse_expr()
-		parser.eat_if(R_PAREN)
-		env = parser.env
+		x = arg_parser.expr()
+		arg_parser.end_func()
+		env = arg_parser.env
 		saved_x = env.numerics.X
 		env.numerics.X = require_num(x)
 		try:
@@ -565,11 +571,11 @@ class SequenceVar(Accessor):
 	def resolve(self, env):
 		return env.eval_sequence(self.seq_index, env.n)
 
-	def invoke(self, parser):
+	def invoke(self, arg_parser):
 		# The '(' is already eaten: u(n) evaluates at the explicit index n.
-		n = parser.parse_expr()
-		parser.eat_if(R_PAREN)
-		return parser.env.eval_sequence(self.seq_index, n)
+		n = arg_parser.expr()
+		arg_parser.end_func()
+		return arg_parser.env.eval_sequence(self.seq_index, n)
 
 	def store(self, env, value):
 		self.set(env, _normalize_eq(value))

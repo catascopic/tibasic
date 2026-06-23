@@ -12,6 +12,8 @@ XRES             = 0x6336
 NMIN, NMAX       = 0x631F, 0x631D
 XFACT, YFACT     = 0x6328, 0x6329
 TBL_START        = 0x631A
+ZXMIN, ZXMAX     = 0x6312, 0x6313
+ZNMIN, ZXRES     = 0x6320, 0x6337
 
 
 def store(env, code, value):
@@ -135,6 +137,39 @@ class TestZoomMemory:
 		assert clone.delta_x == pytest.approx(62 / 94)
 		w.xmax = 200.0                          # mutate original
 		assert clone.delta_x == pytest.approx(62 / 94)  # clone unaffected
+
+
+class TestZWindowVars:
+	"""The Z-window system variables are real, addressable variables backed by the
+	ZoomSto snapshot (env.zoom_window)."""
+
+	def test_zoomsto_populates_z_vars(self):
+		env = Environment()
+		env.window.xmin, env.window.xmax = -3.0, 7.0
+		run('ZoomSto', env)
+		assert resolve(env, ZXMIN) == -3.0
+		assert resolve(env, ZXMAX) == 7.0
+
+	def test_store_to_z_var_hits_zoom_window(self):
+		env = Environment()
+		store(env, ZXMIN, 12.0)
+		assert env.zoom_window.xmin == 12.0
+		assert env.window.xmin == -10.0          # live window untouched
+
+	def test_zoomrcl_restores_from_z_vars(self):
+		# Writing the Z-variables directly, then ZoomRcl, drives the live window.
+		env = Environment()
+		store(env, ZXMIN, 5.0)
+		store(env, ZXMAX, 25.0)
+		run('ZoomRcl', env)
+		assert (env.window.xmin, env.window.xmax) == (5.0, 25.0)
+
+	def test_z_vars_keep_their_counterpart_validation(self):
+		env = Environment()
+		with pytest.raises(DomainError):
+			store(env, ZXRES, 9.0)               # ZXres is still an integer 1-8
+		with pytest.raises(DomainError):
+			store(env, ZNMIN, 2.5)               # ZnMin is still whole-number
 
 
 class TestTableVarsSeparated:

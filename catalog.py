@@ -279,8 +279,8 @@ token(0x623A, b'df')        # Error df
 token(0x623B, b'SS')        # Error SS
 token(0x623C, b'MS')        # Error MS
 
-token(0x6300, b'ZXscl')
-token(0x6301, b'ZYscl')
+token(0x6300, b'ZXscl',                 var=WindowVar('xscl', 'zoom_window'))
+token(0x6301, b'ZYscl',                 var=WindowVar('yscl', 'zoom_window'))
 token(0x6302, b'Xscl',                  var=WindowVar('xscl'))
 token(0x6303, b'Yscl',                  var=WindowVar('yscl'))
 token(0x6304, b'\x02(nMin)')            # u(nMin)
@@ -297,26 +297,26 @@ token(0x630E, b'Tmin',                  var=WindowVar('tmin'))
 token(0x630F, b'Tmax',                  var=WindowVar('tmax'))
 token(0x6310, b'\x5bmin',               var=WindowVar('theta_min'))    # θmin
 token(0x6311, b'\x5bmax',               var=WindowVar('theta_max'))    # θmax
-token(0x6312, b'ZXmin')
-token(0x6313, b'ZXmax')
-token(0x6314, b'ZYmin')
-token(0x6315, b'ZYmax')
-token(0x6316, b'Z\x5bmin')              # Zθmin
-token(0x6317, b'Z\x5bmax')              # Zθmax
-token(0x6318, b'ZTmin')
-token(0x6319, b'ZTmax')
+token(0x6312, b'ZXmin',                 var=WindowVar('xmin', 'zoom_window'))
+token(0x6313, b'ZXmax',                 var=WindowVar('xmax', 'zoom_window'))
+token(0x6314, b'ZYmin',                 var=WindowVar('ymin', 'zoom_window'))
+token(0x6315, b'ZYmax',                 var=WindowVar('ymax', 'zoom_window'))
+token(0x6316, b'Z\x5bmin',              var=WindowVar('theta_min', 'zoom_window'))   # Zθmin
+token(0x6317, b'Z\x5bmax',              var=WindowVar('theta_max', 'zoom_window'))   # Zθmax
+token(0x6318, b'ZTmin',                 var=WindowVar('tmin', 'zoom_window'))
+token(0x6319, b'ZTmax',                 var=WindowVar('tmax', 'zoom_window'))
 token(0x631A, b'TblStart',              var=TableVar('tbl_start'))
 token(0x631B, b'PlotStart',             var=WindowVar('plot_start'))
-token(0x631C, b'ZPlotStart')
+token(0x631C, b'ZPlotStart',            var=WindowVar('plot_start', 'zoom_window'))
 token(0x631D, b'nMax',                  var=IntWindowVar('n_max'))
-token(0x631E, b'ZnMax')
+token(0x631E, b'ZnMax',                 var=IntWindowVar('n_max', 'zoom_window'))
 token(0x631F, b'nMin',                  var=IntWindowVar('n_min'))
-token(0x6320, b'ZnMin')
+token(0x6320, b'ZnMin',                 var=IntWindowVar('n_min', 'zoom_window'))
 token(0x6321, b'\xbeTbl',               var=TableVar('delta_tbl'))       # ΔTbl
 token(0x6322, b'Tstep',                 var=WindowVar('tstep'))
 token(0x6323, b'\x5bstep',              var=WindowVar('theta_step'))    # θstep
-token(0x6324, b'ZTstep')
-token(0x6325, b'Z\x5bstep')             # Zθstep
+token(0x6324, b'ZTstep',                var=WindowVar('tstep', 'zoom_window'))
+token(0x6325, b'Z\x5bstep',             var=WindowVar('theta_step', 'zoom_window'))  # Zθstep
 token(0x6326, b'\xbeX',                 var=DeltaWindowVar('xmin', 'xmax', 94))  # ΔX
 token(0x6327, b'\xbeY',                 var=DeltaWindowVar('ymin', 'ymax', 62))  # ΔY
 token(0x6328, b'XFact',                 var=FactorWindowVar('x_fact'))
@@ -332,9 +332,9 @@ token(0x6331, b'C/Y',                   var=EnvVar('cy'))
 token(0x6332, b'\x04(nMin)')            # w(nMin)
 token(0x6333, b'Z\x04(nMin)')           # Zw(nMin)
 token(0x6334, b'PlotStep',              var=WindowVar('plot_step'))
-token(0x6335, b'ZPlotStep')
+token(0x6335, b'ZPlotStep',             var=WindowVar('plot_step', 'zoom_window'))
 token(0x6336, b'Xres',                  var=XresVar('xres'))
-token(0x6337, b'ZXres')
+token(0x6337, b'ZXres',                 var=XresVar('xres', 'zoom_window'))
 token(0x6338, b'TraceStep')
 
 

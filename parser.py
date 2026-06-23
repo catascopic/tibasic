@@ -345,7 +345,7 @@ class Parser:
 		a following '(' for implicit multiplication.  Order matters: `invocable` is tested
 		before eat_if so a plain variable never has its '(' eaten."""
 		if acc.invocable and self.eat_if(L_PAREN):
-			return acc.invoke(self)
+			return acc.invoke(ArgParser(self))
 		return acc.resolve(self.env)
 
 	def parse_indices(self, count):
