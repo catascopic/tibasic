@@ -22,9 +22,6 @@ from contextlib import contextmanager
 from core import require_num, require_matrix, require_list, require_string, require_real, require_int, py_int
 from core import TiString, TiEquation
 from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, DataTypeError
-from modes import GraphMode
-
-
 class Accessor(ABC):
 	"""Stateless description of how to access one symbol.  Subclasses override the
 	pieces that differ; the defaults make a read-only value (store raises).
@@ -502,19 +499,18 @@ class EquationVar(Accessor):
 	and selects the function.
 	"""
 
-	__slots__ = ('mode', 'eq_index', 'func_index')
+	__slots__ = ('attr', 'index')
 	invocable = True
 
-	def __init__(self, mode: GraphMode, eq_index: int, func_index: int):
-		self.mode = mode
-		self.eq_index = eq_index
-		self.func_index = func_index
+	def __init__(self, attr: str, index: int):
+		self.attr = attr
+		self.index = index
 
 	def _get(self, env):
-		return env.graph_functions.equations[self.mode][self.eq_index]
+		return getattr(env, self.attr)[self.index].equation
 
 	def _set(self, env, value):
-		env.graph_functions.equations[self.mode][self.eq_index] = value
+		getattr(env, self.attr)[self.index].equation = value
 
 	def resolve(self, env):
 		eq = self._get(env)
@@ -536,13 +532,44 @@ class EquationVar(Accessor):
 
 	def store(self, env, value):
 		self._set(env, _normalize_eq(value))
-		env.graph_functions.selected[self.mode][self.func_index] = True
+		getattr(env, self.attr)[self.index].selected = True
 
 	def delete(self, env):
 		self._set(env, None)
 
 	def __repr__(self):
-		return f"EquationVar({self.mode.name}, {self.eq_index}, {self.func_index})"
+		return f"EquationVar({self.attr!r}, {self.index})"
+
+
+class ParEquationVar(EquationVar):
+	"""One half of a parametric pair (XnT or YnT).
+
+	Inherits `invoke`/`resolve`/`store` from `EquationVar` but addresses `x_eq`
+	or `y_eq` on the `ParData` rather than the generic `.equation` field.
+	Both halves share the same index (the pair index) so selecting either half
+	selects the pair.
+	"""
+
+	__slots__ = ('is_x',)
+
+	def __init__(self, index: int, is_x: bool):
+		super().__init__('parametric', index)
+		self.is_x = is_x
+
+	def _get(self, env):
+		fn = env.parametric[self.index]
+		return fn.x_eq if self.is_x else fn.y_eq
+
+	def _set(self, env, value):
+		fn = env.parametric[self.index]
+		if self.is_x:
+			fn.x_eq = value
+		else:
+			fn.y_eq = value
+
+	def __repr__(self):
+		half = 'x' if self.is_x else 'y'
+		return f"ParEquationVar({self.index}, {half})"
 
 
 class SequenceVar(Accessor):
@@ -561,10 +588,10 @@ class SequenceVar(Accessor):
 		self.seq_index = seq_index
 
 	def _get(self, env):
-		return env.graph_functions.equations[GraphMode.SEQ][self.seq_index]
+		return env.sequence[self.seq_index].equation
 
 	def _set(self, env, value):
-		env.graph_functions.equations[GraphMode.SEQ][self.seq_index] = value
+		env.sequence[self.seq_index].equation = value
 
 	def resolve(self, env):
 		return env.eval_sequence(self.seq_index, env.n)
@@ -577,7 +604,7 @@ class SequenceVar(Accessor):
 
 	def store(self, env, value):
 		self._set(env, _normalize_eq(value))
-		env.graph_functions.selected[GraphMode.SEQ][self.seq_index] = True
+		env.sequence[self.seq_index].selected = True
 
 	def store_initial(self, env, value):
 		"""Handle `{…}→u(nMin)`: store the sequence's initial-value list."""

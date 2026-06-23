@@ -15,7 +15,6 @@ import sys
 
 from core import TiEquation, TiString
 from environment import Environment
-from modes import GraphMode
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,11 +51,10 @@ def main(argv=None) -> int:
 	env.grid_on = args.grid
 
 	# Plot Y1=X and Y2=X²; storing each equation also selects it for graphing.
-	gf = env.graph_functions
-	gf.equations[GraphMode.FUNC][0] = TiEquation(TiString.from_str('X').tokens)
-	gf.equations[GraphMode.FUNC][1] = TiEquation(TiString.from_str('X^2').tokens)
-	gf.selected[GraphMode.FUNC][0] = True
-	gf.selected[GraphMode.FUNC][1] = True
+	env.function[0].equation = TiEquation(TiString.from_str('X').tokens)
+	env.function[1].equation = TiEquation(TiString.from_str('X^2').tokens)
+	env.function[0].selected = True
+	env.function[1].selected = True
 
 	env.display_graph()   # set the graph as active and re-plot (axes/grid/functions)
 

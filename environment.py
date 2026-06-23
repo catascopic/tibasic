@@ -2,22 +2,138 @@ import math
 import random
 from collections import defaultdict, deque
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime, date, timedelta
+from enum import Enum
 from typing import Any, ClassVar
 
 import math as _math
 
-from core import TiList, is_complex_val
+from core import TiList, TiEquation, is_complex_val
 from core import require_real, require_int, py_int
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graphscreen import GraphScreen
-from graph import draw_axes, draw_grid
+from graph import (
+	draw_axes, draw_grid,
+	trace_curve, trace_parametric,
+	sample_function, sample_parametric, sample_polar, sample_sequence,
+	_param_values, MAX_COL,
+)
 from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
 from accessors import NumericVar
 from iodevice import HomeScreenIO
 from terminal import ScriptedConsole
 from titoken import Token
+
+
+class GraphStyle(Enum):
+	LINE        = 'line'
+	THICK       = 'thick'
+	SHADE_ABOVE = 'shade_above'
+	SHADE_BELOW = 'shade_below'
+	TRACE       = 'trace'
+	ANIMATE     = 'animate'
+	DOT         = 'dot'
+
+
+@dataclass
+class FuncData:
+	"""One Y= function slot: equation, on/off, style.  Knows how to plot itself."""
+	equation: 'TiEquation | None' = None
+	selected: bool = False
+	style: GraphStyle = GraphStyle.LINE
+
+	def is_defined(self) -> bool:
+		return self.equation is not None
+
+	def plot(self, env) -> None:
+		eq = self.equation
+		trace_curve(env, sample_function(env, lambda: eq.eval(env)))
+
+	def fit_points(self, env) -> list:
+		"""Y values sampled across the current X window, for ZoomFit."""
+		w = env.window
+		xmin = w.xmin
+		delta = (w.xmax - xmin) / MAX_COL
+		eq = self.equation
+		f = sample_function(env, lambda: eq.eval(env))
+		return [y for i in range(MAX_COL + 1) if (y := f(xmin + i * delta)) is not None]
+
+
+@dataclass
+class ParData:
+	"""One parametric pair (XnT + YnT): both halves, shared on/off and style."""
+	x_eq: 'TiEquation | None' = None
+	y_eq: 'TiEquation | None' = None
+	selected: bool = False
+	style: GraphStyle = GraphStyle.LINE
+
+	def is_defined(self) -> bool:
+		return self.x_eq is not None and self.y_eq is not None
+
+	def plot(self, env) -> None:
+		w = env.window
+		x_eq, y_eq = self.x_eq, self.y_eq
+		trace_parametric(env,
+			sample_parametric(env, lambda: x_eq.eval(env), lambda: y_eq.eval(env)),
+			w.tmin, w.tmax, w.tstep)
+
+	def fit_points(self, env) -> list:
+		"""(x, y) pairs sampled over T, for ZoomFit."""
+		w = env.window
+		x_eq, y_eq = self.x_eq, self.y_eq
+		point = sample_parametric(env, lambda: x_eq.eval(env), lambda: y_eq.eval(env))
+		return [xy for t in _param_values(w.tmin, w.tmax, w.tstep) if (xy := point(t)) is not None]
+
+
+@dataclass
+class PolarData:
+	"""One polar equation slot (r=): equation, on/off, style."""
+	equation: 'TiEquation | None' = None
+	selected: bool = False
+	style: GraphStyle = GraphStyle.LINE
+
+	def is_defined(self) -> bool:
+		return self.equation is not None
+
+	def plot(self, env) -> None:
+		w = env.window
+		eq = self.equation
+		trace_parametric(env,
+			sample_polar(env, lambda: eq.eval(env)),
+			w.theta_min, w.theta_max, w.theta_step)
+
+	def fit_points(self, env) -> list:
+		"""(x, y) pairs sampled over θ, for ZoomFit."""
+		w = env.window
+		eq = self.equation
+		point = sample_polar(env, lambda: eq.eval(env))
+		return [xy for t in _param_values(w.theta_min, w.theta_max, w.theta_step) if (xy := point(t)) is not None]
+
+
+@dataclass
+class SeqData:
+	"""One sequence slot (u/v/w): index, equation, on/off, style."""
+	seq_index: int
+	equation: 'TiEquation | None' = None
+	selected: bool = False
+	style: GraphStyle = GraphStyle.LINE
+
+	def is_defined(self) -> bool:
+		return self.equation is not None
+
+	def plot(self, env) -> None:
+		w = env.window
+		trace_parametric(env,
+			sample_sequence(env, self.seq_index),
+			w.plot_start, w.n_max, w.plot_step)
+
+	def fit_points(self, env) -> list:
+		"""(x, y) pairs sampled over n, for ZoomFit."""
+		w = env.window
+		point = sample_sequence(env, self.seq_index)
+		return [xy for t in _param_values(w.plot_start, w.n_max, w.plot_step) if (xy := point(t)) is not None]
 
 
 # Sentinel parked in the sequence cache while a term is being computed; seeing it
@@ -70,13 +186,13 @@ class Environment:
 		self.matrices   = MatrixVars()      # [A]–[J] (named slots, None until assigned)
 		self.lists      = [None] * 6        # L1–L6  (TiList | None)
 		self.strings    = [None] * 10       # Str1–Str0 (TiString | None)
-		# Graph equations and their on/off selection (see GraphFunctions).  The per-mode
-		# variable lists below are flat views the catalog tokens index into.
-		self.graph_functions = GraphFunctions()
-		self.function   = self.graph_functions.variables(GraphMode.FUNC)  # Y1–Y0
-		self.parametric = self.graph_functions.variables(GraphMode.PAR)   # X1T–Y6T
-		self.polar      = self.graph_functions.variables(GraphMode.POL)   # r1–r6
-		self.sequence   = self.graph_functions.variables(GraphMode.SEQ)   # u, v, w
+		# Plottable functions, one slot per selectable entry.  Each carries its equation,
+		# on/off selection flag, and draw style, and knows how to plot itself.
+		self.function   = [FuncData()    for _ in range(10)]     # Y1–Y0
+		self.parametric = [ParData()     for _ in range(6)]      # X1T/Y1T – X6T/Y6T
+		self.polar      = [PolarData()   for _ in range(6)]      # r1–r6
+		self.sequence   = [SeqData(i)    for i in range(3)]      # u, v, w
+		self.sequence_initial: list = [None, None, None]         # u/v/w(nMin) lists
 		self.user_lists = {}
 		# self.stat        = [None] * 0x3D # stat vars
 		self.n: float = 0.0
@@ -272,16 +388,15 @@ class Environment:
 			return self._eval_sequence(index, py_int(at))
 
 	def _eval_sequence(self, index: int, k: int):
-		gf = self.graph_functions
 		n_min = py_int(self.window.n_min)
 		if k < n_min:
 			raise DomainError(f"Sequence index {k} is below nMin ({n_min})")
 		# Initial terms come straight from the u(nMin) list (element i is the value at
 		# n_min + i — chronological order).
-		initial = gf.initial[index]
+		initial = self.sequence_initial[index]
 		if initial is not None and k - n_min < len(initial.data):
 			return initial.data[k - n_min]
-		equation = gf.equations[GraphMode.SEQ][index]
+		equation = self.sequence[index].equation
 		if equation is None:
 			raise UndefinedError(f"Sequence {'uvw'[index]} is not defined")
 		key = (index, k)
@@ -304,7 +419,7 @@ class Environment:
 	def store_sequence_initial(self, index: int, value) -> None:
 		"""Set sequence 𝑢/𝑣/𝑤's u(nMin) initial-value list ({…}→u(nMin)).  A scalar is
 		wrapped as a one-element list (a single initial term)."""
-		self.graph_functions.initial[index] = value if isinstance(value, TiList) else TiList([value])
+		self.sequence_initial[index] = value if isinstance(value, TiList) else TiList([value])
 
 	def display_graph(self):
 		"""DispGraph — make the graph the active screen and re-plot the functions."""
@@ -506,72 +621,10 @@ class TableVars:
 		self.tbl_input = None                 # TblInput — a 7-element list (TiList | None)
 
 
-# ── Graph functions (the plottable equations + their on/off selection) ──────────
-
-class GraphFunctions:
-	"""All plottable equations and their on/off selection, per graph mode.
-
-	Each mode keeps a flat list of `TiEquation | None` in token order (Y1–Y0;
-	X1T, Y1T, X2T, …; r1–r6; u, v, w) — the view `EquationVar`/`SequenceVar`
-	accessors index into — plus a list of `selected` flags, one per *function*.
-	A function owns `equations_per_function` consecutive equations: 1 for
-	Func/Polar/Seq, 2 for a parametric X/Y pair.  So a parametric pair shares
-	one flag (storing to either half, or FnOn/FnOff on it, moves the one flag),
-	with no per-equation flags to keep in sync.
-
-	Selection lives here rather than on the equations, so it survives a mode
-	switch (storing Y1 in Polar mode selects it for when you return to Function
-	mode).  Per-mode layout (function count, equations per function) comes from
-	the graph-mode handlers (see graphmodes.py), keeping all mode-shape
-	knowledge in one place.
-	"""
-
-	def __init__(self):
-		self.equations = {}      # mode -> list[TiEquation | None] (flat, token order)
-		self.selected = {}       # mode -> list[bool], one flag per function
-		for mode, handler in GRAPH_MODE_HANDLERS.items():
-			self.selected[mode] = [False] * handler.function_count
-			self.equations[mode] = [None] * (handler.function_count * handler.equations_per_function)
-		# Recursive-sequence initial values u(nMin)/v(nMin)/w(nMin): a TiList per
-		# sequence (index 0/1/2), or None.  No user variable / token addresses these —
-		# they live here, set via {…}→u(nMin) and read via u(nMin).
-		self.initial = [None, None, None]
-
-	def variables(self, mode: GraphMode) -> list:
-		"""Flat list of a mode's equations (TiEquation | None), in token order."""
-		return self.equations[mode]
-
-	def selected_defined(self, mode: GraphMode):
-		"""Yield (function index, [equation values]) for each selected function whose
-		equations are *all* defined.  The all-defined rule means a parametric pair only
-		plots when both halves are set, with no mode-specific check."""
-		stride = GRAPH_MODE_HANDLERS[mode].equations_per_function
-		eqs = self.equations[mode]
-		for f, sel in enumerate(self.selected[mode]):
-			if sel:
-				values = [eqs[f * stride + k] for k in range(stride)]
-				if all(v is not None for v in values):
-					yield f, values
-
-	def set_selected(self, mode: GraphMode, on: bool, numbers=()) -> None:
-		"""FnOn/FnOff: select (on=True) or deselect the listed 1-based functions in
-		`mode`, or all of them when `numbers` is empty.  Number 0 means the 10th
-		function (Y0), matching the calculator's 1-9,0 numbering."""
-		flags = self.selected[mode]
-		if not numbers:
-			for i in range(len(flags)):
-				flags[i] = on
-			return
-		for n in numbers:
-			index = n - 1 if n >= 1 else 9        # FnOn 0 → the 10th function (Y0)
-			if not (0 <= index < len(flags)):
-				raise DomainError(f"FnOn/FnOff: function number out of range: {n}")
-			flags[index] = on
-
-
 class ReturnSignal(Exception):
 	"""Raised by Return to exit the current sub-program and return to the caller."""
 
 
 class StopSignal(Exception):
 	"""Raised by Stop to terminate all program execution immediately."""
+

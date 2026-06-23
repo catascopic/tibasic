@@ -243,7 +243,7 @@ class TestSequenceEval:
 	def test_store_selects_the_sequence(self):
 		# Storing the recurrence selects u, like any equation store.
 		env = run('"2n"@ u')
-		assert env.graph_functions.selected[GraphMode.SEQ][0]
+		assert env.sequence[0].selected
 
 
 class TestSequencePlot:

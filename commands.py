@@ -153,7 +153,7 @@ def zoom_rcl(env):
 def _fn_select(env, on: bool, numbers):
 	"""Shared body of FnOn/FnOff: (de)select the given 1-based function numbers for the
 	current graph mode, or all of them when none are given."""
-	env.graph_functions.set_selected(env.graph_mode, on, [py_int(n) for n in numbers])
+	env.graph_mode_handler.set_selected(env, on, [py_int(n) for n in numbers])
 
 
 @preparse_cmd

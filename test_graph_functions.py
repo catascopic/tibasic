@@ -11,7 +11,8 @@ FUNC, PAR, POL, SEQ = GraphMode.FUNC, GraphMode.PAR, GraphMode.POL, GraphMode.SE
 
 
 def selected(env, mode):
-	return list(env.graph_functions.selected[mode])
+	attr = {FUNC: 'function', PAR: 'parametric', POL: 'polar', SEQ: 'sequence'}[mode]
+	return [fn.selected for fn in getattr(env, attr)]
 
 
 class TestDefaults:
@@ -33,7 +34,7 @@ class TestStoreSelects:
 
 	def test_store_still_records_the_equation(self):
 		env = run('"2X"@ Y1')
-		assert isinstance(env.function[0], TiEquation)
+		assert isinstance(env.function[0].equation, TiEquation)
 
 	def test_selection_survives_wrong_mode(self):
 		# Storing Y1 while in Polar mode still selects it — for when you return to Func.
@@ -46,8 +47,8 @@ class TestStoreSelects:
 	def test_parametric_pair_shares_one_flag(self):
 		x_env = run('"T"@ X1t')                  # store the X half
 		y_env = run('"T"@ Y1t')                  # store the Y half
-		assert x_env.graph_functions.selected[PAR][0]
-		assert y_env.graph_functions.selected[PAR][0]
+		assert x_env.parametric[0].selected
+		assert y_env.parametric[0].selected
 
 
 class TestFnOnOff:

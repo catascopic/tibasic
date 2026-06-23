@@ -10,9 +10,8 @@ from accessors import (
 	NumericVar, MatrixVar, ListVar, StringVar,
 	ComputedAccessor, RandAccessor,
 	WindowVar, XresVar, IntWindowVar, FactorWindowVar, DeltaWindowVar,
-	EnvVar, TableVar, EquationVar, SequenceVar,
+	EnvVar, TableVar, EquationVar, ParEquationVar, SequenceVar,
 )
-from modes import GraphMode
 import commands as cmds
 import distributions as dist
 import draw
@@ -192,19 +191,20 @@ for _i in range(10):
 for _i in range(6):
 	token(0x5D00 | _i, bytes([0x4C, 0x81 + _i]), var=ListVar(_i))
 
-# Y₁ - Y₀  (Func mode, stride=1 so func_index == eq_index)
+# Y₁ - Y₀  (Function mode)
 for _i in range(10):
-	token(0x5E10 + _i, bytes([0x59, 0x80 + (_i + 1) % 10]), var=EquationVar(GraphMode.FUNC, _i, _i))
+	token(0x5E10 + _i, bytes([0x59, 0x80 + (_i + 1) % 10]), var=EquationVar('function', _i))
 
-# X₁ₜ/Y₁ₜ - X₆ₜ/Y₆ₜ  (Par mode, stride=2 so func_index = eq_index // 2)
-for _i in range(12):
-	token(0x5E20 + _i, bytes([0x58 + _i % 2, 0x81 + _i // 2, 0x0D]), var=EquationVar(GraphMode.PAR, _i, _i // 2))
-
-# r₁ - r₆  (Pol mode, stride=1)
+# X₁ₜ/Y₁ₜ - X₆ₜ/Y₆ₜ  (Parametric mode: pairs share one index)
 for _i in range(6):
-	token(0x5E40 + _i, bytes([0x72, 0x81 + _i]), var=EquationVar(GraphMode.POL, _i, _i))
+	token(0x5E20 + _i * 2,     bytes([0x58, 0x81 + _i, 0x0D]), var=ParEquationVar(_i, is_x=True))
+	token(0x5E20 + _i * 2 + 1, bytes([0x59, 0x81 + _i, 0x0D]), var=ParEquationVar(_i, is_x=False))
 
-# 𝑢, 𝑣, 𝑤  (Seq mode)
+# r₁ - r₆  (Polar mode)
+for _i in range(6):
+	token(0x5E40 + _i, bytes([0x72, 0x81 + _i]), var=EquationVar('polar', _i))
+
+# 𝑢, 𝑣, 𝑤  (Sequence mode)
 for _i in range(3):
 	token(0x5E80 + _i, bytes([0x02 + _i]), var=SequenceVar(_i))
 

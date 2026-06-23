@@ -1,55 +1,61 @@
 """Per-graph-mode behavior, as a small strategy hierarchy.
 
 Each of the four graphing modes (Function, Parametric, Polar, Sequence) decides how
-its equations are plotted, how ZoomFit measures their extent, and what ZStandard
-resets — behavior that used to live as parallel 4-way branches in environment.py and
-zoom.py.  The handlers are stateless singletons (see HANDLERS); all mutable state
-stays on the environment, which is passed in.
+ZoomFit measures extent and what ZStandard resets — behavior that used to live as
+parallel 4-way branches in environment.py and zoom.py.  The handlers are stateless
+singletons (see HANDLERS); all mutable state stays on the environment.
 
-The modes split into two shapes:
-  * FuncMode      — one Y per pixel column (Y=f(X)), traced with trace_curve.
-  * SweptMode     — a path traced as a parameter advances (Par/Pol/Seq), via
-                    trace_parametric; subclasses differ only in the sampler and which
-                    window variables give the (start, stop, step) sweep.
-
-This module imports only graph.py (the cycle-free plotting layer), modes, and errors,
-so it stays out of the preparse⇄environment import cycle.
+Plotting and point sampling live on the individual function data objects (FuncData,
+ParData, PolarData, SeqData in environment.py).  Each handler just iterates its list,
+delegates to the function objects, and handles the mode-specific window reset.
 """
 import math
 from contextlib import nullcontext
 
 from modes import GraphMode, AngleMode
-from errors import WindowRangeError
-from graph import (
-	MAX_COL, _param_values,
-	trace_curve, trace_parametric,
-	sample_function, sample_parametric, sample_polar, sample_sequence,
-)
+from errors import WindowRangeError, DomainError
 
 
 def _trig_window(env):
-	"""(Tmax/θmax, Tstep/θstep) for ZStandard — 2π / π⁄24 in Radian mode, 360 / 7.5 in
-	Degree mode."""
+	"""(Tmax/θmax, Tstep/θstep) for ZStandard — 2π / π⁄24 in Radian, 360 / 7.5 in Degree."""
 	if env.angle_mode is AngleMode.RAD:
 		return 2 * math.pi, math.pi / 24
 	return 360.0, 7.5
 
 
 class GraphModeHandler:
-	"""Strategy for one graphing mode.  Subclasses implement plotting, the ZoomFit
-	extent, and the ZStandard reset of the mode's own window variables.
+	"""Strategy for one graphing mode.  Subclasses supply `_fns` and `standard_window`;
+	`plot`, `fit_bounds`, and `set_selected` are implemented here or on SweptMode."""
 
-	`function_count` and `equations_per_function` describe the mode's layout — how many
-	selectable functions it has and how many equation variables each owns (2 for a
-	parametric X/Y pair, 1 otherwise).  GraphFunctions builds its storage from these.
-	"""
+	def _fns(self, env) -> list:
+		"""The list of function data objects for this mode."""
+		raise NotImplementedError
 
-	function_count: int
-	equations_per_function: int = 1
+	def _pass(self, env):
+		"""Context manager wrapping the full plot/fit sweep (SeqMode uses a memo cache)."""
+		return nullcontext()
+
+	def standard_window(self, env) -> None:
+		"""ZStandard: reset this mode's own window variables."""
+
+	def set_selected(self, env, on: bool, numbers=()) -> None:
+		"""FnOn/FnOff: select or deselect the listed 1-based functions, or all when
+		`numbers` is empty.  Number 0 means the last function, matching 1-9,0 numbering."""
+		fns = self._fns(env)
+		indices = range(len(fns)) if not numbers else [
+			(n - 1 if n >= 1 else len(fns) - 1) for n in numbers
+		]
+		for i in indices:
+			if not (0 <= i < len(fns)):
+				raise DomainError("FnOn/FnOff: function number out of range")
+			fns[i].selected = on
 
 	def plot(self, env) -> None:
-		"""Draw the mode's selected, defined functions onto env.graph."""
-		raise NotImplementedError
+		"""Draw all selected, defined functions onto env.graph."""
+		with self._pass(env):
+			for fn in self._fns(env):
+				if fn.selected and fn.is_defined():
+					fn.plot(env)
 
 	def fit_bounds(self, env) -> tuple:
 		"""ZoomFit: return (xmin, xmax, ymin, ymax) enclosing every plotted point.
@@ -59,28 +65,16 @@ class GraphModeHandler:
 		"""
 		raise NotImplementedError
 
-	def standard_window(self, env) -> None:
-		"""ZStandard: reset this mode's own window variables (the shared bounds and
-		scales are reset by the caller)."""
-
 
 class FuncMode(GraphModeHandler):
-	"""Function mode: each Yn is sampled column-by-column as Y=f(X) (like DrawF)."""
+	"""Function mode: each Yn is sampled column-by-column as Y=f(X)."""
 
-	function_count = 10            # Y1–Y0
-
-	def plot(self, env):
-		for _, (eq,) in env.graph_functions.selected_defined(GraphMode.FUNC):
-			trace_curve(env, sample_function(env, lambda eq=eq: eq.eval(env)))
+	def _fns(self, env):
+		return env.function
 
 	def fit_bounds(self, env):
-		w = env.window
-		xmin = w.xmin
-		delta = (w.xmax - xmin) / MAX_COL
-		ys = []
-		for _, (eq,) in env.graph_functions.selected_defined(GraphMode.FUNC):
-			f = sample_function(env, lambda eq=eq: eq.eval(env))
-			ys += [y for i in range(MAX_COL + 1) if (y := f(xmin + i * delta)) is not None]
+		ys = [y for fn in env.function if fn.selected and fn.is_defined()
+		        for y in fn.fit_points(env)]
 		if not ys or min(ys) == max(ys):
 			raise WindowRangeError("ZoomFit: no Y range to fit")
 		return (None, None, min(ys), max(ys))   # Func keeps the current X range
@@ -90,36 +84,18 @@ class FuncMode(GraphModeHandler):
 
 
 class SweptMode(GraphModeHandler):
-	"""A path traced as a parameter advances (Parametric, Polar, Sequence).
+	"""Parametric, Polar, and Sequence modes: a path traced as a parameter advances.
 
-	Subclasses supply only point_fns (a sampler per selected, defined function) and
-	sweep_range (the window's start/stop/step); plot and fit_bounds are shared.
+	Subclasses supply only `_fns`, `standard_window`, and optionally `_pass`;
+	`fit_bounds` is shared here since all three modes return an (x, y) bounding box.
 	"""
 
-	def point_fns(self, env):
-		"""Yield a point(t) -> (x, y) | None callable for each selected, defined function."""
-		raise NotImplementedError
-
-	def sweep_range(self, env) -> tuple:
-		"""(start, stop, step) for the parameter sweep, from the window variables."""
-		raise NotImplementedError
-
-	def _pass(self, env):
-		"""Context manager active while points are evaluated (Seq owns the memo cache)."""
-		return nullcontext()
-
-	def plot(self, env):
-		start, stop, step = self.sweep_range(env)
-		with self._pass(env):
-			for point in self.point_fns(env):
-				trace_parametric(env, point, start, stop, step)
-
 	def fit_bounds(self, env):
-		start, stop, step = self.sweep_range(env)
 		pts = []
 		with self._pass(env):
-			for point in self.point_fns(env):
-				pts += [xy for t in _param_values(start, stop, step) if (xy := point(t)) is not None]
+			for fn in self._fns(env):
+				if fn.selected and fn.is_defined():
+					pts += fn.fit_points(env)
 		xs = [x for x, _ in pts]
 		ys = [y for _, y in pts]
 		if not pts or min(xs) == max(xs) or min(ys) == max(ys):
@@ -128,18 +104,10 @@ class SweptMode(GraphModeHandler):
 
 
 class ParMode(SweptMode):
-	"""Parametric mode: sweep T, plotting (XnT(T), YnT(T)); both halves must be defined."""
+	"""Parametric mode: sweep T, plotting (XnT(T), YnT(T))."""
 
-	function_count = 6             # X1T/Y1T – X6T/Y6T
-	equations_per_function = 2     # the X/Y pair (selected_defined yields it only when both are set)
-
-	def point_fns(self, env):
-		for _, (x_eq, y_eq) in env.graph_functions.selected_defined(GraphMode.PAR):
-			yield sample_parametric(env, lambda e=x_eq: e.eval(env), lambda e=y_eq: e.eval(env))
-
-	def sweep_range(self, env):
-		w = env.window
-		return w.tmin, w.tmax, w.tstep
+	def _fns(self, env):
+		return env.parametric
 
 	def standard_window(self, env):
 		w = env.window
@@ -150,15 +118,8 @@ class ParMode(SweptMode):
 class PolMode(SweptMode):
 	"""Polar mode: sweep θ, plotting (r·cosθ, r·sinθ)."""
 
-	function_count = 6             # r1–r6
-
-	def point_fns(self, env):
-		for _, (r_eq,) in env.graph_functions.selected_defined(GraphMode.POL):
-			yield sample_polar(env, lambda e=r_eq: e.eval(env))
-
-	def sweep_range(self, env):
-		w = env.window
-		return w.theta_min, w.theta_max, w.theta_step
+	def _fns(self, env):
+		return env.polar
 
 	def standard_window(self, env):
 		w = env.window
@@ -169,20 +130,12 @@ class PolMode(SweptMode):
 class SeqMode(SweptMode):
 	"""Sequence mode, Time plot: plot (n, s(n)) over n = PlotStart … nMax by PlotStep.
 
-	The whole sweep shares one memo cache (see Environment._sequence_pass) so a
-	recursive sequence is evaluated bottom-up rather than recomputed at every point.
-	Web and uv/vw/uvw phase plots aren't modeled — only the default Time plot.
+	The whole sweep shares one memo cache (env._sequence_pass) so a recursive sequence
+	is evaluated bottom-up rather than recomputed at every point.
 	"""
 
-	function_count = 3             # u, v, w
-
-	def point_fns(self, env):
-		for index, _ in env.graph_functions.selected_defined(GraphMode.SEQ):
-			yield sample_sequence(env, index)
-
-	def sweep_range(self, env):
-		w = env.window
-		return w.plot_start, w.n_max, w.plot_step
+	def _fns(self, env):
+		return env.sequence
 
 	def _pass(self, env):
 		return env._sequence_pass()
