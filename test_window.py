@@ -145,8 +145,8 @@ class TestTableVarsSeparated:
 		assert not hasattr(env.window, 'tbl_start')
 
 	def test_tbl_input_is_a_list_slot(self):
-		from core import ListVariable
-		assert isinstance(TableVars().tbl_input, ListVariable)
+		# TblInput is a plain TiList | None slot, defaulting to None (no token wires it yet).
+		assert TableVars().tbl_input is None
 
 
 class TestWiring:

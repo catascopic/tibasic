@@ -1,3 +1,5 @@
+Should invoke take an argparser? That way matrices could parse two args
+
 elif t.is_sequence_var()
 
 remove get/set from accessor
@@ -10,48 +12,10 @@ LegacyAccessor
 
 give variable holders repr methods to make env's repr easier
 
+move eval_sequence and stuff to other module
+
 
 Graph aren't regraphed every time graph is displayed. There should be a boolean flag in GraphScreen that starts as False and resets to False every time ClrDraw is called or a function changes. Whenever all functions finish graphing, this flag is set to True.
-
-I think I want to redo the variable system again! Originally I was using a flyweight system as I think I told you about, before moving to the current system. The old system was annoying because you kept having to pass env to every get/set call, but the current system is also annoying because you have to remember to do `.value` everywhere! Take a look at the zoom module, it's full of .values. Here's my new idea: basically, we'll unify nullaries and variables and also make a generic store-target and "callable with explicit parentheses" API. What pushed me over the edge was seeing how much code is muddied by .value, but also realizing that not just Sequence variables can be called with parentheses, but all types. It makes perfect sense that you can do Y1(5) instead of having to store 5 to X and then call Y1! Also, I've always felt like there could be a common pattern for how pi evaluates to 3.14... and variables also evaluate to a value.
-
-`Token` currently has these fields for interacting with the environment: operator, postfix, function, command, nullary, variable, converter. Converter isn't implemented yet, and this change won't touch operator/postfix or command.
-Let's get rid of nullary and add `resolve`. (Any ideas for a better name?)  All variables will implement resolve, as well as rand, pi, and other constants/0-arg functions.
-Let's add a new method, `store`. Again, all variables will implement this, plus rand. `dim(` probably still has to be a special case for storing.
-Finally, we'll add `call_with`. (Again, better name?) This is for tokens that have different behavior when used with an explicit opening parenthesis. `Ans` might still have to be a special case, but maybe not! Ideally, lists/matrices will implement this for indexing, but storing to an index will still be a special case, probably. (Any ideas of how to do this elegantly?)
-However, in catalog, we won't be explicitly setting all of these. I'm thinking the best way to adapt to these changes to make several new methods in catalog, such as `numeric_var(0x41, 'A')` which would set up all the store/resolve methods automatically, or `func_var(0x5E10, 1)` for Y1, which would set up store, resolve, and call_with.
-
-The only thing this doesn't cover is how variables are used when they're *referenced* (rather than dereferenced), such as in the `seq(` command, which takes as an argument an actual variable rather than its value. For this, we probably need an additional method called `reference`, which will create a lightweight Reference object.
-
-We could do everything through reference objects, for example `2*A` could be parsed as `2 * Ref(env.numerics, 'A').get()`, or `2 -> A` translates to `Ref(env.numerics, 'A').set(2)`, but I think it makes more sense to have a resolve method directly on the token that avoids creating the ref just to dereference it. We would only use references when a function/command takes one as input.
-
-Ref would have basic get/set methods that do no validation, and also store/resolve. The actual store/resolve logic would be part of a flyweight object that the reference object would use.
-
-Code for flyweight accessor:
-...
-
-This way, Xscl/Yscl/Xmax/Ymax wouldn't need any special handling, they'd just have a custom store method. In fact, they could even be virtual properties on the window object with getters and setters there, to ensure they never desynchronize even when they're set using the `set` method instead of `store`.
-
-One problem is that currently, lists and user lists can essentially use the same logic for storing. We might need to make some kind of proxy object for user lists.
- 
-What do you think of all this? It would be a big change. Are there any parts that you'd do differently?
-
-
-
-Ref
-
-
-
-
-As a bonus, we can get rid of that var() method for testing. Instead of doing `var(env, 'A')`, we can just do `env.numerics.A`!
-
-Y1(5)
-
-store_target
-callable
-resolve
-function
-command
 
 
 

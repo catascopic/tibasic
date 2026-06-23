@@ -7,11 +7,12 @@ from parser import ArgParser
 from preparse import special_func
 from titoken import Token
 from accessors import (
-	Accessor, NumericVar, MatrixVar, ListVar, StringVar,
-	ComputedAccessor, LegacyAccessor, RandAccessor,
+	NumericVar, MatrixVar, ListVar, StringVar,
+	ComputedAccessor, RandAccessor,
 	WindowVar, XresVar, IntWindowVar, FactorWindowVar, DeltaWindowVar,
-	EnvVar, TableVar,
+	EnvVar, TableVar, EquationVar, SequenceVar,
 )
+from modes import GraphMode
 import commands as cmds
 import distributions as dist
 import draw
@@ -87,9 +88,6 @@ def read_token(f: BytesIO) -> Token:
 		raise ValueError(f"Invalid token code: 0x{code:0{4 if code > 0xFF else 2}X}")
 
 
-def _make_accessor(table: str, index: int) -> Accessor:
-	"""LegacyAccessor for equation variable tables (function/parametric/polar/sequence)."""
-	return LegacyAccessor(lambda env: getattr(env, table)[index])
 
 
 def token(
@@ -106,15 +104,13 @@ def token(
 	cnv:  Callable | None = None,
 	var=None,
 ) -> Token:
-	# `res` (a 0-arg query: π, getKey, …) and `var` describe how the token reaches the
-	# environment; both collapse to a single Accessor.  `var` may already be an Accessor
-	# (from _make_accessor) or a bare (env)->Variable callable, which we wrap in the
-	# LegacyAccessor bridge.
+	# `res` (a 0-arg query: π, getKey, …) and `var` (an Accessor) describe how the
+	# token reaches the environment; both collapse to a single Accessor.
 	accessor = None
 	if res is not None:
 		accessor = ComputedAccessor(res)
 	elif var is not None:
-		accessor = var if isinstance(var, Accessor) else LegacyAccessor(var)
+		accessor = var
 	t = Token(code, display, bp, op, post, func, cmd, accessor, cnv)
 	_set_token(t)
 	ALL_TOKENS.append(t)
@@ -196,21 +192,21 @@ for _i in range(10):
 for _i in range(6):
 	token(0x5D00 | _i, bytes([0x4C, 0x81 + _i]), var=ListVar(_i))
 
-# Y₁ - Y₀
+# Y₁ - Y₀  (Func mode, stride=1 so func_index == eq_index)
 for _i in range(10):
-	token(0x5E10 + _i, bytes([0x59, 0x80 + (_i + 1) % 10]), var=_make_accessor('function', _i))
+	token(0x5E10 + _i, bytes([0x59, 0x80 + (_i + 1) % 10]), var=EquationVar(GraphMode.FUNC, _i, _i))
 
-# X₁ₜ/Y₁ₜ - X₆ₜ/Y₆ₜ
+# X₁ₜ/Y₁ₜ - X₆ₜ/Y₆ₜ  (Par mode, stride=2 so func_index = eq_index // 2)
 for _i in range(12):
-	token(0x5E20 + _i, bytes([0x58 + _i % 2, 0x81 + _i // 2, 0x0D]), var=_make_accessor('parametric', _i))
+	token(0x5E20 + _i, bytes([0x58 + _i % 2, 0x81 + _i // 2, 0x0D]), var=EquationVar(GraphMode.PAR, _i, _i // 2))
 
-# r₁ - r₆
+# r₁ - r₆  (Pol mode, stride=1)
 for _i in range(6):
-	token(0x5E40 + _i, bytes([0x72, 0x81 + _i]), var=_make_accessor('polar', _i))
+	token(0x5E40 + _i, bytes([0x72, 0x81 + _i]), var=EquationVar(GraphMode.POL, _i, _i))
 
-# 𝑢, 𝑣, 𝑤
+# 𝑢, 𝑣, 𝑤  (Seq mode)
 for _i in range(3):
-	token(0x5E80 + _i, bytes([0x02 + _i]), var=_make_accessor('sequence', _i))
+	token(0x5E80 + _i, bytes([0x02 + _i]), var=SequenceVar(_i))
 
 token(0x5F, b'prgm', cmd=cmds.prgm)
 

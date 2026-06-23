@@ -33,7 +33,7 @@ class TestStoreSelects:
 
 	def test_store_still_records_the_equation(self):
 		env = run('"2X"@ Y1')
-		assert isinstance(env.function[0].value, TiEquation)
+		assert isinstance(env.function[0], TiEquation)
 
 	def test_selection_survives_wrong_mode(self):
 		# Storing Y1 while in Polar mode still selects it — for when you return to Func.

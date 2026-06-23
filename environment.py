@@ -8,7 +8,7 @@ from typing import Any, ClassVar
 import math as _math
 
 from core import TiList, is_complex_val
-from core import ListVariable, EquationVariable, require_real, require_int, py_int
+from core import require_real, require_int, py_int
 from errors import TiError, DataTypeError, DomainError, IllegalNestError, InvalidCommandError, InvalidDimError, UndefinedError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graphscreen import GraphScreen
@@ -182,8 +182,8 @@ class Environment:
 		self.io = HomeScreenIO(value)
 		
 	# X/Y/T/θ are ordinary numeric variables; these return a bound Reference (which
-	# mirrors the old Variable surface — .value, .resolve(), .scoped()) so the graphers
-	# and CALC commands can read/write them without knowing the storage layout.
+	# exposes .value, .resolve(), .scoped()) so the graphers and CALC commands can
+	# read/write them without knowing the storage layout.
 	@property
 	def x(self):
 		return NumericVar('X').reference(self)
@@ -280,7 +280,7 @@ class Environment:
 		initial = gf.initial[index]
 		if initial is not None and k - n_min < len(initial.data):
 			return initial.data[k - n_min]
-		equation = gf.equations[GraphMode.SEQ][index].value
+		equation = gf.equations[GraphMode.SEQ][index]
 		if equation is None:
 			raise UndefinedError(f"Sequence {'uvw'[index]} is not defined")
 		key = (index, k)
@@ -502,7 +502,7 @@ class TableVars:
 	def __init__(self):
 		self.tbl_start: float | None = None   # TblStart
 		self.delta_tbl: float = 1.0           # ΔTbl
-		self.tbl_input = ListVariable()       # TblInput — a 7-element list
+		self.tbl_input = None                 # TblInput — a 7-element list (TiList | None)
 
 
 # ── Graph functions (the plottable equations + their on/off selection) ──────────
@@ -510,43 +510,34 @@ class TableVars:
 class GraphFunctions:
 	"""All plottable equations and their on/off selection, per graph mode.
 
-	Each mode keeps a flat list of EquationVariables in token order (Y1–Y0; X1T, Y1T,
-	X2T, …; r1–r6; u, v, w) — the view the catalog tokens index into — plus a list of
-	`selected` flags, one per *function*.  A function owns `equations_per_function`
-	consecutive equations: 1 for Func/Polar/Seq, 2 for a parametric X/Y pair.  So a
-	parametric pair shares one flag (storing to either half, or FnOn/FnOff on it, moves
-	the one flag), with no per-equation flags to keep in sync.
+	Each mode keeps a flat list of `TiEquation | None` in token order (Y1–Y0;
+	X1T, Y1T, X2T, …; r1–r6; u, v, w) — the view `EquationVar`/`SequenceVar`
+	accessors index into — plus a list of `selected` flags, one per *function*.
+	A function owns `equations_per_function` consecutive equations: 1 for
+	Func/Polar/Seq, 2 for a parametric X/Y pair.  So a parametric pair shares
+	one flag (storing to either half, or FnOn/FnOff on it, moves the one flag),
+	with no per-equation flags to keep in sync.
 
-	Selection lives here rather than on the EquationVariables, so it survives a mode
-	switch (storing Y1 in Polar mode selects it for when you return to Function mode).
-	Per-mode layout (function count, equations per function) comes from the graph-mode
-	handlers (see graphmodes.py), keeping all mode-shape knowledge in one place.
+	Selection lives here rather than on the equations, so it survives a mode
+	switch (storing Y1 in Polar mode selects it for when you return to Function
+	mode).  Per-mode layout (function count, equations per function) comes from
+	the graph-mode handlers (see graphmodes.py), keeping all mode-shape
+	knowledge in one place.
 	"""
 
 	def __init__(self):
-		self.equations = {}      # mode -> flat list of EquationVariable (token order)
+		self.equations = {}      # mode -> list[TiEquation | None] (flat, token order)
 		self.selected = {}       # mode -> list[bool], one flag per function
 		for mode, handler in GRAPH_MODE_HANDLERS.items():
-			stride = handler.equations_per_function
 			self.selected[mode] = [False] * handler.function_count
-			self.equations[mode] = [
-				EquationVariable(on_store=self._selector(mode, i // stride))
-				for i in range(handler.function_count * stride)
-			]
+			self.equations[mode] = [None] * (handler.function_count * handler.equations_per_function)
 		# Recursive-sequence initial values u(nMin)/v(nMin)/w(nMin): a TiList per
 		# sequence (index 0/1/2), or None.  No user variable / token addresses these —
 		# they live here, set via {…}→u(nMin) and read via u(nMin).
 		self.initial = [None, None, None]
 
-	def _selector(self, mode, func_index):
-		"""The on_store callback for an equation: select the function it belongs to."""
-		def select():
-			self.selected[mode][func_index] = True
-		return select
-
 	def variables(self, mode: GraphMode) -> list:
-		"""Flat list of a mode's equation variables, in token order — the view the
-		catalog tokens index into."""
+		"""Flat list of a mode's equations (TiEquation | None), in token order."""
 		return self.equations[mode]
 
 	def selected_defined(self, mode: GraphMode):
@@ -557,7 +548,7 @@ class GraphFunctions:
 		eqs = self.equations[mode]
 		for f, sel in enumerate(self.selected[mode]):
 			if sel:
-				values = [eqs[f * stride + k].value for k in range(stride)]
+				values = [eqs[f * stride + k] for k in range(stride)]
 				if all(v is not None for v in values):
 					yield f, values
 

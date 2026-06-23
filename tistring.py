@@ -1,6 +1,6 @@
 from core import TiString, TiEquation, require_num, require_string, py_int
 from preparse import preparse_func, preparse_cmd_func, special_func, Real, Env, StringVar, EquationVar
-from errors import DomainError, InvalidDimError, TiSyntaxError
+from errors import DomainError, InvalidDimError, TiSyntaxError, UndefinedError
 from parser import ArgParser, Parser
 
 
@@ -54,8 +54,15 @@ def expr(env: Env, string: TiString):
 
 @preparse_cmd_func
 def equ_to_string(equ_var: EquationVar, str_var: StringVar) -> None:
-	"""Equ►String(equvar, strvar) — copy the equation's tokens into a string variable."""
-	str_var.value = TiString(equ_var.resolve().tokens)
+	"""Equ►String(equvar, strvar) — copy the equation's tokens into a string variable.
+
+	Reads the equation as *data* (the raw formula via get), not as a value: resolving
+	an equation evaluates it, which is precisely the conversion this command sidesteps.
+	"""
+	equ = equ_var.get()
+	if equ is None:
+		raise UndefinedError("Equation is not defined")
+	str_var.value = TiString(equ.tokens)
 
 
 @preparse_cmd_func

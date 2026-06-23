@@ -13,8 +13,9 @@ Examples:
 import argparse
 import sys
 
-from core import TiString
+from core import TiEquation, TiString
 from environment import Environment
+from modes import GraphMode
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -44,15 +45,18 @@ def main(argv=None) -> int:
 
 	env = Environment()
 	w = env.window
-	w.xmin.value, w.xmax.value = args.xmin, args.xmax
-	w.ymin.value, w.ymax.value = args.ymin, args.ymax
-	w.xscl.value, w.yscl.value = args.xscl, args.yscl
+	w.xmin, w.xmax = args.xmin, args.xmax
+	w.ymin, w.ymax = args.ymin, args.ymax
+	w.xscl, w.yscl = args.xscl, args.yscl
 	env.axes_on = args.axes
 	env.grid_on = args.grid
 
 	# Plot Y1=X and Y2=X²; storing each equation also selects it for graphing.
-	env.function[0].store(TiString.from_str('X'))
-	env.function[1].store(TiString.from_str('X^2'))
+	gf = env.graph_functions
+	gf.equations[GraphMode.FUNC][0] = TiEquation(TiString.from_str('X').tokens)
+	gf.equations[GraphMode.FUNC][1] = TiEquation(TiString.from_str('X^2').tokens)
+	gf.selected[GraphMode.FUNC][0] = True
+	gf.selected[GraphMode.FUNC][1] = True
 
 	env.display_graph()   # set the graph as active and re-plot (axes/grid/functions)
 

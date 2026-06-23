@@ -35,7 +35,7 @@ from functools import update_wrapper
 from typing import Any, Callable
 
 from core import (
-	Variable, Thunk,
+	Thunk,
 	TiList, TiMatrix, TiString,
 	vectorize, matrix_vectorize,
 	require_num, require_real,
@@ -43,6 +43,7 @@ from core import (
 	require_matrix, require_string, require_list_or_matrix,
 	require_vectorizable, require_vectorizable_real, require_matrix_vectorizable,
 )
+from accessors import Reference
 from environment import Environment
 from errors import TiSyntaxError
 from parser import ArgParser
@@ -75,14 +76,14 @@ type Vectorized = Numeric
 type VectorizedReal = Real
 type MatrixVectorized = Real
 
-# Variable references: All alias Variable but select different parse methods.
-type NumericVar = Variable
-type ListVar = Variable
-type MatrixVar = Variable
-type StringVar = Variable
-type EquationVar = Variable
-type AnyVar = Variable
-type ListVarPrefixOptional = Variable
+# Variable references: All alias Reference but select different parse methods.
+type NumericVar = Reference
+type ListVar = Reference
+type MatrixVar = Reference
+type StringVar = Reference
+type EquationVar = Reference
+type AnyVar = Reference
+type ListVarPrefixOptional = Reference
 
 # Names and environment
 type LabelName = str

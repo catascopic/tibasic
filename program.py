@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from core import Variable, Thunk, require_real
+from core import Thunk, require_real
+from accessors import Reference
 from environment import Environment, ReturnSignal
 from errors import TiSyntaxError, IncrementError, LabelError
 from titoken import THEN, ELSE, LBL
@@ -92,7 +93,7 @@ class Execution:
 	def begin_repeat(self, condition: Thunk):
 		self.push_block(RepeatBlock(self._parser.pos, condition))
 
-	def begin_for(self, var: Variable, start: float, end: float, step: float):
+	def begin_for(self, var: Reference, start: float, end: float, step: float):
 		var.value = start
 		if check_for_condition(start, end, step):
 			self.push_block(ForBlock(self._parser.pos, var, end, step))
@@ -108,12 +109,12 @@ class Execution:
 		else:
 			self._block_stack.pop()
 
-	def is_gt(self, var: Variable, threshold: float):
+	def is_gt(self, var: Reference, threshold: float):
 		var.value = require_real(var.resolve()) + 1
 		if var.value > threshold:
 			self._parser.skip_statement()
 
-	def ds_lt(self, var: Variable, threshold: float):
+	def ds_lt(self, var: Reference, threshold: float):
 		var.value = require_real(var.resolve()) - 1
 		if var.value < threshold:
 			self._parser.skip_statement()
@@ -165,7 +166,7 @@ class LoopBlock(Block, ABC):
 
 @dataclass
 class ForBlock(LoopBlock):
-	var: Variable
+	var: Reference
 	end: float
 	step: float
 

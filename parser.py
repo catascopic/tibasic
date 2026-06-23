@@ -12,8 +12,8 @@ from titoken import (
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
 from environment import Environment
-from core import Variable, Thunk, UserList, py_int, require_num, require_real
-from accessors import LegacyAccessor
+from core import Thunk, py_int, require_num, require_real
+from accessors import Reference, UserListVar
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError
 
 
@@ -341,23 +341,12 @@ class Parser:
 				val = val[self.parse_matrix_indices()]
 			return val
 
-		if t.is_sequence_var():
-			# u(expr) evaluates the sequence at index expr (n-1, nMin, a literal, …);
-			# a bare u evaluates it at the current n.  Unlike other equation variables,
-			# a sequence isn't auto-evaluated — the parenthesized index is a call, not
-			# implicit multiplication.
-			if self.eat_if(L_PAREN):
-				index = self.parse_expr()
-				self.eat_if(R_PAREN)
-			else:
-				index = self.env.n
-			return self.env.eval_sequence(t.sequence_index(), index)
-
 		if t.accessor is not None:
-			value = t.accessor.resolve(self.env)
-			if t.is_equation_var():
-				value = value.eval(self.env)
-			return value
+			if t.accessor.invocable and self.eat_if(L_PAREN):
+				arg = self.parse_expr()
+				self.eat_if(R_PAREN)
+				return t.accessor.invoke(self.env, arg)
+			return t.accessor.invoke(self.env)
 
 		raise TiSyntaxError(f"Unexpected token in expression: {t}")
 
@@ -457,7 +446,7 @@ class Parser:
 			self.advance()                # (
 			self.parse_expr()             # nMin — not used; storing sets the whole list
 			self.eat_if(R_PAREN)
-			self.env.store_sequence_initial(t.sequence_index(), value)
+			t.accessor.store_initial(self.env, value)
 
 		elif t.accessor is not None:
 			# Plain variable, finance var, or rand (RandAccessor.store seeds the RNG).
@@ -469,7 +458,7 @@ class Parser:
 		else:
 			raise TiSyntaxError(f"Invalid store target: {t}")
 
-	def parse_store_list(self, var: Variable, value):
+	def parse_store_list(self, var: Reference, value):
 		if self.eat_if(L_PAREN):
 			index = self.parse_list_index()
 			if var.value is None:
@@ -510,10 +499,10 @@ class Parser:
 		raise TiSyntaxError(f"Expected a list variable, got {t}")
 
 	def parse_user_list(self):
-		# Bridge to the existing UserList Variable (dict-backed by name) via a Reference,
-		# so user lists share the same accessor/Reference surface as everything else.
+		# A user list (dict-backed by name) shares the same accessor/Reference surface
+		# as everything else, so store/resolve/dim go through the common code paths.
 		name = self.read_name(5)
-		return LegacyAccessor(lambda env: UserList(env, name)).reference(self.env)
+		return UserListVar(name).reference(self.env)
 
 	# SKIPPING
 
@@ -702,12 +691,12 @@ class ArgParser:
 	@_parse_arg
 	def equation_var(self) -> "Reference":
 		t = self._parser.advance()
-		if t.is_equation_var():
+		if t.accessor is not None and t.accessor.invocable:
 			return t.accessor.reference(self.env)
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
 	@_parse_arg
-	def list_var_prefix_optional(self) -> Variable:
+	def list_var_prefix_optional(self) -> Reference:
 		"""Read a list variable: L1–L6, ᴸNAME, or a bare user-list name without the ᴸ prefix.
 
 		SetUpEditor accepts all three forms; ordinary list contexts require the prefix.

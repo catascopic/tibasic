@@ -3,23 +3,25 @@
 An `Accessor` is a stateless flyweight that knows *how* to get/set one symbol — a
 numeric variable, a list, π, rand, a window setting — in any Environment.  A Token
 holds one (`Token.accessor`), and the parser calls `resolve`/`store` on it directly,
-passing the environment, so there's no per-environment Variable object to allocate and
+passing the environment, so there's no per-environment variable object to allocate and
 no `env` threaded through every call site.
 
 When a command needs to *hold* a variable rather than its value (For, fnInt, Input,
 DelVar, …), `Accessor.reference(env)` binds the accessor to an environment as a
-`Reference`.  A Reference deliberately mirrors the old Variable surface (`resolve`,
-`store`, `delete`, `scoped`, and a `.value` get/set) so those commands keep working
-while the underlying storage migrates.
+`Reference`.  A Reference exposes a small mutable-variable surface (`resolve`,
+`store`, `delete`, `scoped`, and a `.value` get/set) so those commands can treat any
+symbol uniformly.
 
-Numeric, matrix, list, string, window, TVM, and table variables all have dedicated
-accessor types.  Equation variables and user-defined lists still use `core.Variable`
-objects reached through the `LegacyAccessor` bridge.
+Every symbol has a dedicated accessor type — numeric, matrix, list, string,
+user-list, equation, sequence, window, TVM, and table variables — so values live
+directly in the Environment with no wrapper objects.
 """
 from contextlib import contextmanager
 
 from core import require_num, require_matrix, require_list, require_string, require_real, require_int
-from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError
+from core import TiString, TiEquation
+from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, DataTypeError
+from modes import GraphMode
 
 
 class Accessor:
@@ -29,9 +31,16 @@ class Accessor:
 	`resolve`/`store` are the validating, user-facing operations (auto-init, type
 	checks); `get`/`set` are the raw, unchecked accessors used internally (e.g. by
 	`scoped`).  By default `get`/`set` fall back to `resolve`/`store`.
+
+	`invoke(env, *args)` is the expression-context read: `resolve(env)` plus an
+	optional call argument.  The default ignores args and returns `resolve(env)`;
+	equation and sequence accessors override it so `Y1(x)` / `u(n)` resolve at an
+	explicit argument.  Set `invocable = True` on any subclass that wants the
+	parser to look for a trailing `(expr)`.
 	"""
 
-	kind = None     # a discriminator for callers that must branch on type (e.g. Input: 'string')
+	kind = None       # discriminator for callers that branch on type (e.g. Input: 'string')
+	invocable = False # True for EquationVar and SequenceVar: parser checks for (arg)
 
 	def resolve(self, env):
 		raise NotImplementedError
@@ -39,11 +48,8 @@ class Accessor:
 	def store(self, env, value):
 		raise TiSyntaxError("Invalid store target")
 
-	def get(self, env):
+	def invoke(self, env, *args):
 		return self.resolve(env)
-
-	def set(self, env, value):
-		self.store(env, value)
 
 	def delete(self, env):
 		pass
@@ -54,8 +60,8 @@ class Accessor:
 
 class Reference:
 	"""An accessor bound to an environment — what commands receive when they take a
-	variable rather than its value.  Mirrors the old Variable surface so consumers
-	(For/fnInt/Input/DelVar/…) need no changes."""
+	variable rather than its value.  Exposes a uniform mutable-variable surface so
+	consumers (For/fnInt/Input/DelVar/…) work the same for every symbol kind."""
 
 	__slots__ = ('env', 'accessor')
 
@@ -158,36 +164,48 @@ class RandAccessor(Accessor):
 		env.set_random_seed(value)
 
 
-class LegacyAccessor(Accessor):
-	"""Bridge to a not-yet-converted core.Variable object (lists, matrices, strings,
-	equations, window vars).  `lookup(env)` returns the Variable; everything forwards
-	to it.  `kind` lets callers that must discriminate (Input: string vs numeric) do
-	so without isinstance on the storage class.
+class UserListVar(Accessor):
+	"""A user-defined list ᴸNAME — a dict slot in env.user_lists, keyed by name.
+
+	Mirrors ListVar, but the storage is a name-keyed dict (no fixed slots) so an
+	undefined list is simply an absent key.  Preserves the complex flag of the
+	previous value on store.
 	"""
 
-	__slots__ = ('lookup', 'kind')
+	__slots__ = ('name',)
 
-	def __init__(self, lookup, kind=None):
-		self.lookup = lookup   # (env) -> core.Variable
-		self.kind = kind
-
-	def resolve(self, env):
-		return self.lookup(env).resolve()
-
-	def store(self, env, value):
-		self.lookup(env).store(value)
+	def __init__(self, name: str):
+		self.name = name
 
 	def get(self, env):
-		return self.lookup(env).value
+		return env.user_lists.get(self.name)
 
 	def set(self, env, value):
-		self.lookup(env).value = value
+		env.user_lists[self.name] = value
+
+	def resolve(self, env):
+		try:
+			value = env.user_lists[self.name]
+		except KeyError:
+			raise UndefinedError(f"User list {self.name!r} is not defined")
+		if not value.data:
+			raise InvalidDimError("empty list")
+		return value
+
+	def store(self, env, value):
+		lst = require_list(value)
+		current = self.get(env)
+		was_complex = current is not None and current.is_complex
+		new_value = lst.copy()
+		if was_complex:
+			new_value._upgrade_to_complex()
+		self.set(env, new_value)
 
 	def delete(self, env):
-		self.lookup(env).delete()
+		env.user_lists.pop(self.name, None)
 
 	def __repr__(self):
-		return f"LegacyAccessor(kind={self.kind!r})"
+		return f"UserListVar({self.name!r})"
 
 
 class MatrixVar(Accessor):
@@ -439,3 +457,108 @@ class TableVar(Accessor):
 
 	def __repr__(self):
 		return f"TableVar({self.attr!r})"
+
+
+def _normalize_eq(value) -> TiEquation:
+	"""Coerce a TiString or TiEquation to TiEquation; raise DataTypeError otherwise."""
+	if isinstance(value, TiString):
+		return TiEquation(value.tokens)
+	if isinstance(value, TiEquation):
+		return value
+	raise DataTypeError(f"Expected equation or string, got {value!r}")
+
+
+class EquationVar(Accessor):
+	"""A graph equation (Y1–Y0, X1T/Y1T–X6T/Y6T, r1–r6).
+
+	An equation is not one of TI's runtime value types, so reading it as a value
+	(`resolve`) evaluates the formula at the current X.  `invoke(env, x_val)` is
+	function composition — resolve with X temporarily set to x_val.  The raw
+	`TiEquation` is reachable only through `get`/`set`, which is why copying a
+	formula out (Equ►String) needs a dedicated command.  `store` normalises a
+	string/equation and selects the function.
+	"""
+
+	__slots__ = ('mode', 'eq_index', 'func_index')
+	invocable = True
+
+	def __init__(self, mode: GraphMode, eq_index: int, func_index: int):
+		self.mode = mode
+		self.eq_index = eq_index
+		self.func_index = func_index
+
+	def get(self, env):
+		return env.graph_functions.equations[self.mode][self.eq_index]
+
+	def set(self, env, value):
+		env.graph_functions.equations[self.mode][self.eq_index] = value
+
+	def resolve(self, env):
+		eq = self.get(env)
+		if eq is None:
+			raise UndefinedError("Equation is not defined")
+		return eq.eval(env)
+
+	def invoke(self, env, *args):
+		if not args:
+			return self.resolve(env)
+		saved_x = env.numerics.X
+		env.numerics.X = require_num(args[0])
+		try:
+			return self.resolve(env)
+		finally:
+			env.numerics.X = saved_x
+
+	def store(self, env, value):
+		self.set(env, _normalize_eq(value))
+		env.graph_functions.selected[self.mode][self.func_index] = True
+
+	def delete(self, env):
+		self.set(env, None)
+
+	def __repr__(self):
+		return f"EquationVar({self.mode.name}, {self.eq_index}, {self.func_index})"
+
+
+class SequenceVar(Accessor):
+	"""A recursive sequence variable 𝑢/𝑣/𝑤.
+
+	Reading it as a value (`resolve`) evaluates the sequence at the current n;
+	`invoke(env, n_val)` evaluates at an explicit index.  The raw `TiEquation` is
+	reachable through `get`/`set`; `store_initial` handles the `{…}→u(nMin)`
+	initial-value store path.
+	"""
+
+	__slots__ = ('seq_index',)
+	invocable = True
+
+	def __init__(self, seq_index: int):
+		self.seq_index = seq_index
+
+	def get(self, env):
+		return env.graph_functions.equations[GraphMode.SEQ][self.seq_index]
+
+	def set(self, env, value):
+		env.graph_functions.equations[GraphMode.SEQ][self.seq_index] = value
+
+	def resolve(self, env):
+		return env.eval_sequence(self.seq_index, env.n)
+
+	def invoke(self, env, *args):
+		if not args:
+			return self.resolve(env)
+		return env.eval_sequence(self.seq_index, args[0])
+
+	def store(self, env, value):
+		self.set(env, _normalize_eq(value))
+		env.graph_functions.selected[GraphMode.SEQ][self.seq_index] = True
+
+	def store_initial(self, env, value):
+		"""Handle `{…}→u(nMin)`: store the sequence's initial-value list."""
+		env.store_sequence_initial(self.seq_index, value)
+
+	def delete(self, env):
+		self.set(env, None)
+
+	def __repr__(self):
+		return f"SequenceVar({self.seq_index})"

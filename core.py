@@ -1,4 +1,4 @@
-"""Runtime value types, validators, and the Variable hierarchy.
+"""Runtime value types and validators.
 
 Imports only from errors and titoken so nothing in the graph can cycle back here.
 """
@@ -6,9 +6,7 @@ from __future__ import annotations
 
 import builtins
 import operator
-from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
 from itertools import repeat
@@ -508,98 +506,6 @@ def matrix_vectorize(func: Callable) -> Callable:
 				return a.transform(lambda x, j=i: apply(*args[:j], x, *args[j + 1:]))
 		return call_vectorized(func, args)
 	return apply
-
-
-# ── Variable hierarchy ────────────────────────────────────────────────────────
-
-class Variable(ABC):
-	value = None  # class-level sentinel; instance writes shadow it
-
-	def resolve(self) -> Any:
-		if self.value is None:
-			raise UndefinedError(f"Undefined {type(self).__name__}")
-		return self.value
-
-	def store(self, new_value) -> None:
-		self.value = self.normalize(new_value)
-
-	def delete(self) -> None:
-		"""Clear this variable (DelVar).  Most variables just drop their value;
-		those backed by external storage (e.g. UserList) override this."""
-		self.value = None
-
-	@abstractmethod
-	def normalize(self, value) -> Any:
-		pass
-
-	def __repr__(self):
-		return f"{type(self).__name__}({self.value})"
-
-
-class ListVariable(Variable):
-	def resolve(self):
-		lst = super().resolve()
-		if not lst.data:
-			raise InvalidDimError("empty list")
-		return lst
-
-	def normalize(self, value):
-		return require_list(value).copy()
-
-	def store(self, new_value) -> None:
-		was_complex = self.value is not None and self.value.is_complex
-		self.value = self.normalize(new_value)
-		if was_complex:
-			self.value._upgrade_to_complex()
-
-
-class UserList(ListVariable):
-
-	def __init__(self, env: Environment, name: str):
-		self.lookup = env.user_lists
-		self.name = name
-
-	@property
-	def value(self):
-		return self.lookup.get(self.name)
-
-	@value.setter
-	def value(self, new_value):
-		self.lookup[self.name] = new_value
-
-	def delete(self) -> None:
-		self.lookup.pop(self.name, None)
-
-	def resolve(self) -> Any:
-		try:
-			lst = self.lookup[self.name]
-		except KeyError:
-			raise UndefinedError(f"User list {self.name!r} is not defined")
-		if not lst.data:
-			raise InvalidDimError("empty list")
-		return lst
-
-
-class EquationVariable(Variable):
-	"""A graph equation (Y1, X1T, r1, u, …).  Its on/off selection lives outside the
-	variable (see environment.GraphFunctions); `on_store`, if given, is called after a
-	successful store so storing an equation can re-select its function, matching the
-	calculator."""
-
-	def __init__(self, on_store=None):
-		self._on_store = on_store
-
-	def normalize(self, value):
-		if isinstance(value, TiString):
-			return TiEquation(value.tokens)
-		if isinstance(value, TiEquation):
-			return value
-		raise DataTypeError(f"Expected equation or string, got {value!r}")
-
-	def store(self, new_value) -> None:
-		super().store(new_value)
-		if self._on_store is not None:
-			self._on_store()
 
 
 # ── Thunk ─────────────────────────────────────────────────────────────────────

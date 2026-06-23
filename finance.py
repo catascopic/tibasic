@@ -116,9 +116,9 @@ def irr(cf0: Real, cflist: TiList, cffreq: TiList = None):
 
 def _bal(env, n, roundvalue=None):
 	"""Balance after n payments, using TVM variables from env."""
-	r = env.i_pct.resolve() / 100
-	pv = env.pv.resolve()
-	pmt = env.pmt.resolve()
+	r = env.i_pct / 100
+	pv = env.pv
+	pmt = env.pmt
 	if roundvalue is not None:
 		b = pv
 		for _ in range(n):
@@ -162,7 +162,7 @@ def sigma_int(env: Env, n1: Real, n2: Real, roundvalue: Real = None):
 	if n1 < 1 or n2 < 0:
 		raise DomainError("ΣInt: payment numbers must be positive")
 	sprn = _bal(env, n2, roundvalue) - _bal(env, n1 - 1, roundvalue)
-	return (n2 - n1 + 1) * env.pmt.resolve() - sprn
+	return (n2 - n1 + 1) * env.pmt - sprn
 
 
 @preparse_func
@@ -219,28 +219,28 @@ def _factors(r: float, n: float) -> tuple[float, float]:
 
 def tvm_pmt_value(env) -> float:
 	"""Payment amount from the stored finance variables (the bare tvm_Pmt)."""
-	v, a = _factors(env.i_pct.resolve() / 100, env.n_tvm.resolve())
+	v, a = _factors(env.i_pct / 100, env.n_tvm)
 	if a == 0:
 		raise DomainError("tvm_Pmt: N must be nonzero")
-	return -(env.pv.resolve() + env.fv.resolve() * v) / a
+	return -(env.pv + env.fv * v) / a
 
 
 def tvm_pv_value(env) -> float:
 	"""Present value from the stored finance variables (the bare tvm_PV)."""
-	v, a = _factors(env.i_pct.resolve() / 100, env.n_tvm.resolve())
-	return -(env.pmt.resolve() * a + env.fv.resolve() * v)
+	v, a = _factors(env.i_pct / 100, env.n_tvm)
+	return -(env.pmt * a + env.fv * v)
 
 
 def tvm_fv_value(env) -> float:
 	"""Future value from the stored finance variables (the bare tvm_FV)."""
-	v, a = _factors(env.i_pct.resolve() / 100, env.n_tvm.resolve())
-	return -(env.pv.resolve() + env.pmt.resolve() * a) / v
+	v, a = _factors(env.i_pct / 100, env.n_tvm)
+	return -(env.pv + env.pmt * a) / v
 
 
 def tvm_n_value(env) -> float:
 	"""Number of payment periods from the stored finance variables (the bare tvm_N)."""
-	r = env.i_pct.resolve() / 100
-	pv, pmt, fv = env.pv.resolve(), env.pmt.resolve(), env.fv.resolve()
+	r = env.i_pct / 100
+	pv, pmt, fv = env.pv, env.pmt, env.fv
 	if r == 0:
 		if pmt == 0:
 			raise DomainError("tvm_N: PMT must be nonzero when I%=0")
@@ -259,7 +259,7 @@ def tvm_i_pct_value(env) -> float:
 	I% has no closed form, so the TVM residual is bracketed (scanning outward from
 	just above −100% per period, widening the step) and then bisected.
 	"""
-	n, pv, pmt, fv = env.n_tvm.resolve(), env.pv.resolve(), env.pmt.resolve(), env.fv.resolve()
+	n, pv, pmt, fv = env.n_tvm, env.pv, env.pmt, env.fv
 
 	def f(r):
 		if builtins.abs(r) < 1e-12:
@@ -301,12 +301,12 @@ def tvm_i_pct_value(env) -> float:
 
 def _apply_tvm(env, *, n=None, i_pct=None, pv=None, pmt=None, fv=None, py=None, cy=None) -> None:
 	"""Overwrite the stored finance variables with any explicitly-passed arguments."""
-	for value, variable in (
-		(n, env.n_tvm), (i_pct, env.i_pct), (pv, env.pv),
-		(pmt, env.pmt), (fv, env.fv), (py, env.py), (cy, env.cy),
+	for value, attr in (
+		(n, 'n_tvm'), (i_pct, 'i_pct'), (pv, 'pv'),
+		(pmt, 'pmt'), (fv, 'fv'), (py, 'py'), (cy, 'cy'),
 	):
 		if value is not None:
-			variable.store(value)
+			setattr(env, attr, require_real(value))
 
 
 @preparse_func
