@@ -7,8 +7,8 @@ from parser import ArgParser
 from preparse import special_func
 from titoken import Token
 from accessors import (
-	NumericVar, MatrixVar, ListVar, StringVar,
-	ComputedAccessor, RandAccessor,
+	Accessor, NumericVar, MatrixVar, ListVar, StringVar,
+	Computed, Constant,
 	WindowVar, XresVar, IntWindowVar, FactorWindowVar, DeltaWindowVar,
 	EnvVar, TableVar, EquationVar, FuncEquationVar, ParEquationVar, PolarEquationVar, SequenceVar, SequenceInitialVar,
 )
@@ -87,8 +87,6 @@ def read_token(f: BytesIO) -> Token:
 		raise ValueError(f"Invalid token code: 0x{code:0{4 if code > 0xFF else 2}X}")
 
 
-
-
 def token(
 	code: int,
 	display: bytes,
@@ -99,18 +97,11 @@ def token(
 	post: Callable | None = None,
 	func: Callable | None = None,
 	cmd:  Callable | None = None,
-	res:  Callable | None = None,
 	cnv:  Callable | None = None,
-	var=None,
+	var:  Accessor | None = None,
 ) -> Token:
-	# `res` (a 0-arg query: π, getKey, …) and `var` (an Accessor) describe how the
-	# token reaches the environment; both collapse to a single Accessor.
-	accessor = None
-	if res is not None:
-		accessor = ComputedAccessor(res)
-	elif var is not None:
-		accessor = var
-	t = Token(code, display, bp, op, post, func, cmd, accessor, cnv)
+
+	t = Token(code, display, bp, op, post, func, cmd, var, cnv)
 	_set_token(t)
 	ALL_TOKENS.append(t)
 	if typeable:
@@ -160,7 +151,7 @@ token(0x28, b'fMax(',                   func=timath.f_max)
 token(0x29, b' ',                       typeable=True)
 token(tk.QUOTE, b'"',                   typeable=True)
 token(tk.COMMA, b',',                   typeable=True)
-token(0x2C, b'\xd7',                    res=lambda env: 1j, typeable=True)  # 𝑖
+token(0x2C, b'\xd7',                    var=Constant(1j), typeable=True)  # 𝑖
 token(0x2D, b'!',                       post=ops.factorial, typeable=True)
 token(0x2E, b'CubicReg ')
 token(0x2F, b'QuartReg ')
@@ -283,12 +274,12 @@ token(0x6300, b'ZXscl',                 var=WindowVar('zxscl'))
 token(0x6301, b'ZYscl',                 var=WindowVar('zyscl'))
 token(0x6302, b'Xscl',                  var=WindowVar('xscl'))
 token(0x6303, b'Yscl',                  var=WindowVar('yscl'))
-token(0x6304, b'\x02(nMin)',            var=SequenceInitialVar(0))   # u(nMin)
-token(0x6305, b'\x03(nMin)',            var=SequenceInitialVar(1))   # v(nMin)
+token(0x6304, b'\x02(nMin)',            var=SequenceInitialVar(0))   # 𝑢(nMin)
+token(0x6305, b'\x03(nMin)',            var=SequenceInitialVar(1))   # 𝑣(nMin)
 token(0x6306, b'\x02(n-1)')             # u(n-1)
 token(0x6307, b'\x03(n-1)')             # v(n-1)
-token(0x6308, b'Z\x02(nMin)',           var=SequenceInitialVar(0))  # Zu(nMin) — same slot, zoom-window alias
-token(0x6309, b'Z\x03(nMin)',           var=SequenceInitialVar(1))  # Zv(nMin)
+token(0x6308, b'Z\x02(nMin)',           var=SequenceInitialVar(0))  # Z𝑢(nMin) — same slot, zoom-window alias
+token(0x6309, b'Z\x03(nMin)',           var=SequenceInitialVar(1))  # Z𝑣(nMin)
 token(0x630A, b'Xmin',                  var=WindowVar('xmin'))
 token(0x630B, b'Xmax',                  var=WindowVar('xmax'))
 token(0x630C, b'Ymin',                  var=WindowVar('ymin'))
@@ -312,9 +303,9 @@ token(0x631D, b'nMax',                  var=IntWindowVar('n_max'))
 token(0x631E, b'ZnMax',                 var=IntWindowVar('zn_max'))
 token(0x631F, b'nMin',                  var=IntWindowVar('n_min'))
 token(0x6320, b'ZnMin',                 var=IntWindowVar('zn_min'))
-token(0x6321, b'\xbeTbl',               var=TableVar('delta_tbl'))       # ΔTbl
+token(0x6321, b'\xbeTbl',               var=TableVar('delta_tbl'))     # ΔTbl
 token(0x6322, b'Tstep',                 var=WindowVar('tstep'))
-token(0x6323, b'\x5bstep',              var=WindowVar('theta_step'))    # θstep
+token(0x6323, b'\x5bstep',              var=WindowVar('theta_step'))   # θstep
 token(0x6324, b'ZTstep',                var=WindowVar('ztstep'))
 token(0x6325, b'Z\x5bstep',             var=WindowVar('ztheta_step'))  # Zθstep
 token(0x6326, b'\xbeX',                 var=DeltaWindowVar('xmin', 'xmax', 94))  # ΔX
@@ -329,8 +320,8 @@ token(0x632E, b'PMT',                   var=EnvVar('pmt'))
 token(0x632F, b'FV',                    var=EnvVar('fv'))
 token(0x6330, b'P/Y',                   var=EnvVar('py'))
 token(0x6331, b'C/Y',                   var=EnvVar('cy'))
-token(0x6332, b'\x04(nMin)', var=SequenceInitialVar(2))   # w(nMin)
-token(0x6333, b'Z\x04(nMin)', var=SequenceInitialVar(2))  # Zw(nMin)
+token(0x6332, b'\x04(nMin)',            var=SequenceInitialVar(2))  # 𝑤(nMin)
+token(0x6333, b'Z\x04(nMin)',           var=SequenceInitialVar(2))  # Z𝑤(nMin)
 token(0x6334, b'PlotStep',              var=WindowVar('plot_step'))
 token(0x6335, b'ZPlotStep',             var=WindowVar('zplot_step'))
 token(0x6336, b'Xres',                  var=XresVar('xres'))
@@ -386,7 +377,7 @@ token(0x7E10, b'uvAxes')
 token(0x7E11, b'vwAxes')
 token(0x7E12, b'uwAxes')
 
-token(0x7F, b'\x0a')    # ▫
+token(0x7F, b'\x0a')  # ▫
 token(0x80, b'\x0b')  # ﹢
 token(0x81, b'\x0c')  # ·
 token(0x82, b'*',                       bp=(60, 61), op=ops.mul, typeable=True)
@@ -409,8 +400,8 @@ token(0x92, b'ZoomSto',                 cmd=cmds.zoom_sto)
 token(0x93, b'Text(',                   cmd=draw.text)
 token(0x94, b'nPr',                     bp=(60, 61), op=ops.npr)
 token(0x95, b'nCr',                     bp=(60, 61), op=ops.ncr)
-token(0x96, b'FnOn ', cmd=cmds.fn_on)
-token(0x97, b'FnOff ', cmd=cmds.fn_off)
+token(0x96, b'FnOn ',                   cmd=cmds.fn_on)
+token(0x97, b'FnOff ',                  cmd=cmds.fn_off)
 token(0x98, b'StorePic ')
 token(0x99, b'RecallPic ')
 token(0x9A, b'StoreGDB ')
@@ -434,9 +425,9 @@ token(0xA9, b'DrawF ',                  cmd=draw.draw_f)
 for _i in range(10):
 	token(0xAA00 | _i, b'Str' + bytes([0x30 + (_i + 1) % 10]), var=StringVar(_i))
 
-token(tk.RAND, b'rand',                 var=RandAccessor(), func=timath.rand_list)
-token(0xAC, b'\xc4',                    res=lambda env: math.pi, typeable=True)  # π
-token(0xAD, b'getKey',                  res=Environment.get_key)
+token(tk.RAND, b'rand',                 var=timath.RandAccessor())
+token(0xAC, b'\xc4',                    var=Constant(math.pi), typeable=True)  # π
+token(0xAD, b'getKey',                  var=Computed(Environment.get_key))
 token(tk.APOS, b"'",                    typeable=True)
 token(0xAF, b'?',                       typeable=True)
 token(tk.NEG, b'\x1a')  # ⁻
@@ -484,11 +475,11 @@ token(0xBB1C, b'tpdf(',                 func=dist.tpdf)
 token(0xBB1D, b'\xd9\x12pdf(',          func=dist.chi_sq_pdf)  # χ²pdf(
 token(0xBB1E, b'Fpdf(',                 func=dist.f_pdf)
 token(0xBB1F, b'randNorm(',             func=timath.rand_norm)
-token(0xBB20, b'tvm_Pmt',               res=finance.tvm_pmt_value,   func=finance.tvm_pmt)
-token(0xBB21, b'tvm_I%',                res=finance.tvm_i_pct_value, func=finance.tvm_i_pct)
-token(0xBB22, b'tvm_PV',                res=finance.tvm_pv_value,    func=finance.tvm_pv)
-token(0xBB23, b'tvm_N',                 res=finance.tvm_n_value,     func=finance.tvm_n)
-token(0xBB24, b'tvm_FV',                res=finance.tvm_fv_value,    func=finance.tvm_fv)
+token(0xBB20, b'tvm_Pmt',               var=Computed(finance.tvm_pmt_value),   func=finance.tvm_pmt)
+token(0xBB21, b'tvm_I%',                var=Computed(finance.tvm_i_pct_value), func=finance.tvm_i_pct)
+token(0xBB22, b'tvm_PV',                var=Computed(finance.tvm_pv_value),    func=finance.tvm_pv)
+token(0xBB23, b'tvm_N',                 var=Computed(finance.tvm_n_value),     func=finance.tvm_n)
+token(0xBB24, b'tvm_FV',                var=Computed(finance.tvm_fv_value),    func=finance.tvm_fv)
 token(0xBB25, b'conj(',                 func=timath.conj)
 token(0xBB26, b'real(',                 func=timath.real)
 token(0xBB27, b'imag(',                 func=timath.imag)
@@ -501,7 +492,7 @@ token(0xBB2D, b'ref(',                  func=matrix.ref)
 token(0xBB2E, b'rref(',                 func=matrix.rref)
 token(0xBB2F, b'\x05Rect')  # ►Rect
 token(0xBB30, b'\x05Polar')  # ►Polar
-token(0xBB31, b'\xdb',                  res=lambda env: math.e, typeable=True)  # 𝑒
+token(0xBB31, b'\xdb',                  var=Constant(math.e), typeable=True)  # 𝑒
 token(0xBB32, b'SinReg ')
 token(0xBB33, b'Logistic ')
 token(0xBB34, b'LinRegTTest ')
@@ -749,12 +740,12 @@ token(0xEF05, b'timeCnv(',              func=titime.time_cnv)
 token(0xEF06, b'dayOfWk(',              func=titime.dayofwk)
 token(0xEF07, b'getDtStr(',             func=titime.get_dt_str)
 token(0xEF08, b'getTmStr(',             func=titime.get_tm_str)
-token(0xEF09, b'getDate',               res=Environment.get_date)
-token(0xEF0A, b'getTime',               res=Environment.get_time)
-token(0xEF0B, b'startTmr',              res=Environment.start_tmr)
-token(0xEF0C, b'getDtFmt',              res=Environment.get_dt_fmt)
-token(0xEF0D, b'getTmFmt',              res=Environment.get_tm_fmt)
-token(0xEF0E, b'isClockOn',             res=Environment.is_clock_on)
+token(0xEF09, b'getDate',               var=Computed(Environment.get_date))
+token(0xEF0A, b'getTime',               var=Computed(Environment.get_time))
+token(0xEF0B, b'startTmr',              var=Computed(Environment.start_tmr))
+token(0xEF0C, b'getDtFmt',              var=Computed(Environment.get_dt_fmt))
+token(0xEF0D, b'getTmFmt',              var=Computed(Environment.get_tm_fmt))
+token(0xEF0E, b'isClockOn',             var=Computed(Environment.is_clock_on))
 token(0xEF0F, b'ClockOff',              cmd=modecmds.clock_off)
 token(0xEF10, b'ClockOn',               cmd=modecmds.clock_on)
 token(0xEF11, b'OpenLib(')

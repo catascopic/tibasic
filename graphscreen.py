@@ -46,7 +46,7 @@ class GraphScreen:
 			row.__init__(COLS)  # hack?
 		self.valid = False
 
-	def save(self, path, pixel_size: int = 1) -> None:
+	def print_screen(self, path, pixel_size: int = 1) -> None:
 		"""Save the graph buffer as a monochrome BMP.
 
 		Each logical pixel becomes a `pixel_size` × `pixel_size` block.  On pixels

@@ -18,6 +18,7 @@ import random
 from functools import wraps
 from numbers import Number
 
+from accessors import Accessor
 from core import TiList, TiMatrix, require_list
 from core import require_real, require_int, require_num, py_int
 from preparse import preparse_func, Real, Vectorized, VectorizedReal, MatrixVectorized, AnyValue, Thunk, NumericVar, Env
@@ -53,29 +54,36 @@ def not_(x: VectorizedReal):
 
 # DEDICATED KEYS
 
+
 @preparse_func
 def sin(env: Env, x: VectorizedReal):
 	return math.sin(env.to_rad(x))
+
 
 @preparse_func
 def cos(env: Env, x: VectorizedReal):
 	return math.cos(env.to_rad(x))
 
+
 @preparse_func
 def tan(env: Env, x: VectorizedReal):
 	return math.tan(env.to_rad(x))
+
 
 @preparse_func
 def asin(env: Env, x: VectorizedReal):
 	return _inv_trig(math.asin, env, x)
 
+
 @preparse_func
 def acos(env: Env, x: VectorizedReal):
 	return _inv_trig(math.acos, env, x)
 
+
 @preparse_func
 def atan(env: Env, x: VectorizedReal):
 	return _inv_trig(math.atan, env, x)
+
 
 @preparse_func
 def sqrt(x: Vectorized):
@@ -84,6 +92,7 @@ def sqrt(x: Vectorized):
 	if x >= 0:
 		return math.sqrt(x)
 	return cmath.sqrt(x)
+
 
 @preparse_func
 def ln(x: Vectorized):
@@ -95,6 +104,7 @@ def ln(x: Vectorized):
 		raise DomainError("ln: undefined for 0")
 	return cmath.log(x)
 
+
 @preparse_func
 def log(x: Vectorized):
 	if isinstance(x, complex):
@@ -105,9 +115,11 @@ def log(x: Vectorized):
 		raise DomainError("log: undefined for 0")
 	return cmath.log10(x)
 
+
 @preparse_func
 def exp(x: Vectorized):
 	return cmath.exp(x) if isinstance(x, complex) else math.exp(x)
+
 
 @preparse_func
 def pow10(x: Vectorized):
@@ -115,6 +127,7 @@ def pow10(x: Vectorized):
 
 
 # MATH MENU
+
 
 @preparse_func
 def cbrt(x: Vectorized):
@@ -172,6 +185,7 @@ def _adaptive_gk15(f, lo, hi, tol, depth=0):
 		_adaptive_gk15(f, mid, hi, tol / 2, depth + 1)
 	)
 
+
 @preparse_func
 def fn_int(env: Env, formula: Thunk, var: NumericVar, lo: Real, hi: Real, tol: Real = 1e-5) -> float:
 	with env.nest_guard('fnInt'), var.scoped():
@@ -192,10 +206,6 @@ def sigma(env: Env, formula: Thunk, var: NumericVar, start: Real, end: Real) -> 
 			n += 1
 	return total
 
-
-# ── Root finding and optimization (solve(, fMin(, fMax() ──────────────────────
-# All three drive a real-valued f(var) built from the user's expression, sweeping
-# `var` while leaving its stored value untouched (var.scoped()).
 
 def _real_of(env, formula, var):
 	"""Build f(x): set `var` to x, evaluate the expression, require a real result."""
@@ -343,7 +353,6 @@ def solve(env: Env, formula: Thunk, var: NumericVar, guess: Real, bounds: TiList
 _GOLDEN   = 0.3819660112501051      # (3 − √5) / 2, the golden-section fraction
 _SQRT_EPS = 1.4901161193847656e-08  # √(machine epsilon), Brent's relative tolerance floor
 
-
 def _brent_minimize(f, a, b, xatol, max_eval=500):
 	"""Brent's bounded minimization on [a, b] (SciPy's fminbound); returns the argmin.
 
@@ -485,9 +494,11 @@ def _minmax(func, a, b):
 		return func(a, b)
 	raise DataTypeError(f"{func.__name__}: both args must be the same type (both numeric or both list)")
 
+
 @preparse_func
 def min(a: AnyValue, b: AnyValue = None):
 	return _minmax(builtins.min, a, b)
+
 
 @preparse_func
 def max(a: AnyValue, b: AnyValue = None):
@@ -538,6 +549,20 @@ def angle(x: Vectorized):
 @preparse_func
 def rand_list(n: Real):
 	return TiList([random.random() for _ in range(py_int(n))])
+
+
+class RandAccessor(Accessor):
+	invocable = True
+
+	def resolve(self, env):
+		return env.rand()
+
+	def invoke(self, args):
+		return rand_list.call_with_parser(args)
+
+	def store(self, env, value):
+		env.set_random_seed(value)
+
 
 @vectorize
 def _rand_int_single(low, high):
@@ -591,17 +616,21 @@ def rand_int_no_rep(low: Real, high: Real):
 
 # ANGLE MENU
 
+
 @preparse_func
 def rect_to_polar_radius(env: Env, x: VectorizedReal, y: VectorizedReal):
 	return math.hypot(x, y)
+
 
 @preparse_func
 def rect_to_polar_angle(env: Env, x: VectorizedReal, y: VectorizedReal):
 	return env.from_rad(math.atan2(y, x))
 
+
 @preparse_func
 def polar_to_rect_x(env: Env, r: VectorizedReal, theta: VectorizedReal):
 	return r * math.cos(env.to_rad(theta))
+
 
 @preparse_func
 def polar_to_rect_y(env: Env, r: VectorizedReal, theta: VectorizedReal):
@@ -610,27 +639,33 @@ def polar_to_rect_y(env: Env, r: VectorizedReal, theta: VectorizedReal):
 
 # CATALOG (hyperbolic trig functions)
 
+
 @preparse_func
 def sinh(x: VectorizedReal):
 	return math.sinh(x)
+
 
 @preparse_func
 def cosh(x: VectorizedReal):
 	return math.cosh(x)
 
+
 @preparse_func
 def tanh(x: VectorizedReal):
 	return math.tanh(x)
 
+
 @preparse_func
 def asinh(x: VectorizedReal):
 	return math.asinh(x)
+
 
 @preparse_func
 def acosh(x: VectorizedReal):
 	if x >= 1:
 		return math.acosh(x)
 	return cmath.acosh(x)
+
 
 @preparse_func
 def atanh(x: VectorizedReal):

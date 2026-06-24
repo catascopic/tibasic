@@ -1,3 +1,5 @@
+import time
+
 from parser import ArgParser, Parser
 from titoken import QUOTE
 
@@ -103,22 +105,20 @@ def disp(args: ArgParser):
 	while args.has_next:
 		io.disp(args.expr())
 	args.end_cmd()
+	time.sleep(0.05)
 
 
-@special_func
-def output(args: ArgParser):
+@preparse_cmd_func
+def output(env: Env, row: Real, col: Real, value: AnyValue):
 	"""Output(row, col, value) — write value at a fixed 1-indexed cell.
 
 	The value is rendered linearly (as you'd type it): lists/matrices use comma
 	separators and a matrix is inlined onto the single starting position, wrapping
 	across cells from there."""
-	row = py_int(args.expr())
-	col = py_int(args.expr())
-	value = args.expr()
-	args.end_paren_cmd()
-	args.env.screen = Screen.HOME       # Output( brings up the home screen
-	args.env.io.output(row, col, value)
-
+	env.screen = Screen.HOME  # Output( brings up the home screen
+	env.io.output(py_int(row), py_int(col), value)
+	# time.sleep(0.05)
+	
 
 @no_arg_command
 def clr_home(env):
@@ -223,9 +223,7 @@ def _input_one(env, prompt: str, var) -> None:
 	rather than storing anything, so neither Input nor Prompt can yield a value.
 	"""
 	env.screen = Screen.HOME            # Input/Prompt bring up the home screen
-	while not (text := env.io.read_value(prompt).strip()):
-		pass
-	tokens = _tokenize_input(text)
+	tokens = _tokenize_input(env.io.read_value(prompt))
 	if var.accessor.kind == 'string':   # a string var keeps the raw text, no eval
 		var.store(TiString(tokens))
 	else:
@@ -253,6 +251,7 @@ def prompt_cmd(args: ArgParser):
 	"""Prompt var[,var...] — Input each variable in turn, with an implicit
 	"NAME=?" prompt instead of a custom one."""
 	pending = []
+	# Use ArgParser because the calculator does evaluate the args lazily
 	while args.has_next:
 		name = args.peek().text
 		pending.append((name, args.any_var()))

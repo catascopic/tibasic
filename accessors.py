@@ -56,17 +56,12 @@ class Accessor(ABC):
 	def _set(self, env, value):
 		raise NotImplementedError(f"{type(self).__name__} does not support _set")
 
-	@property
-	def label(self) -> str:
-		"""Human-readable name for error messages; defaults to the repr."""
-		return repr(self)
-
 	def resolve(self, env):
 		"""Read the value, erroring if the slot is empty.  Subclasses with auto-init
 		(NumericVar), extra validation (ListVar), or computed values (rand, ΔX) override."""
 		value = self._get(env)
 		if value is None:
-			raise UndefinedError(f"{self.label} is not defined")
+			raise UndefinedError(f"{self} is not defined")
 		return value
 
 	def store(self, env, value):
@@ -163,27 +158,27 @@ class NumericVar(Deletable, Accessor):
 		return f"NumericVar({self.name!r})"
 
 
-class ComputedAccessor(Accessor):
+class Computed(Accessor):
 	"""A read-only 0-arg value: a constant (π, 𝑒, 𝑖) or a computed query (getKey,
 	getDate, …).  `resolve(env)` calls the wrapped function; storing is an error."""
 
-	__slots__ = ('fn',)
+	__slots__ = ('func',)
 
-	def __init__(self, fn):
-		self.fn = fn          # (env) -> value
-
-	def resolve(self, env):
-		return self.fn(env)
-
-
-class RandAccessor(Accessor):
-	"""`rand` — resolves to a fresh random number; storing seeds the generator."""
+	def __init__(self, func):
+		self.func = func
 
 	def resolve(self, env):
-		return env.rand()
+		return self.func(env)
 
-	def store(self, env, value):
-		env.set_random_seed(value)
+
+class Constant(Accessor):
+	__slots__ = ('value',)
+
+	def __init__(self, value):
+		self.value = value
+
+	def resolve(self, env):
+		return self.value
 
 
 class UserListVar(Accessor):
@@ -199,10 +194,6 @@ class UserListVar(Accessor):
 
 	def __init__(self, name: str):
 		self.name = name
-
-	@property
-	def label(self):
-		return f"user list {self.name!r}"
 
 	def _get(self, env):
 		return env.user_lists.get(self.name)
@@ -244,10 +235,6 @@ class MatrixVar(Deletable, Accessor):
 	def __init__(self, name: str):
 		self.name = name
 
-	@property
-	def label(self):
-		return f"[{self.name}]"
-
 	def _get(self, env):
 		return getattr(env.matrices, self.name)
 
@@ -279,10 +266,6 @@ class ListVar(Deletable, Accessor):
 
 	def __init__(self, index: int):
 		self.index = index
-
-	@property
-	def label(self):
-		return f"L{self.index + 1}"
 
 	def _get(self, env):
 		return env.lists[self.index]
@@ -321,10 +304,6 @@ class StringVar(Deletable, Accessor):
 	def __init__(self, index: int):
 		self.index = index
 
-	@property
-	def label(self):
-		return f"Str{(self.index + 1) % 10}"
-
 	def _get(self, env):
 		return env.strings[self.index]
 
@@ -351,10 +330,6 @@ class WindowVar(Accessor):
 
 	def __init__(self, attr: str):
 		self.attr = attr
-
-	@property
-	def label(self):
-		return f"window variable {self.attr!r}"
 
 	def _get(self, env):
 		return getattr(env.window, self.attr)
@@ -440,10 +415,6 @@ class EnvVar(Accessor):
 	def __init__(self, attr: str):
 		self.attr = attr
 
-	@property
-	def label(self):
-		return repr(self.attr)
-
 	def _get(self, env):
 		return getattr(env, self.attr)
 
@@ -464,10 +435,6 @@ class TableVar(Accessor):
 
 	def __init__(self, attr: str):
 		self.attr = attr
-
-	@property
-	def label(self):
-		return f"table variable {self.attr!r}"
 
 	def _get(self, env):
 		return getattr(env.table, self.attr)
@@ -635,9 +602,9 @@ class SequenceInitialVar(Deletable, Accessor):
 				raise InvalidDimError("u/v/w(nMin) list may have at most 2 elements")
 		else:
 			value = TiList([require_real(value)])
-		if value is not env.sequence[self.index].initial and env.graph_mode is GraphMode.SEQ:
+		if value != self._get(env) and env.graph_mode is GraphMode.SEQ:
 			env.graph.valid = False
-		env.sequence[self.index].initial = value
+		self._set(env, value)
 
 	def __repr__(self):
 		return f"SequenceInitialVar({self.index})"

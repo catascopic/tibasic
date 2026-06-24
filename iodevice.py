@@ -106,8 +106,8 @@ class HomeScreenIO(IODevice):
 		# The terminal's own input echo lands below the painted frame and is wiped on
 		# the next repaint, so an accepted entry has to be committed into the grid to
 		# persist.  Empty entries (which the caller re-prompts) aren't echoed.
-		if stripped := text.strip():
-			self._echo_input(prompt, stripped)
+		if text:
+			self._echo_input(prompt, text)
 		return text
 
 	def _echo_input(self, prompt: str, text: str) -> None:

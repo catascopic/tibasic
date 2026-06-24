@@ -24,6 +24,74 @@ def run_demo(source, freeform=False):
 if __name__ == '__main__':
 	run_demo("""
 
-Pause randM( 10,10
+Lbl 1
+Disp "X--------------O
+Disp "_X------------O
+Disp "__X----------O
+Disp "___X--------O
+Disp "____X------O
+Disp "_____X----O
+Disp "______X--O
+Disp "_______XO
+Disp "_______OX
+Disp "______O--X
+Disp "_____O----X
+Disp "____O------X
+Disp "___O--------X
+Disp "__O----------X
+Disp "_O------------X
+Disp "O--------------X
+Disp "_O------------X
+Disp "__O----------X
+Disp "___O--------X
+Disp "____O------X
+Disp "_____O----X
+Disp "______O--X
+Disp "_______OX
+Disp "_______XO
+Disp "______X--O
+Disp "_____X----O
+Disp "____X------O
+Disp "___X--------O
+Disp "__X----------O
+Disp "_X------------O
+Goto 1
 
 	""", freeform='--freeform' in sys.argv)
+
+
+"""
+
+Disp "X
+Disp "_X
+Disp "__X
+Disp "___X
+Disp "____X
+Disp "_____X
+Disp "______X
+Disp "_______X
+Disp "________X
+Disp "_________X
+Disp "__________X
+Disp "___________X
+Disp "____________X
+Disp "_____________X
+Disp "______________X
+Disp "_______________X
+Disp "______________X
+Disp "_____________X
+Disp "____________X
+Disp "___________X
+Disp "__________X
+Disp "_________X
+Disp "________X
+Disp "_______X
+Disp "______X
+Disp "_____X
+Disp "____X
+Disp "___X
+Disp "__X
+Disp "_X
+prgm DEMO
+
+	"""
