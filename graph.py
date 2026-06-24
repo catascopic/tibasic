@@ -454,10 +454,13 @@ def eval_sequence(env, index: int, at):
 
 def _eval_sequence(env, seq: SeqData, n: int):
 	n_min = py_int(env.window.n_min)
+	# data[0] = u(nMin), data[1] = u(nMin-1) — initial values run backwards from nMin
+	if seq.initial is not None:
+		idx = n_min - n
+		if 0 <= idx < len(seq.initial.data):
+			return seq.initial.data[idx]
 	if n < n_min:
 		raise DomainError(f"Sequence index {n} is below nMin ({n_min})")
-	if seq.initial is not None and n - n_min < len(seq.initial.data):
-		return seq.initial.data[n - n_min]
 	if seq.equation is None:
 		seq_name = 'uvw'[env.sequence.index(seq)]
 		raise UndefinedError(f"Sequence {seq_name} is not defined")

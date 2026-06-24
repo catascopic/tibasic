@@ -1,4 +1,4 @@
-from enum import Enum, auto
+from enum import Enum, auto, StrEnum
 
 
 class AngleMode(Enum):
@@ -10,11 +10,11 @@ class NumberMode(Enum):
 	SCI    = auto()
 	ENG    = auto()
 
-class GraphMode(Enum):
-	FUNC = auto()
-	PAR  = auto()
-	POL  = auto()
-	SEQ  = auto()
+class GraphMode(StrEnum):
+	FUNC = 'function'
+	PAR  = 'parametric'
+	POL  = 'polar'
+	SEQ  = 'sequence'
 
 class Screen(Enum):
 	"""Which screen is currently displayed.  Not a persistent mode setting — runtime

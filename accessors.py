@@ -512,27 +512,28 @@ class EquationVar(Deletable, Accessor):
 	reachable only through `get`/`set`, which is why copying a formula out
 	(Equ►String) needs a dedicated command.  `store` normalises a string/equation
 	and selects the function.
+
+	`mode` is a class-level GraphMode on each subclass.  Because GraphMode is a
+	StrEnum whose values are the Environment attribute names, `self.mode` doubles as
+	the list name: `getattr(env, self.mode)` retrieves the right equation collection.
 	"""
 
-	__slots__ = ('attr', 'index')
+	__slots__ = ('index',)
 	invocable = True
+	mode: GraphMode = None
 	graph_var = None
 
-	def __init__(self, attr: str, index: int):
-		self.attr = attr
+	def __init__(self, index: int):
 		self.index = index
 
 	def _get(self, env):
-		return getattr(env, self.attr)[self.index].equation
+		return getattr(env, self.mode)[self.index].equation
 
 	def _set(self, env, value):
-		getattr(env, self.attr)[self.index].equation = value
+		getattr(env, self.mode)[self.index].equation = value
 
 	def resolve(self, env):
-		eq = self._get(env)
-		if eq is None:
-			raise UndefinedError("Equation is not defined")
-		return eq.eval(env)
+		return super().resolve(env).eval(env)
 
 	def invoke(self, arg_parser):
 		# The '(' is already eaten: Y1(x) composes by resolving with X set to x.
@@ -543,39 +544,36 @@ class EquationVar(Deletable, Accessor):
 			return self.resolve(env)
 
 	def store(self, env, value):
-		new_eq = _normalize_eq(value)
-		old_eq = self._get(env)
-		getattr(env, self.attr)[self.index].selected = True
-		if new_eq != old_eq and env.graph_mode_handler.eq_attr == self.attr:
+		self._set(env, _normalize_eq(value))
+		getattr(env, self.mode)[self.index].selected = True
+		if env.graph_mode is self.mode:
 			env.graph.valid = False
-		self._set(env, new_eq)
 
 	def __repr__(self):
-		return f"EquationVar({self.attr!r}, {self.index})"
+		return f"EquationVar({self.mode!r}, {self.index})"
 
 
 class FuncEquationVar(EquationVar):
 	__slots__ = ()
+	mode = GraphMode.FUNC
 	graph_var = 'X'
-
-	def __init__(self, index: int):
-		super().__init__('function', index)
 
 
 class ParEquationVar(EquationVar):
 	"""One half of a parametric pair (XnT or YnT).
 
-	Inherits `invoke`/`resolve`/`store` from `EquationVar` but addresses `x_eq`
-	or `y_eq` on the `ParData` rather than the generic `.equation` field.
+	Inherits `invoke`/`resolve`/`store` from `EquationVar` but addresses the `x`
+	or `y` field on `ParData` rather than the generic `.equation` field.
 	Both halves share the same index (the pair index) so selecting either half
 	selects the pair.
 	"""
 
 	__slots__ = ('half',)
+	mode = GraphMode.PAR
 	graph_var = 'T'
 
 	def __init__(self, index: int, half: str):
-		super().__init__('parametric', index)
+		super().__init__(index)
 		self.half = half   # 'x' or 'y'
 
 	def _get(self, env):
@@ -590,10 +588,8 @@ class ParEquationVar(EquationVar):
 
 class PolarEquationVar(EquationVar):
 	__slots__ = ()
+	mode = GraphMode.POL
 	graph_var = 'theta'
-
-	def __init__(self, index: int):
-		super().__init__('polar', index)
 
 
 class SequenceVar(EquationVar):
@@ -604,8 +600,7 @@ class SequenceVar(EquationVar):
 	through `_get`/`_set`.
 	"""
 
-	def __init__(self, index: int):
-		super().__init__('sequence', index)
+	mode = GraphMode.SEQ
 
 	def resolve(self, env):
 		return eval_sequence(env, self.index, env.n)
@@ -640,7 +635,7 @@ class SequenceInitialVar(Deletable, Accessor):
 				raise InvalidDimError("u/v/w(nMin) list may have at most 2 elements")
 		else:
 			value = TiList([require_real(value)])
-		if value is not env.sequence[self.index].initial and env.graph_mode is not GraphMode.SEQ:
+		if value is not env.sequence[self.index].initial and env.graph_mode is GraphMode.SEQ:
 			env.graph.valid = False
 		env.sequence[self.index].initial = value
 

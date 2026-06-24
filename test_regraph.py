@@ -210,15 +210,15 @@ class TestSequenceEval:
 		assert [eval_sequence(env,0, k) for k in range(1, 6)] == [2, 4, 6, 8, 10]
 
 	def test_recursive_fibonacci(self):
-		# u(n)=u(n-1)+u(n-2), u(nMin)={1,1}: the classic two-term recurrence.
-		env = _seq_env('u(n-1)+u(n-2)', initial=[1, 1])
-		assert [eval_sequence(env,0, k) for k in range(1, 9)] == [1, 1, 2, 3, 5, 8, 13, 21]
+		# u(nMin)={1,1}: data[0]=u(1)=1, data[1]=u(0)=1, so u(2)=u(1)+u(0)=2, u(3)=3, …
+		env = _seq_env('u(n-1)+u(n-2)', initial=[1, 1], nmin=1)
+		assert [eval_sequence(env,0, k) for k in range(1, 9)] == [1, 2, 3, 5, 8, 13, 21, 34]
 
-	def test_initial_values_are_chronological(self):
-		# Element i of u(nMin) is the term at nMin+i (earliest first).
-		env = _seq_env(initial=[10, 20], nmin=1)
-		assert eval_sequence(env,0, 1) == 10
-		assert eval_sequence(env,0, 2) == 20
+	def test_initial_values_indexed_from_nmin(self):
+		# data[0] = u(nMin), data[1] = u(nMin-1) — second element is one step before nMin.
+		env = _seq_env(initial=[10, 20], nmin=3)
+		assert eval_sequence(env, 0, 3) == 10   # u(nMin)   = data[0]
+		assert eval_sequence(env, 0, 2) == 20   # u(nMin-1) = data[1]
 
 	def test_scalar_initial_value(self):
 		# A single-term recurrence takes a scalar u(nMin) (wrapped as a 1-element list).

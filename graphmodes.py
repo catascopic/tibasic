@@ -28,20 +28,21 @@ _VIEWPORT_ATTRS = frozenset({'xmin', 'xmax', 'ymin', 'ymax', 'xscl', 'yscl'})
 
 
 class GraphModeHandler:
-	"""Strategy for one graphing mode.  Subclasses supply `eq_attr`, `window_attrs`,
+	"""Strategy for one graphing mode.  Subclasses supply `equations`, `window_attrs`,
 	and `standard_window`; `plot`, `fit_bounds`, and `set_selected` are implemented
 	here or on SweptMode.
 
-	`eq_attr` names the Environment list that holds this mode's function data objects
-	(e.g. `'function'` for Func, `'parametric'` for Par).  `window_attrs` is the set
-	of Window attribute names whose values affect the graph in this mode.
+	`mode` is the GraphMode this handler serves; its string value is the Environment
+	attribute name holding this mode's function data objects (e.g. GraphMode.FUNC ==
+	'function').  `window_attrs` is the set of Window attribute names whose values
+	affect the graph in this mode.
 	"""
 
-	eq_attr: str = ''
+	mode: GraphMode = None
 	window_attrs: frozenset = frozenset()
 
 	def _functions(self, env) -> list:
-		return getattr(env, self.eq_attr)
+		return getattr(env, self.mode)
 
 	def _pass(self, env):
 		"""Context manager wrapping the full plot/fit sweep (SeqMode uses a memo cache)."""
@@ -81,7 +82,7 @@ class GraphModeHandler:
 class FuncMode(GraphModeHandler):
 	"""Function mode: each Yn is sampled column-by-column as Y=f(X)."""
 
-	eq_attr = 'function'
+	mode = GraphMode.FUNC
 	window_attrs = _VIEWPORT_ATTRS | {'xres'}
 
 	def fit_bounds(self, env):
@@ -98,7 +99,7 @@ class FuncMode(GraphModeHandler):
 class SweptMode(GraphModeHandler):
 	"""Parametric, Polar, and Sequence modes: a path traced as a parameter advances.
 
-	Subclasses supply only `eq_attr`, `window_attrs`, `standard_window`, and optionally
+	Subclasses supply only `equations`, `window_attrs`, `standard_window`, and optionally
 	`_pass`; `fit_bounds` is shared here since all three modes return an (x, y) bounding
 	box.
 	"""
@@ -119,7 +120,7 @@ class SweptMode(GraphModeHandler):
 class ParMode(SweptMode):
 	"""Parametric mode: sweep T, plotting (XnT(T), YnT(T))."""
 
-	eq_attr = 'parametric'
+	mode = GraphMode.PAR
 	window_attrs = _VIEWPORT_ATTRS | {'tmin', 'tmax', 'tstep'}
 
 	def standard_window(self, env):
@@ -131,7 +132,7 @@ class ParMode(SweptMode):
 class PolMode(SweptMode):
 	"""Polar mode: sweep θ, plotting (r·cosθ, r·sinθ)."""
 
-	eq_attr = 'polar'
+	mode = GraphMode.POL
 	window_attrs = _VIEWPORT_ATTRS | {'theta_min', 'theta_max', 'theta_step'}
 
 	def standard_window(self, env):
@@ -147,7 +148,7 @@ class SeqMode(SweptMode):
 	is evaluated bottom-up rather than recomputed at every point.
 	"""
 
-	eq_attr = 'sequence'
+	mode = GraphMode.SEQ
 	window_attrs = _VIEWPORT_ATTRS | {'n_min', 'n_max', 'plot_start', 'plot_step'}
 
 	def _pass(self, env):
