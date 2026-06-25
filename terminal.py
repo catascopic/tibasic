@@ -51,8 +51,10 @@ class Console(ABC):
 		can't take key input just render the initial window."""
 
 	@abstractmethod
-	def menu(self, title: str, options: list[str]) -> int:
-		"""Blocking: present a menu, return the chosen 0-based index (Menu()."""
+	def menu(self) -> int:
+		"""Blocking: present env.menu (the active MenuScreen) and return the chosen
+		0-based index (Menu().  The model holds the title/options/highlight; a frontend
+		maps input onto menu.up()/down()/choose() and renders menu.styled_rows()."""
 
 	def finish(self) -> None:
 		"""Called when program execution ends; default is a no-op."""
@@ -105,9 +107,9 @@ class ScriptedConsole(Console):
 			view.render_into(self.env.home)
 		self._capture()
 
-	def menu(self, title: str, options: list[str]) -> int:
+	def menu(self) -> int:
 		if not self.choices:
-			raise ValueError(f"ScriptedConsole: no choice queued for menu {title!r}")
+			raise ValueError(f"ScriptedConsole: no choice queued for menu {self.env.menu.title!r}")
 		return self.choices.pop(0)
 
 
@@ -145,16 +147,17 @@ class FreeFormConsole(Console):
 		print('[PAUSED]')
 		input()
 
-	def menu(self, title: str, options: list[str]) -> int:
-		print(title)
-		for i, option in enumerate(options, 1):
+	def menu(self) -> int:
+		menu = self.env.menu
+		print(menu.title)
+		for i, option in enumerate(menu.options, 1):
 			print(f"{i}: {option}")
 		while True:
 			try:
 				choice = int(input('> '))
 			except ValueError:
 				continue
-			if 1 <= choice <= len(options):
+			if 1 <= choice <= len(menu.options):
 				return choice - 1
 
 	def finish(self) -> None:
@@ -228,12 +231,14 @@ class TerminalConsole(Console):
 			time.sleep(self._present_delay)
 
 	def _paint_current(self, indicator: str | None) -> None:
-		"""Repaint whichever screen is active — the graph (96-wide pixel art) or the
-		home grid (16-wide chars) — with `indicator` in the border.  This is the one
-		place that consults env.screen, so present/finish/the getKey tick all show the
-		right surface; a drawing command that just raised the graph shows the graph."""
+		"""Repaint whichever screen is active — the graph (96-wide pixel art), a Menu(
+		modal, or the home grid (16-wide chars) — with `indicator` in the border.  This
+		is the one place that consults env.screen, so present/finish/the getKey tick and
+		the menu loop all show the right surface."""
 		if self.env.screen is Screen.GRAPH:
 			self._paint(self.env.graph.rows(), indicator, width=_GRAPH_COLS)
+		elif self.env.screen is Screen.MENU:
+			self._paint(self._menu_rows(self.env.menu), indicator)
 		else:
 			self._render(self.env.home, indicator)
 
@@ -443,26 +448,27 @@ class TerminalConsole(Console):
 			time.sleep(_POLL_SECONDS)
 		return False
 
-	def menu(self, title: str, options: list[str]) -> int:
-		"""Render an actual bordered menu screen (title bar inverted, the
-		selected item's "N:" inverted) and animate the Pause spinner while
-		waiting — the menu is a genuine block-until-the-user-acts state, the
-		same as Pause, not a polling loop like getKey.
+	def menu(self) -> int:
+		"""Render the active menu (env.menu) as a bordered screen and animate the
+		Pause spinner while waiting — a menu is a genuine block-until-the-user-acts
+		state like Pause, not a polling loop like getKey.
 
-		Up/Down move the highlighted item; a number key 1-7 jumps straight to
-		that item and confirms it immediately, matching the real calculator;
-		Enter confirms whichever item is currently highlighted.
+		Up/Down move the highlighted item; a number key 1-7 jumps straight to that
+		item and confirms it immediately, matching the real calculator; Enter confirms
+		whichever item is currently highlighted.  The highlight lives on the model
+		(menu.selected); this just maps keys onto it and repaints.
 
 		Falls back to a plain numbered prompt without msvcrt or a real terminal,
 		for the same reason pause() does (msvcrt can't see piped/redirected input).
 		"""
+		menu = self.env.menu
 		try:
 			import msvcrt
 		except ImportError:
 			msvcrt = None
 		if msvcrt is None or not sys.stdin.isatty():
-			print(title)
-			for i, option in enumerate(options, 1):
+			print(menu.title)
+			for i, option in enumerate(menu.options, 1):
 				print(f'{i}: {option}')
 			with self._input_cursor():
 				while True:
@@ -470,46 +476,36 @@ class TerminalConsole(Console):
 						choice = int(input('> '))
 					except ValueError:
 						continue
-					if 1 <= choice <= len(options):
+					if 1 <= choice <= len(menu.options):
 						return choice - 1
-		selected = 0
 		# _paint keeps the cursor hidden while the menu animates; like Pause, the
 		# menu never collects keystrokes through input(), so it stays hidden.
 		while True:
-			self._paint(self._menu_rows(title, options, selected), _spinner_frame(_PAUSE_SPINNER))
-			result = self._poll_menu_key(msvcrt, len(options))
+			self._paint_current(_spinner_frame(_PAUSE_SPINNER))
+			result = self._poll_menu_key(msvcrt, len(menu.options))
 			if result is None:
 				continue
 			if result == 'up':
-				selected = (selected - 1) % len(options)
+				menu.up()
 			elif result == 'down':
-				selected = (selected + 1) % len(options)
+				menu.down()
 			elif result == 'enter':
-				return selected
+				return menu.selected
 			else:                # a number key: direct, immediate selection
-				return result
+				menu.choose(result)
+				return menu.selected
 			sys.stdout.flush()
 
-	def _menu_rows(self, title: str, options: list[str], selected: int) -> list:
-		"""Build the menu's 8 display rows: an inverted title bar, then one
-		numbered option per row with the selected item's "N:" inverted.
-
-		Padding/truncation is done on *visible* width — the inverted spans embed
-		invisible ANSI codes, so they're added after sizing the plain text to
-		HomeScreen.COLS, never counted as part of it.
-		"""
-		title_text = title[:HomeScreen.COLS]
-		title_row = _INV_ON + title_text + _INV_OFF + ' ' * (HomeScreen.COLS - len(title_text))
-		rows = [title_row]
-		for i, option in enumerate(options):
-			prefix = f'{i + 1}:'
-			body = option[:HomeScreen.COLS - len(prefix)]
-			body = body.ljust(HomeScreen.COLS - len(prefix))
-			if i == selected:
-				prefix = _INV_ON + prefix + _INV_OFF
-			rows.append(prefix + body)
-		rows += [' ' * HomeScreen.COLS] * (HomeScreen.ROWS - len(rows))
-		return rows
+	def _menu_rows(self, menu) -> list:
+		"""The menu's display rows as ANSI strings — the model's canonical layout
+		(menu.styled_rows()) with each inverted segment wrapped in inverse-video
+		codes.  The plain text is sized to the 16 columns by the model; the ANSI
+		codes are invisible, so _paint is given the visible width explicitly."""
+		return [
+			''.join((_INV_ON + text + _INV_OFF) if inverted else text
+			        for text, inverted in row)
+			for row in menu.styled_rows()
+		]
 
 	def _poll_menu_key(self, msvcrt, n_options: int):
 		"""Poll for up to _FRAME_SECONDS; returns None (nothing relevant), 'up',

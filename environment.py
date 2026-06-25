@@ -102,6 +102,9 @@ class Environment:
 		# (Disp/Output(/Input).  Commands mutate these directly and ping the console.
 		self.graph = GraphScreen()
 		self.home = HomeScreen()
+		# The transient menu modal: a MenuScreen while a Menu( is up (Screen.MENU),
+		# None otherwise.  Set/cleared by the Menu( command around the blocking call.
+		self.menu = None
 		# The frontend: it renders the model and supplies input.  Assigning it attaches
 		# this env (see the `console` setter) so it can read home/graph on present().
 		self.console = console or ScriptedConsole()
@@ -345,9 +348,9 @@ class Environment:
 		return self.execution_stack[-1]
 
 	def print_screen(self, path):
-		"""Save the active screen to `path` as a BMP — the graph's pixels or the home
-		grid rasterized through the font, whichever is currently displayed."""
-		surface = self.graph if self.screen is Screen.GRAPH else self.home
+		"""Save the active screen to `path` as a BMP — the graph's pixels, the home
+		grid, or a Menu( modal, rasterized through the font, whichever is displayed."""
+		surface = {Screen.GRAPH: self.graph, Screen.MENU: self.menu}.get(self.screen, self.home)
 		surface.print_screen(path)
 
 

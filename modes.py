@@ -19,10 +19,14 @@ class GraphMode(StrEnum):
 class Screen(Enum):
 	"""Which screen is currently displayed.  Not a persistent mode setting — runtime
 	state that tracks the last screen shown, so e.g. ClrDraw knows whether to regraph.
-	(The table isn't implemented; TABLE only records that DispTable switched away.)"""
+	(The table isn't implemented; TABLE only records that DispTable switched away.)
+
+	MENU is the transient modal a Menu( puts up over whatever was there; it's active
+	only for the duration of that command (see env.menu)."""
 	HOME  = auto()
 	GRAPH = auto()
 	TABLE = auto()
+	MENU  = auto()
 
 class ComplexMode(Enum):
 	REAL       = auto()

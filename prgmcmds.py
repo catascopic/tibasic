@@ -13,6 +13,7 @@ from preparse import special_func, no_arg_command
 from core import TiString, py_int, require_string
 from errors import TiSyntaxError, UndefinedError, DomainError
 from tiformat import output_text
+from menuscreen import MenuScreen
 from modes import Screen
 
 ############
@@ -255,4 +256,16 @@ def menu_cmd(args: ArgParser):
 			break
 	args.end_paren_cmd()
 
-	program.goto(labels[args.env.console.menu(title, options)])
+	# Put the menu up as a transient modal screen over whatever was showing; the
+	# console drives the highlight and returns the chosen index.  Restore the prior
+	# screen and clear the modal before branching to the chosen label.
+	env = args.env
+	prev_screen = env.screen
+	env.menu = MenuScreen(title, options)
+	env.screen = Screen.MENU
+	try:
+		index = env.console.menu()
+	finally:
+		env.menu = None
+		env.screen = prev_screen
+	program.goto(labels[index])

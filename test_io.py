@@ -9,6 +9,7 @@ from environment import Environment
 from program import Program
 from core import TiList, TiString
 from modes import Screen
+from menuscreen import MenuScreen
 from test_tibasic import run, toks, var
 
 
@@ -327,6 +328,49 @@ class TestMenu:
 		with pytest.raises(DataTypeError):
 			run_program('Menu( 5,"O",A\nLbl A', choices=[0])
 
+	def test_modal_cleared_after_selection(self):
+		# The menu is transient: env.menu is set only for the duration of the call.
+		env = run_program(_MENU_PROG, choices=[0])
+		assert env.menu is None
+
+
+class TestMenuScreen:
+	"""The MenuScreen model: canonical layout + navigation, frontend-independent."""
+
+	def test_down_and_up_wrap_around(self):
+		m = MenuScreen('T', ['A', 'B', 'C'])
+		m.down()
+		assert m.selected == 1
+		m.up(); m.up()                  # 1 → 0 → wraps to 2
+		assert m.selected == 2
+
+	def test_choose_jumps_directly(self):
+		m = MenuScreen('T', ['A', 'B', 'C'])
+		m.choose(2)
+		assert m.selected == 2
+
+	def test_rows_layout_and_padding(self):
+		rows = MenuScreen('PICK', ['ONE', 'TWO']).rows()
+		assert len(rows) == 8
+		assert rows[0] == 'PICK' + ' ' * 12
+		assert rows[1] == '1:ONE' + ' ' * 11
+		assert rows[2] == '2:TWO' + ' ' * 11
+		assert rows[3] == ' ' * 16
+
+	def test_styled_rows_mark_title_and_selection(self):
+		m = MenuScreen('T', ['A', 'B'])
+		m.selected = 1
+		styled = m.styled_rows()
+		assert styled[0][0] == ('T', True)        # title inverted
+		assert styled[1][0] == ('1:', False)      # unselected prefix plain
+		assert styled[2][0] == ('2:', True)       # selected prefix inverted
+
+	def test_print_screen_writes_bmp(self, tmp_path):
+		path = tmp_path / 'menu.bmp'
+		MenuScreen('PICK', ['ONE', 'TWO']).print_screen(str(path))
+		data = path.read_bytes()
+		assert data[:2] == b'BM'
+
 
 class TestTerminalMenuRendering:
 	"""Unit tests for TerminalConsole's menu-screen rendering/key logic, which
@@ -341,30 +385,36 @@ class TestTerminalMenuRendering:
 	def _plain(row):
 		return re.sub(r'\x1b\[\d+m', '', row)
 
+	@staticmethod
+	def _menu(title, options, selected=0):
+		m = MenuScreen(title, options)
+		m.selected = selected
+		return m
+
 	def test_eight_rows_of_sixteen_visible_chars(self):
-		rows = self._console()._menu_rows('T', ['A', 'B'], selected=0)
+		rows = self._console()._menu_rows(self._menu('T', ['A', 'B']))
 		assert len(rows) == HomeScreen.ROWS
 		assert all(len(self._plain(r)) == HomeScreen.COLS for r in rows)
 
 	def test_title_row_is_inverted(self):
-		row = self._console()._menu_rows('PICK', ['A'], selected=0)[0]
+		row = self._console()._menu_rows(self._menu('PICK', ['A']))[0]
 		# Only "PICK" itself is inverted — the trailing padding to fill the row
 		# is plain, not part of the inverted span.
 		assert row == '\033[7mPICK\033[27m' + ' ' * 12
 		assert self._plain(row) == 'PICK' + ' ' * 12
 
 	def test_selected_prefix_inverted_others_not(self):
-		rows = self._console()._menu_rows('T', ['ONE', 'TWO', 'THREE'], selected=1)
+		rows = self._console()._menu_rows(self._menu('T', ['ONE', 'TWO', 'THREE'], selected=1))
 		assert '\033[7m' not in rows[1] and self._plain(rows[1]) == '1:ONE' + ' ' * 11
 		assert rows[2].startswith('\033[7m2:\033[27m')
 		assert '\033[7m' not in rows[3]
 
 	def test_long_option_truncated_to_fit(self):
-		row = self._console()._menu_rows('T', ['X' * 30], selected=0)[1]
+		row = self._console()._menu_rows(self._menu('T', ['X' * 30]))[1]
 		assert self._plain(row) == '1:' + 'X' * 14   # 16 - len('1:')
 
 	def test_blank_rows_pad_to_eight(self):
-		rows = self._console()._menu_rows('T', ['A'], selected=0)
+		rows = self._console()._menu_rows(self._menu('T', ['A']))
 		assert rows[2:] == [' ' * HomeScreen.COLS] * 6
 
 	def test_poll_recognizes_up_down_enter_digit(self):
