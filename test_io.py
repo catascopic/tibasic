@@ -527,6 +527,60 @@ class TestInput:
 		with pytest.raises(TiSyntaxError):
 			run_with('Input', [])
 
+	# ── Prompt grammar ──────────────────────────────────────────────────────────
+	# The display string is a restricted string expression — a literal, a string
+	# variable, Ans, or sub(, joined with +.  When the first argument is a string
+	# variable and a comma follows, it's the prompt and the next variable is the
+	# target; with no comma the lone string variable is the target.
+
+	def test_string_var_prompt_with_second_target(self):
+		# Input Str1,Str2 → Str1 is the prompt, the response goes into Str2
+		env = run_with('"HI" @ Str1\nInput Str1 , Str2', ['XYZ'])
+		assert str(var(env, 'Str2')) == 'XYZ'
+		assert str(var(env, 'Str1')) == 'HI'   # unchanged — it was the prompt
+
+	def test_sub_prompt(self):
+		assert var(run_with('Input sub( "AB" ,1,1 ) ,X', ['5']), 'X') == 5
+
+	def test_concatenated_prompt(self):
+		assert var(run_with('Input "A" + "B" ,X', ['7']), 'X') == 7
+
+	def test_string_var_concatenated_prompt(self):
+		assert var(run_with('"GO" @ Str1\nInput Str1 + "B" ,X', ['9']), 'X') == 9
+
+	def test_nested_sub_prompt(self):
+		assert var(run_with('Input sub( sub( "ABC" ,1,2 ) ,1,1 ) ,X', ['3']), 'X') == 3
+
+	# The 0xEF token table (getDtStr(/getTmStr() postdates the prompt parser, so its
+	# tokens are rejected — as a syntax error at the top level, but a data-type error
+	# nested inside sub('s parentheses (a different routine catches it).
+
+	def test_clock_function_in_prompt_is_syntax_error(self):
+		with pytest.raises(TiSyntaxError):
+			run_with('Input "A" + getDtStr( 1 ) ,X', [])
+
+	def test_clock_function_as_first_arg_is_syntax_error(self):
+		with pytest.raises(TiSyntaxError):
+			run_with('Input getDtStr( 1 ) ,X', [])
+
+	def test_get_tm_str_in_prompt_is_syntax_error(self):
+		with pytest.raises(TiSyntaxError):
+			run_with('Input getTmStr( 1 ) ,X', [])
+
+	def test_clock_function_inside_sub_is_data_type_error(self):
+		with pytest.raises(DataTypeError):
+			run_with('Input sub( getDtStr( 1 ) ,1,1 ) ,X', [])
+
+	def test_parenthesized_first_arg_is_syntax_error(self):
+		# A leading '(' isn't a prompt-starter, so it's read as the target → not a var
+		with pytest.raises(TiSyntaxError):
+			run_with('Input ( "A" ) ,X', [])
+
+	def test_number_concatenated_to_prompt_is_data_type_error(self):
+		# "A"+5 passes the token filter but fails at evaluation, like on hardware
+		with pytest.raises(DataTypeError):
+			run_with('Input "A" + 5 ,X', [])
+
 
 # ── ScriptedConsole ───────────────────────────────────────────────────────────
 

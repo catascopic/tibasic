@@ -1,7 +1,7 @@
 import time
 
 from parser import ArgParser, Parser
-from titoken import LIST_PREFIX
+from titoken import QUOTE, ANS, L_PAREN, R_PAREN
 
 from preparse import (
 	preparse_cmd, preparse_cmd_func, preparse_bunch,
@@ -11,7 +11,7 @@ from accessors import Reference
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, py_int, require_string
-from errors import TiSyntaxError, UndefinedError, DomainError
+from errors import TiSyntaxError, UndefinedError, DomainError, DataTypeError
 from tiformat import output_text
 from menuscreen import MenuScreen
 from modes import Screen
@@ -193,31 +193,80 @@ def _input_one(env, prompt: TiString | None, var: Reference, raw_string: bool = 
 		var.store(value)
 
 
+_SUB = 0xBB0C
+
+def _prompt_starter(tok) -> bool:
+	"""Whether `tok` begins an Input/Prompt display string rather than the target var.
+
+	The calculator decides purely from the first token: a string literal, a string
+	variable, Ans, or sub( introduce a display string; anything else (a numeric/list/
+	matrix variable, a number, '(' …) means there's no prompt and this token is the
+	storage target itself."""
+	return tok.code in (QUOTE, ANS, _SUB) or tok.is_string_var()
+
+
+def _check_prompt(tokens) -> None:
+	"""Reject the 0xEF-table tokens a display string can't contain (see _SUB).
+
+	The calculator surfaces one at the top level as a syntax error, but one nested
+	inside sub('s parentheses as a data-type error — a different routine catches it —
+	so we mirror both by paren depth.  String-literal contents and sub('s numeric
+	arguments are otherwise unrestricted, which is why e.g. "A"+5 still reaches
+	evaluation and fails there instead (cannot add a number to a string)."""
+	depth = 0
+	in_string = False
+	for t in tokens:
+		if in_string:
+			in_string = t.code != QUOTE
+		elif t.code == QUOTE:
+			in_string = True
+		elif 0xEF00 <= t.code < 0xF000:
+			raise (TiSyntaxError if depth == 0 else DataTypeError)(
+				f"Input: {t.text} is not allowed in a prompt")
+		elif t.function is not None or t.code == L_PAREN:
+			depth += 1
+		elif t.code == R_PAREN:
+			depth = max(0, depth - 1)
+
+
 @special_func
 def input_cmd(args: ArgParser):
 	"""Input [strexpr,] var — read from the console and store in var.
 
-	If the first token is a variable (has an accessor or is the list prefix), it
-	is the target directly — no prompt.  Anything else is parsed as a string
-	expression prompt (a literal, sub(, concatenation, …), followed by a comma
-	and the target variable.
+	The optional display string is a restricted string expression — a string literal,
+	string variable, Ans, or sub(, joined with + — followed by a comma and the target
+	variable.  When the first argument isn't one of those (a numeric/list/matrix
+	variable, a number, …) there's no prompt and it is the target; the bare
+	string-variable form `Input Str1` likewise stores without a prompt.
 
-	For string variables, the typed text is stored verbatim (no quotes needed;
-	any typed quotes are included literally).
-
-	The bare graph-cursor form (Input with no arguments) isn't supported yet.
+	For string variables the typed text is stored verbatim (no quotes needed; any
+	typed quotes are included literally).  The bare graph-cursor form (no arguments)
+	isn't supported yet.
 	"""
 	if not args.has_next:
 		raise TiSyntaxError("Input: the graph-cursor form is not supported yet")
 	q_tok = TiString.from_str('?').tokens[0]
-	t = args.peek()
-	if t.accessor is None and t.code != LIST_PREFIX:
-		prompt = TiString(list(require_string(args.expr()).tokens) + [q_tok])
+	env = args.env
+
+	if _prompt_starter(args.peek()):
+		display = args.thunk()
+		_check_prompt(display.tokens)
+		if args.has_next:                       # a comma followed → it's the prompt
+			text = require_string(display.eval())
+			prompt = TiString(list(text.tokens) + [q_tok])
+			var = args.any_var_or_user_list()
+		else:                                   # no comma → a lone string var is the target
+			tok = display.tokens[0]
+			if len(display.tokens) != 1 or not tok.is_string_var():
+				raise TiSyntaxError(f"Input: {display.tokens} is not a storage target")
+			prompt = TiString([q_tok])
+			var = tok.accessor.reference(env)
 	else:
 		prompt = TiString([q_tok])
-	var = args.any_var_or_user_list()
+		var = args.any_var_or_user_list()
+
 	args.end_cmd()
-	_input_one(args.env, prompt, var, raw_string=True)
+	_input_one(env, prompt, var, raw_string=True)
 
 
 @special_func
