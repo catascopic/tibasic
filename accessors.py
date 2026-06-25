@@ -132,8 +132,8 @@ class NumericVar(Deletable, Accessor):
 	An undefined numeric reads as 0 (and is initialized to 0 on first resolve),
 	matching the calculator; `store` accepts any number (real or complex).
 	"""
-
 	__slots__ = ('name',)
+	kind = 'numeric'
 
 	def __init__(self, name: str):
 		self.name = name

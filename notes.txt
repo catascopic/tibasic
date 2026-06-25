@@ -1,5 +1,10 @@
-Need method for "token is a variable" which is different from "token has accessor"
-Could put class-level attribute on Accessor instances that tell you if they're a true variable
+except KeyError as bad:
+Should not be prgmcmds's job!
+
+Should tokens actually be instances of accessor?
+
+
+I think we need a way to distinguish tokens that have accessors from tokens that are true variables because, currently, there are some methods that use... that accessor is not none to test if something is a variable. But there are other tokens that have accessors like pi. I think the best way to do this would be to put a class-level attribute on accessors that tell you if they're a true variable or not.
 
 accessors -> variables
 
@@ -8,8 +13,6 @@ print screen
 env.screen = Screen.HOME
 Actively set so that IO device knows to switch
 env.focus_home()/focus_graph()/focus_table()
-
-
 
 
 

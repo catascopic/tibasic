@@ -687,19 +687,7 @@ class ArgParser:
 	@_parse_arg
 	def any_var(self) -> "Reference":
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
-		return self._any_var_body(self._parser.advance())
-
-	@_parse_arg
-	def any_var_prefix_optional(self) -> Reference:
-		"""Like any_var, but a run of alphanumeric tokens without the ᴸ prefix is
-		treated as a bare user-list name (e.g. LPRIMES).  A single-letter numeric
-		token with no following name character is still a numeric variable."""
 		t = self._parser.advance()
-		if t.is_numeric_var() and self.peek().is_name_char():
-			return UserListVar(t.text + self._parser.read_name(4)).reference(self.env)
-		return self._any_var_body(t)
-
-	def _any_var_body(self, t: Token) -> Reference:
 		if t.accessor is not None:
 			return t.accessor.reference(self.env)
 		if t.code == LIST_PREFIX:

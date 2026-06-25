@@ -190,7 +190,10 @@ def _input_one(env, prompt: TiString | None, var: Reference, raw_string: bool = 
 		value = parser.parse_expr()
 		if parser.has_next:
 			raise TiSyntaxError(f"Input: expected a single expression, got {tokens}")
-		var.store(value)
+		if isinstance(value, TiList) and var.accessor.kind == 'numeric':
+			UserListVar(var.text).store(value)
+		else:
+			var.store(value)
 
 
 _SUB = 0xBB0C  # sub( — the one string function the calculator accepts in a prompt
@@ -219,11 +222,11 @@ def input_cmd(args: ArgParser):
 		if args.has_next:
 			# the first arg was the prompt
 			prompt = first.eval()
-			var = args.any_var_prefix_optional()
+			var = args.any_var()
 		else:
 			var = t.accessor.reference(env)
 	else:
-		var = args.any_var_prefix_optional()
+		var = args.any_var()
 	
 	args.end_cmd()
 	_input_one(env, prompt, var, raw_string=True)
@@ -235,8 +238,6 @@ def prompt_cmd(args: ArgParser):
 	"NAME=?" prompt instead of a custom one."""
 	env = args.env
 	suffix = TiString.from_str('=?')
-	# We're taking matters into our own hands
-	p = args._parser
 	while args.has_next:
 		t = args.peek()
 		var = args.any_var()
