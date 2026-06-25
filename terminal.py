@@ -14,6 +14,8 @@ import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
+from core import TiString
+from titoken import Token
 from homescreen import HomeScreen
 from scrollview import ScrollView
 
@@ -25,8 +27,8 @@ class Console(ABC):
 		"""Re-render the home screen after a Disp / Output( / ClrHome."""
 
 	@abstractmethod
-	def read_value(self, prompt: str, home: HomeScreen) -> str:
-		"""Blocking: show `prompt`, return the raw text the user typed (Input/Prompt)."""
+	def read_tokens(self, prompt: TiString | None, home: HomeScreen) -> list[Token]:
+		"""Blocking: display prompt (if any) and return the tokens the user entered."""
 
 	@abstractmethod
 	def read_key(self) -> int:
@@ -66,10 +68,10 @@ class ScriptedConsole(Console):
 	def update(self, home: HomeScreen) -> None:
 		self.frames.append(home.render())
 
-	def read_value(self, prompt: str, home: HomeScreen) -> str:
+	def read_tokens(self, prompt: TiString | None, home: HomeScreen) -> list[Token]:
 		if not self.inputs:
-			raise ValueError(f"ScriptedConsole: no input queued for prompt {prompt!r}")
-		return self.inputs.pop(0)
+			raise ValueError(f"ScriptedConsole: no input queued")
+		return TiString.from_str(self.inputs.pop(0)).tokens
 
 	def read_key(self) -> int:
 		return self.keys.pop(0) if self.keys else 0
@@ -85,11 +87,28 @@ class ScriptedConsole(Console):
 		return self.choices.pop(0)
 
 
-_PAUSE_SPINNER   = '▚▞'	# one frame per redraw while a Pause is waiting
-_RUNNING_SPINNER = '▙▛▜▟'	# one frame per redraw while idle-polling (getKey)
-_FRAME_SECONDS = 0.1        # spinner redraw interval (~10 fps)
+# The border carries one status indicator that stands in for the calculator's
+# busy/pause icons.  Which spinner shows says what the program is doing; that it
+# animates says the program is alive.  A third state — no indicator at all — means
+# the program is either waiting for the user to type (Input/Prompt) or finished.
+_RUNNING_SPINNER = '▙▛▜▟'	# the program is running
+_PAUSE_SPINNER   = '▚▞'		# the program is blocked on the user (Pause / Menu)
+_FRAME_SECONDS = 0.1        # spinner advances one frame this often (~10 fps)
 _POLL_SECONDS = 0.01        # how often we check for a keypress within a frame
 _BOUNDARY = '░'
+
+
+def _now_frame() -> int:
+	"""Index of the current animation frame, ticking once per _FRAME_SECONDS off
+	the wall clock.  Every spinner glyph and the getKey-loop repaint throttle key
+	off this, so the animation is a function of *when* we paint — never of how many
+	times we happen to — and all of it stays in lockstep with elapsed time."""
+	return int(time.monotonic() / _FRAME_SECONDS)
+
+
+def _spinner_frame(spinner: str) -> str:
+	"""The glyph `spinner` should show right now (see _now_frame)."""
+	return spinner[_now_frame() % len(spinner)]
 
 # Extended scan-code letter (after the '\x00'/'\xe0' prefix) → scroll direction,
 # for paging a scrollable Pause value (see _poll_scroll_key).
@@ -120,25 +139,23 @@ class TerminalConsole(Console):
 			sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 		except (AttributeError, ValueError):
 			pass
-		self._pause_spin = 0
-		self._run_spin = 0
 		self._last_home: HomeScreen | None = None
-		self._last_run_render = 0.0
+		self._last_run_frame = -1
 
 	def update(self, home: HomeScreen) -> None:
-		self._render(home, marker=_RUNNING_SPINNER[self._run_spin % len(_RUNNING_SPINNER)])
+		self._render(home, _spinner_frame(_RUNNING_SPINNER))
 
-	def _render(self, home: HomeScreen, marker: str | None = None) -> None:
+	def _render(self, home: HomeScreen, indicator: str | None = None) -> None:
 		# Remembered so _tick_running_indicator can redraw the real home screen
 		# while idle-polling getKey.  The menu screen (_menu_rows/_paint) never
 		# touches this — it isn't the home screen and shouldn't be confused for it.
 		self._last_home = home
-		self._paint(home.render().split('\n'), marker)
+		self._paint(home.render().split('\n'), indicator)
 
-	def _paint(self, rows: list, marker: str | None = None) -> None:
+	def _paint(self, rows: list, indicator: str | None = None) -> None:
 		"""Repaint `rows` (ROWS strings of COLS visible characters, ANSI styling
-		allowed) framed in the border, with `marker` optionally overlaid one cell
-		left of the top-right corner.  Shared by the home screen and the menu
+		allowed) framed in the border, with `indicator` optionally overlaid one
+		cell left of the top-right corner.  Shared by the home screen and the menu
 		screen — neither carries any state for the other.
 
 		Repaints in place: home the cursor, overwrite each row clearing to its
@@ -147,20 +164,22 @@ class TerminalConsole(Console):
 		off — so the screen never scrolls.  The trailing newline drops the cursor
 		below the grid so an Input prompt appears there (wiped on the next repaint).
 
-		`marker` stands in for the real calculator's status-bar icons (pause
-		indicator, run indicator), which live above the character grid, not in
-		it.  Putting it in the border rather than a content cell means it can
-		never collide with anything a program actually Output(s, and there's
-		nothing to restore afterward: the next plain repaint just redraws the
-		border without it.
+		`indicator` is the calculator's status icon (the running or pause spinner);
+		None means show none — the program is taking input or has finished.  It
+		lives in the border, not a content cell, so it can never collide with
+		anything a program Output(s, and nothing needs restoring afterward: the
+		next repaint without it just redraws a plain border.
 		"""
-		framed = [(_BOUNDARY * (HomeScreen.COLS + 1)) + (marker or _BOUNDARY)]
+		framed = [(_BOUNDARY * (HomeScreen.COLS + 1)) + (indicator or _BOUNDARY)]
 		for row in rows:
 			framed.append(_BOUNDARY + row + _BOUNDARY)
 		framed.append(_BOUNDARY * (HomeScreen.COLS + 2))
-		frame = '\033[H' + '\n'.join(f'{row}\033[K' for row in framed) + '\033[J\n'
-		sys.stdout.write(frame)
-		self._hide_cursor()   # every painted frame is "program running" → no cursor
+		painted = '\033[H' + '\n'.join(f'{row}\033[K' for row in framed) + '\033[J\n'
+		sys.stdout.write(painted)
+		# A painted frame parks the cursor in the corner, so hide it by default;
+		# the two states that want it back (Input via _input_cursor, the finished
+		# program via finish) re-show it explicitly after painting.
+		self._hide_cursor()
 		sys.stdout.flush()
 
 	def _hide_cursor(self) -> None:
@@ -186,14 +205,15 @@ class TerminalConsole(Console):
 			sys.stdout.flush()
 
 	def finish(self, home: HomeScreen) -> None:
-		self._render(home)
-		self._show_cursor()   # program's done — hand the cursor back to the terminal
+		self._render(home)    # final repaint with no indicator — the program is done
+		self._show_cursor()   # hand the cursor back to the terminal
 		sys.stdout.flush()
 
-	def read_value(self, prompt: str, home: HomeScreen) -> str:
+	def read_tokens(self, prompt: TiString | None, home: HomeScreen) -> list[Token]:
 		self._render(home)  # repaint without indicator before blocking on input
 		with self._input_cursor():
-			return input(prompt)
+			text = input(str(prompt) if prompt is not None else '')
+		return TiString.from_str(text).tokens
 
 	def read_key(self) -> int:
 		"""Best-effort non-blocking poll; returns 0 where the platform has no support.
@@ -237,22 +257,21 @@ class TerminalConsole(Console):
 		return _TI_KEY_CODES.get(ch.upper(), 0)
 
 	def _tick_running_indicator(self) -> None:
-		"""Animate the border's running indicator while idle-polling for a key.
+		"""Keep the running indicator animating during a getKey poll loop.
 
-		Distinguishes "the program is alive and looping" (e.g. inside
-		`Repeat getKey…End`) from Pause's "stopped, waiting for you" — a lighter
-		glyph, and not redrawn on every single poll (read_key can be called
-		thousands of times a second), only at the same ~10fps pace as Pause's
-		animation.  No-op before anything has ever been rendered.
+		A tight `Repeat getKey…End` never calls update(), so without this the
+		indicator would freeze even though the program is plainly alive.  read_key
+		can fire thousands of times a second, so repaint only when the frame index
+		actually advances — the same ~10fps as every other spinner.  No-op before
+		anything has been rendered.
 		"""
 		if self._last_home is None:
 			return
-		now = time.monotonic()
-		if now - self._last_run_render < _FRAME_SECONDS:
+		frame = _now_frame()
+		if frame == self._last_run_frame:
 			return
-		self._last_run_render = now
-		self._render(self._last_home, marker=_RUNNING_SPINNER[self._run_spin % len(_RUNNING_SPINNER)])
-		self._run_spin += 1
+		self._last_run_frame = frame
+		self._render(self._last_home, _spinner_frame(_RUNNING_SPINNER))
 
 	def pause(self, home: HomeScreen, value=None) -> None:
 		"""Animate the spinner in real time until Enter or Space is pressed.
@@ -276,7 +295,7 @@ class TerminalConsole(Console):
 		if msvcrt is None or not sys.stdin.isatty():
 			if view is not None:
 				view.render_into(home)
-			self._render(home, marker=_PAUSE_SPINNER[0])
+			self._render(home, _PAUSE_SPINNER[0])   # static: no key polling to animate it
 			with self._input_cursor():
 				input()
 			return
@@ -285,8 +304,7 @@ class TerminalConsole(Console):
 		while True:
 			if view is not None:
 				view.render_into(home)
-			self._render(home, marker=_PAUSE_SPINNER[self._pause_spin % len(_PAUSE_SPINNER)])
-			self._pause_spin += 1
+			self._render(home, _spinner_frame(_PAUSE_SPINNER))
 			if view is None:
 				if self._wait_for_key(msvcrt, {'\r', ' '}):
 					return
@@ -357,9 +375,7 @@ class TerminalConsole(Console):
 		# _paint keeps the cursor hidden while the menu animates; like Pause, the
 		# menu never collects keystrokes through input(), so it stays hidden.
 		while True:
-			marker = _PAUSE_SPINNER[self._pause_spin % len(_PAUSE_SPINNER)]
-			self._paint(self._menu_rows(title, options, selected), marker)
-			self._pause_spin += 1
+			self._paint(self._menu_rows(title, options, selected), _spinner_frame(_PAUSE_SPINNER))
 			result = self._poll_menu_key(msvcrt, len(options))
 			if result is None:
 				continue

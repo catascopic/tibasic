@@ -275,9 +275,8 @@ class TestTerminalMenuRendering:
 
 	def _console(self):
 		c = TerminalConsole.__new__(TerminalConsole)
-		c._pause_spin = c._run_spin = 0
 		c._last_home = None
-		c._last_run_render = 0.0
+		c._last_run_frame = -1
 		return c
 
 	@staticmethod
@@ -411,6 +410,6 @@ class TestScriptedConsole:
 		c = ScriptedConsole(keys=[25, 34])
 		assert (c.read_key(), c.read_key(), c.read_key()) == (25, 34, 0)
 
-	def test_read_value_without_input_errors(self):
+	def test_read_tokens_without_input_errors(self):
 		with pytest.raises(ValueError):
-			ScriptedConsole().read_value('?', HomeScreen())
+			ScriptedConsole().read_tokens(None, HomeScreen())

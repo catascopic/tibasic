@@ -18,8 +18,9 @@ value.
 """
 from abc import ABC, abstractmethod
 
-from errors import DomainError
-from titoken import encode, decode
+from core import TiString
+from errors import DomainError, TiSyntaxError
+from titoken import Token, encode, decode
 from tiformat import disp_lines, output_text, value_lines
 from homescreen import HomeScreen
 
@@ -48,12 +49,12 @@ class IODevice(ABC):
 		"""Pause — show `value` (if any), then block until the user continues."""
 
 	@abstractmethod
-	def read_value(self, prompt: str) -> str:
-		"""Blocking: show `prompt`, return the raw text typed (Input/Prompt).
+	def read_tokens(self, prompt: TiString | None) -> list[Token]:
+		"""Blocking: display prompt (if any), return the tokens the user entered.
 
-		A device that paints over its own input echo (e.g. the home screen) is
-		responsible for committing the accepted entry to its display here; for others
-		the terminal's inline echo already suffices."""
+		The caller is responsible for including any '?' in the prompt TiString.
+		A device that paints over its own input echo is responsible for committing
+		the accepted entry to its display here."""
 
 	@abstractmethod
 	def menu(self, title: str, options) -> int:
@@ -101,21 +102,19 @@ class HomeScreenIO(IODevice):
 				self.home.disp(line)
 		self.console.pause(self.home, value)
 
-	def read_value(self, prompt: str) -> str:
-		text = self.console.read_value(prompt, self.home)
-		# The terminal's own input echo lands below the painted frame and is wiped on
-		# the next repaint, so an accepted entry has to be committed into the grid to
-		# persist.  Empty entries (which the caller re-prompts) aren't echoed.
-		if text:
-			self._echo_input(prompt, text)
-		return text
-
-	def _echo_input(self, prompt: str, text: str) -> None:
+	def read_tokens(self, prompt: TiString | None) -> list[Token]:
 		try:
-			line = encode(prompt + text)   # wraps, doesn't truncate
-		except KeyError:
-			return   # an untypeable character; the command's parse raises a clean error
-		self.home.echo(line)
+			tokens = self.console.read_tokens(prompt, self.home)
+		except KeyError as bad:
+			raise TiSyntaxError(f"Input: unsupported character {bad}")
+		if tokens:
+			self._echo_input(prompt, tokens)
+		return tokens
+
+	def _echo_input(self, prompt: TiString | None, tokens: list[Token]) -> None:
+		prompt_bytes = b''.join(t.display for t in prompt.tokens) if prompt is not None else b''
+		input_bytes  = b''.join(t.display for t in tokens)
+		self.home.echo(prompt_bytes + input_bytes)
 		self.console.update(self.home)
 
 	def menu(self, title: str, options) -> int:
@@ -155,8 +154,12 @@ class FreeFormIO(IODevice):
 		print('[PAUSED]')
 		input()
 
-	def read_value(self, prompt: str) -> str:
-		return input(prompt)
+	def read_tokens(self, prompt: TiString | None) -> list[Token]:
+		text = input(str(prompt) if prompt is not None else '')
+		try:
+			return TiString.from_str(text).tokens
+		except KeyError as bad:
+			raise TiSyntaxError(f"Input: unsupported character {bad} in {text!r}")
 
 	def menu(self, title: str, options) -> int:
 		print(title)

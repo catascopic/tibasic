@@ -1,7 +1,7 @@
 import time
 
 from parser import ArgParser, Parser
-from titoken import QUOTE, LIST_PREFIX
+from titoken import LIST_PREFIX
 
 from preparse import (
 	preparse_cmd, preparse_cmd_func, preparse_bunch,
@@ -154,32 +154,16 @@ def pause_cmd(env: Env, value: AnyValue = None):
 	env.io.pause(value)
 
 
-def _tokenize_input(text: str) -> list:
-	"""Convert console-typed text to tokens, restricted to TI's typeable set.
-
-	This is the same restriction the real keypad imposes — there's no key for
-	`sin(` or similar — so it doubles as validation: a character with no
-	typeable token raises before anything is shown or evaluated.
-	"""
-	try:
-		return TiString.from_str(text).tokens
-	except KeyError as bad:
-		raise TiSyntaxError(f"Input: unsupported character {bad} in {text!r}")
-
-
-def _input_one(env, prompt: str, var: Reference, raw_string: bool = False) -> None:
+def _input_one(env, prompt: TiString | None, var: Reference, raw_string: bool = False) -> None:
 	"""Read one value for `var` and store it.  Shared by Input and Prompt.
 
 	When `raw_string` is True (Input only), a string variable stores the typed
 	text verbatim — quotes are not required and are included literally if typed.
 	Otherwise (Prompt, or non-string vars) the typed text is evaluated as an
 	expression, same as expr(.
-
-	Empty input is rejected: an entry that's blank (or only whitespace) re-prompts
-	rather than storing anything, so neither Input nor Prompt can yield a value.
 	"""
 	env.screen = Screen.HOME            # Input/Prompt bring up the home screen
-	tokens = _tokenize_input(env.io.read_value(prompt))
+	tokens = env.io.read_tokens(prompt)
 	if raw_string and var.accessor.kind == 'string':
 		var.store(TiString(tokens))
 	else:
@@ -206,10 +190,12 @@ def input_cmd(args: ArgParser):
 	"""
 	if not args.has_next:
 		raise TiSyntaxError("Input: the graph-cursor form is not supported yet")
-	prompt = '?'
+	q_tok = TiString.from_str('?').tokens[0]
 	t = args.peek()
 	if t.accessor is None and t.code != LIST_PREFIX:
-		prompt = str(args.expr())
+		prompt = TiString(list(require_string(args.expr()).tokens) + [q_tok])
+	else:
+		prompt = TiString([q_tok])
 	var = args.any_var_or_user_list()
 	args.end_cmd()
 	_input_one(args.env, prompt, var, raw_string=True)
@@ -220,14 +206,16 @@ def prompt_cmd(args: ArgParser):
 	"""Prompt var[,var...] — Input each variable in turn, with an implicit
 	"NAME=?" prompt instead of a custom one."""
 	pending = []
-	# Use ArgParser because the calculator does evaluate the args lazily
 	while args.has_next:
-		name = args.peek().text
-		pending.append((name, args.any_var_or_user_list()))
+		tok = args.peek()
+		pending.append((tok, args.any_var_or_user_list()))
 	args.end_cmd()
 	env = args.env
-	for name, var in pending:
-		_input_one(env, f'{name}=?', var)
+	eq_token = TiString.from_str('=').tokens[0]
+	q_token  = TiString.from_str('?').tokens[0]
+	for tok, var in pending:
+		prompt = TiString([tok, eq_token, q_token])
+		_input_one(env, prompt, var)
 
 
 @special_func
