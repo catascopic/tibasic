@@ -263,33 +263,6 @@ LARGE_FONT: list[bytes | None] = [
 ]
 
 
-# A character cell on the LCD is 6×8 pixels: the 5×7 large-font glyph plus the
-# font's 1px right/bottom spacing, so a 16×8 character grid fills the 96×64 LCD
-# exactly.  These let the home and menu screens rasterize themselves to pixels.
-GLYPH_HEIGHT = 7
-CELL_WIDTH = 6
-CELL_HEIGHT = 8
-
-
-def blit_cell(surface, cell_row, cell_col, byte, invert=False):
-	"""Rasterize the large-font glyph for display `byte` into `surface` (any object
-	with set(row, col) / toggle(row, col)) at character cell (cell_row, cell_col).
-
-	`invert` flips the whole 6×8 cell afterward — inverse video, for the menu's
-	highlighted title and selection."""
-	glyph = LARGE_FONT[byte]
-	base_r, base_c = cell_row * CELL_HEIGHT, cell_col * CELL_WIDTH
-	if glyph:
-		for dc, colbits in enumerate(glyph):
-			for dr in range(GLYPH_HEIGHT):
-				if (colbits >> (GLYPH_HEIGHT - 1 - dr)) & 1:
-					surface.set(base_r + dr, base_c + dc)
-	if invert:
-		for dr in range(CELL_HEIGHT):
-			for dc in range(CELL_WIDTH):
-				surface.toggle(base_r + dr, base_c + dc)
-
-
 # Small-font bitmap data for the TI-83+ display byte charset.
 # Each entry corresponds to one display byte (index = byte value).
 # Each bytes object encodes one column per byte; each byte uses 6 bits,
@@ -553,3 +526,11 @@ SMALL_FONT: list[bytes | None] = [
 	None,              # FE (undefined)
 	None,              # FF (undefined)
 ]
+
+# Large-font character cell geometry on the 96×64 LCD.
+# Each glyph is GLYPH_WIDTH×GLYPH_HEIGHT pixels; add 1px spacing on the right and
+# bottom and the 16×8 character grid fills the LCD exactly.
+GLYPH_WIDTH  = 5
+GLYPH_HEIGHT = 7
+CELL_WIDTH   = 6   # GLYPH_WIDTH  + 1
+CELL_HEIGHT  = 8   # GLYPH_HEIGHT + 1

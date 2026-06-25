@@ -2,6 +2,7 @@ import struct
 
 from itertools import batched
 
+from fonts import LARGE_FONT, GLYPH_HEIGHT, CELL_WIDTH, CELL_HEIGHT
 
 ROWS = 64
 COLS = 96
@@ -52,6 +53,27 @@ class Bitmap:
 		for row in self.buffer:
 			row.__init__(COLS)  # hack?
 		self.version += 1
+
+	def blit_large(self, row: int, col: int, byte: int, invert: bool = False) -> int:
+		"""Rasterize a large-font glyph as a full CELL_WIDTH×CELL_HEIGHT (6×8) block.
+
+		Covers all 6×8 pixels in a single pass: glyph data in columns 0–4, rows 0–6;
+		the gap column (5) and gap row (7) are set to 0 (or 1 when inverted).  With
+		invert=True every bit is XOR'd with 1 — no second toggle pass needed.
+		Returns the next column position (col + CELL_WIDTH).
+		"""
+		glyph = LARGE_FONT[byte]
+		for dc in range(CELL_WIDTH):
+			colbits = glyph[dc] if (glyph and dc < len(glyph)) else 0
+			c = col + dc
+			for dr in range(CELL_HEIGHT):
+				bit = bool((colbits >> (GLYPH_HEIGHT - 1 - dr)) & 1) if dr < GLYPH_HEIGHT else False
+				self.set(row + dr, c, bit ^ invert)
+		return col + CELL_WIDTH
+
+	def blit_cell(self, cell_row: int, cell_col: int, byte: int, invert: bool = False) -> None:
+		"""Rasterize a large-font glyph at character grid position (cell_row, cell_col)."""
+		self.blit_large(cell_row * CELL_HEIGHT, cell_col * CELL_WIDTH, byte, invert)
 
 	def print_screen(self, path, pixel_size: int = 1) -> None:
 		"""Save the buffer as a monochrome BMP.

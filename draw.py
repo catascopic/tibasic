@@ -5,7 +5,7 @@ from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, 
 from errors import DataTypeError, DomainError
 from modes import Screen
 from graphscreen import GraphScreen
-from fonts import SMALL_FONT, LARGE_FONT
+from fonts import SMALL_FONT, GLYPH_WIDTH
 from core import TiString, py_int
 from graph import (
 	MAX_ROW, MAX_COL, _round_half_up,
@@ -409,17 +409,15 @@ def text(args):
 	"""Text(row,col,val[,val...]) — draw values on the graph screen in small font.
 
 	Text(-1,row,col,val[,val...]) uses the large font instead.
-	"""	
+	"""
 	first = args.expr()
 	large_mode = first == -1
 
 	if large_mode:
-		font   = LARGE_FONT
 		height = 7
 		row    = py_int(args.expr())
 		col    = py_int(args.expr())
 	else:
-		font   = SMALL_FONT
 		height = 6
 		row    = py_int(first)
 		col    = py_int(args.expr())
@@ -428,30 +426,28 @@ def text(args):
 		raise DomainError("Text(: not enough vertical space")
 
 	# Collect and validate every value before touching the screen, so an invalid
-	# argument (e.g. a complex number) can't leave a partially-drawn string. #
-	glyphs = []
+	# argument (e.g. a complex number) can't leave a partially-drawn string.
+	chars = []
 	while args.has_next:
-		for char in _get_text_chars(args.expr()):
-			glyphs.append(font[char])
+		for ch in _get_text_chars(args.expr()):
+			chars.append(ch)
 	args.end_paren_cmd()
 
 	graph = args.env.graph
 	cur_col = col
-	for glyph in glyphs:
-		if cur_col + len(glyph) > MAX_COL + 1:
-			break
-		next_col = _blit_char(graph, row, cur_col, glyph, height)
+	for ch in chars:
 		if large_mode:
-			# Large font carries a 1px separator: blank the column to the right of
-			# the glyph and the padding row beneath, but only if they fit in the drawable area.
-			if next_col <= MAX_COL:
-				for r in range(row, row + height + 1):
-					graph.set(r, next_col, False)
-			if row + height <= MAX_ROW:
-				for c in range(cur_col, next_col):
-					graph.set(row + height, c, False)
-			next_col += 1
-		cur_col = next_col
+			# Gap is optional overhang — only the glyph pixels must fit.
+			if cur_col + GLYPH_WIDTH > MAX_COL + 1:
+				break
+			cur_col = graph.blit_large(row, cur_col, ch)
+		else:
+			glyph = SMALL_FONT[ch]
+			if glyph is None:
+				continue
+			if cur_col + len(glyph) > MAX_COL + 1:
+				break
+			cur_col = _blit_char(graph, row, cur_col, glyph, height)
 
 
 # Wrap every command that marks the graph so that running it displays the graph

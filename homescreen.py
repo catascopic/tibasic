@@ -173,12 +173,11 @@ class HomeScreen:
 		uses — the home screen and the graph are two views of one Bitmap.
 		"""
 		from bitmap import Bitmap
-		from fonts import blit_cell
 		surface = Bitmap()
 		for r in range(self.ROWS):
 			row = self._window_row(r)
 			for c in range(self.COLS):
-				blit_cell(surface, r, c, row[c])
+				surface.blit_cell(r, c, row[c])
 		surface.print_screen(path, pixel_size)
 
 	def __str__(self) -> str:

@@ -63,12 +63,11 @@ class MenuScreen:
 		rasterized through the large font into the shared 96×64 Bitmap, with the
 		inverted title and selection drawn as flipped pixels (fonts.blit_cell)."""
 		from bitmap import Bitmap
-		from fonts import blit_cell
 		surface = Bitmap()
 		for r, row in enumerate(self.styled_rows()):
 			c = 0
 			for text, inverted in row:
 				for ch in text:
-					blit_cell(surface, r, c, encode(ch)[0], invert=inverted)
+					surface.blit_cell(r, c, encode(ch)[0], invert=inverted)
 					c += 1
 		surface.print_screen(path, pixel_size)

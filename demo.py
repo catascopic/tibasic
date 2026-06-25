@@ -23,38 +23,8 @@ def run_demo(source, freeform=False):
 if __name__ == '__main__':
 	run_demo("""
 
-Lbl 1
-Disp "X--------------O
-Disp "_X------------O
-Disp "__X----------O
-Disp "___X--------O
-Disp "____X------O
-Disp "_____X----O
-Disp "______X--O
-Disp "_______XO
-Disp "_______OX
-Disp "______O--X
-Disp "_____O----X
-Disp "____O------X
-Disp "___O--------X
-Disp "__O----------X
-Disp "_O------------X
-Disp "O--------------X
-Disp "_O------------X
-Disp "__O----------X
-Disp "___O--------X
-Disp "____O------X
-Disp "_____O----X
-Disp "______O--X
-Disp "_______OX
-Disp "_______XO
-Disp "______X--O
-Disp "_____X----O
-Disp "____X------O
-Disp "___X--------O
-Disp "__X----------O
-Disp "_X------------O
-Goto 1
+"AB@ Str1
+Input Str1 , Str2
 
 	""", freeform='--freeform' in sys.argv)
 
@@ -94,3 +64,42 @@ Disp "_X
 prgm DEMO
 
 	"""
+	
+	
+"""
+
+
+Lbl 1
+Disp "X--------------O
+Disp "_X------------O
+Disp "__X----------O
+Disp "___X--------O
+Disp "____X------O
+Disp "_____X----O
+Disp "______X--O
+Disp "_______XO
+Disp "_______OX
+Disp "______O--X
+Disp "_____O----X
+Disp "____O------X
+Disp "___O--------X
+Disp "__O----------X
+Disp "_O------------X
+Disp "O--------------X
+Disp "_O------------X
+Disp "__O----------X
+Disp "___O--------X
+Disp "____O------X
+Disp "_____O----X
+Disp "______O--X
+Disp "_______OX
+Disp "_______XO
+Disp "______X--O
+Disp "_____X----O
+Disp "____X------O
+Disp "___X--------O
+Disp "__X----------O
+Disp "_X------------O
+Goto 1
+
+"""
