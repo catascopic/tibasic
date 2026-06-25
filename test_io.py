@@ -551,25 +551,24 @@ class TestInput:
 	def test_nested_sub_prompt(self):
 		assert var(run_with('Input sub( sub( "ABC" ,1,2 ) ,1,1 ) ,X', ['3']), 'X') == 3
 
-	# The 0xEF token table (getDtStr(/getTmStr() postdates the prompt parser, so its
-	# tokens are rejected — as a syntax error at the top level, but a data-type error
-	# nested inside sub('s parentheses (a different routine catches it).
-
-	def test_clock_function_in_prompt_is_syntax_error(self):
-		with pytest.raises(TiSyntaxError):
-			run_with('Input "A" + getDtStr( 1 ) ,X', [])
+	# Only the *first* token is checked.  A clock function (getDtStr(/getTmStr() can't
+	# begin a prompt — so as the first argument it's read as the target and rejected —
+	# but once a valid first token commits to "prompt", the rest is parsed normally, so
+	# a clock function later in the expression is simply evaluated (the real calculator
+	# rejects it; we deliberately don't, since only the first token is gated).
 
 	def test_clock_function_as_first_arg_is_syntax_error(self):
 		with pytest.raises(TiSyntaxError):
 			run_with('Input getDtStr( 1 ) ,X', [])
 
-	def test_get_tm_str_in_prompt_is_syntax_error(self):
+	def test_get_tm_str_as_first_arg_is_syntax_error(self):
 		with pytest.raises(TiSyntaxError):
 			run_with('Input getTmStr( 1 ) ,X', [])
 
-	def test_clock_function_inside_sub_is_data_type_error(self):
-		with pytest.raises(DataTypeError):
-			run_with('Input sub( getDtStr( 1 ) ,1,1 ) ,X', [])
+	def test_clock_function_later_in_prompt_is_allowed(self):
+		# Allowed here (unlike hardware): the first token is a literal, so the rest —
+		# including getDtStr( — is just evaluated as an ordinary string expression.
+		assert var(run_with('Input "A" + getDtStr( 1 ) ,X', ['5']), 'X') == 5
 
 	def test_parenthesized_first_arg_is_syntax_error(self):
 		# A leading '(' isn't a prompt-starter, so it's read as the target → not a var
@@ -577,7 +576,7 @@ class TestInput:
 			run_with('Input ( "A" ) ,X', [])
 
 	def test_number_concatenated_to_prompt_is_data_type_error(self):
-		# "A"+5 passes the token filter but fails at evaluation, like on hardware
+		# "A"+5 starts with a valid token, parses normally, then fails at evaluation
 		with pytest.raises(DataTypeError):
 			run_with('Input "A" + 5 ,X', [])
 
