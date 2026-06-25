@@ -5,7 +5,7 @@ from io import BytesIO
 from environment import Environment
 from parser import ArgParser
 from preparse import special_func
-from titoken import Token
+from titoken import Token, TokenKind
 from accessors import (
 	Accessor, NumericVar, MatrixVar, ListVar, StringVar,
 	Computed, Constant,
@@ -99,9 +99,10 @@ def token(
 	cmd:  Callable | None = None,
 	cnv:  Callable | None = None,
 	var:  Accessor | None = None,
+	kind: TokenKind = TokenKind(0),
 ) -> Token:
 
-	t = Token(code, display, bp, op, post, func, cmd, var, cnv)
+	t = Token(code, display, bp, op, post, func, cmd, var, cnv, kind)
 	_set_token(t)
 	ALL_TOKENS.append(t)
 	if typeable:
@@ -170,34 +171,34 @@ token(0x40, b' and ',                   bp=(30, 31), op=ops.and_)
 
 # A - Z, θ
 for _i in range(26):
-	token(0x41 + _i, bytes([0x41 + _i]), var=NumericVar(chr(0x41 + _i)), typeable=True)
+	token(0x41 + _i, bytes([0x41 + _i]), var=NumericVar(chr(0x41 + _i)), kind=TokenKind.NUMERIC, typeable=True)
 
-token(0x5B, b'\x5b', var=NumericVar('theta'), typeable=True)
+token(0x5B, b'\x5b', var=NumericVar('theta'), kind=TokenKind.NUMERIC, typeable=True)
 
 # [A] - [J]
 for _i in range(10):
-	token(0x5C00 | _i, bytes([0xC1, 0x41 + _i, 0x5D]), var=MatrixVar(chr(0x41 + _i)))
+	token(0x5C00 | _i, bytes([0xC1, 0x41 + _i, 0x5D]), var=MatrixVar(chr(0x41 + _i)), kind=TokenKind.MATRIX)
 
 # L₁ - L₆
 for _i in range(6):
-	token(0x5D00 | _i, bytes([0x4C, 0x81 + _i]), var=ListVar(_i))
+	token(0x5D00 | _i, bytes([0x4C, 0x81 + _i]), var=ListVar(_i), kind=TokenKind.LIST)
 
 # Y₁ - Y₀  (Function mode)
 for _i in range(10):
-	token(0x5E10 + _i, bytes([0x59, 0x80 + (_i + 1) % 10]), var=FuncEquationVar(_i))
+	token(0x5E10 + _i, bytes([0x59, 0x80 + (_i + 1) % 10]), var=FuncEquationVar(_i), kind=TokenKind.EQUATION)
 
 # X₁ₜ/Y₁ₜ - X₆ₜ/Y₆ₜ  (Parametric mode: pairs share one index)
 for _i in range(6):
-	token(0x5E20 + _i * 2,     bytes([0x58, 0x81 + _i, 0x0D]), var=ParEquationVar(_i, half='x'))
-	token(0x5E20 + _i * 2 + 1, bytes([0x59, 0x81 + _i, 0x0D]), var=ParEquationVar(_i, half='y'))
+	token(0x5E20 + _i * 2,     bytes([0x58, 0x81 + _i, 0x0D]), var=ParEquationVar(_i, half='x'), kind=TokenKind.EQUATION)
+	token(0x5E20 + _i * 2 + 1, bytes([0x59, 0x81 + _i, 0x0D]), var=ParEquationVar(_i, half='y'), kind=TokenKind.EQUATION)
 
 # r₁ - r₆  (Polar mode)
 for _i in range(6):
-	token(0x5E40 + _i, bytes([0x72, 0x81 + _i]), var=PolarEquationVar(_i))
+	token(0x5E40 + _i, bytes([0x72, 0x81 + _i]), var=PolarEquationVar(_i), kind=TokenKind.EQUATION)
 
 # 𝑢, 𝑣, 𝑤  (Sequence mode)
 for _i in range(3):
-	token(0x5E80 + _i, bytes([0x02 + _i]), var=SequenceVar(_i))
+	token(0x5E80 + _i, bytes([0x02 + _i]), var=SequenceVar(_i), kind=TokenKind.SEQUENCE)
 
 token(0x5F, b'prgm', cmd=cmds.prgm)
 
@@ -241,7 +242,7 @@ token(0x621D, b'x\x83')     # x₃
 token(0x621E, b'y\x81')     # y₁
 token(0x621F, b'y\x82')     # y₂
 token(0x6220, b'y\x83')     # y₃
-token(0x6221, b'\x01',                  var=EnvVar('n'))      # 𝑛
+token(0x6221, b'\x01',                  var=EnvVar('n'), kind=TokenKind.NUMERIC)      # 𝑛 (counts as a numeric var)
 token(0x6222, b'p')
 token(0x6223, b'z')
 token(0x6224, b't')
@@ -423,7 +424,7 @@ token(0xA9, b'DrawF ',                  cmd=draw.draw_f)
 
 # Str1 - Str0
 for _i in range(10):
-	token(0xAA00 | _i, b'Str' + bytes([0x30 + (_i + 1) % 10]), var=StringVar(_i))
+	token(0xAA00 | _i, b'Str' + bytes([0x30 + (_i + 1) % 10]), var=StringVar(_i), kind=TokenKind.STRING)
 
 token(tk.RAND, b'rand',                 var=timath.RandAccessor())
 token(0xAC, b'\xc4',                    var=Constant(math.pi), typeable=True)  # π

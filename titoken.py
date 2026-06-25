@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from collections.abc import Callable
+from enum import IntFlag, auto
 
 
 # _CHARSET: TI-83+ byte -> Unicode character (None = undefined slot).
@@ -99,6 +100,21 @@ END         = 0xD4
 LBL         = 0xD6
 
 
+class TokenKind(IntFlag):
+	"""A token's variable classification, declared explicitly in the catalog instead of
+	inferred from its code range.  Only assignable variable kinds get a flag; VARIABLE
+	is their union — what any_var / DelVar accept.  Lexical categories (digits, name
+	chars) stay as range checks, and settings (window/stat vars) aren't variables here.
+	"""
+	NUMERIC  = auto()
+	LIST     = auto()
+	MATRIX   = auto()
+	STRING   = auto()
+	SEQUENCE = auto()
+	EQUATION = auto()
+	VARIABLE = NUMERIC | LIST | MATRIX | STRING | SEQUENCE | EQUATION
+
+
 @dataclass(slots=True, frozen=True, eq=False)
 class Token:
 	code: int                 # token code as stored in a program (1 or 2 bytes packed into an int)
@@ -110,6 +126,7 @@ class Token:
 	command:   Callable | None = None  # (ArgParser) -> None for command tokens
 	accessor:  "Accessor | None" = None  # how this symbol reads/writes the environment (variables, π, rand, getKey, window vars …): resolve() for a bare reference, store() as a store target, reference() to bind it for a command.  See accessors.py.
 	converter: Callable | None = None  # (value) -> value for ►DMS, ►Dec, ►Frac and others
+	kind:      "TokenKind" = TokenKind(0)  # which assignable-variable kind(s) this is, if any
 
 	@property
 	def text(self) -> str:
@@ -124,25 +141,25 @@ class Token:
 		return 0x30 <= self.code <= 0x39
 
 	def is_numeric_var(self) -> bool:
-		return 0x41 <= self.code < 0x5C or self.code == 0x6221
+		return bool(self.kind & TokenKind.NUMERIC)
 
 	def is_list_var(self) -> bool:
-		return 0x5D00 <= self.code <= 0x5DFF
+		return bool(self.kind & TokenKind.LIST)
 
 	def is_list_start(self):
-		return self.code == 0xEB or 0x5D00 <= self.code <= 0x5DFF
+		return self.code == LIST_PREFIX or self.is_list_var()
 
 	def is_matrix_var(self) -> bool:
-		return 0x5C00 <= self.code <= 0x5CFF
+		return bool(self.kind & TokenKind.MATRIX)
 
 	def is_sequence_var(self) -> bool:
-		return 0x5E80 <= self.code <= 0x5E82
+		return bool(self.kind & TokenKind.SEQUENCE)
 
 	def is_equation_var(self) -> bool:
-		return 0x5E10 <= self.code <= 0x5E4F   # Yn (func), XnT/YnT (par), rn (polar)
+		return bool(self.kind & TokenKind.EQUATION)
 
 	def is_string_var(self) -> bool:
-		return 0xAA00 <= self.code <= 0xAAFF
+		return bool(self.kind & TokenKind.STRING)
 
 	def is_stat_var(self) -> bool:
 		return 0x6200 <= self.code <= 0x62FF

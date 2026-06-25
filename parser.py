@@ -3,11 +3,11 @@ from numbers import Number
 import operators
 from core import TiList, TiMatrix, TiString
 from titoken import (
-	Token, EOF_TOKEN, EOF_CODE,
+	Token, TokenKind, EOF_TOKEN, EOF_CODE,
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
 	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
 	SCI_E, DEG, RAD, APOS,
-	ANS, RAND, DIM, 
+	ANS, RAND, DIM,
 	LIST_PREFIX,
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
@@ -697,8 +697,7 @@ class ArgParser:
 		failing later at store time.
 		"""
 		t = self._parser.advance()
-		if (t.is_numeric_var() or t.is_list_var() or t.is_matrix_var()
-				or t.is_string_var() or t.is_sequence_var() or t.is_equation_var()):
+		if t.kind & TokenKind.VARIABLE:
 			return t.accessor.reference(self.env, TiString([t]))
 		if t.code == LIST_PREFIX:
 			return self._parser.parse_user_list()
