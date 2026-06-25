@@ -480,8 +480,11 @@ class Parser:
 	def parse_user_list(self):
 		# A user list (dict-backed by name) shares the same accessor/Reference surface
 		# as everything else, so store/resolve/dim go through the common code paths.
+		# The ᴸ prefix is already consumed, so the captured tokens are the bare name —
+		# exactly what Prompt should echo (∟PRIMES and PRIMES both display "PRIMES=?").
+		start = self.pos
 		name = self.read_name(5)
-		return UserListVar(name).reference(self.env)
+		return UserListVar(name).reference(self.env, TiString(self.tokens[start:self.pos]))
 
 	# SKIPPING
 
@@ -686,10 +689,17 @@ class ArgParser:
 
 	@_parse_arg
 	def any_var(self) -> "Reference":
-		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
+		"""Read any variable reference: numeric, list, matrix, string, equation, or user list.
+
+		Classified positively from the token, so symbols that merely carry an accessor
+		but aren't assignable variables — constants (π, 𝑒, 𝑖), computed reads (getKey,
+		getDate), rand, and window/stat/finance settings — are rejected here rather than
+		failing later at store time.
+		"""
 		t = self._parser.advance()
-		if t.accessor is not None:
-			return t.accessor.reference(self.env)
+		if (t.is_numeric_var() or t.is_list_var() or t.is_matrix_var()
+				or t.is_string_var() or t.is_sequence_var() or t.is_equation_var()):
+			return t.accessor.reference(self.env, TiString([t]))
 		if t.code == LIST_PREFIX:
 			return self._parser.parse_user_list()
 		raise TiSyntaxError(f"Expected a variable, got {t}")

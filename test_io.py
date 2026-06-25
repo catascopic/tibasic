@@ -502,6 +502,12 @@ class TestInput:
 	def test_reads_list(self):
 		assert var(run_with('Input L1', ['{1,2,3}']), 'L1').data == [1, 2, 3]
 
+	def test_list_into_numeric_creates_user_list(self):
+		# A list entered for a numeric variable lands in ∟<name>, not the numeric var
+		env = run_with('Input A', ['{1,2,3}'])
+		assert var(env, '$A').data == [1, 2, 3]
+		assert var(env, 'A') is None
+
 	def test_prompt_passed_to_console(self):
 		env = Environment()
 		env.console = ScriptedConsole(inputs=['1'])
@@ -526,6 +532,11 @@ class TestInput:
 	def test_graph_form_not_supported(self):
 		with pytest.raises(TiSyntaxError):
 			run_with('Input', [])
+
+	def test_constant_target_is_rejected(self):
+		# π has an accessor but isn't an assignable variable
+		with pytest.raises(TiSyntaxError):
+			run_with('Input π', ['1'])
 
 	# ── Prompt grammar ──────────────────────────────────────────────────────────
 	# The display string is a restricted string expression — a literal, a string
@@ -605,6 +616,12 @@ class TestPrompt:
 		# Prompt requires the ᴸ prefix for user lists; bare multi-char names are an error
 		with pytest.raises(Exception):
 			run_with('Prompt ABC', ['{1}'])
+
+	def test_list_into_numeric_creates_user_list(self):
+		# A list entered for a numeric variable is stored to ∟<name> instead
+		env = run_with('Prompt A', ['{1,2,3}'])
+		assert var(env, '$A').data == [1, 2, 3]
+		assert var(env, 'A') is None    # the numeric A was never written
 
 
 # ── ScriptedConsole ───────────────────────────────────────────────────────────

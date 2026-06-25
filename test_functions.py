@@ -1138,6 +1138,21 @@ class TestDelVar:
 		assert var(env, 'A') is None
 		assert var(env, 'B') == 99
 
+	def test_clears_equation(self):
+		env = run('"2X"@ Y1')
+		assert var(env, 'Y1') is not None
+		run('DelVar Y1', env)
+		assert var(env, 'Y1') is None
+
+	def test_constant_is_not_a_variable(self):
+		# π carries an accessor but isn't assignable — rejected at parse time
+		with pytest.raises(TiSyntaxError):
+			run('DelVar π')
+
+	def test_rand_is_not_a_variable(self):
+		with pytest.raises(TiSyntaxError):
+			run('DelVar rand')
+
 
 class TestSetUpEditor:
 

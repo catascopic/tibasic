@@ -47,7 +47,6 @@ class Accessor(ABC):
 	== A·2).
 	"""
 
-	kind = None        # discriminator for callers that branch on type (e.g. Input: 'string')
 	invocable = False  # True ⇒ a trailing '(' is a call/index (see invoke), not implicit mult
 
 	def _get(self, env):
@@ -73,8 +72,8 @@ class Accessor(ABC):
 	def delete(self, env):
 		raise TiSyntaxError(f"Cannot delete {self}")
 
-	def reference(self, env) -> "Reference":
-		return Reference(env, self)
+	def reference(self, env, name: "TiString | None" = None) -> "Reference":
+		return Reference(env, self, name)
 
 
 class Deletable:
@@ -89,13 +88,22 @@ class Deletable:
 class Reference:
 	"""An accessor bound to an environment — what commands receive when they take a
 	variable rather than its value.  Exposes a uniform mutable-variable surface so
-	consumers (For/fnInt/Input/DelVar/…) work the same for every symbol kind."""
+	consumers (For/fnInt/Input/DelVar/…) work the same for every symbol kind.
 
-	__slots__ = ('env', 'accessor')
+	`name` is the variable's source spelling as display tokens — a single token for a
+	built-in (`A`, `Str1`, `L1`), or the bare name tokens for a user list (`PRIMES`,
+	with the ᴸ prefix dropped).  It's what Prompt echoes as "NAME=?", and lets a
+	consumer reclassify the target with the token's own `is_*_var()` methods (rather
+	than re-deriving the kind from the accessor).  Only the parser, which sees the
+	original tokens, can fill it in; commands that don't need it leave it None.
+	"""
 
-	def __init__(self, env, accessor: Accessor):
+	__slots__ = ('env', 'accessor', 'name')
+
+	def __init__(self, env, accessor: Accessor, name: "TiString | None" = None):
 		self.env = env
 		self.accessor = accessor
+		self.name = name
 
 	def resolve(self):
 		return self.accessor.resolve(self.env)
@@ -133,7 +141,6 @@ class NumericVar(Deletable, Accessor):
 	matching the calculator; `store` accepts any number (real or complex).
 	"""
 	__slots__ = ('name',)
-	kind = 'numeric'
 
 	def __init__(self, name: str):
 		self.name = name
@@ -294,12 +301,11 @@ class ListVar(Deletable, Accessor):
 class StringVar(Deletable, Accessor):
 	"""A string variable Str1–Str0 — a 0-based slot in env.strings (list[TiString | None]).
 
-	`kind = 'string'` lets Input/Prompt store the raw typed text rather than
-	evaluating it as an expression.
+	Input/Prompt recognize a string target through its token's `is_string_var()` and
+	store the raw typed text rather than evaluating it as an expression.
 	"""
 
 	__slots__ = ('index',)
-	kind = 'string'
 
 	def __init__(self, index: int):
 		self.index = index

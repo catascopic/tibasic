@@ -1,16 +1,16 @@
 import time
 
 from parser import ArgParser, Parser
-from titoken import QUOTE, ANS, EOF_CODE, COLON, NEWLINE, LIST_PREFIX
+from titoken import QUOTE, ANS
 
 from preparse import (
 	preparse_cmd, preparse_cmd_func, preparse_bunch,
 	Thunk, NumericVar, LabelName, ProgramName, AnyVar, Real, Env, AnyValue,
 )
-from accessors import Reference
+from accessors import Reference, UserListVar
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
-from core import TiString, py_int, require_string
+from core import TiString, TiList, py_int, require_string
 from errors import TiSyntaxError, UndefinedError, DomainError
 from tiformat import output_text
 from menuscreen import MenuScreen
@@ -183,15 +183,19 @@ def _input_one(env, prompt: TiString | None, var: Reference, raw_string: bool = 
 		prompt_bytes = b''.join(t.display for t in prompt.tokens) if prompt is not None else b''
 		env.home.echo(prompt_bytes + b''.join(t.display for t in tokens))
 		env.console.present()
-	if raw_string and var.accessor.kind == 'string':
+	if raw_string and var.name.tokens[0].is_string_var():
 		var.store(TiString(tokens))
 	else:
 		parser = Parser(tokens, env)
 		value = parser.parse_expr()
 		if parser.has_next:
 			raise TiSyntaxError(f"Input: expected a single expression, got {tokens}")
-		if isinstance(value, TiList) and var.accessor.kind == 'numeric':
-			UserListVar(var.text).store(value)
+		# A list typed into a numeric variable isn't stored to it: the calculator
+		# makes a user list of the same name instead (a list entered for `Input A`
+		# lands in $A).  A user-list target already holds lists, so it's exempt.
+		if (isinstance(value, TiList) and var.name.tokens[0].is_numeric_var()
+				and not isinstance(var.accessor, UserListVar)):
+			UserListVar(str(var.name)).store(env, value)
 		else:
 			var.store(value)
 
@@ -219,12 +223,13 @@ def input_cmd(args: ArgParser):
 	t = args.peek()
 	if t.is_string_var() or t.code in {QUOTE, ANS, _SUB}:
 		first = args.thunk()
+		# TODO: reject EF tokens
 		if args.has_next:
 			# the first arg was the prompt
 			prompt = first.eval()
 			var = args.any_var()
 		else:
-			var = t.accessor.reference(env)
+			var = t.accessor.reference(env, TiString([t]))
 	else:
 		var = args.any_var()
 	
@@ -239,10 +244,8 @@ def prompt_cmd(args: ArgParser):
 	env = args.env
 	suffix = TiString.from_str('=?')
 	while args.has_next:
-		t = args.peek()
 		var = args.any_var()
-		prompt = TiString([t]) if t.code != LIST_PREFIX else TiString.from_str(var.accessor.name)
-		_input_one(env, prompt + suffix, var)
+		_input_one(env, var.name + suffix, var)
 	args.end_cmd()
 
 

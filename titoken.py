@@ -138,6 +138,9 @@ class Token:
 	def is_sequence_var(self) -> bool:
 		return 0x5E80 <= self.code <= 0x5E82
 
+	def is_equation_var(self) -> bool:
+		return 0x5E10 <= self.code <= 0x5E4F   # Yn (func), XnT/YnT (par), rn (polar)
+
 	def is_string_var(self) -> bool:
 		return 0xAA00 <= self.code <= 0xAAFF
 
