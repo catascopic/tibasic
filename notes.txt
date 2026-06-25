@@ -10,15 +10,8 @@ env.focus_home()/focus_graph()/focus_table()
 
 
 
-Run indicator in HELIX
-
 *values: AnyValue
 Wrong type from function's POV
-
-input_cmd: can take a string variable or expression as first param
-Can also take prefix-optional user list name!
-
-prompt_cmd: Does not share Input's optional quote behavior
 
 
 
@@ -31,12 +24,8 @@ _eval_sequence: use context manager
 
 seq: sample_sequence index
 
-Timer-based indicator
-
 merge graphmodes into graph
 QR: Fix version bump 5->6 when set explicitly
-
-Spinner doesn't spin without getkey
 
 "Done" When program finishes or ans if the last line produced a result
 

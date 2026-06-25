@@ -1,8 +1,7 @@
 import sys
 
 from environment import Environment
-from terminal import TerminalConsole
-from iodevice import FreeFormIO
+from terminal import TerminalConsole, FreeFormConsole
 from program import Program
 from test_tibasic import toks
 
@@ -16,7 +15,7 @@ def run_demo(source, freeform=False):
 	"""
 	env = Environment(console=TerminalConsole())
 	if freeform:
-		env.io = FreeFormIO()
+		env.console = FreeFormConsole()
 	env.programs['DEMO'] = Program(toks(source), 'DEMO')
 	env.submit(toks('prgm DEMO'))
 

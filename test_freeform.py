@@ -1,15 +1,15 @@
-"""The grid-less FreeFormIO device: Disp/Output/Pause/Input via print()/input()."""
+"""The grid-less FreeFormConsole: Disp streamed via print(), Input via input()."""
 import pytest
 
 from environment import Environment
-from iodevice import FreeFormIO
+from terminal import FreeFormConsole
 from program import Program
 from test_tibasic import toks, var
 
 
 def freeform_env():
 	env = Environment()
-	env.io = FreeFormIO()
+	env.console = FreeFormConsole()
 	return env
 
 
@@ -31,11 +31,13 @@ class TestFreeFormOutput:
 		run('Disp [[1,2][3,4]]', freeform_env())
 		assert capsys.readouterr().out == '[[1 2]\n [3 4]]\n'
 
-	def test_output_ignores_position_and_prints(self, capsys):
-		# Weakly supported: an out-of-range cell that would raise on the home screen
-		# is fine here — the value is just printed without positioning.
-		run('Output( 99,99,7', freeform_env())
-		assert capsys.readouterr().out == '7\n'
+	def test_output_writes_to_grid_not_stream(self, capsys):
+		# Output( is positional, so it writes to the (unpainted) home grid like any
+		# other frontend rather than streaming; free-form prints only the Disp
+		# transcript, so nothing is emitted, but the grid reflects the write.
+		env = run('Output( 1,1,7', freeform_env())
+		assert capsys.readouterr().out == ''
+		assert env.home.render().split('\n')[0].startswith('7')
 
 
 class TestFreeFormPause:
@@ -65,4 +67,4 @@ class TestFreeFormInput:
 
 class TestFreeFormKeys:
 	def test_get_key_unsupported_returns_zero(self):
-		assert FreeFormIO().get_key() == 0
+		assert FreeFormConsole().read_key() == 0

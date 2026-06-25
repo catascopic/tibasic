@@ -34,10 +34,16 @@ class _GraphDrawing(TiCall):
 		prev_screen = env.screen
 		env.draw_to_graph()
 		try:
-			return self._inner.call_with_parser(args)
+			result = self._inner.call_with_parser(args)
 		except Exception:
 			env.screen = prev_screen
 			raise
+		# One present() per drawing command (not per pixel): a pixel-art loop is many
+		# commands, so it animates step by step; a curve-plotting command is one, so
+		# it repaints once when done.  This is what lets a frontend show a drawing
+		# being built up in real time.
+		env.console.present()
+		return result
 
 # Pt-On/Off/Change mark pixel offsets (Δrow, Δcol) relative to centre.
 # mark 2/6 = 3×3 filled box (9 pixels)

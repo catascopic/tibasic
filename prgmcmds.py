@@ -11,7 +11,8 @@ from accessors import Reference
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, py_int, require_string
-from errors import TiSyntaxError, UndefinedError
+from errors import TiSyntaxError, UndefinedError, DomainError
+from tiformat import output_text
 from modes import Screen
 
 ############
@@ -99,12 +100,13 @@ def disp(args: ArgParser):
 	"""Disp [value[,value...]] — show each value (no args just re-renders).  Every TI
 	data type is supported; how it's laid out is the device's call (the home screen
 	right-aligns numbers/lists/matrices, a matrix one line per row, strings left)."""
-	args.env.screen = Screen.HOME       # Disp brings up the home screen
-	io = args.env.io
+	env = args.env
+	env.screen = Screen.HOME            # Disp brings up the home screen
 	if not args.has_next:
-		io.refresh()
+		env.console.present()           # bare Disp just re-presents the screen
 	while args.has_next:
-		io.disp(args.expr())
+		env.home.disp(args.expr())
+		env.console.present()
 	args.end_cmd()
 	time.sleep(0.05)
 
@@ -117,20 +119,25 @@ def output(env: Env, row: Real, col: Real, value: AnyValue):
 	separators and a matrix is inlined onto the single starting position, wrapping
 	across cells from there."""
 	env.screen = Screen.HOME  # Output( brings up the home screen
-	env.io.output(py_int(row), py_int(col), value)
-	# time.sleep(0.05)
-	
+	r, c = py_int(row), py_int(col)
+	if not (1 <= r <= env.home.ROWS and 1 <= c <= env.home.COLS):
+		raise DomainError(f"Output(: position out of range: ({r}, {c})")
+	env.home.output(r - 1, c - 1, output_text(value))
+	env.console.present()
+
 
 @no_arg_command
 def clr_home(env):
 	"""ClrHome — clear the text screen.  Does not change which screen is displayed."""
-	env.io.clear_home()
+	env.home.clear()
+	env.console.present()
 
 
 @no_arg_command
 def disp_graph(env):
 	"""DispGraph — display the graph screen, re-plotting the active functions."""
 	env.display_graph()
+	env.console.present()
 
 
 @no_arg_command
@@ -151,7 +158,7 @@ def pause_cmd(env: Env, value: AnyValue = None):
 	env.current_execution()       # raises ERR:INVALID outside a program
 	if value is not None:
 		env.ans = value
-	env.io.pause(value)
+	env.console.pause(value)
 
 
 def _input_one(env, prompt: TiString | None, var: Reference, raw_string: bool = False) -> None:
@@ -163,7 +170,18 @@ def _input_one(env, prompt: TiString | None, var: Reference, raw_string: bool = 
 	expression, same as expr(.
 	"""
 	env.screen = Screen.HOME            # Input/Prompt bring up the home screen
-	tokens = env.io.read_tokens(prompt)
+	try:
+		tokens = env.console.read_tokens(prompt)
+	except KeyError as bad:
+		# A character the calculator's keypad couldn't type (e.g. a multi-char
+		# function name); the keypad-restricted consoles raise this on tokenizing.
+		raise TiSyntaxError(f"Input: unsupported character {bad}")
+	# Mirror the entry onto the home grid (the console paints it on present); the
+	# prompt's own bytes precede the typed bytes, exactly as on the calculator.
+	if tokens:
+		prompt_bytes = b''.join(t.display for t in prompt.tokens) if prompt is not None else b''
+		env.home.echo(prompt_bytes + b''.join(t.display for t in tokens))
+		env.console.present()
 	if raw_string and var.accessor.kind == 'string':
 		var.store(TiString(tokens))
 	else:
@@ -237,4 +255,4 @@ def menu_cmd(args: ArgParser):
 			break
 	args.end_paren_cmd()
 
-	program.goto(labels[args.env.io.menu(title, options)])
+	program.goto(labels[args.env.console.menu(title, options)])

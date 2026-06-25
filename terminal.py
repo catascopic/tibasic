@@ -1,13 +1,16 @@
 """The boundary between the interpreter and a frontend (terminal, HTML, tests).
 
-The interpreter owns the HomeScreen *state*; a Console only renders it and supplies
-user input.  Console methods return raw results — typed text, a key code, a chosen
-index — and the I/O commands apply the TI semantics (parse, store, Goto), so every
-frontend stays dumb.
+The interpreter owns the *state* — the HomeScreen and GraphScreen on `env` — and a
+Console only renders it and supplies user input.  Output is observation, not
+notification: a command mutates the model and calls `present()`, a payload-free
+"a good moment to repaint"; the console pulls whatever it needs from `self.env`
+(home grid, Disp transcript, graph pixels) and paints the view it wants.  Input is
+the irreducible part — the console must block and ask — so read_tokens / read_key /
+pause / menu are real request-response methods and the only suspension points (when
+the HTML frontend needs a suspendable eval loop, these are the hooks to yield at).
 
-The five methods are deliberately the only suspension points: when the HTML
-frontend needs a suspendable eval loop (a synchronous `While 1:getKey→K` can't
-block the browser), read_value / read_key / pause / choose are the hooks to yield at.
+The console reaches the model through `self.env`, attached by Environment when the
+console is assigned, so no method has to be handed the screen.
 """
 import sys
 import time
@@ -15,19 +18,24 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
 from core import TiString
-from titoken import Token
+from titoken import Token, decode
+from tiformat import disp_lines, value_lines
+from modes import Screen
 from homescreen import HomeScreen
+from graphscreen import COLS as _GRAPH_COLS
 from scrollview import ScrollView
 
 
 class Console(ABC):
 
-	@abstractmethod
-	def update(self, home: HomeScreen) -> None:
-		"""Re-render the home screen after a Disp / Output( / ClrHome."""
+	env = None   # the Environment, attached by its `console` setter
+
+	def present(self) -> None:
+		"""A repaint opportunity — output changed (Disp/Output(/ClrHome/a drawing
+		command).  Payload-free: pull from self.env.  Default is a no-op."""
 
 	@abstractmethod
-	def read_tokens(self, prompt: TiString | None, home: HomeScreen) -> list[Token]:
+	def read_tokens(self, prompt: TiString | None) -> list[Token]:
 		"""Blocking: display prompt (if any) and return the tokens the user entered."""
 
 	@abstractmethod
@@ -35,20 +43,28 @@ class Console(ABC):
 		"""Non-blocking: the TI key code currently pressed, or 0 for none (getKey)."""
 
 	@abstractmethod
-	def pause(self, home: HomeScreen, value=None) -> None:
-		"""Blocking: render `home` and wait for the user to continue (Pause).
+	def pause(self, value=None) -> None:
+		"""Blocking: show `value` (if any) and wait for the user to continue (Pause).
 
-		`value` is the paused value (already rendered onto `home` Disp-style).  A
-		frontend may offer to page it with the arrow keys when it's a list/matrix too
-		big for the screen — `ScrollView.of(value)` decides that; frontends that can't
-		take key input just render the initial window."""
+		A frontend may offer to page it with the arrow keys when it's a list/matrix
+		too big for the screen — `ScrollView.of(value)` decides that; frontends that
+		can't take key input just render the initial window."""
 
 	@abstractmethod
-	def choose(self, title: str, options: list[str]) -> int:
+	def menu(self, title: str, options: list[str]) -> int:
 		"""Blocking: present a menu, return the chosen 0-based index (Menu()."""
 
-	def finish(self, home: HomeScreen) -> None:
+	def finish(self) -> None:
 		"""Called when program execution ends; default is a no-op."""
+
+	def _render_pause_value(self, value) -> None:
+		"""Place a Pause value onto the home grid Disp-style, but without logging it
+		to the Disp transcript (Pause shows a value, it isn't a Disp).  A list/matrix
+		too big for the screen is left for the caller to page via ScrollView instead.
+		Shared by every console's pause()."""
+		if value is not None and ScrollView.of(value) is None:
+			for line in disp_lines(value, self.env.home.COLS):
+				self.env.home.write_line(line)
 
 
 class ScriptedConsole(Console):
@@ -65,10 +81,17 @@ class ScriptedConsole(Console):
 		self.choices = list(choices)
 		self.frames: list[str] = []
 
-	def update(self, home: HomeScreen) -> None:
-		self.frames.append(home.render())
+	def _capture(self) -> None:
+		"""Snapshot the active screen — home grid or graph — into `frames`."""
+		if self.env.screen is Screen.GRAPH:
+			self.frames.append('\n'.join(self.env.graph.rows()))
+		else:
+			self.frames.append(self.env.home.render())
 
-	def read_tokens(self, prompt: TiString | None, home: HomeScreen) -> list[Token]:
+	def present(self) -> None:
+		self._capture()
+
+	def read_tokens(self, prompt: TiString | None) -> list[Token]:
 		if not self.inputs:
 			raise ValueError(f"ScriptedConsole: no input queued")
 		return TiString.from_str(self.inputs.pop(0)).tokens
@@ -76,15 +99,66 @@ class ScriptedConsole(Console):
 	def read_key(self) -> int:
 		return self.keys.pop(0) if self.keys else 0
 
-	def pause(self, home: HomeScreen, value=None) -> None:
+	def pause(self, value=None) -> None:
+		self._render_pause_value(value)
 		if view := ScrollView.of(value):
-			view.render_into(home)
-		self.frames.append(home.render())
+			view.render_into(self.env.home)
+		self._capture()
 
-	def choose(self, title: str, options: list[str]) -> int:
+	def menu(self, title: str, options: list[str]) -> int:
 		if not self.choices:
 			raise ValueError(f"ScriptedConsole: no choice queued for menu {title!r}")
 		return self.choices.pop(0)
+
+
+class FreeFormConsole(Console):
+	"""A grid-less frontend: a plain stdout stream and a blocking input().
+
+	The home screen still exists and is fully maintained in the model; this console
+	just doesn't paint its 8×16 window.  Instead it streams the *Disp transcript* —
+	the full-width, untruncated history the home screen records — so output isn't
+	confined to 16 columns.  `present()` prints whatever transcript lines have
+	appeared since last time (tracked by `_printed`), so each Disp shows up once as
+	it happens.  Output( writes to the (unpainted) grid like any other frontend;
+	getKey isn't supported.
+	"""
+
+	def __init__(self):
+		self._printed = 0
+
+	def present(self) -> None:
+		transcript = self.env.home.transcript
+		for line in transcript[self._printed:]:
+			print(line)
+		self._printed = len(transcript)
+
+	def read_tokens(self, prompt: TiString | None) -> list[Token]:
+		return TiString.from_str(input(str(prompt) if prompt is not None else '')).tokens
+
+	def read_key(self) -> int:
+		return 0   # no key support in free-form mode
+
+	def pause(self, value=None) -> None:
+		self.present()   # flush any pending Disp output first
+		if value is not None:
+			print('\n'.join(decode(line) for line in value_lines(value)))
+		print('[PAUSED]')
+		input()
+
+	def menu(self, title: str, options: list[str]) -> int:
+		print(title)
+		for i, option in enumerate(options, 1):
+			print(f"{i}: {option}")
+		while True:
+			try:
+				choice = int(input('> '))
+			except ValueError:
+				continue
+			if 1 <= choice <= len(options):
+				return choice - 1
+
+	def finish(self) -> None:
+		self.present()
 
 
 # The border carries one status indicator that stands in for the calculator's
@@ -128,8 +202,14 @@ class TerminalConsole(Console):
 	# the program finishes.  Class-level default so a bare __new__ instance (used
 	# in menu-rendering tests) still has a sane value.
 	_cursor_hidden = False
+	_present_delay = 0.0
 
-	def __init__(self):
+	def __init__(self, present_delay: float = 0.0):
+		"""`present_delay` pauses this long (seconds) after each output repaint, to
+		mimic the real calculator's slowness — set it to watch a drawing build up
+		pixel by pixel or text scroll at a readable pace.  0 (the default) runs at
+		full speed.  It only paces command-driven output (Disp/Output(/drawing), not
+		the getKey indicator tick, which self-throttles."""
 		if sys.platform == 'win32':
 			_enable_windows_vt()
 		# stdout's inherited encoding can be a legacy codepage (e.g. cp1252) that
@@ -139,24 +219,32 @@ class TerminalConsole(Console):
 			sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 		except (AttributeError, ValueError):
 			pass
-		self._last_home: HomeScreen | None = None
+		self._present_delay = present_delay
 		self._last_run_frame = -1
 
-	def update(self, home: HomeScreen) -> None:
-		self._render(home, _spinner_frame(_RUNNING_SPINNER))
+	def present(self) -> None:
+		self._paint_current(_spinner_frame(_RUNNING_SPINNER))
+		if self._present_delay:
+			time.sleep(self._present_delay)
+
+	def _paint_current(self, indicator: str | None) -> None:
+		"""Repaint whichever screen is active — the graph (96-wide pixel art) or the
+		home grid (16-wide chars) — with `indicator` in the border.  This is the one
+		place that consults env.screen, so present/finish/the getKey tick all show the
+		right surface; a drawing command that just raised the graph shows the graph."""
+		if self.env.screen is Screen.GRAPH:
+			self._paint(self.env.graph.rows(), indicator, width=_GRAPH_COLS)
+		else:
+			self._render(self.env.home, indicator)
 
 	def _render(self, home: HomeScreen, indicator: str | None = None) -> None:
-		# Remembered so _tick_running_indicator can redraw the real home screen
-		# while idle-polling getKey.  The menu screen (_menu_rows/_paint) never
-		# touches this — it isn't the home screen and shouldn't be confused for it.
-		self._last_home = home
 		self._paint(home.render().split('\n'), indicator)
 
-	def _paint(self, rows: list, indicator: str | None = None) -> None:
-		"""Repaint `rows` (ROWS strings of COLS visible characters, ANSI styling
-		allowed) framed in the border, with `indicator` optionally overlaid one
-		cell left of the top-right corner.  Shared by the home screen and the menu
-		screen — neither carries any state for the other.
+	def _paint(self, rows: list, indicator: str | None = None, width: int = HomeScreen.COLS) -> None:
+		"""Repaint `rows` (each `width` visible characters, ANSI styling allowed)
+		framed in the border, with `indicator` optionally overlaid one cell left of
+		the top-right corner.  Shared by the home grid, the graph, and the menu —
+		none carries any state for the others.
 
 		Repaints in place: home the cursor, overwrite each row clearing to its
 		end, then erase anything below.  This avoids \033[2J — which clears only
@@ -164,16 +252,20 @@ class TerminalConsole(Console):
 		off — so the screen never scrolls.  The trailing newline drops the cursor
 		below the grid so an Input prompt appears there (wiped on the next repaint).
 
+		`width` is given explicitly rather than measured from `rows` because the menu
+		embeds invisible ANSI codes (so len() overcounts); callers pass the visible
+		width (16 for home/menu, 96 for the graph).
+
 		`indicator` is the calculator's status icon (the running or pause spinner);
 		None means show none — the program is taking input or has finished.  It
 		lives in the border, not a content cell, so it can never collide with
 		anything a program Output(s, and nothing needs restoring afterward: the
 		next repaint without it just redraws a plain border.
 		"""
-		framed = [(_BOUNDARY * (HomeScreen.COLS + 1)) + (indicator or _BOUNDARY)]
+		framed = [(_BOUNDARY * (width + 1)) + (indicator or _BOUNDARY)]
 		for row in rows:
 			framed.append(_BOUNDARY + row + _BOUNDARY)
-		framed.append(_BOUNDARY * (HomeScreen.COLS + 2))
+		framed.append(_BOUNDARY * (width + 2))
 		painted = '\033[H' + '\n'.join(f'{row}\033[K' for row in framed) + '\033[J\n'
 		sys.stdout.write(painted)
 		# A painted frame parks the cursor in the corner, so hide it by default;
@@ -204,13 +296,15 @@ class TerminalConsole(Console):
 			self._hide_cursor()
 			sys.stdout.flush()
 
-	def finish(self, home: HomeScreen) -> None:
-		self._render(home)    # final repaint with no indicator — the program is done
-		self._show_cursor()   # hand the cursor back to the terminal
+	def finish(self) -> None:
+		self._paint_current(None)   # final repaint with no indicator — the program is done
+		self._show_cursor()         # hand the cursor back to the terminal
 		sys.stdout.flush()
 
-	def read_tokens(self, prompt: TiString | None, home: HomeScreen) -> list[Token]:
-		self._render(home)  # repaint without indicator before blocking on input
+	def read_tokens(self, prompt: TiString | None) -> list[Token]:
+		# Input/Prompt always run on the home screen; repaint it without an indicator
+		# (the cursor stands in for one) before blocking.
+		self._render(self.env.home)
 		with self._input_cursor():
 			text = input(str(prompt) if prompt is not None else '')
 		return TiString.from_str(text).tokens
@@ -259,22 +353,27 @@ class TerminalConsole(Console):
 	def _tick_running_indicator(self) -> None:
 		"""Keep the running indicator animating during a getKey poll loop.
 
-		A tight `Repeat getKey…End` never calls update(), so without this the
+		A tight `Repeat getKey…End` never calls present(), so without this the
 		indicator would freeze even though the program is plainly alive.  read_key
 		can fire thousands of times a second, so repaint only when the frame index
-		actually advances — the same ~10fps as every other spinner.  No-op before
-		anything has been rendered.
+		actually advances — the same ~10fps as every other spinner.  No-op before a
+		console is attached (bare instances in tests).
 		"""
-		if self._last_home is None:
+		if self.env is None:
 			return
 		frame = _now_frame()
 		if frame == self._last_run_frame:
 			return
 		self._last_run_frame = frame
-		self._render(self._last_home, _spinner_frame(_RUNNING_SPINNER))
+		self._paint_current(_spinner_frame(_RUNNING_SPINNER))
 
-	def pause(self, home: HomeScreen, value=None) -> None:
+	def pause(self, value=None) -> None:
 		"""Animate the spinner in real time until Enter or Space is pressed.
+
+		The value (if any) is rendered onto the home grid here — Pause shows it like
+		Disp but doesn't log it to the Disp transcript, so it uses write_line, not
+		home.disp.  A list/matrix too big for the screen is shown through a ScrollView
+		the arrow keys page instead.
 
 		Needs msvcrt for non-blocking key polling (Windows-only) AND a real
 		interactive terminal: msvcrt.kbhit() polls the console's own input buffer,
@@ -287,6 +386,8 @@ class TerminalConsole(Console):
 		Enter/Space ends the Pause.  Without msvcrt/a terminal there's no scrolling:
 		the initial window is shown and a plain input() waits.
 		"""
+		home = self.env.home
+		self._render_pause_value(value)
 		view = ScrollView.of(value)
 		try:
 			import msvcrt
@@ -342,7 +443,7 @@ class TerminalConsole(Console):
 			time.sleep(_POLL_SECONDS)
 		return False
 
-	def choose(self, title: str, options: list[str]) -> int:
+	def menu(self, title: str, options: list[str]) -> int:
 		"""Render an actual bordered menu screen (title bar inverted, the
 		selected item's "N:" inverted) and animate the Pause spinner while
 		waiting — the menu is a genuine block-until-the-user-acts state, the

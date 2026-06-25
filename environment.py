@@ -17,7 +17,7 @@ from graph import (
 )
 from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
 from accessors import NumericVar
-from iodevice import HomeScreenIO
+from homescreen import HomeScreen
 from terminal import ScriptedConsole
 from titoken import Token
 
@@ -97,12 +97,14 @@ class Environment:
 		# Table-screen variables (TblStart, ΔTbl, TblInput).  The table itself isn't
 		# implemented, but programs can still store to and read these back.
 		self.table = TableVars()
-		# LCD pixel buffer (used by Pxl-/Pt-/Line/etc. drawing commands)
+		# The two display surfaces — peer calculator state.  The graph is a 64×96
+		# pixel buffer (Pxl-/Pt-/Line/…); the home screen is the 16×8 character grid
+		# (Disp/Output(/Input).  Commands mutate these directly and ping the console.
 		self.graph = GraphScreen()
-		# Text I/O device.  Commands talk to it semantically (io.disp/output/pause/…);
-		# it owns how that's realized — the default is the faithful 8×16 home screen
-		# painted by a Console backend (see iodevice.HomeScreenIO).
-		self.io = HomeScreenIO(console or ScriptedConsole())
+		self.home = HomeScreen()
+		# The frontend: it renders the model and supplies input.  Assigning it attaches
+		# this env (see the `console` setter) so it can read home/graph on present().
+		self.console = console or ScriptedConsole()
 		# TVM finance variables (used by bal(, ΣPrn(, ΣInt(, tvm_Pmt, etc.)
 		self.n_tvm: float = 0.0   # 𝐍 (number of payments)
 		self.i_pct: float = 0.0   # I% (interest rate per period, as percentage)
@@ -131,7 +133,7 @@ class Environment:
 		except StopSignal:
 			# It's correct to catch here because doing `prgmTEST:1->A` (where TEST just runs Stop) will not reach the following store command.
 			pass
-		self.io.finish()
+		self.console.finish()
 
 	def to_rad(self, x: float):
 		"""Convert x from the current angle mode to radians (for trig input)."""
@@ -163,22 +165,20 @@ class Environment:
 			self.graph.valid = False
 		self._graph_mode = value
 
-	# ── I/O convenience accessors ────────────────────────────────────────────────
-	# The home-screen device exposes its grid and Console backend; these shortcuts
-	# let callers reach them (and swap the Console) without going through .io.  They
-	# assume the default HomeScreenIO and don't apply to a grid-less device.
-
-	@property
-	def home(self):
-		return self.io.home
+	# ── Frontend ─────────────────────────────────────────────────────────────────
+	# A console renders the model (home/graph) and supplies input.  Assigning one
+	# back-references this env onto it, so its methods can read the screens without
+	# being handed them; swapping the console (terminal ↔ free-form ↔ scripted) is
+	# just an assignment.
 
 	@property
 	def console(self):
-		return self.io.console
+		return self._console
 
 	@console.setter
 	def console(self, value):
-		self.io = HomeScreenIO(value)
+		self._console = value
+		value.env = self
 
 	def guard_real(self, inputs, result):
 		"""Raise NonRealAnsError if real-mode is active and a real-input operation produced a complex result."""
@@ -288,7 +288,7 @@ class Environment:
 		return float(self.clock_on)
 
 	def get_key(self):
-		return float(self.io.get_key())
+		return float(self.console.read_key())
 
 	def rand(self):
 		return random.random()
@@ -344,8 +344,11 @@ class Environment:
 			raise InvalidCommandError("This command cannot be used outside a program")
 		return self.execution_stack[-1]
 
-	def print_screen(self):
-		pass
+	def print_screen(self, path):
+		"""Save the active screen to `path` as a BMP — the graph's pixels or the home
+		grid rasterized through the font, whichever is currently displayed."""
+		surface = self.graph if self.screen is Screen.GRAPH else self.home
+		surface.print_screen(path)
 
 
 # ── Window variables ──────────────────────────────────────────────────────────

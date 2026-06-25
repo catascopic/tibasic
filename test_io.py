@@ -7,6 +7,8 @@ from terminal import ScriptedConsole, TerminalConsole
 from errors import DomainError, DataTypeError, TiSyntaxError, InvalidCommandError
 from environment import Environment
 from program import Program
+from core import TiList, TiString
+from modes import Screen
 from test_tibasic import run, toks, var
 
 
@@ -53,20 +55,20 @@ class TestHomeScreen:
 
 	def test_disp_appends_and_advances(self):
 		h = HomeScreen()
-		h.disp(b'one')
-		h.disp(b'two')
+		h.write_line(b'one')
+		h.write_line(b'two')
 		rows = h.render().split('\n')
 		assert rows[0].startswith('one') and rows[1].startswith('two')
 		assert h.cursor_row == 2
 
 	def test_disp_truncates_with_ellipsis(self):
 		h = HomeScreen()
-		h.disp(b'X' * 20)
+		h.write_line(b'X' * 20)
 		assert h.render().split('\n')[0] == 'X' * 15 + '…'
 
 	def test_disp_exact_width_no_ellipsis(self):
 		h = HomeScreen()
-		h.disp(b'X' * 16)
+		h.write_line(b'X' * 16)
 		assert h.render().split('\n')[0] == 'X' * 16
 
 	def test_output_wraps_long_text_across_rows(self):
@@ -99,7 +101,7 @@ class TestHomeScreen:
 		# guarantees a trailing blank line.
 		h = HomeScreen()
 		for i in range(7):
-			h.disp(str(i).encode())
+			h.write_line(str(i).encode())
 		h.echo(b'LAST')
 		assert h.render().split('\n')[7].startswith('LAST')
 
@@ -109,7 +111,7 @@ class TestHomeScreen:
 		# second-to-last row, with the last row blank, not holding '8' itself.
 		h = HomeScreen()
 		for i in range(9):
-			h.disp(str(i).encode())
+			h.write_line(str(i).encode())
 		rows = h.render().split('\n')
 		assert rows[0].startswith('2')   # '0' and '1' both scrolled off
 		assert rows[6].startswith('8')
@@ -118,13 +120,13 @@ class TestHomeScreen:
 	def test_disp_always_leaves_a_blank_bottom_line(self):
 		h = HomeScreen()
 		for i in range(20):       # many more than fit; screen scrolls repeatedly
-			h.disp(str(i).encode())
+			h.write_line(str(i).encode())
 		assert h.render().split('\n')[7] == ' ' * 16
 		assert h.cursor_row == 7
 
 	def test_clear_resets_grid_and_cursor(self):
 		h = HomeScreen()
-		h.disp(b'stuff')
+		h.write_line(b'stuff')
 		h.clear()
 		assert h.render() == '\n'.join([' ' * 16] * 8)
 		assert h.cursor_row == 0
@@ -171,6 +173,63 @@ class TestDisp:
 	def test_each_disp_renders_a_frame(self):
 		env = run('Disp 1 : Disp 2')
 		assert len(env.console.frames) == 2
+
+
+class TestHomeScreenLogs:
+	"""The host-only Disp logs: `values` (actual TiValues) and `transcript`
+	(full-width rendered text) — what makes the model serve a free-form view."""
+
+	def test_disp_records_values_and_transcript(self):
+		env = run('Disp 5 : Disp {1,2,3} : Disp "HI')
+		assert env.home.transcript == ['5', '{1 2 3}', 'HI']
+		vals = env.home.values
+		assert len(vals) == 3 and vals[0] == 5
+		assert isinstance(vals[1], TiList) and vals[1].data == [1, 2, 3]
+		assert isinstance(vals[2], TiString) and str(vals[2]) == 'HI'
+
+	def test_transcript_keeps_full_width_though_grid_truncates(self):
+		env = run('Disp "ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+		assert env.home.render().split('\n')[0].endswith('…')   # 16-col grid truncates
+		assert env.home.transcript == ['ABCDEFGHIJKLMNOPQRSTUVWXYZ']  # log keeps it whole
+
+	def test_matrix_disp_is_one_value_but_many_lines(self):
+		env = run('Disp [[1,2][3,4]]')
+		assert len(env.home.values) == 1
+		assert env.home.transcript == ['[[1 2]', ' [3 4]]']
+
+	def test_logs_survive_clrhome(self):
+		env = run('Disp 7')
+		run('ClrHome', env)
+		assert env.home.render().strip() == ''          # grid wiped
+		assert env.home.transcript == ['7']             # history kept
+
+
+class TestPresent:
+	def test_each_drawing_command_presents_a_frame(self):
+		# One present() per drawing command — what lets a frontend animate a drawing
+		# being built up.  Four Pxl-On calls → four captured graph frames.
+		env = Environment()
+		env.console = ScriptedConsole()
+		Program(toks('For( I,0,3\nPxl-On( I,I\nEnd')).run(env)
+		assert len(env.console.frames) == 4
+
+
+class TestPrintScreen:
+	def test_home_writes_a_bmp(self, tmp_path):
+		env = run('Disp "HI')
+		path = tmp_path / 'home.bmp'
+		env.print_screen(str(path))
+		assert path.read_bytes()[:2] == b'BM'
+
+	def test_home_and_graph_share_lcd_dimensions(self, tmp_path):
+		# Both rasterize to the same 96×64 LCD, so the BMPs are byte-identical in size.
+		env = run('Disp "HI')
+		home_bmp = tmp_path / 'home.bmp'
+		env.print_screen(str(home_bmp))
+		env.screen = Screen.GRAPH
+		graph_bmp = tmp_path / 'graph.bmp'
+		env.print_screen(str(graph_bmp))
+		assert len(home_bmp.read_bytes()) == len(graph_bmp.read_bytes())
 
 
 class TestOutput:
@@ -275,7 +334,6 @@ class TestTerminalMenuRendering:
 
 	def _console(self):
 		c = TerminalConsole.__new__(TerminalConsole)
-		c._last_home = None
 		c._last_run_frame = -1
 		return c
 
@@ -397,11 +455,10 @@ class TestInput:
 
 class TestScriptedConsole:
 	def test_captures_frames(self):
-		c = ScriptedConsole()
-		h = HomeScreen()
-		h.disp(b'hi')
-		c.update(h)
-		assert c.frames == [h.render()]
+		env = Environment()                 # default console is a ScriptedConsole
+		env.home.write_line(b'hi')
+		env.console.present()
+		assert env.console.frames == [env.home.render()]
 
 	def test_read_key_empty_is_zero(self):
 		assert ScriptedConsole().read_key() == 0
@@ -412,4 +469,4 @@ class TestScriptedConsole:
 
 	def test_read_tokens_without_input_errors(self):
 		with pytest.raises(ValueError):
-			ScriptedConsole().read_tokens(None, HomeScreen())
+			ScriptedConsole().read_tokens(None)

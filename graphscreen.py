@@ -28,23 +28,29 @@ class GraphScreen:
 	def __init__(self):
 		self.buffer = tuple(bytearray(COLS) for _ in range(ROWS))
 		self.valid = False
+		# Bumped on every pixel change — the cheap signal a frontend diffs against to
+		# decide whether to repaint (e.g. to animate a drawing as it's built up).
+		self.version = 0
 
 	def get(self, row: int, col: int) -> bool:
 		return bool(self.buffer[row][col])
 
 	def set(self, row: int, col: int, on: bool = True) -> None:
 		self.buffer[row][col] = on
+		self.version += 1
 
 	def set_off(self, row: int, col: int, on: bool = True) -> None:
 		self.set(row, col, False)
 
 	def toggle(self, row: int, col: int) -> None:
 		self.buffer[row][col] ^= 1
+		self.version += 1
 
 	def clear(self) -> None:
 		for row in self.buffer:
 			row.__init__(COLS)  # hack?
 		self.valid = False
+		self.version += 1
 
 	def print_screen(self, path, pixel_size: int = 1) -> None:
 		"""Save the graph buffer as a monochrome BMP.
@@ -77,12 +83,18 @@ class GraphScreen:
 				for _ in range(pixel_size):
 					f.write(row)
 
-	def disp(self) -> str:
+	def rows(self) -> list[str]:
+		"""The buffer as 32 rows of 96 half-block characters — two pixel rows packed
+		into each text row (▀ top, ▄ bottom, █ both, space neither).  Border/framing
+		is the caller's concern; this is the shared content a text frontend paints."""
+		return [
+			''.join(' ▀▄█'[~(px1 | (px2 << 1))] for px1, px2 in zip(row1, row2, strict=True))
+			for row1, row2 in batched(self.buffer, 2)
+		]
+
+	def disp(self) -> None:
 		border = '▒' * (COLS + 4)
 		print(border)
-		for row1, row2 in batched(self.buffer, 2):
-			print('▒▒', end='')
-			for px1, px2 in zip(row1, row2, strict=True):
-				print(' ▀▄█'[~(px1 | (px2 << 1))], end='')
-			print('▒▒')
+		for row in self.rows():
+			print('▒▒' + row + '▒▒')
 		print(border)
