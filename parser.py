@@ -320,13 +320,6 @@ class Parser:
 			return ans
 
 		if t.function is not None:
-			# A bare-or-called token (rand) has both an accessor and a function: bare it
-			# resolves; with a '(' it calls.  A plain function token (sin(, …) has its '('
-			# baked in, so it always calls with no extra paren to consume.
-			if t.accessor is not None:
-				if self.peek().code != L_PAREN:
-					return t.accessor.resolve(self.env)
-				self.advance()
 			return self._call_function(t)
 
 		# A user list's accessor is name-dependent, so it's built from the following

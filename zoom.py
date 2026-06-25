@@ -139,3 +139,15 @@ def zoom_fit(env):
 		_set_x(env, xmin, xmax)
 	_set_y(env, ymin, ymax)
 	env.display_graph()
+
+
+@no_arg_command
+def zoom_sto(env):
+	"""ZoomSto — save the current window into the Zoom memory."""
+	env.zoom_store()
+
+
+@no_arg_command
+def zoom_rcl(env):
+	"""ZoomRcl — restore the window saved by the last ZoomSto."""
+	env.zoom_recall()

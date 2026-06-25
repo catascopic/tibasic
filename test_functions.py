@@ -760,11 +760,10 @@ class TestTVM:
 	# ── wiring / errors ──
 
 	def test_bare_and_called_are_both_wired(self):
-		# The point of the nullary+function pairing: every tvm_* token carries both
-		# a bare form (nullary) and a called form (function).
+		from finance import TvmAccessor
 		for code in range(0xBB20, 0xBB25):
 			t = catalog.get_token(code)
-			assert t.accessor is not None and t.function is not None
+			assert isinstance(t.accessor, TvmAccessor) and t.function is None
 
 	def test_pmt_zero_n_raises(self):
 		# N defaults to 0 → no periods to spread the payment over.

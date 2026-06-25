@@ -9,6 +9,7 @@ import builtins
 import math
 from datetime import date
 
+from accessors import Accessor
 from core import TiList, require_list
 from core import require_real, require_int, py_int
 from preparse import preparse_func, Real, VectorizedReal, Env
@@ -342,3 +343,23 @@ def tvm_fv(env: Env, n: Real = None, i_pct: Real = None, pv: Real = None, pmt: R
 	"""tvm_FV([N,I%,PV,PMT,P/Y,C/Y]) — future value."""
 	_apply_tvm(env, n=n, i_pct=i_pct, pv=pv, pmt=pmt, py=py, cy=cy)
 	return tvm_fv_value(env)
+
+
+class TvmAccessor(Accessor):
+	"""Bare-or-called accessor for tvm_Pmt, tvm_I%, tvm_PV, tvm_N, tvm_FV.
+
+	Bare (no '('): resolves the stored finance variables via `_value_fn`.
+	Called (with '('): updates the stored variables then resolves, via `_solver`.
+	"""
+
+	invocable = True
+
+	def __init__(self, value_fn, solver):
+		self._value_fn = value_fn
+		self._solver = solver
+
+	def resolve(self, env):
+		return self._value_fn(env)
+
+	def invoke(self, args):
+		return self._solver.call_with_parser(args)

@@ -1,14 +1,12 @@
 accessors -> variables
 
-tvm_Pmt: special accessors
-token(0xBB20, b'tvm_Pmt',               var=Computed(finance.tvm_pmt_value),   func=finance.tvm_pmt)
+print screen
 
 env.screen = Screen.HOME
 Actively set so that IO device knows to switch
 env.focus_home()/focus_graph()/focus_table()
 
-1. Move Accessor (base class only) and Reference to Environment or somewhere else.
-2. Move just the RandAccessor to timath
+
 
 seq: shared method that returns list of sequence items
 

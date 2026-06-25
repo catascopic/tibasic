@@ -12,7 +12,7 @@ from accessors import (
 	WindowVar, XresVar, IntWindowVar, FactorWindowVar, DeltaWindowVar,
 	EnvVar, TableVar, EquationVar, FuncEquationVar, ParEquationVar, PolarEquationVar, SequenceVar, SequenceInitialVar,
 )
-import commands as cmds
+import prgmcmds as cmds
 import distributions as dist
 import draw
 import finance
@@ -394,14 +394,14 @@ token(0x8C, b'ZInteger',                cmd=zoom.z_integer)
 token(0x8D, b'ZPrevious')
 token(0x8E, b'ZDecimal',                cmd=zoom.z_decimal)
 token(0x8F, b'ZoomStat')
-token(0x90, b'ZoomRcl',                 cmd=cmds.zoom_rcl)
+token(0x90, b'ZoomRcl',                 cmd=zoom.zoom_rcl)
 token(0x91, b'PrintScreen')
-token(0x92, b'ZoomSto',                 cmd=cmds.zoom_sto)
+token(0x92, b'ZoomSto',                 cmd=zoom.zoom_sto)
 token(0x93, b'Text(',                   cmd=draw.text)
 token(0x94, b'nPr',                     bp=(60, 61), op=ops.npr)
 token(0x95, b'nCr',                     bp=(60, 61), op=ops.ncr)
-token(0x96, b'FnOn ',                   cmd=cmds.fn_on)
-token(0x97, b'FnOff ',                  cmd=cmds.fn_off)
+token(0x96, b'FnOn ',                   cmd=modecmds.fn_on)
+token(0x97, b'FnOff ',                  cmd=modecmds.fn_off)
 token(0x98, b'StorePic ')
 token(0x99, b'RecallPic ')
 token(0x9A, b'StoreGDB ')
@@ -475,11 +475,11 @@ token(0xBB1C, b'tpdf(',                 func=dist.tpdf)
 token(0xBB1D, b'\xd9\x12pdf(',          func=dist.chi_sq_pdf)  # χ²pdf(
 token(0xBB1E, b'Fpdf(',                 func=dist.f_pdf)
 token(0xBB1F, b'randNorm(',             func=timath.rand_norm)
-token(0xBB20, b'tvm_Pmt',               var=Computed(finance.tvm_pmt_value),   func=finance.tvm_pmt)
-token(0xBB21, b'tvm_I%',                var=Computed(finance.tvm_i_pct_value), func=finance.tvm_i_pct)
-token(0xBB22, b'tvm_PV',                var=Computed(finance.tvm_pv_value),    func=finance.tvm_pv)
-token(0xBB23, b'tvm_N',                 var=Computed(finance.tvm_n_value),     func=finance.tvm_n)
-token(0xBB24, b'tvm_FV',                var=Computed(finance.tvm_fv_value),    func=finance.tvm_fv)
+token(0xBB20, b'tvm_Pmt',               var=finance.TvmAccessor(finance.tvm_pmt_value,   finance.tvm_pmt))
+token(0xBB21, b'tvm_I%',                var=finance.TvmAccessor(finance.tvm_i_pct_value, finance.tvm_i_pct))
+token(0xBB22, b'tvm_PV',                var=finance.TvmAccessor(finance.tvm_pv_value,    finance.tvm_pv))
+token(0xBB23, b'tvm_N',                 var=finance.TvmAccessor(finance.tvm_n_value,     finance.tvm_n))
+token(0xBB24, b'tvm_FV',                var=finance.TvmAccessor(finance.tvm_fv_value,    finance.tvm_fv))
 token(0xBB25, b'conj(',                 func=timath.conj)
 token(0xBB26, b'real(',                 func=timath.real)
 token(0xBB27, b'imag(',                 func=timath.imag)

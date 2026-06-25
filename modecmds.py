@@ -1,4 +1,4 @@
-"""Mode-setting commands (Radian, Degree, Float, Fix, Func, ClockOn, …).
+"""Mode-setting commands (Radian, Degree, Float, Fix, Func, FnOn, ClockOn, …).
 
 The mode *enums* live in modes.py (low-level); these are the commands that set
 them, so they sit up here with the rest of the command layer.
@@ -81,3 +81,20 @@ def clock_on(env): env.clock_on = True
 
 @no_arg_bunch
 def clock_off(env): env.clock_on = False
+
+
+# Equation selection
+def _fn_select(env, on: bool, numbers):
+	env.graph_mode_handler.set_selected(env, on, [py_int(n) for n in numbers])
+
+@preparse_cmd
+def fn_on(env: Env, *numbers: Real):
+	"""FnOn [function#,...] — select (turn on) the listed functions in the current
+	graph mode, or all of them with no arguments."""
+	_fn_select(env, True, numbers)
+
+@preparse_cmd
+def fn_off(env: Env, *numbers: Real):
+	"""FnOff [function#,...] — deselect (turn off) the listed functions in the current
+	graph mode, or all of them with no arguments."""
+	_fn_select(env, False, numbers)
