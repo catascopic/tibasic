@@ -33,8 +33,8 @@ class TestFreeFormOutput:
 
 	def test_output_writes_to_grid_not_stream(self, capsys):
 		# Output( is positional, so it writes to the (unpainted) home grid like any
-		# other frontend rather than streaming; free-form prints only the Disp
-		# transcript, so nothing is emitted, but the grid reflects the write.
+		# other frontend rather than streaming; free-form prints only Disp values,
+		# so nothing is emitted, but the grid reflects the write.
 		env = run('Output( 1,1,7', freeform_env())
 		assert capsys.readouterr().out == ''
 		assert env.home.render().split('\n')[0].startswith('7')

@@ -132,6 +132,31 @@ class TestHomeScreen:
 		assert h.render() == '\n'.join([' ' * 16] * 8)
 		assert h.cursor_row == 0
 
+	def test_output_to_bottom_does_not_advance_disp_scroll(self):
+		# ClrHome, Output( to the bottom row, then Disp: the screen mustn't scroll
+		# until the 8th Disp — Output's positioned write doesn't count toward how
+		# many lines Disp has taken up.
+		h = HomeScreen()
+		h.output(7, 0, b'BOTTOM')           # window row 7 (0-indexed)
+		for i in range(7):                  # 7 disps fill rows 0..6, no scroll
+			h.write_line(str(i).encode())
+		rows = h.render().split('\n')
+		assert rows[0].startswith('0')      # nothing scrolled off yet
+		assert rows[7].startswith('BOTTOM') # Output's row still showing
+		h.write_line(b'7')                  # the 8th disp writes row 7 and scrolls
+		rows = h.render().split('\n')
+		assert rows[0].startswith('1')      # '0' has now scrolled out of view
+		assert rows[6].startswith('7')
+		assert rows[7] == ' ' * 16          # blank bottom line restored
+
+	def test_clrhome_preserves_scrollback(self):
+		# ClrHome scrolls the screen out of view without dropping it from the buffer.
+		h = HomeScreen()
+		h.write_line(b'keep')
+		h.clear()
+		assert h.render().strip() == ''     # window blank
+		assert h.lines and bytes(h.lines[0]).startswith(b'keep')   # still in scrollback
+
 
 # ── Disp / Output( / ClrHome through the interpreter ──────────────────────────
 
@@ -177,32 +202,34 @@ class TestDisp:
 
 
 class TestHomeScreenLogs:
-	"""The host-only Disp logs: `values` (actual TiValues) and `transcript`
-	(full-width rendered text) — what makes the model serve a free-form view."""
+	"""The host-only Disp `values` log (actual TiValues) and the byte scrollback —
+	what lets the model serve a full-width free-form view and keep history."""
 
-	def test_disp_records_values_and_transcript(self):
+	def test_disp_records_actual_values(self):
 		env = run('Disp 5 : Disp {1,2,3} : Disp "HI')
-		assert env.home.transcript == ['5', '{1 2 3}', 'HI']
 		vals = env.home.values
 		assert len(vals) == 3 and vals[0] == 5
 		assert isinstance(vals[1], TiList) and vals[1].data == [1, 2, 3]
 		assert isinstance(vals[2], TiString) and str(vals[2]) == 'HI'
 
-	def test_transcript_keeps_full_width_though_grid_truncates(self):
-		env = run('Disp "ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-		assert env.home.render().split('\n')[0].endswith('…')   # 16-col grid truncates
-		assert env.home.transcript == ['ABCDEFGHIJKLMNOPQRSTUVWXYZ']  # log keeps it whole
+	def test_scrollback_retains_lines_that_left_the_window(self):
+		env = run('\n'.join(f'Disp {i}' for i in range(12)))
+		assert len(env.home.lines) == 12                          # every line kept
+		assert env.home.render().split('\n')[0].strip() == '5'    # window has scrolled
 
-	def test_matrix_disp_is_one_value_but_many_lines(self):
-		env = run('Disp [[1,2][3,4]]')
-		assert len(env.home.values) == 1
-		assert env.home.transcript == ['[[1 2]', ' [3 4]]']
-
-	def test_logs_survive_clrhome(self):
+	def test_clrhome_scrolls_out_of_view_but_keeps_history(self):
 		env = run('Disp 7')
 		run('ClrHome', env)
-		assert env.home.render().strip() == ''          # grid wiped
-		assert env.home.transcript == ['7']             # history kept
+		assert env.home.render().strip() == ''      # window blank
+		assert env.home.values[0] == 7              # values log kept
+		assert env.home.lines                       # byte scrollback kept
+
+	def test_matrix_disp_is_one_value_two_lines(self):
+		env = run('Disp [[1,2][3,4]]')
+		assert len(env.home.values) == 1            # one value...
+		rows = env.home.render().split('\n')
+		assert rows[0].rstrip().endswith('[[1 2]')  # ...spread over two grid lines
+		assert rows[1].rstrip().endswith('[3 4]]')
 
 
 class TestPresent:

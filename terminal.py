@@ -4,7 +4,7 @@ The interpreter owns the *state* — the HomeScreen and GraphScreen on `env` —
 Console only renders it and supplies user input.  Output is observation, not
 notification: a command mutates the model and calls `present()`, a payload-free
 "a good moment to repaint"; the console pulls whatever it needs from `self.env`
-(home grid, Disp transcript, graph pixels) and paints the view it wants.  Input is
+(home grid, Disp values log, graph pixels) and paints the view it wants.  Input is
 the irreducible part — the console must block and ask — so read_tokens / read_key /
 pause / menu are real request-response methods and the only suspension points (when
 the HTML frontend needs a suspendable eval loop, these are the hooks to yield at).
@@ -61,7 +61,7 @@ class Console(ABC):
 
 	def _render_pause_value(self, value) -> None:
 		"""Place a Pause value onto the home grid Disp-style, but without logging it
-		to the Disp transcript (Pause shows a value, it isn't a Disp).  A list/matrix
+		to the Disp `values` log (Pause shows a value, it isn't a Disp).  A list/matrix
 		too big for the screen is left for the caller to page via ScrollView instead.
 		Shared by every console's pause()."""
 		if value is not None and ScrollView.of(value) is None:
@@ -117,22 +117,22 @@ class FreeFormConsole(Console):
 	"""A grid-less frontend: a plain stdout stream and a blocking input().
 
 	The home screen still exists and is fully maintained in the model; this console
-	just doesn't paint its 8×16 window.  Instead it streams the *Disp transcript* —
-	the full-width, untruncated history the home screen records — so output isn't
-	confined to 16 columns.  `present()` prints whatever transcript lines have
-	appeared since last time (tracked by `_printed`), so each Disp shows up once as
-	it happens.  Output( writes to the (unpainted) grid like any other frontend;
-	getKey isn't supported.
+	just doesn't paint its 8×16 window.  Instead it streams the Disp *values* —
+	re-rendered at full width via value_lines, so output isn't confined to 16
+	columns (the byte grid is the faithful 16-wide screen; `values` is the lossless
+	log).  `present()` prints whatever values have appeared since last time (tracked
+	by `_printed`), so each Disp shows up once as it happens.  Output( writes to the
+	(unpainted) grid like any other frontend; getKey isn't supported.
 	"""
 
 	def __init__(self):
 		self._printed = 0
 
 	def present(self) -> None:
-		transcript = self.env.home.transcript
-		for line in transcript[self._printed:]:
-			print(line)
-		self._printed = len(transcript)
+		values = self.env.home.values
+		for value in values[self._printed:]:
+			print('\n'.join(decode(line) for line in value_lines(value)))
+		self._printed = len(values)
 
 	def read_tokens(self, prompt: TiString | None) -> list[Token]:
 		return TiString.from_str(input(str(prompt) if prompt is not None else '')).tokens
@@ -376,7 +376,7 @@ class TerminalConsole(Console):
 		"""Animate the spinner in real time until Enter or Space is pressed.
 
 		The value (if any) is rendered onto the home grid here — Pause shows it like
-		Disp but doesn't log it to the Disp transcript, so it uses write_line, not
+		Disp but doesn't log it to the Disp `values` log, so it uses write_line, not
 		home.disp.  A list/matrix too big for the screen is shown through a ScrollView
 		the arrow keys page instead.
 

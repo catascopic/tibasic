@@ -90,7 +90,7 @@ class ScrollView:
 
 	def render_into(self, home: HomeScreen) -> None:
 		"""Paint the current window (with edge indicators) onto `home`."""
-		home.clear()
+		home.blank_window()   # in-place wipe — ClrHome would scroll a screen into history each frame
 		visible = self.lines[self.row_off:self.row_off + self.VIEW_ROWS]
 		right = HomeScreen.COLS - 1
 		for r, line in enumerate(visible):
