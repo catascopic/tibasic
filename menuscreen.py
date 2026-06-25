@@ -60,11 +60,11 @@ class MenuScreen:
 
 	def print_screen(self, path, pixel_size: int = 1) -> None:
 		"""Save the menu as a monochrome BMP, like home/graph: each character is
-		rasterized through the large font, with the inverted title and selection drawn
-		as flipped pixels (fonts.blit_cell handles the inversion)."""
-		from graphscreen import GraphScreen
+		rasterized through the large font into the shared 96×64 Bitmap, with the
+		inverted title and selection drawn as flipped pixels (fonts.blit_cell)."""
+		from bitmap import Bitmap
 		from fonts import blit_cell
-		surface = GraphScreen()
+		surface = Bitmap()
 		for r, row in enumerate(self.styled_rows()):
 			c = 0
 			for text, inverted in row:

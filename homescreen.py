@@ -166,16 +166,15 @@ class HomeScreen:
 		return '\n'.join(decode(bytes(self._window_row(r))) for r in range(self.ROWS))
 
 	def print_screen(self, path, pixel_size: int = 1) -> None:
-		"""Save the visible window as a monochrome BMP — the character-grid counterpart
-		to GraphScreen.print_screen.
+		"""Save the visible window as a monochrome BMP.
 
 		Each cell's glyph is rasterized through the large font (fonts.blit_cell) into
 		a 6×8 pixel block, so the 16×8 window fills exactly the same 96×64 LCD the graph
-		uses.  The pixel buffer is handed to GraphScreen.print_screen for encoding.
+		uses — the home screen and the graph are two views of one Bitmap.
 		"""
-		from graphscreen import GraphScreen
+		from bitmap import Bitmap
 		from fonts import blit_cell
-		surface = GraphScreen()
+		surface = Bitmap()
 		for r in range(self.ROWS):
 			row = self._window_row(r)
 			for c in range(self.COLS):
