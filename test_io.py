@@ -347,6 +347,21 @@ class TestInput:
 	def test_with_prompt(self):
 		assert var(run_with('Input "AGE?",A', ['30']), 'A') == 30
 
+	def test_string_var_without_comma_is_target(self):
+		# Str1 with no comma → it's the target variable, not a prompt
+		env = run_with('Input Str1', ['ABC'])
+		assert str(var(env, 'Str1')) == 'ABC'
+
+	def test_string_input_stores_raw_no_quotes_needed(self):
+		# Input into a string var: typed text is stored verbatim (no quotes required)
+		env = run_with('Input Str1', ['ABC'])
+		assert str(var(env, 'Str1')) == 'ABC'
+
+	def test_string_input_includes_typed_quotes(self):
+		# If the user types quotes, they become part of the stored string
+		env = run_with('Input Str1', ['"ABC"'])
+		assert str(var(env, 'Str1')) == '"ABC"'
+
 	def test_evaluates_expression(self):
 		assert var(run_with('Input X', ['2+3']), 'X') == 5
 

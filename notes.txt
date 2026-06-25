@@ -8,10 +8,6 @@ env.focus_home()/focus_graph()/focus_table()
 
 
 
-seq: shared method that returns list of sequence items
-
-get rid of sequence cache, create a new one every time a sequence is evaluated
-I think the way it should work is, if the user calls u(10), it should evaluate every item in the sequence form nMin to n, then return the result.
 
 
 Run indicator in HELIX
@@ -26,6 +22,10 @@ prompt_cmd: Does not share Input's optional quote behavior
 
 
 
+seq: shared method that returns list of sequence items
+
+get rid of sequence cache, create a new one every time a sequence is evaluated
+I think the way it should work is, if the user calls u(10), it should evaluate every item in the sequence form nMin to n, then return the result.
 
 _eval_sequence: use context manager
 

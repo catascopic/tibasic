@@ -1,12 +1,13 @@
 import time
 
 from parser import ArgParser, Parser
-from titoken import QUOTE
+from titoken import QUOTE, LIST_PREFIX
 
 from preparse import (
 	preparse_cmd, preparse_cmd_func, preparse_bunch,
 	Thunk, NumericVar, LabelName, ProgramName, AnyVar, Real, Env, AnyValue,
 )
+from accessors import Reference
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, py_int, require_string
@@ -166,52 +167,52 @@ def _tokenize_input(text: str) -> list:
 		raise TiSyntaxError(f"Input: unsupported character {bad} in {text!r}")
 
 
-def _eval_input(tokens: list, env) -> object:
-	"""Evaluate a typed token sequence as one TI expression (like expr()."""
-	parser = Parser(tokens, env)
-	value = parser.parse_expr()
-	if parser.has_next:
-		text = ''.join(t.text for t in tokens)
-		raise TiSyntaxError(f"Input: expected a single expression, got {text!r}")
-	return value
-
-
-def _input_one(env, prompt: str, var) -> None:
+def _input_one(env, prompt: str, var: Reference, raw_string: bool = False) -> None:
 	"""Read one value for `var` and store it.  Shared by Input and Prompt.
 
-	The device reads the text and (if it manages a screen) commits the typed line to
-	it; this just validates and stores.
-
-	A string variable takes the typed text as a literal string, verbatim — no
-	quotes, no expression evaluation (you can't type a quote-enclosed string
-	expression on the real keypad input line either).  Every other variable
-	type evaluates the typed text as an expression, same as expr(.
+	When `raw_string` is True (Input only), a string variable stores the typed
+	text verbatim — quotes are not required and are included literally if typed.
+	Otherwise (Prompt, or non-string vars) the typed text is evaluated as an
+	expression, same as expr(.
 
 	Empty input is rejected: an entry that's blank (or only whitespace) re-prompts
 	rather than storing anything, so neither Input nor Prompt can yield a value.
 	"""
 	env.screen = Screen.HOME            # Input/Prompt bring up the home screen
 	tokens = _tokenize_input(env.io.read_value(prompt))
-	if var.accessor.kind == 'string':   # a string var keeps the raw text, no eval
+	if raw_string and var.accessor.kind == 'string':
 		var.store(TiString(tokens))
 	else:
-		var.store(_eval_input(tokens, env))
+		parser = Parser(tokens, env)
+		value = parser.parse_expr()
+		if parser.has_next:
+			raise TiSyntaxError(f"Input: expected a single expression, got {tokens}")
+		var.store(value)
 
 
 @special_func
 def input_cmd(args: ArgParser):
-	"""Input ["prompt",] var — read an expression from the console and store it in var.
+	"""Input [strexpr,] var — read from the console and store in var.
+
+	If the first token is a variable (has an accessor or is the list prefix), it
+	is the target directly — no prompt.  Anything else is parsed as a string
+	expression prompt (a literal, sub(, concatenation, …), followed by a comma
+	and the target variable.
+
+	For string variables, the typed text is stored verbatim (no quotes needed;
+	any typed quotes are included literally).
 
 	The bare graph-cursor form (Input with no arguments) isn't supported yet.
 	"""
 	if not args.has_next:
 		raise TiSyntaxError("Input: the graph-cursor form is not supported yet")
 	prompt = '?'
-	if args.peek().code == QUOTE:        # Input "prompt", var
+	t = args.peek()
+	if t.accessor is None and t.code != LIST_PREFIX:
 		prompt = str(args.expr())
-	var = args.any_var()
+	var = args.any_var_or_user_list()
 	args.end_cmd()
-	_input_one(args.env, prompt, var)
+	_input_one(args.env, prompt, var, raw_string=True)
 
 
 @special_func
@@ -222,7 +223,7 @@ def prompt_cmd(args: ArgParser):
 	# Use ArgParser because the calculator does evaluate the args lazily
 	while args.has_next:
 		name = args.peek().text
-		pending.append((name, args.any_var()))
+		pending.append((name, args.any_var_or_user_list()))
 	args.end_cmd()
 	env = args.env
 	for name, var in pending:
