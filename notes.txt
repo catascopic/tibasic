@@ -1,3 +1,6 @@
+Need method for "token is a variable" which is different from "token has accessor"
+Could put class-level attribute on Accessor instances that tell you if they're a true variable
+
 accessors -> variables
 
 print screen

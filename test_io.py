@@ -581,6 +581,32 @@ class TestInput:
 			run_with('Input "A" + 5 ,X', [])
 
 
+class TestPrompt:
+	def test_stores_value_to_var(self):
+		assert var(run_with('Prompt A', ['5']), 'A') == 5
+
+	def test_multiple_vars(self):
+		env = run_with('Prompt A,B', ['3', '7'])
+		assert var(env, 'A') == 3 and var(env, 'B') == 7
+
+	def test_prompt_echoes_name(self):
+		# The home screen echo shows NAME=?<typed> after a Prompt
+		env = run_with('Prompt A', ['1'])
+		assert env.home.render().split('\n')[0].startswith('A=?')
+
+	def test_user_list_prompt_strips_prefix(self):
+		# Prompt ᴸNAME should echo NAME=?, not ᴸNAME=? (per calculator behavior)
+		env = run_with('Prompt ᴸNAME', ['{1}'])
+		first = env.home.render().split('\n')[0]
+		assert first.startswith('NAME=?')
+		assert 'ᴸ' not in first
+
+	def test_bare_user_list_name_is_rejected(self):
+		# Prompt requires the ᴸ prefix for user lists; bare multi-char names are an error
+		with pytest.raises(Exception):
+			run_with('Prompt ABC', ['{1}'])
+
+
 # ── ScriptedConsole ───────────────────────────────────────────────────────────
 
 class TestScriptedConsole:

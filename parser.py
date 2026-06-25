@@ -631,12 +631,6 @@ class ArgParser:
 	def peek(self):
 		return self._parser.peek()
 
-	def peek_next(self) -> Token:
-		"""Peek at the token after the current one, without consuming anything."""
-		p = self._parser
-		idx = p.pos + 1
-		return p.tokens[idx] if idx < len(p.tokens) else EOF_TOKEN
-
 	@_parse_arg
 	def expr(self):
 		"""Parse one general expression.  The token-boundary type guards live in
@@ -693,19 +687,19 @@ class ArgParser:
 	@_parse_arg
 	def any_var(self) -> "Reference":
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list."""
-		return self._any_var_body()
+		return self._any_var_body(self._parser.advance())
 
 	@_parse_arg
-	def any_var_or_user_list(self) -> "Reference":
+	def any_var_prefix_optional(self) -> Reference:
 		"""Like any_var, but a run of alphanumeric tokens without the ᴸ prefix is
 		treated as a bare user-list name (e.g. LPRIMES).  A single-letter numeric
 		token with no following name character is still a numeric variable."""
-		if self.peek().is_numeric_var() and self.peek_next().is_name_char():
-			return self._parser.parse_user_list()
-		return self._any_var_body()
-
-	def _any_var_body(self) -> "Reference":
 		t = self._parser.advance()
+		if t.is_numeric_var() and self.peek().is_name_char():
+			return UserListVar(t.text + self._parser.read_name(4)).reference(self.env)
+		return self._any_var_body(t)
+
+	def _any_var_body(self, t: Token) -> Reference:
 		if t.accessor is not None:
 			return t.accessor.reference(self.env)
 		if t.code == LIST_PREFIX:

@@ -1,7 +1,7 @@
 import time
 
 from parser import ArgParser, Parser
-from titoken import QUOTE, ANS, EOF_CODE, COLON, NEWLINE
+from titoken import QUOTE, ANS, EOF_CODE, COLON, NEWLINE, LIST_PREFIX
 
 from preparse import (
 	preparse_cmd, preparse_cmd_func, preparse_bunch,
@@ -195,22 +195,6 @@ def _input_one(env, prompt: TiString | None, var: Reference, raw_string: bool = 
 
 _SUB = 0xBB0C  # sub( — the one string function the calculator accepts in a prompt
 
-def _prompt_starter(tok) -> bool:
-	"""Whether `tok` begins an Input/Prompt display string rather than the target var.
-
-	The calculator decides purely from the first token: a string literal, a string
-	variable, Ans, or sub( introduce a display string; anything else (a numeric/list/
-	matrix variable, a number, '(' …) means there's no prompt and this token is the
-	storage target itself.
-
-	That's the whole check — once the first token says "prompt", the rest is parsed
-	as an ordinary expression.  So a display string can't *start* with anything but
-	those four, but is otherwise unrestricted: "A"+5 fails at evaluation (can't add a
-	number to a string), and the clock functions getDtStr(/getTmStr( — which the real
-	calculator rejects from a prompt — are simply allowed here."""
-	return tok.code in (QUOTE, ANS, _SUB) or tok.is_string_var()
-
-
 @special_func
 def input_cmd(args: ArgParser):
 	"""Input [strexpr,] var — read from the console and store in var.
@@ -227,23 +211,20 @@ def input_cmd(args: ArgParser):
 	"""
 	if not args.has_next:
 		raise TiSyntaxError("Input: the graph-cursor form is not supported yet")
-	q_tok = TiString.from_str('?').tokens[0]
 	env = args.env
-
-	if _prompt_starter(args.peek()):
-		if args.peek().is_string_var() and args.peek_next().code in {EOF_CODE, COLON, NEWLINE}:
-			# Input Str1 with nothing after — lone string var is the target
-			prompt = TiString([q_tok])
-			var = args.any_var_or_user_list()
+	prompt = TiString.from_str('?')
+	t = args.peek()
+	if t.is_string_var() or t.code in {QUOTE, ANS, _SUB}:
+		first = args.thunk()
+		if args.has_next:
+			# the first arg was the prompt
+			prompt = first.eval()
+			var = args.any_var_prefix_optional()
 		else:
-			# Prompt: QUOTE/ANS/SUB are never targets; StrN here starts a longer expression
-			prompt_str = require_string(args.expr())
-			prompt = TiString(list(prompt_str.tokens) + [q_tok])
-			var = args.any_var_or_user_list()
+			var = t.accessor.reference(env)
 	else:
-		prompt = TiString([q_tok])
-		var = args.any_var_or_user_list()
-
+		var = args.any_var_prefix_optional()
+	
 	args.end_cmd()
 	_input_one(env, prompt, var, raw_string=True)
 
@@ -252,17 +233,16 @@ def input_cmd(args: ArgParser):
 def prompt_cmd(args: ArgParser):
 	"""Prompt var[,var...] — Input each variable in turn, with an implicit
 	"NAME=?" prompt instead of a custom one."""
-	pending = []
-	while args.has_next:
-		tok = args.peek()
-		pending.append((tok, args.any_var_or_user_list()))
-	args.end_cmd()
 	env = args.env
-	eq_token = TiString.from_str('=').tokens[0]
-	q_token  = TiString.from_str('?').tokens[0]
-	for tok, var in pending:
-		prompt = TiString([tok, eq_token, q_token])
-		_input_one(env, prompt, var)
+	suffix = TiString.from_str('=?')
+	# We're taking matters into our own hands
+	p = args._parser
+	while args.has_next:
+		t = args.peek()
+		var = args.any_var()
+		prompt = TiString([t]) if t.code != LIST_PREFIX else TiString.from_str(var.accessor.name)
+		_input_one(env, prompt + suffix, var)
+	args.end_cmd()
 
 
 @special_func
