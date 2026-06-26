@@ -14,7 +14,7 @@ from errors import TiSyntaxError
 # duplicated.  Byte D6 decodes to '\n' (the newline token) rather than its ↵ glyph
 # so program text round-trips with real line breaks.
 
-
+# TODO: This is for debugging only! Move to terminal or something.
 _CHARSET: list[str | None] = [
 #	0		1		2		3		4		5		6		7		8		9		A		B		C		D		E		F
 	' ',	'𝑛',	'𝑢',	'𝑣',	'𝑤',	'►',	'🡅',	'🡇',	'∫',	'×',	'▫',	'﹢',	'·',	'ₜ',		'𝟑',	'𝟊',	# 0
@@ -109,7 +109,6 @@ class Flag(IntFlag):
 	is their union — what any_var / DelVar accept.  Lexical categories (digits, name
 	chars) stay as range checks, and settings (window/stat vars) aren't variables here.
 	"""
-	ASCII    = auto()
 	EXPR_START = auto()
 	
 	FUNCTION = auto()
@@ -148,6 +147,7 @@ class Token:
 	code: int
 	display: bytes
 	flags = Flag(0)
+	char = None
 
 	@property
 	def text(self) -> str:

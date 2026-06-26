@@ -15,6 +15,12 @@ HOWEVER, setting P/Y alters C/Y, and vice-versa. (One of them should probably be
 
 Replace typeable=True with ASCII flag.
 
+Move ans invoke logic to accessor
+
+char vs display
+
+does ° really deserve a char?
+
 
 
 except KeyError as bad:

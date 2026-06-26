@@ -42,8 +42,8 @@ def _PLACEHOLDER(args):
 
 class FunctionToken(Token):
 	
-	def __init__(self, code, chars, func)
-		super().__(code, chars, Flag.FUNCTION)
+	def __init__(self, code, display, func)
+		super().__(code, display, Flag.FUNCTION)
 		self._func = func
 
 	def function(self, parser):
@@ -54,8 +54,8 @@ class FunctionToken(Token):
 
 class CommandToken(Token):
 
-	def __init__(self, code, chars, cmd)
-		super().__(code, chars, Flag.COMMAND)
+	def __init__(self, code, display, cmd)
+		super().__(code, display, Flag.COMMAND)
 		self._cmd = cmd
 
 	def command(self, parser):
@@ -66,8 +66,8 @@ class CommandToken(Token):
 
 class OperatorToken(Token):
 
-	def __init__(self, code, chars, op, bp)
-		super().__(code, chars, Flag.INFIX)
+	def __init__(self, code, display, char=None, op, bp)
+		super().__(code, display, Flag.INFIX, char=char)
 		self._op = op
 		self._bp = bp
 
@@ -82,8 +82,8 @@ class OperatorToken(Token):
 
 class PostfixToken(Token):
 
-	def __init__(self, code, chars, op)
-		super().__(code, chars, Flag.POSTFIX)
+	def __init__(self, code, display, op)
+		super().__(code, display, Flag.POSTFIX)
 		self._op = op
 
 	def apply_postfix(self, value):
@@ -116,8 +116,9 @@ class Accessor(ABC, Token):
 
 class LetterToken(Deletable, Accessor):
 
-	def __init__(self, index, ascii: bool):
-		super().__init__(0x41 + index, bytes([0x41 + i]), TokenKind.NUMERIC | (TokenKind.ASCII if ascii else Flag(0))):
+	def __init__(self, index):
+		ch = 0x41 + index
+		super().__init__(ch, bytes([ch]), TokenKind.NUMERIC, char=chr(ch) if ch != 0x91 else 'θ'):
 		self.index = index
 
 	def _get(self, env):
@@ -232,8 +233,8 @@ class FuncEquationVar(EquationVar):
 
 
 class RealVariable(Deletable, Accessor):
-	def __init__(self, code, chars, name):
-		super().__init__(code, chars, Flag.REAL)
+	def __init__(self, code, display, name):
+		super().__init__(code, display, Flag.REAL)
 		self._name = name
 
 	def _get(self, env):
@@ -246,6 +247,20 @@ class RealVariable(Deletable, Accessor):
 		self._set(env, require_real(value))
 
 
+class StringToken(Deletable, Accessor):
+	def __init__(self, index: int):
+		super().__init__(0xAA00 | index, b'Str' + bytes([0x30 + (index + 1) % 10]))
+		self.index = index
+
+	def _get(self, env):
+		return env.strings[self.index]
+
+	def _set(self, env, value):
+		env.strings[self.index] = value
+
+	def store(self, env, value):
+		self._set(env, require_string(value))
+
 
 def generate():
 	yield Token(0x01, b'\x05DMS')   # ►DMS
@@ -253,18 +268,18 @@ def generate():
 	yield Token(0x03, b'\x05Frac')  # ►Frac
 	yield Token(tk.STORE, b'\x1c')  # → (Store operator)
 	yield Token(0x05, b'Boxplot')
-	yield Token(tk.L_BRACKET, b'\xc1',            flags=Flag.ASCII)  # The '[' symbol (θ steals this place in the charset)
-	yield Token(tk.R_BRACKET, b']',               flags=Flag.ASCII)
-	yield Token(tk.L_BRACE, b'{',                 flags=Flag.ASCII)
-	yield Token(tk.R_BRACE, b'}',                 flags=Flag.ASCII)
-	yield Token(tk.RAD, b'\x15')                                     # ʳ (Radian symbol; postfix needs env, handled specially)
-	yield Token(tk.DEG, b'\x14',                  flags=Flag.ASCII)  # ° (Degree symbol; ditto)
-	yield PostfixToken(0x0C, b'\x11',             ops.inv)   # ¹ (ideally a supersccript negative 1, but this is the best 1-char approximation)
-	yield PostfixToken(0x0D, b'\x12',             lambda x: x**2, flags=Flag.ASCII)  # ² (squared)
-	yield PostfixToken(0x0E, b'\x16',             ops.transpose)                     # ᵀ (superscript T)
-	yield PostfixToken(0x0F, b'\xd5',             lambda x: x**3, flags=Flag.ASCII)  # ³ (cubed)
-	yield Token(tk.L_PAREN, b'(',                 flags=Flag.ASCII)
-	yield Token(tk.R_PAREN, b')',                 flags=Flag.ASCII)
+	yield Token(tk.L_BRACKET, b'\xc1',            char='[')  # (θ steals this place in the displayet)
+	yield Token(tk.R_BRACKET, b']',               char=']')
+	yield Token(tk.L_BRACE, b'{',                 char='{')
+	yield Token(tk.R_BRACE, b'}',                 char='}')
+	yield Token(tk.RAD, b'\x15')                             #  postfix needs env, handled specially.
+	yield Token(tk.DEG, b'\x14',                  char='°')  #  postfix also handled specially
+	yield PostfixToken(0x0C, b'\x11',             ops.inv)
+	yield PostfixToken(0x0D, b'\x12',             lambda x: x**2)
+	yield PostfixToken(0x0E, b'\x16',             ops.transpose)
+	yield PostfixToken(0x0F, b'\xd5',             lambda x: x**3)
+	yield Token(tk.L_PAREN, b'(',                 char='(')
+	yield Token(tk.R_PAREN, b')',                 char=')')
 	yield FunctionToken(0x12, b'round(',          timath.round)
 	yield FunctionToken(0x13, b'pxl-Test(',       draw.pxl_test)
 	yield FunctionToken(0x14, b'augment(',        tilist.augment)
@@ -287,32 +302,31 @@ def generate():
 	yield FunctionToken(0x25, b'nDeriv(',         timath.n_deriv)
 	yield FunctionToken(0x27, b'fMin(',           timath.f_min)
 	yield FunctionToken(0x28, b'fMax(',           timath.f_max)
-	yield token(0x29, b' ',                       flags=Flag.ASCII)
-	yield token(tk.QUOTE, b'"',                   flags=Flag.ASCII)
-	yield token(tk.COMMA, b',',                   flags=Flag.ASCII)
-	yield variable_token(0x2C, b'\xd7',           Constant(1j), flags=Flag.ASCII)  # 𝑖 (imaginary unit)
-	yield PostfixToken(0x2D, b'!',                ops.factorial, flags=Flag.ASCII)
+	yield token(0x29, b' ',                       char=' ')
+	yield token(tk.QUOTE, b'"',                   char='"')
+	yield token(tk.COMMA, b',',                   char=',')
+	yield variable_token(0x2C, b'\xd7',           Constant(1j), char='𝑖')
+	yield PostfixToken(0x2D, b'!',                ops.factorial, char='!')
 	yield token(0x2E, b'CubicReg ')
 	yield token(0x2F, b'QuartReg ')
 	
 	# 0 - 9
 	for i in range(10):
-		yield Token(0x30 + i, bytes([0x30 + i]), flags=Flag.ASCII | Flag.DIGIT)
+		ch = 0x30 + i
+		yield Token(ch, bytes([ch]), Flag.DIGIT, char=chr(ch))
 
-	yield Token(tk.DOT, b'.',                     flags=Flag.ASCII)
+	yield Token(tk.DOT, b'.', char='.')
 	yield Token(tk.SCI_E, b'\x1b')  # ᴇ
 	yield OperatorToken(0x3C, b' or ',            ops.or_, (20, 21))
 	yield OperatorToken(0x3D, b' xor ',           ops.xor, (20, 21))
-	yield Token(tk.COLON, b':',                   flags=Flag.ASCII)
-	yield Token(tk.NEWLINE, b'\xd6',              flags=Flag.ASCII)
+	yield Token(tk.COLON, b':', char=':')
+	yield Token(tk.NEWLINE, b'\xd6', char='\n')
 	yield OperatorToken(0x40, b' and ',           ops.and_, (30, 31))
 
-	# A - Z
-	for i in range(26): 
-		yield LetterToken(i, ascii=True)
+	# A - Z, θ
+	for i in range(27): 
+		yield LetterToken(i)
 	
-	yield LetterToken(27)  # θ
-
 	# [A] - [J]
 	for i in range(10):
 		yield MatrixToken(i)
@@ -480,15 +494,15 @@ command_token(0x66, b'Normal',                  modecmds.normal)
 command_token(0x67, b'Sci',                     modecmds.sci)
 command_token(0x68, b'Eng',                     modecmds.eng)
 command_token(0x69, b'Float',                   modecmds.float_)
-operator_token(0x6A, b'=', ops.eq, (40, 41),  typeable=True)
-operator_token(0x6B, b'<', ops.lt, (40, 41),  typeable=True)
-operator_token(0x6C, b'>', ops.gt, (40, 41),  typeable=True)
-operator_token(0x6D, b'\x17', ops.le, (40, 41),  typeable=True)  # ≤
-operator_token(0x6E, b'\x19', ops.ge, (40, 41),  typeable=True)  # ≥
-operator_token(0x6F, b'\x18', ops.ne, (40, 41),  typeable=True)  # ≠
-operator_token(0x70, b'+', ops.add, (50, 51), typeable=True)
-operator_token(0x71, b'-', ops.sub, (50, 51), typeable=True)
-token(tk.ANS, b'Ans')                   # Handled as special case in parser
+yield OperatorToken(0x6A, b'=',       char='=', ops.eq,  (40, 41))
+yield OperatorToken(0x6B, b'<',       char='<', ops.lt,  (40, 41))
+yield OperatorToken(0x6C, b'>',       char='>', ops.gt,  (40, 41))
+yield OperatorToken(0x6D, b'\x17',    char='≤', ops.le,  (40, 41))
+yield OperatorToken(0x6E, b'\x19',    char='≥', ops.ge,  (40, 41))
+yield OperatorToken(0x6F, b'\x18',    char='≠', ops.ne,  (40, 41))
+yield OperatorToken(0x70, b'+',       char='+', ops.add, (50, 51))
+yield OperatorToken(0x71, b'-',       char='-', ops.sub, (50, 51))
+token(tk.ANS, b'Ans')                           # Handled as special case in parser
 command_token(0x73, b'Fix',                     modecmds.fix)
 token(0x74, b'Horiz')
 token(0x75, b'Full')
@@ -525,8 +539,8 @@ token(0x7E12, b'uwAxes')
 token(0x7F, b'\x0a')  # ▫
 token(0x80, b'\x0b')  # ﹢
 token(0x81, b'\x0c')  # ·
-operator_token(0x82, b'*', ops.mul, (60, 61), typeable=True)
-operator_token(0x83, b'/', ops.div, (60, 61), typeable=True)
+yield OperatorToken(0x82, b'*', char='*', ops.mul, (60, 61))
+yield OperatorToken(0x83, b'/', char='/', ops.div, (60, 61))
 token(0x84, b'Trace')
 command_token(0x85, b'ClrDraw',                 draw.clr_draw)
 command_token(0x86, b'ZStandard',               zoom.z_standard)
@@ -543,8 +557,8 @@ command_token(0x90, b'ZoomRcl',                 zoom.zoom_rcl)
 token(0x91, b'PrintScreen')
 command_token(0x92, b'ZoomSto',                 zoom.zoom_sto)
 command_token(0x93, b'Text(',                   draw.text)
-operator_token(0x94, b'nPr', ops.npr, (60, 61))
-operator_token(0x95, b'nCr', ops.ncr, (60, 61))
+yield OperatorToken(0x94, b'nPr', ops.npr, (60, 61))
+yield OperatorToken(0x95, b'nCr', ops.ncr, (60, 61))
 command_token(0x96, b'FnOn ',                   modecmds.fn_on)
 command_token(0x97, b'FnOff ',                  modecmds.fn_off)
 token(0x98, b'StorePic ')
@@ -567,14 +581,14 @@ command_token(0xA8, b'DrawInv ',                draw.draw_inv)
 command_token(0xA9, b'DrawF ',                  draw.draw_f)
 
 # Str1 - Str0
-for _i in range(10):
-	variable_token(0xAA00 | _i, b'Str' + bytes([0x30 + (_i + 1) % 10]), StringVar(_i), kind=TokenKind.STRING)
+for i in range(10):
+	yield StringToken(i)
 
 variable_token(tk.RAND, b'rand', timath.RandAccessor())
-variable_token(0xAC, b'\xc4', Constant(math.pi), typeable=True)  # π
+variable_token(0xAC, b'\xc4', Constant(math.pi))  # π
 variable_token(0xAD, b'getKey', Computed(Environment.get_key))
-token(tk.APOS, b"'",                    typeable=True)
-token(0xAF, b'?',                       typeable=True)
+token(tk.APOS, b"'", char="'")
+token(0xAF,    b'?', char='?')
 token(tk.NEG, b'\x1a')  # ⁻
 function_token(0xB1, b'int(',                    timath.int_)
 function_token(0xB2, b'abs(',                    timath.abs)
@@ -637,7 +651,7 @@ function_token(0xBB2D, b'ref(',                  matrix.ref)
 function_token(0xBB2E, b'rref(',                 matrix.rref)
 token(0xBB2F, b'\x05Rect')  # ►Rect
 token(0xBB30, b'\x05Polar')  # ►Polar
-variable_token(0xBB31, b'\xdb', Constant(math.e), typeable=True)  # 𝑒
+variable_token(0xBB31, b'\xdb', Constant(math.e))  # 𝑒
 token(0xBB32, b'SinReg ')
 token(0xBB33, b'Logistic ')
 token(0xBB34, b'LinRegTTest ')
@@ -688,144 +702,144 @@ token(0xBB68, b'Archive ')
 token(0xBB69, b'UnArchive ')
 token(0xBB6A, b'Asm(')
 token(0xBB6B, b'AsmComp(')
-token(0xBB6C, b'?')  # "compiled asm" token, displays as '?'
-token(0xBB6D, b'compiled asm')
-token(0xBB6E, b'\x8a',                  typeable=True)  # Á
-token(0xBB6F, b'\x8b',                  typeable=True)  # À
-token(0xBB70, b'\x8c',                  typeable=True)  # Â
-token(0xBB71, b'\x8d',                  typeable=True)  # Ä
-token(0xBB72, b'\x8e',                  typeable=True)  # á
-token(0xBB73, b'\x8f',                  typeable=True)  # à
-token(0xBB74, b'\x90',                  typeable=True)  # â
-token(0xBB75, b'\x91',                  typeable=True)  # ä
-token(0xBB76, b'\x92',                  typeable=True)  # É
-token(0xBB77, b'\x93',                  typeable=True)  # È
-token(0xBB78, b'\x94',                  typeable=True)  # Ê
-token(0xBB79, b'\x95',                  typeable=True)  # Ë
-token(0xBB7A, b'\x96',                  typeable=True)  # é
-token(0xBB7B, b'\x97',                  typeable=True)  # è
-token(0xBB7C, b'\x98',                  typeable=True)  # ê
-token(0xBB7D, b'\x99',                  typeable=True)  # ë
-token(0xBB7F, b'\x9b',                  typeable=True)  # Ì
-token(0xBB80, b'\x9c',                  typeable=True)  # Î
-token(0xBB81, b'\x9d',                  typeable=True)  # Ï
-token(0xBB82, b'\x9e',                  typeable=True)  # í
-token(0xBB83, b'\x9f',                  typeable=True)  # ì
-token(0xBB84, b'\xa0',                  typeable=True)  # î
-token(0xBB85, b'\xa1',                  typeable=True)  # ï
-token(0xBB86, b'\xa2',                  typeable=True)  # Ó
-token(0xBB87, b'\xa3',                  typeable=True)  # Ò
-token(0xBB88, b'\xa4',                  typeable=True)  # Ô
-token(0xBB89, b'\xa5',                  typeable=True)  # Ö
-token(0xBB8A, b'\xa6',                  typeable=True)  # ó
-token(0xBB8B, b'\xa7',                  typeable=True)  # ò
-token(0xBB8C, b'\xa8',                  typeable=True)  # ô
-token(0xBB8D, b'\xa9',                  typeable=True)  # ö
-token(0xBB8E, b'\xaa',                  typeable=True)  # Ú
-token(0xBB8F, b'\xab',                  typeable=True)  # Ù
-token(0xBB90, b'\xac',                  typeable=True)  # Û
-token(0xBB91, b'\xad',                  typeable=True)  # Ü
-token(0xBB92, b'\xae',                  typeable=True)  # ú
-token(0xBB93, b'\xaf',                  typeable=True)  # ù
-token(0xBB94, b'\xb0',                  typeable=True)  # û
-token(0xBB95, b'\xb1',                  typeable=True)  # ü
-token(0xBB96, b'\xb2',                  typeable=True)  # Ç
-token(0xBB97, b'\xb3',                  typeable=True)  # ç
-token(0xBB98, b'\xb4',                  typeable=True)  # Ñ
-token(0xBB99, b'\xb5',                  typeable=True)  # ñ
-token(0xBB9A, b'\xb6')                                  # ´
-token(0xBB9B, b'\xb7')                                  # Modifier Letter Grave Accent (differentiates from backtick)
-token(0xBB9C, b'\xb8')                                  # ¨
-token(0xBB9D, b'\xb9',                  typeable=True)  # ¿
-token(0xBB9E, b'\xba',                  typeable=True)  # ¡
-token(0xBB9F, b'\xbb',                  typeable=True)  # α
-token(0xBBA0, b'\xbc',                  typeable=True)  # β
-token(0xBBA1, b'\xbd',                  typeable=True)  # γ
-token(0xBBA2, b'\xbe',                  typeable=True)  # Δ
-token(0xBBA3, b'\xbf',                  typeable=True)  # δ
-token(0xBBA4, b'\xc0',                  typeable=True)  # ε
-token(0xBBA5, b'\xc2',                  typeable=True)  # λ
-token(0xBBA6, b'\xc3',                  typeable=True)  # μ
-token(0xBBA7, b'\xc4')                                  # π (homoglyph of 0xAC without syntactic meaning)
-token(0xBBA8, b'\xc5',                  typeable=True)  # ρ
-token(0xBBA9, b'\xc6',                  typeable=True)  # Σ
-token(0xBBAB, b'\xc9',                  typeable=True)  # φ
-token(0xBBAC, b'\xca',                  typeable=True)  # Ω
-token(0xBBAD, b'\xd8',                  typeable=True)  # ṕ (homoglyph of 0x6228 without syntactic meaning)
-token(0xBBAE, b'\xd9',                  typeable=True)  # χ
-token(0xBBAF, b'\x0f')                                  # Mathematical Bold Capital Digamma, known as "Hexadecimal F" in the tibasicdev docs
-token(0xBBB0, b'a',                     typeable=True)
-token(0xBBB1, b'b',                     typeable=True)
-token(0xBBB2, b'c',                     typeable=True)
-token(0xBBB3, b'd',                     typeable=True)
-token(0xBBB4, b'e',                     typeable=True)
-token(0xBBB5, b'f',                     typeable=True)
-token(0xBBB6, b'g',                     typeable=True)
-token(0xBBB7, b'h',                     typeable=True)
-token(0xBBB8, b'i',                     typeable=True)
-token(0xBBB9, b'j',                     typeable=True)
-token(0xBBBA, b'k',                     typeable=True)
-token(0xBBBC, b'l',                     typeable=True)
-token(0xBBBD, b'm',                     typeable=True)
-token(0xBBBE, b'n',                     typeable=True)
-token(0xBBBF, b'o',                     typeable=True)
-token(0xBBC0, b'p',                     typeable=True)
-token(0xBBC1, b'q',                     typeable=True)
-token(0xBBC2, b'r',                     typeable=True)
-token(0xBBC3, b's',                     typeable=True)
-token(0xBBC4, b't',                     typeable=True)
-token(0xBBC5, b'u',                     typeable=True)
-token(0xBBC6, b'v',                     typeable=True)
-token(0xBBC7, b'w',                     typeable=True)
-token(0xBBC8, b'x',                     typeable=True)
-token(0xBBC9, b'y',                     typeable=True)
-token(0xBBCA, b'z',                     typeable=True)
-token(0xBBCB, b'\xc7',                  typeable=True)  # σ
-token(0xBBCC, b'\xc8',                  typeable=True)  # τ
-token(0xBBCD, b'\x9a',                  typeable=True)  # Í
+token(0xBB6C, b'AsmPrgm')
+token(0xBB6D, b'?')  # "compiled asm" token, displays as '?'
+Token(0xBB6E, b'\x8a', char='Á')
+Token(0xBB6F, b'\x8b', char='À')
+Token(0xBB70, b'\x8c', char='Â')
+Token(0xBB71, b'\x8d', char='Ä')
+Token(0xBB72, b'\x8e', char='á')
+Token(0xBB73, b'\x8f', char='à')
+Token(0xBB74, b'\x90', char='â')
+Token(0xBB75, b'\x91', char='ä')
+Token(0xBB76, b'\x92', char='É')
+Token(0xBB77, b'\x93', char='È')
+Token(0xBB78, b'\x94', char='Ê')
+Token(0xBB79, b'\x95', char='Ë')
+Token(0xBB7A, b'\x96', char='é')
+Token(0xBB7B, b'\x97', char='è')
+Token(0xBB7C, b'\x98', char='ê')
+Token(0xBB7D, b'\x99', char='ë')
+Token(0xBB7F, b'\x9b', char='Ì')
+Token(0xBB80, b'\x9c', char='Î')
+Token(0xBB81, b'\x9d', char='Ï')
+Token(0xBB82, b'\x9e', char='í')
+Token(0xBB83, b'\x9f', char='ì')
+Token(0xBB84, b'\xa0', char='î')
+Token(0xBB85, b'\xa1', char='ï')
+Token(0xBB86, b'\xa2', char='Ó')
+Token(0xBB87, b'\xa3', char='Ò')
+Token(0xBB88, b'\xa4', char='Ô')
+Token(0xBB89, b'\xa5', char='Ö')
+Token(0xBB8A, b'\xa6', char='ó')
+Token(0xBB8B, b'\xa7', char='ò')
+Token(0xBB8C, b'\xa8', char='ô')
+Token(0xBB8D, b'\xa9', char='ö')
+Token(0xBB8E, b'\xaa', char='Ú')
+Token(0xBB8F, b'\xab', char='Ù')
+Token(0xBB90, b'\xac', char='Û')
+Token(0xBB91, b'\xad', char='Ü')
+Token(0xBB92, b'\xae', char='ú')
+Token(0xBB93, b'\xaf', char='ù')
+Token(0xBB94, b'\xb0', char='û')
+Token(0xBB95, b'\xb1', char='ü')
+Token(0xBB96, b'\xb2', char='Ç')
+Token(0xBB97, b'\xb3', char='ç')
+Token(0xBB98, b'\xb4', char='Ñ')
+Token(0xBB99, b'\xb5', char='ñ')
+Token(0xBB9A, b'\xb6')  # ´
+Token(0xBB9B, b'\xb7')  # Modifier Letter Grave Accent (differentiates from backtick)
+Token(0xBB9C, b'\xb8')  # ¨
+Token(0xBB9D, b'\xb9', char='¿')
+Token(0xBB9E, b'\xba', char='¡')
+Token(0xBB9F, b'\xbb', char='α')
+Token(0xBBA0, b'\xbc', char='β')
+Token(0xBBA1, b'\xbd', char='γ')
+Token(0xBBA2, b'\xbe', char='Δ')
+Token(0xBBA3, b'\xbf', char='δ')
+Token(0xBBA4, b'\xc0', char='ε')
+Token(0xBBA5, b'\xc2', char='λ')
+Token(0xBBA6, b'\xc3', char='μ')
+Token(0xBBA7, b'\xc4')  # π (homoglyph of 0xAC without syntactic meaning)
+Token(0xBBA8, b'\xc5', char='ρ')
+Token(0xBBA9, b'\xc6', char='Σ')
+Token(0xBBAB, b'\xc9', char='φ')
+Token(0xBBAC, b'\xca', char='Ω')
+Token(0xBBAD, b'\xd8')  # ṕ (homoglyph of 0x6228 without syntactic meaning)
+Token(0xBBAE, b'\xd9', char='χ')
+Token(0xBBAF, b'\x0f')  # Mathematical Bold Capital Digamma, known as "Hexadecimal F" in the tibasicdev docs
+token(0xBBB0, b'a', char='a')
+token(0xBBB1, b'b', char='b')
+token(0xBBB2, b'c', char='c')
+token(0xBBB3, b'd', char='d')
+token(0xBBB4, b'e', char='e')
+token(0xBBB5, b'f', char='f')
+token(0xBBB6, b'g', char='g')
+token(0xBBB7, b'h', char='h')
+token(0xBBB8, b'i', char='i')
+token(0xBBB9, b'j', char='j')
+token(0xBBBA, b'k', char='k')
+token(0xBBBC, b'l', char='l')
+token(0xBBBD, b'm', char='m')
+token(0xBBBE, b'n', char='n')
+token(0xBBBF, b'o', char='o')
+token(0xBBC0, b'p', char='p')
+token(0xBBC1, b'q', char='q')
+token(0xBBC2, b'r', char='r')
+token(0xBBC3, b's', char='s')
+token(0xBBC4, b't', char='t')
+token(0xBBC5, b'u', char='u')
+token(0xBBC6, b'v', char='v')
+token(0xBBC7, b'w', char='w')
+token(0xBBC8, b'x', char='x')
+token(0xBBC9, b'y', char='y')
+token(0xBBCA, b'z', char='z')
+token(0xBBCB, b'\xc7', char='σ')
+token(0xBBCC, b'\xc8', char='τ')
+token(0xBBCD, b'\x9a', char='Í')
 token(0xBBCE, b'GarbageCollect')
-token(0xBBCF, b'~',                     typeable=True)
-token(0xBBD1, b'@',                     typeable=True)
-token(0xBBD2, b'#',                     typeable=True)
-token(0xBBD3, b'\xf2',                  typeable=True)  # $
-token(0xBBD4, b'&',                     typeable=True)
-token(0xBBD5, b'`',                     typeable=True)  # Backtick (confusing because the symbol is officially called Grave Accent)
-token(0xBBD6, b';',                     typeable=True)
-token(0xBBD7, b'\\',                    typeable=True)
-token(0xBBD8, b'|',                     typeable=True)
-token(0xBBD9, b'_',                     typeable=True)
-postfix_token(0xBBDA, b'%', lambda x: x / 100, typeable=True)
-token(0xBBDB, b'\xce',                  typeable=True)  # …
-token(0xBBDC, b'\x13',                  typeable=True)  # ∠
-token(0xBBDD, b'\xf4',                  typeable=True)  # ß
-token(0xBBDE, b'\xcd')                                  # ˣ
-token(0xBBDF, b'\r')                                    # ₜ
-token(0xBBE0, b'\x80')                                  # ₀
-token(0xBBE1, b'\x81')                                  # ₁
-token(0xBBE2, b'\x82')                                  # ₂
-token(0xBBE3, b'\x83')                                  # ₃
-token(0xBBE4, b'\x84')                                  # ₄
-token(0xBBE5, b'\x85')                                  # ₅
-token(0xBBE6, b'\x86')                                  # ₆
-token(0xBBE7, b'\x87')                                  # ₇
-token(0xBBE8, b'\x88')                                  # ₈
-token(0xBBE9, b'\x89')                                  # ₉
-token(0xBBEA, b'\x1d')                                  # ⑽
-token(0xBBEB, b'\xcf')                                  # ◄
-token(0xBBEC, b'\x05')                                  # ►
-token(0xBBED, b'\x1e')                                  # ↑
-token(0xBBEE, b'\x1f')                                  # ↓
-token(0xBBF0, b'\x09')                                  # ×
-token(0xBBF1, b'\x08',                  typeable=True)  # ∫
-token(0xBBF2, b'\x06')                                  # 🡅
-token(0xBBF3, b'\x07')                                  # 🡇
-token(0xBBF4, b'\x10')                                  # √
-token(0xBBF5, b'\x7f')                                  # ≛
+token(0xBBCF, b'~', char='~')
+token(0xBBD1, b'@', char='@')
+token(0xBBD2, b'#', char='#')
+token(0xBBD3, b'\xf2', char='$')
+token(0xBBD4, b'&', char='&')
+token(0xBBD5, b'`', char='`')  # Backtick (confusing because the symbol is officially called Grave Accent)
+token(0xBBD6, b';', char=';')
+token(0xBBD7, b'\\', char='\\')
+token(0xBBD8, b'|', char='|')
+token(0xBBD9, b'_', char='_')
+postfix_token(0xBBDA, b'%', lambda x: x / 100, char='%')
+token(0xBBDB, b'\xce')  # …
+token(0xBBDC, b'\x13')  # ∠
+token(0xBBDD, b'\xf4')  # ß
+token(0xBBDE, b'\xcd')  # ˣ
+token(0xBBDF, b'\x0d')  # ₜ
+token(0xBBE0, b'\x80')  # ₀
+token(0xBBE1, b'\x81')  # ₁
+token(0xBBE2, b'\x82')  # ₂
+token(0xBBE3, b'\x83')  # ₃
+token(0xBBE4, b'\x84')  # ₄
+token(0xBBE5, b'\x85')  # ₅
+token(0xBBE6, b'\x86')  # ₆
+token(0xBBE7, b'\x87')  # ₇
+token(0xBBE8, b'\x88')  # ₈
+token(0xBBE9, b'\x89')  # ₉
+token(0xBBEA, b'\x1d')  # ⑽
+token(0xBBEB, b'\xcf')  # ◄
+token(0xBBEC, b'\x05')  # ►
+token(0xBBED, b'\x1e')  # ↑
+token(0xBBEE, b'\x1f')  # ↓
+token(0xBBF0, b'\x09')  # ×
+token(0xBBF1, b'\x08')  # ∫
+token(0xBBF2, b'\x06')  # 🡅
+token(0xBBF3, b'\x07')  # 🡇
+token(0xBBF4, b'\x10')  # √
+token(0xBBF5, b'\x7f')  # ≛
 
 
-function_token(0xBC, b'\x10(',                   timath.sqrt)   # √(
-function_token(0xBD, b'\x0e\x10(',               timath.cbrt)   # 𝟑√(
-function_token(0xBE, b'ln(',		                timath.ln)
+function_token(0xBC, b'\x10(',                  timath.sqrt)   # √(
+function_token(0xBD, b'\x0e\x10(',              timath.cbrt)   # 𝟑√(
+function_token(0xBE, b'ln(',		            timath.ln)
 function_token(0xBF, b'\xdb^(',		            timath.exp)    # 𝑒^(
 function_token(0xC0, b'log(',		            timath.log)
 function_token(0xC1, b'\x1d^(',		            timath.pow10)  # ⑽^(
@@ -923,8 +937,8 @@ token(0xEF3C, b'FRAC')
 token(0xEF3D, b'FRAC-APPROX')
 
 
-operator_token(0xF0, b'^', ops.power, (70, 70), typeable=True)
-operator_token(0xF1, b'\xcd\x10', ops.xth_root, (60, 61))  # ˣ√
+OperatorToken(0xF0, b'^', char='^', ops.power, (70, 70))
+OperatorToken(0xF1, b'\xcd\x10', ops.xth_root, (60, 61))  # ˣ√
 token(0xF2, b'1-Var Stats ')
 token(0xF3, b'2-Var Stats ')
 token(0xF4, b'LinReg(a+bx) ')
@@ -941,23 +955,18 @@ token(0xFE, b'Scatter')
 token(0xFF, b'LinReg(ax+b) ')
 
 
+ALL_TOKENS: list[Token] = []
 
-ALL_TOKENS: list[Token] = list(_generate())
-
-# TEXT_INPUT: characters accepted when converting a Python string into tokens
-# (TiString.from_str).  Populated at definition time for tokens marked
-# `typeable=True` — these are the tokens whose display character is a legitimate,
-# directly-typeable equivalent (letters, digits, punctuation, Greek, ...).  Keyed
-# by the token's decoded text.
-TEXT_INPUT: dict[str, Token] = {}
+CHAR_TABLE: dict[str, Token] = {}
 
 _TABLE: list[Token | list[Token | None] | None] = [None] * 256
 
-
 def _init():
-	for token in ALL_TOKENS:
-		if token.flags & Flag.ASCII:
-			TEXT_INPUT[token.chars] = token
+	for token in _generate():
+		CHAR_TABLE.append(token)
+
+		if token.char:
+			CHAR_TABLE[token.char] = token
 
 		code = token.code
 		if code <= 0xFF:
@@ -975,6 +984,8 @@ def _init():
 		if (dup := tbl[idx]) is not None:
 			raise ValueError(f"Duplicate token: {token} vs. {dup}")
 		tbl[idx] = token
+
+_init()
 
 
 def get_token(code: int) -> Token:
