@@ -36,7 +36,23 @@ class Console(ABC):
 
 	@abstractmethod
 	def read_tokens(self, prompt: TiString | None) -> list[Token]:
-		"""Blocking: display prompt (if any) and return the tokens the user entered."""
+		"""Blocking: display prompt (if any) and return the tokens the user entered.
+
+		Implementations tokenize the typed text through `_tokenize`, so a caller gets a
+		well-formed token list and never a raw tokenizer error."""
+
+	@staticmethod
+	def _tokenize(text: str) -> list[Token]:
+		"""Tokenize typed input.  A character the calculator's keypad can't produce (e.g.
+		a pasted multi-char function name) is a host-level problem — it can't happen on
+		real hardware and only arises because a frontend accepts free-form text — so it
+		surfaces as a plain ValueError, not a TiSyntaxError.  TiSyntaxError is reserved for
+		genuine parse failures of valid tokens; the tokenizer signals an un-typeable
+		character with KeyError."""
+		try:
+			return TiString.from_str(text).tokens
+		except KeyError as bad:
+			raise ValueError(f"input contains an un-typeable character: {bad}")
 
 	@abstractmethod
 	def read_key(self) -> int:
@@ -95,8 +111,8 @@ class ScriptedConsole(Console):
 
 	def read_tokens(self, prompt: TiString | None) -> list[Token]:
 		if not self.inputs:
-			raise ValueError(f"ScriptedConsole: no input queued")
-		return TiString.from_str(self.inputs.pop(0)).tokens
+			raise ValueError("ScriptedConsole: no input queued")
+		return self._tokenize(self.inputs.pop(0))
 
 	def read_key(self) -> int:
 		return self.keys.pop(0) if self.keys else 0
@@ -135,7 +151,7 @@ class FreeFormConsole(Console):
 		self._printed = len(values)
 
 	def read_tokens(self, prompt: TiString | None) -> list[Token]:
-		return TiString.from_str(input(str(prompt) if prompt is not None else '')).tokens
+		return self._tokenize(input(str(prompt) if prompt is not None else ''))
 
 	def read_key(self) -> int:
 		return 0   # no key support in free-form mode
@@ -312,7 +328,7 @@ class TerminalConsole(Console):
 		self._render(self.env.home)
 		with self._input_cursor():
 			text = input(str(prompt) if prompt is not None else '')
-		return TiString.from_str(text).tokens
+		return self._tokenize(text)
 
 	def read_key(self) -> int:
 		"""Best-effort non-blocking poll; returns 0 where the platform has no support.

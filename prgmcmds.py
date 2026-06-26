@@ -171,12 +171,7 @@ def _input_one(env, prompt: TiString | None, var: Reference, raw_string: bool = 
 	expression, same as expr(.
 	"""
 	env.screen = Screen.HOME            # Input/Prompt bring up the home screen
-	try:
-		tokens = env.console.read_tokens(prompt)
-	except KeyError as bad:
-		# A character the calculator's keypad couldn't type (e.g. a multi-char
-		# function name); the keypad-restricted consoles raise this on tokenizing.
-		raise TiSyntaxError(f"Input: unsupported character {bad}")
+	tokens = env.console.read_tokens(prompt)
 	# Mirror the entry onto the home grid (the console paints it on present); the
 	# prompt's own bytes precede the typed bytes, exactly as on the calculator.
 	if tokens:
@@ -223,7 +218,7 @@ def input_cmd(args: ArgParser):
 	t = args.peek()
 	if t.is_string_var() or t.code in {QUOTE, ANS, _SUB}:
 		first = args.thunk()
-		# TODO: reject EF tokens
+		# Ideally we'd reject 0xEFxx tokens here, but they're still valid within a string so it's more complex than it's worth
 		if args.has_next:
 			# the first arg was the prompt
 			prompt = first.eval()

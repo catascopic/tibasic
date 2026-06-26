@@ -515,9 +515,18 @@ class TestInput:
 		# (ScriptedConsole ignores the prompt, but the command must not choke on it)
 		assert var(env, 'X') == 1
 
-	def test_unsupported_character_raises(self):
+	def test_garbage_input_is_syntax_error(self):
+		# 'sin' tokenizes fine (lowercase letters are typeable) but doesn't parse as an
+		# expression — a genuine ERR:SYNTAX from the parser.
 		with pytest.raises(TiSyntaxError):
 			run_with('Input X', ['sin'])
+
+	def test_untypeable_character_is_host_error(self):
+		# A character the keypad can't produce (a tab) can't happen on real hardware; it
+		# only arises because a frontend accepts free-form text, so the console reports a
+		# plain ValueError rather than ERR:SYNTAX.
+		with pytest.raises(ValueError):
+			run_with('Input X', ['\t'])
 
 	def test_long_response_wraps_not_truncates(self):
 		# 1 (prompt '?') + 21 chars = 22, past one 16-wide row — should wrap
