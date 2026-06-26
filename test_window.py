@@ -2,7 +2,7 @@
 import pytest
 
 from environment import Environment, TableVars
-from catalog import get_token
+from catalog import get_token, CommandToken
 from errors import DomainError
 from test_tibasic import run
 
@@ -176,5 +176,5 @@ class TestTableVarsSeparated:
 
 class TestWiring:
 	def test_zoom_commands_are_wired(self):
-		assert get_token(0x92).command is not None   # ZoomSto
-		assert get_token(0x90).command is not None   # ZoomRcl
+		assert isinstance(get_token(0x92), CommandToken)   # ZoomSto
+		assert isinstance(get_token(0x90), CommandToken)   # ZoomRcl

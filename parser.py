@@ -231,7 +231,7 @@ class Parser:
 				in_string = True
 			elif stack and t.code == stack[-1]:
 				stack.pop()
-			elif t.function is not None or t.code == L_PAREN:
+			elif t.opens_paren_group() or t.code == L_PAREN:
 				stack.append(R_PAREN)
 			elif t.code == L_BRACE:
 				stack.append(R_BRACE)
@@ -268,10 +268,6 @@ class Parser:
 		return name
 
 	# ── Atom parser ────────────────────────────────────────────────────────────
-
-	def _call_function(self, t: Token):
-		"""Dispatch a token function via its call_with_parser interface."""
-		return t.function.call_with_parser(ArgParser(self))
 
 	def parse_atom(self):
 		if self.peek().code in {COLON, NEWLINE, EOF_CODE}:
@@ -319,18 +315,14 @@ class Parser:
 					return ans[self.parse_matrix_indices()]
 			return ans
 
-		if t.function is not None:
-			return self._call_function(t)
-
 		# A user list's accessor is name-dependent, so it's built from the following
 		# name; every other variable carries its accessor on the token.
 		if t.code == LIST_PREFIX:
 			return self._read_accessor(UserListVar(self.read_name(5)))
 
-		if t.accessor is not None:
-			return self._read_accessor(t.accessor)
-
-		raise TiSyntaxError(f"Unexpected token in expression: {t}")
+		# FunctionToken invokes a call; a plain variable token reads its accessor;
+		# anything else raises — all via the token's own parse_prefix (see titoken).
+		return t.parse_prefix(self)
 
 	def _read_accessor(self, acc):
 		"""Read an accessor as an atom.  An invocable accessor (list/matrix/equation/
@@ -372,21 +364,19 @@ class Parser:
 
 			t = self.peek()
 
-			# Postfix operators
-			# make a .eat_if_flag method if I make flags for tokens after decoupling from functions
-			if t.postfix:
+			# Postfix operators (²/!/ᵀ/… — PostfixToken applies its op)
+			if t.is_postfix():
 				self.advance()
-				lhs = t.postfix(lhs)
+				lhs = t.apply_postfix(lhs)
 				continue
 
-			# Explicit binary operator
-			if t.bp is not None:
-				left_bp, right_bp = t.bp
+			# Explicit binary operator (OperatorToken reports its left binding power)
+			left_bp = t.infix_bp()
+			if left_bp is not None:
 				if left_bp <= min_bp:
 					break
 				self.advance()
-				rhs = self.parse_expr(right_bp)
-				lhs = self.env.guard_real((lhs, rhs), t.operator(lhs, rhs))
+				lhs = t.parse_infix(self, lhs)
 				continue
 
 			# Implicit multiplication
@@ -474,7 +464,7 @@ class Parser:
 		if t.code == LIST_PREFIX:
 			return self.parse_user_list()
 		if t.is_list_var():
-			return t.accessor.reference(self.env)
+			return t.reference(self.env)
 		raise TiSyntaxError(f"Expected a list variable, got {t}")
 
 	def parse_user_list(self):
@@ -559,16 +549,9 @@ class Parser:
 			return
 
 		try:
-			if self.peek().command is not None:
-				self.advance().command.call_with_parser(ArgParser(self))
-			else:
-				value = self.parse_expr()
-				if self.eat_if(STORE):
-					self.parse_store(value)
-				elif self.peek().converter is not None:
-					value = self.advance().converter(value)
-				self.env.ans = value
-				self.end_statement()
+			# CommandToken runs its command; every other token's default run_statement
+			# is the expression statement (evaluate, then handle →store / ►conv / Ans).
+			self.peek().run_statement(self)
 		except TiError as e:
 			if e.pos is None:
 				e.pos = self.pos - 1
@@ -650,7 +633,7 @@ class ArgParser:
 		t = self._parser.advance()
 		if not t.is_numeric_var():
 			raise DataTypeError(f"Expected a numeric variable, got {t}")
-		return t.accessor.reference(self.env)
+		return t.reference(self.env)
 
 	@_parse_arg
 	def list_var(self) -> "Reference":
@@ -660,21 +643,21 @@ class ArgParser:
 	def matrix_var(self) -> "Reference":
 		t = self._parser.advance()
 		if t.is_matrix_var():
-			return t.accessor.reference(self.env)
+			return t.reference(self.env)
 		raise DataTypeError(f"Expected a matrix variable, got {t}")
 
 	@_parse_arg
 	def string_var(self) -> "Reference":
 		t = self._parser.advance()
 		if t.is_string_var():
-			return t.accessor.reference(self.env)
+			return t.reference(self.env)
 		raise DataTypeError(f"Expected a string variable, got {t}")
 
 	@_parse_arg
 	def equation_var(self) -> "Reference":
 		t = self._parser.advance()
 		if isinstance(t.accessor, (EquationVar, SequenceVar)):
-			return t.accessor.reference(self.env)
+			return t.reference(self.env)
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
 	@_parse_arg
@@ -698,7 +681,7 @@ class ArgParser:
 		"""
 		t = self._parser.advance()
 		if t.kind & TokenKind.VARIABLE:
-			return t.accessor.reference(self.env, TiString([t]))
+			return t.reference(self.env, TiString([t]))
 		if t.code == LIST_PREFIX:
 			return self._parser.parse_user_list()
 		raise TiSyntaxError(f"Expected a variable, got {t}")

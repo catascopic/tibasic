@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from collections.abc import Callable
 from enum import IntFlag, auto
 
+from errors import TiSyntaxError
+
 
 # _CHARSET: TI-83+ byte -> Unicode character (None = undefined slot).
 #
@@ -117,16 +119,24 @@ class TokenKind(IntFlag):
 
 @dataclass(slots=True, frozen=True, eq=False)
 class Token:
+	"""A token in a program.  The plain dataclass is the base for *inert* tokens —
+	punctuation, literals, and plain variables; the subclasses that carry behavior
+	(FunctionToken, CommandToken, OperatorToken, …) live in catalog.py, where they can
+	import the operator/command/accessor modules that titoken (a leaf module) cannot.
+
+	The parser drives tokens through the polymorphic hooks below (parse_prefix /
+	parse_infix / run_statement / …) rather than inspecting nullable callable fields,
+	so each kind owns its own parse behavior next to where it's wired up.
+	"""
 	code: int                 # token code as stored in a program (1 or 2 bytes packed into an int)
 	display: bytes            # large-font byte sequence that renders this token
-	bp: tuple[int, int] | None = None
-	operator:  Callable | None = None  # (lhs, rhs) -> value
-	postfix:   Callable | None = None  # (operand) -> value (prefix or postfix)
-	function:  Callable | None = None  # (ArgParser) -> value; a call.  Set whenever the display ends in '(' — sin(, round(, npv( — where the '(' is part of the token.  When `accessor` is also set the token is bare-or-called: a trailing '(' selects `function`, otherwise `accessor.resolve` (e.g. rand / rand(n)).
-	command:   Callable | None = None  # (ArgParser) -> None for command tokens
-	accessor:  "Accessor | None" = None  # how this symbol reads/writes the environment (variables, π, rand, getKey, window vars …): resolve() for a bare reference, store() as a store target, reference() to bind it for a command.  See accessors.py.
 	converter: Callable | None = None  # (value) -> value for ►DMS, ►Dec, ►Frac and others
-	kind:      "TokenKind" = TokenKind(0)  # which assignable-variable kind(s) this is, if any
+
+	# Universal-query fallbacks: only VariableToken carries a real accessor/kind, but
+	# the parser asks `t.accessor` / `t.is_*_var()` of arbitrary tokens, so the base
+	# answers "no variable" via these class-level defaults rather than a per-token field.
+	accessor = None
+	kind = TokenKind(0)
 
 	@property
 	def text(self) -> str:
@@ -172,9 +182,53 @@ class Token:
 
 	def can_start_atom(self) -> bool:
 		return bool(
-			self.is_digit() or self.accessor or self.function
+			self.is_digit() or self.accessor
 			or self.code in {L_PAREN, L_BRACE, L_BRACKET, QUOTE, DOT, SCI_E, NEG, LIST_PREFIX, ANS}
 		)
+
+	# ── Parse hooks (overridden by the behavior-carrying subclasses in catalog) ──
+
+	def parse_prefix(self, parser):
+		"""nud — produce this token's value when it leads an atom.  VariableToken reads
+		its accessor and FunctionToken invokes a call; structural/literal atoms (numbers,
+		"…", {…}, …) are handled by the parser directly.  Anything else can't start an
+		expression."""
+		raise TiSyntaxError(f"Unexpected token in expression: {self}")
+
+	def is_postfix(self) -> bool:
+		"""Whether this token is a postfix operator (², !, ᵀ, …).  PostfixToken overrides."""
+		return False
+
+	def apply_postfix(self, value):
+		"""Apply this postfix operator to `value`.  Only reached when is_postfix() is True."""
+		raise TiSyntaxError(f"{self} is not a postfix operator")
+
+	def infix_bp(self):
+		"""Left binding power if this token is an infix binary operator, else None.
+		The Pratt loop uses it to decide whether to bind; OperatorToken overrides."""
+		return None
+
+	def parse_infix(self, parser, lhs):
+		"""led — combine `lhs` via this infix operator.  Only reached when infix_bp()
+		returns a value (i.e. for OperatorToken)."""
+		raise TiSyntaxError(f"{self} is not an infix operator")
+
+	def opens_paren_group(self) -> bool:
+		"""Whether this token introduces a parenthesised group (a trailing '(' needing a
+		matching ')').  True for call tokens; used by capture() to balance delimiters."""
+		return False
+
+	def run_statement(self, parser):
+		"""Execute this token as the head of a statement.  The default is the expression
+		statement: evaluate, then handle a → store, a ►conversion, and Ans.  CommandToken
+		overrides to run a command instead."""
+		value = parser.parse_expr()
+		if parser.eat_if(STORE):
+			parser.parse_store(value)
+		elif parser.peek().converter is not None:
+			value = parser.advance().converter(value)
+		parser.env.ans = value
+		parser.end_statement()
 
 	def __repr__(self):
 		return f"0x{self.code:0{4 if self.code > 0xFF else 2}X}:{self.text!r}"

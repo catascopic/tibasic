@@ -761,9 +761,10 @@ class TestTVM:
 
 	def test_bare_and_called_are_both_wired(self):
 		from finance import TvmAccessor
+		from catalog import FunctionToken
 		for code in range(0xBB20, 0xBB25):
 			t = catalog.get_token(code)
-			assert isinstance(t.accessor, TvmAccessor) and t.function is None
+			assert isinstance(t.accessor, TvmAccessor) and not isinstance(t, FunctionToken)
 
 	def test_pmt_zero_n_raises(self):
 		# N defaults to 0 → no periods to spread the payment over.

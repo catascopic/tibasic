@@ -158,8 +158,8 @@ class ArgSpec:
 
 # ── Call machinery: TiCall and the decorator forms ───────────────────────────
 # A TiCall wraps a core function and knows how to drive an ArgParser to invoke it
-# (call_with_parser).  Tokens hold these as their .function / .command.  The core
-# stays a plain function, callable from Python via TiCall.__call__.
+# (call_with_parser).  A FunctionToken / CommandToken holds one as its fn / cmd.  The
+# core stays a plain function, callable from Python via TiCall.__call__.
 
 class TiCall(ABC):
 

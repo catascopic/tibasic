@@ -229,7 +229,7 @@ def input_cmd(args: ArgParser):
 			prompt = first.eval()
 			var = args.any_var()
 		else:
-			var = t.accessor.reference(env, TiString([t]))
+			var = t.reference(env, TiString([t]))
 	else:
 		var = args.any_var()
 	
