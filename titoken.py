@@ -14,6 +14,7 @@ from errors import TiSyntaxError
 # duplicated.  Byte D6 decodes to '\n' (the newline token) rather than its ↵ glyph
 # so program text round-trips with real line breaks.
 
+
 _CHARSET: list[str | None] = [
 #	0		1		2		3		4		5		6		7		8		9		A		B		C		D		E		F
 	' ',	'𝑛',	'𝑢',	'𝑣',	'𝑤',	'►',	'🡅',	'🡇',	'∫',	'×',	'▫',	'﹢',	'·',	'ₜ',		'𝟑',	'𝟊',	# 0
@@ -102,18 +103,34 @@ END         = 0xD4
 LBL         = 0xD6
 
 
-class TokenKind(IntFlag):
+class Flag(IntFlag):
 	"""A token's variable classification, declared explicitly in the catalog instead of
 	inferred from its code range.  Only assignable variable kinds get a flag; VARIABLE
 	is their union — what any_var / DelVar accept.  Lexical categories (digits, name
 	chars) stay as range checks, and settings (window/stat vars) aren't variables here.
 	"""
+	ASCII    = auto()
+	EXPR_START = auto()
+	
+	FUNCTION = auto()
+	COMMAND  = auto()
+	INFIX    = auto()
+	POSTFIX  = auto()
+	DIGIT    = auto()
+	
 	NUMERIC  = auto()
 	LIST     = auto()
 	MATRIX   = auto()
 	STRING   = auto()
 	SEQUENCE = auto()
 	EQUATION = auto()
+	STAT_VAR = auto()
+	
+	WINDOW_VAR = auto()
+	
+	PIC      = auto()
+	GDB      = auto()
+	
 	VARIABLE = NUMERIC | LIST | MATRIX | STRING | SEQUENCE | EQUATION
 
 
@@ -128,15 +145,9 @@ class Token:
 	parse_infix / run_statement / …) rather than inspecting nullable callable fields,
 	so each kind owns its own parse behavior next to where it's wired up.
 	"""
-	code: int                 # token code as stored in a program (1 or 2 bytes packed into an int)
-	display: bytes            # large-font byte sequence that renders this token
-	converter: Callable | None = None  # (value) -> value for ►DMS, ►Dec, ►Frac and others
-
-	# Universal-query fallbacks: only VariableToken carries a real accessor/kind, but
-	# the parser asks `t.accessor` / `t.is_*_var()` of arbitrary tokens, so the base
-	# answers "no variable" via these class-level defaults rather than a per-token field.
-	accessor = None
-	kind = TokenKind(0)
+	code: int
+	display: bytes
+	flags = Flag(0)
 
 	@property
 	def text(self) -> str:
@@ -148,43 +159,41 @@ class Token:
 		return self.code.to_bytes(1 + (self.code > 0xFF))
 
 	def is_digit(self) -> bool:
-		return 0x30 <= self.code <= 0x39
+		return bool(self.flags & Flag.DIGIT)
 
 	def is_numeric_var(self) -> bool:
-		return bool(self.kind & TokenKind.NUMERIC)
+		return bool(self.flags & Flag.NUMERIC)
 
 	def is_list_var(self) -> bool:
-		return bool(self.kind & TokenKind.LIST)
+		return bool(self.flag & Flag.LIST)
 
 	def is_list_start(self):
 		return self.code == LIST_PREFIX or self.is_list_var()
 
 	def is_matrix_var(self) -> bool:
-		return bool(self.kind & TokenKind.MATRIX)
+		return bool(self.flag & Flag.MATRIX)
 
 	def is_sequence_var(self) -> bool:
-		return bool(self.kind & TokenKind.SEQUENCE)
+		return bool(self.flag & Flag.SEQUENCE)
 
 	def is_equation_var(self) -> bool:
-		return bool(self.kind & TokenKind.EQUATION)
+		return bool(self.flag & Flag.EQUATION)
 
 	def is_string_var(self) -> bool:
-		return bool(self.kind & TokenKind.STRING)
+		return bool(self.flag & Flag.STRING)
 
 	def is_stat_var(self) -> bool:
-		return 0x6200 <= self.code <= 0x62FF
+		return bool(self.flag & Flag.STAT_VAR)
 
 	def is_window_var(self) -> bool:
-		return 0x6300 <= self.code <= 0x63FF
+		return bool(self.flag & Flag.WINDOW_VAR)
 
 	def is_name_char(self):
 		return self.is_numeric_var() or self.is_digit()
 
 	def can_start_atom(self) -> bool:
-		return bool(
-			self.is_digit() or self.accessor
-			or self.code in {L_PAREN, L_BRACE, L_BRACKET, QUOTE, DOT, SCI_E, NEG, LIST_PREFIX, ANS}
-		)
+		# TODO: Check if flags contain one of EXPR_START | FUNCTION | DIGIT | VARIABLE
+		pass
 
 	# ── Parse hooks (overridden by the behavior-carrying subclasses in catalog) ──
 
@@ -196,8 +205,8 @@ class Token:
 		raise TiSyntaxError(f"Unexpected token in expression: {self}")
 
 	def is_postfix(self) -> bool:
-		"""Whether this token is a postfix operator (², !, ᵀ, …).  PostfixToken overrides."""
-		return False
+		# TODO: check if POSTFIX in flags
+		pass
 
 	def apply_postfix(self, value):
 		"""Apply this postfix operator to `value`.  Only reached when is_postfix() is True."""
@@ -214,11 +223,12 @@ class Token:
 		raise TiSyntaxError(f"{self} is not an infix operator")
 
 	def opens_paren_group(self) -> bool:
-		"""Whether this token introduces a parenthesised group (a trailing '(' needing a
-		matching ')').  True for call tokens; used by capture() to balance delimiters."""
-		return False
+		# TODO: Check if flags contain FUNCTION or if self is L_PAREN
+		pass
 
 	def run_statement(self, parser):
+		# TODO: Return this logic to Parser
+	
 		"""Execute this token as the head of a statement.  The default is the expression
 		statement: evaluate, then handle a → store, a ►conversion, and Ans.  CommandToken
 		overrides to run a command instead."""

@@ -1,3 +1,22 @@
+I'm making my own changes to the tokens and now they really are accessors. I think this works pretty well, but let me know what you think.
+Also, I've 
+
+get rid of run_statement, let's handle that in the parser like we were doing.
+
+Consider getting rid of all `Token.is_*` methods
+
+I kind of like Environment's numerics object, but let's just go back to a plain list to make things easier.
+HOWEVER, I think it would be nice if there was another, user-friendlier way to access the variables. Could we subclass list and add in virtual accessors? Or just make a separate object that implements __getattr__ and __setattr__ as accessing env.numerics[i]?
+
+On real variables:
+`n` (the recursive sequence variable)
+The finance variables: N, I%, PV, PMT, FV, P/Y, and C/Y
+HOWEVER, setting P/Y alters C/Y, and vice-versa. (One of them should probably be made a virtual variable, like DeltaX/Y.) The others are independent.
+
+Replace typeable=True with ASCII flag.
+
+
+
 except KeyError as bad:
 Should not be prgmcmds's job!
 

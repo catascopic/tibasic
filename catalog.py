@@ -35,343 +35,385 @@ def _PLACEHOLDER(args):
 	args.end_cmd()
 
 
-_TABLE: list[Token | list[Token | None] | None] = [None] * 256
-
-ALL_TOKENS: list[Token] = []
-
-# TEXT_INPUT: characters accepted when converting a Python string into tokens
-# (TiString.from_str).  Populated at definition time for tokens marked
-# `typeable=True` — these are the tokens whose display character is a legitimate,
-# directly-typeable equivalent (letters, digits, punctuation, Greek, ...).  Keyed
-# by the token's decoded text.
-TEXT_INPUT: dict[str, Token] = {}
-
-def get_token(code: int) -> Token:
-	if code <= 0xFF:
-		item = _TABLE[code]
-	else:
-		sub = _TABLE[code >> 8]
-		lo = code & 0xFF
-		item = sub[lo] if isinstance(sub, list) and lo < len(sub) else None
-	if not isinstance(item, Token):
-		raise KeyError(code)
-	return item
-
-
-def _set_token(token: Token):
-	code = token.code
-	if code <= 0xFF:
-		tbl = _TABLE
-		idx = code
-	else:
-		b0 = code >> 8
-		idx = code & 0xFF
-		tbl = _TABLE[b0]
-		if tbl is None:
-			_TABLE[b0] = tbl = []
-		if idx >= len(tbl):
-			tbl.extend([None] * (idx + 1 - len(tbl)))
-
-	if (dup := tbl[idx]) is not None:
-		raise ValueError(f"Duplicate token: {token} vs. {dup}")
-	tbl[idx] = token
-
-
-def read_token(f: BytesIO) -> Token:
-	b0 = f.read(1)[0]
-	code = (b0 << 8) | f.read(1)[0] if isinstance(_TABLE[b0], list) else b0
-	try:
-		return get_token(code)
-	except KeyError:
-		raise ValueError(f"Invalid token code: 0x{code:0{4 if code > 0xFF else 2}X}")
-
-
 # ── Behavior-carrying token subclasses ──────────────────────────────────────────
 # These live here, not in titoken, so they can reach the operator/command modules and
 # ArgParser.  Each owns its parse hook(s) and carries only the field(s) it needs, so
 # there are no nullable callable bags and no way to wire two roles onto one token.
 
-@dataclass(frozen=True, slots=True, eq=False)
 class FunctionToken(Token):
-	"""A call token whose display ends in '(' — sin(, round(, augment(, …."""
-	fn: Callable = field(kw_only=True)
+	
+	def __init__(self, code, chars, func)
+		super().__(code, chars, Flag.FUNCTION)
+		self._func = func
 
-	def parse_prefix(self, parser):
-		return self.fn.call_with_parser(ArgParser(parser))
+	def function(self, parser):
+		return self._func.call_with_parser(ArgParser(parser))
 
-	def can_start_atom(self) -> bool:
-		return True
-
-	def opens_paren_group(self) -> bool:
-		return True
+	# TODO: Flag.FUNCTION signifies start-of-atom as well as opens-parentheses
 
 
-@dataclass(frozen=True, slots=True, eq=False)
 class CommandToken(Token):
-	"""A statement-level command — Disp, For(, Goto, ClrHome, …."""
-	cmd: Callable = field(kw_only=True)
 
-	def run_statement(self, parser):
-		parser.advance()
-		self.cmd.call_with_parser(ArgParser(parser))
+	def __init__(self, code, chars, cmd)
+		super().__(code, chars, Flag.COMMAND)
+		self._cmd = cmd
+
+	def command(self, parser):
+		self._cmd.call_with_parser(ArgParser(parser))
+		
+	# Note: Some commands use parentheses, but since they can't be nested, the parser doesn't really care.
 
 
-@dataclass(frozen=True, slots=True, eq=False)
 class OperatorToken(Token):
-	"""An infix binary operator with a (left, right) binding power — +, *, ^, nCr, …."""
-	op: Callable      = field(kw_only=True)
-	bp: tuple[int, int] = field(kw_only=True)
 
+	def __init__(self, code, chars, op, bp)
+		super().__(code, chars, Flag.INFIX)
+		self._op = op
+		self._bp = bp
+
+	@property
 	def infix_bp(self):
-		return self.bp[0]
+		return self._bp[0]
 
 	def parse_infix(self, parser, lhs):
-		rhs = parser.parse_expr(self.bp[1])
-		return parser.env.guard_real((lhs, rhs), self.op(lhs, rhs))
+		rhs = parser.parse_expr(self._bp[1])
+		return parser.env.guard_real((lhs, rhs), self._op(lhs, rhs))
 
 
-@dataclass(frozen=True, slots=True, eq=False)
 class PostfixToken(Token):
-	"""A postfix operator applied to the expression on its left — ², ³, !, ⁻¹, ᵀ."""
-	op: Callable = field(kw_only=True)
 
-	def is_postfix(self) -> bool:
-		return True
+	def __init__(self, code, chars, op)
+		super().__(code, chars, Flag.POSTFIX)
+		self._op = op
 
 	def apply_postfix(self, value):
-		return self.op(value)
+		return self._op(value)
 
 
-@dataclass(frozen=True, slots=True, eq=False)
-class VariableToken(Token):
-	"""A token that reads/writes the environment through an accessor — a variable, but
-	also π / rand / getKey / a window setting.  It *implements the accessor interface*
-	(delegating to its accessor), so it can be passed wherever a bare Accessor is — which
-	is why `parse_prefix` and the ArgParser var methods can hand the token itself to
-	`_read_accessor` / bind it with `reference`.  `kind` flags the assignable kinds."""
-	accessor: Accessor = field(kw_only=True)
-	kind: TokenKind = field(default=TokenKind(0), kw_only=True)
+class Accessor(ABC, Token):
 
-	# ── Accessor interface (delegated) ──
-	@property
-	def invocable(self) -> bool:
-		return self.accessor.invocable
+	def _get(self, env):
+		raise NotImplementedError(f"{type(self).__name__} does not support _get")
 
-	def invoke(self, arg_parser):
-		return self.accessor.invoke(arg_parser)
+	def _set(self, env, value):
+		raise NotImplementedError(f"{type(self).__name__} does not support _set")
 
 	def resolve(self, env):
-		return self.accessor.resolve(env)
+		value = self._get(env)
+		if value is None:
+			raise UndefinedError(f"{self} is not defined")
+		return value
 
 	def store(self, env, value):
-		return self.accessor.store(env, value)
+		raise TiSyntaxError(f"Cannot store to {self}")
 
-	def reference(self, env, name=None):
-		return self.accessor.reference(env, name)
+	def delete(self, env):
+		raise TiSyntaxError(f"Cannot delete {self}")
 
-	def parse_prefix(self, parser):
-		return parser._read_accessor(self)
-
-
-def _register(t: Token, typeable: bool = False) -> Token:
-	_set_token(t)
-	ALL_TOKENS.append(t)
-	if typeable:
-		TEXT_INPUT[t.text] = t
-	return t
+	def reference(self, env) -> Reference:
+		return Reference(env, self)
 
 
-def token(
-	code: int,
-	display: bytes,
-	*,
-	typeable: bool = False,
-	cnv:  Callable | None = None,
-) -> Token:
-	"""An inert token: punctuation, a literal, or a (pending) converter."""
-	return _register(Token(code, display, cnv), typeable)
+class LetterToken(Deletable, Accessor):
+
+	def __init__(self, index, ascii: bool):
+		super().__init__(0x41 + index, bytes([0x41 + i]), TokenKind.NUMERIC | (TokenKind.ASCII if ascii else Flag(0))):
+		self.index = index
+
+	def _get(self, env):
+		return env.numerics[self.index]
+
+	def _set(self, env, value):
+		return env.numerics[self.index] = value
+
+	def resolve(self, env):
+		value = self._get(env)
+		if value is None:
+			value = 0.0
+			self._set(env, value)
+		return value
+
+	def store(self, env, value):
+		self._set(env, require_num(value))
 
 
-def function_token(code: int, display: bytes, fn: Callable, *, typeable: bool = False) -> Token:
-	return _register(FunctionToken(code, display, fn=fn), typeable)
+class MatrixToken(Deletable, Accessor):
+
+	def __init__(self, index):
+		super().__init__(0x5C00 | index, bytes([0xC1, 0x41 + index, 0x5D]), Flag.MATRIX | Flag.INVOKABLE):
+		self._index = index
+
+	def _get(self, env):
+		return env.matrices[self._index]
+
+	def _set(self, env, value):
+		env.matrices[self._index] = value
+
+	def store(self, env, value):
+		self._set(env, require_matrix(value).copy())
+
+	def invoke(self, arg_parser):
+		row = py_int(arg_parser.expr(), InvalidDimError)
+		col = py_int(arg_parser.expr(), InvalidDimError)
+		arg_parser.end_func()
+		return self.resolve(arg_parser.env)[(row, col)]
 
 
-def command_token(code: int, display: bytes, cmd: Callable, *, typeable: bool = False) -> Token:
-	return _register(CommandToken(code, display, cmd=cmd), typeable)
+class ListToken(Deletable, Accessor):
+
+	def __init__(self, index: int):
+		super().__init__(0x5D00 | index, bytes([0x4C, 0x81 + index]), TokenKind.LIST | Flag.INVOKABLE)
+		self._index = index
+
+	def _get(self, env):
+		return env.lists[self._index]
+
+	def _set(self, env, value):
+		env.lists[self._index] = value
+
+	def resolve(self, env):
+		value = super().resolve(env)
+		if not value.data:
+			raise InvalidDimError("empty list")
+		return value
+
+	def store(self, env, value):
+		self._set(env, require_list(value).copy())
+
+	def invoke(self, arg_parser):
+		index = py_int(arg_parser.expr(), InvalidDimError)
+		arg_parser.end_func()
+		return self.resolve(arg_parser.env)[index]
 
 
-def operator_token(code: int, display: bytes, op: Callable, bp: tuple[int, int], *, typeable: bool = False) -> Token:
-	return _register(OperatorToken(code, display, op=op, bp=bp), typeable)
+class EquationVar(Deletable, Accessor):
+	mode: GraphMode = None
+	# In theory, the graph_var should be derivable from the mode?
+	graph_var = None
+
+	def _get(self, env):
+		return getattr(env, self.mode)[self.index].equation
+
+	def _set(self, env, value):
+		getattr(env, self.mode)[self.index].equation = value
+
+	def resolve(self, env):
+		return super().resolve(env).eval(env)
+
+	def invoke(self, arg_parser):
+		# The '(' is already eaten: Y1(x) composes by resolving with X set to x.
+		x = arg_parser.expr()
+		arg_parser.end_func()
+		env = arg_parser.env
+		with scoped_numeric(env, self.graph_var, require_num(x)):
+			return self.resolve(env)
+
+	def store(self, env, value):
+		self._set(env, _normalize_eq(value))
+		getattr(env, self.mode)[self.index].selected = True
+		if env.graph_mode is self.mode:
+			env.graph.valid = False
 
 
-def postfix_token(code: int, display: bytes, op: Callable, *, typeable: bool = False) -> Token:
-	return _register(PostfixToken(code, display, op=op), typeable)
+class FuncEquationVar(EquationVar):
+	mode = GraphMode.FUNC
+	graph_var = 'X'
+
+	def __init__(self, index):
+		return super().__init__(0x5E10 + index, bytes([0x59, 0x80 + (index + 1) % 10]), Flag.EQUATION | Flag.INVOKABLE)
+		self.index = index
+		# TODO: how to reduce code duplication of setting index as well as EQUATION|INVOKABLE?
+
+	# Maybe something like this instead of a constructor?
+	# I'm not sure I like it...
+	@staticmethod
+	def _format(index):
+		return 0x5E10 + index, bytes([0x59, 0x80 + (index + 1) % 10])
 
 
-def variable_token(code: int, display: bytes, accessor: Accessor, *, kind: TokenKind = TokenKind(0), typeable: bool = False) -> Token:
-	return _register(VariableToken(code, display, accessor=accessor, kind=kind), typeable)
+class RealVariable(Deletable, Accessor):
+	def __init__(self, code, chars, name):
+		super().__init__(code, chars, Flag.REAL)
+		self._name = name
+
+	def _get(self, env):
+		return getattr(env, self._name)
+
+	def _set(self, env, value):
+		setattr(env, self._name, value)
+
+	def store(self, env, value):
+		self._set(env, require_real(value))
 
 
-token(0x01, b'\x05DMS')   # ►DMS
-token(0x02, b'\x05Dec')   # ►Dec
-token(0x03, b'\x05Frac')  # ►Frac
-token(tk.STORE, b'\x1c')  # →
-token(0x05, b'Boxplot')
-token(tk.L_BRACKET, b'\xc1',            typeable=True)  # The '[' symbol (θ steals this place in the charset)
-token(tk.R_BRACKET, b']',               typeable=True)
-token(tk.L_BRACE, b'{',                 typeable=True)
-token(tk.R_BRACE, b'}',                 typeable=True)
-token(tk.RAD, b'\x15')                                    # post needs env, handled specially
-token(tk.DEG, b'\x14',                  typeable=True)  # ditto
-postfix_token(0x0C, b'\x11', ops.inv)   # ¹
-postfix_token(0x0D, b'\x12', lambda x: x**2, typeable=True)  # ²
-postfix_token(0x0E, b'\x16', ops.transpose)                  # ᵀ
-postfix_token(0x0F, b'\xd5', lambda x: x**3, typeable=True)  # ³
-token(tk.L_PAREN, b'(',                 typeable=True)
-token(tk.R_PAREN, b')',                 typeable=True)
-function_token(0x12, b'round(',                  timath.round)
-function_token(0x13, b'pxl-Test(',               draw.pxl_test)
-function_token(0x14, b'augment(',                tilist.augment)
-function_token(0x15, b'rowSwap(',                matrix.row_swap)
-function_token(0x16, b'row+(',                   matrix.row_plus)
-function_token(0x17, b'*row(',                   matrix.times_row)
-function_token(0x18, b'*row+(',                  matrix.times_row_plus)
-function_token(0x19, b'max(',                    timath.max)
-function_token(0x1A, b'min(',                    timath.min)
-function_token(0x1B, b'R\x05Pr(',                timath.rect_to_polar_radius)  # R►Pr(
-function_token(0x1C, b'R\x05P\x5b(',             timath.rect_to_polar_angle)   # R►Pθ(
-function_token(0x1D, b'P\x05Rx(',                timath.polar_to_rect_x)       # P►Rx(
-function_token(0x1E, b'P\x05Ry(',                timath.polar_to_rect_y)       # P►Ry(
-function_token(0x1F, b'median(',                 tilist.median)
-function_token(0x20, b'randM(',                  matrix.rand_m)
-function_token(0x21, b'mean(',                   tilist.mean)
-function_token(0x22, b'solve(',                  timath.solve)
-function_token(0x23, b'seq(',                    tilist.seq)
-function_token(0x24, b'fnInt(',                  timath.fn_int)
-function_token(0x25, b'nDeriv(',                 timath.n_deriv)
-function_token(0x27, b'fMin(',                   timath.f_min)
-function_token(0x28, b'fMax(',                   timath.f_max)
-token(0x29, b' ',                       typeable=True)
-token(tk.QUOTE, b'"',                   typeable=True)
-token(tk.COMMA, b',',                   typeable=True)
-variable_token(0x2C, b'\xd7', Constant(1j), typeable=True)  # 𝑖
-postfix_token(0x2D, b'!', ops.factorial, typeable=True)
-token(0x2E, b'CubicReg ')
-token(0x2F, b'QuartReg ')
 
-# 0 - 9
-for _i in range(10):
-	token(0x30 + _i, bytes([0x30 + _i]), typeable=True)
+def generate():
+	yield Token(0x01, b'\x05DMS')   # ►DMS
+	yield Token(0x02, b'\x05Dec')   # ►Dec
+	yield Token(0x03, b'\x05Frac')  # ►Frac
+	yield Token(tk.STORE, b'\x1c')  # → (Store operator)
+	yield Token(0x05, b'Boxplot')
+	yield Token(tk.L_BRACKET, b'\xc1',            flags=Flag.ASCII)  # The '[' symbol (θ steals this place in the charset)
+	yield Token(tk.R_BRACKET, b']',               flags=Flag.ASCII)
+	yield Token(tk.L_BRACE, b'{',                 flags=Flag.ASCII)
+	yield Token(tk.R_BRACE, b'}',                 flags=Flag.ASCII)
+	yield Token(tk.RAD, b'\x15')                                     # ʳ (Radian symbol; postfix needs env, handled specially)
+	yield Token(tk.DEG, b'\x14',                  flags=Flag.ASCII)  # ° (Degree symbol; ditto)
+	yield PostfixToken(0x0C, b'\x11',             ops.inv)   # ¹ (ideally a supersccript negative 1, but this is the best 1-char approximation)
+	yield PostfixToken(0x0D, b'\x12',             lambda x: x**2, flags=Flag.ASCII)  # ² (squared)
+	yield PostfixToken(0x0E, b'\x16',             ops.transpose)                     # ᵀ (superscript T)
+	yield PostfixToken(0x0F, b'\xd5',             lambda x: x**3, flags=Flag.ASCII)  # ³ (cubed)
+	yield Token(tk.L_PAREN, b'(',                 flags=Flag.ASCII)
+	yield Token(tk.R_PAREN, b')',                 flags=Flag.ASCII)
+	yield FunctionToken(0x12, b'round(',          timath.round)
+	yield FunctionToken(0x13, b'pxl-Test(',       draw.pxl_test)
+	yield FunctionToken(0x14, b'augment(',        tilist.augment)
+	yield FunctionToken(0x15, b'rowSwap(',        matrix.row_swap)
+	yield FunctionToken(0x16, b'row+(',           matrix.row_plus)
+	yield FunctionToken(0x17, b'*row(',           matrix.times_row)
+	yield FunctionToken(0x18, b'*row+(',          matrix.times_row_plus)
+	yield FunctionToken(0x19, b'max(',            timath.max)
+	yield FunctionToken(0x1A, b'min(',            timath.min)
+	yield FunctionToken(0x1B, b'R\x05Pr(',        timath.rect_to_polar_radius)  # R►Pr(
+	yield FunctionToken(0x1C, b'R\x05P\x5b(',     timath.rect_to_polar_angle)   # R►Pθ(
+	yield FunctionToken(0x1D, b'P\x05Rx(',        timath.polar_to_rect_x)       # P►Rx(
+	yield FunctionToken(0x1E, b'P\x05Ry(',        timath.polar_to_rect_y)       # P►Ry(
+	yield FunctionToken(0x1F, b'median(',         tilist.median)
+	yield FunctionToken(0x20, b'randM(',          matrix.rand_m)
+	yield FunctionToken(0x21, b'mean(',           tilist.mean)
+	yield FunctionToken(0x22, b'solve(',          timath.solve)
+	yield FunctionToken(0x23, b'seq(',            tilist.seq)
+	yield FunctionToken(0x24, b'fnInt(',          timath.fn_int)
+	yield FunctionToken(0x25, b'nDeriv(',         timath.n_deriv)
+	yield FunctionToken(0x27, b'fMin(',           timath.f_min)
+	yield FunctionToken(0x28, b'fMax(',           timath.f_max)
+	yield token(0x29, b' ',                       flags=Flag.ASCII)
+	yield token(tk.QUOTE, b'"',                   flags=Flag.ASCII)
+	yield token(tk.COMMA, b',',                   flags=Flag.ASCII)
+	yield variable_token(0x2C, b'\xd7',           Constant(1j), flags=Flag.ASCII)  # 𝑖 (imaginary unit)
+	yield PostfixToken(0x2D, b'!',                ops.factorial, flags=Flag.ASCII)
+	yield token(0x2E, b'CubicReg ')
+	yield token(0x2F, b'QuartReg ')
+	
+	# 0 - 9
+	for i in range(10):
+		yield Token(0x30 + i, bytes([0x30 + i]), flags=Flag.ASCII | Flag.DIGIT)
 
-token(tk.DOT, b'.',                     typeable=True)
-token(tk.SCI_E, b'\x1b')  # ᴇ
-operator_token(0x3C, b' or ', ops.or_, (20, 21))
-operator_token(0x3D, b' xor ', ops.xor, (20, 21))
-token(tk.COLON, b':',                   typeable=True)
-token(tk.NEWLINE, b'\xd6',              typeable=True)
-operator_token(0x40, b' and ', ops.and_, (30, 31))
+	yield Token(tk.DOT, b'.',                     flags=Flag.ASCII)
+	yield Token(tk.SCI_E, b'\x1b')  # ᴇ
+	yield OperatorToken(0x3C, b' or ',            ops.or_, (20, 21))
+	yield OperatorToken(0x3D, b' xor ',           ops.xor, (20, 21))
+	yield Token(tk.COLON, b':',                   flags=Flag.ASCII)
+	yield Token(tk.NEWLINE, b'\xd6',              flags=Flag.ASCII)
+	yield OperatorToken(0x40, b' and ',           ops.and_, (30, 31))
 
-# A - Z, θ
-for _i in range(26):
-	variable_token(0x41 + _i, bytes([0x41 + _i]), NumericVar(chr(0x41 + _i)), kind=TokenKind.NUMERIC, typeable=True)
+	# A - Z
+	for i in range(26): 
+		yield LetterToken(i, ascii=True)
+	
+	yield LetterToken(27)  # θ
 
-variable_token(0x5B, b'\x5b', NumericVar('theta'), kind=TokenKind.NUMERIC, typeable=True)
+	# [A] - [J]
+	for i in range(10):
+		yield MatrixToken(i)
 
-# [A] - [J]
-for _i in range(10):
-	variable_token(0x5C00 | _i, bytes([0xC1, 0x41 + _i, 0x5D]), MatrixVar(chr(0x41 + _i)), kind=TokenKind.MATRIX)
+	# L₁ - L₆
+	for i in range(6):
+		yield ListToken(i)
 
-# L₁ - L₆
-for _i in range(6):
-	variable_token(0x5D00 | _i, bytes([0x4C, 0x81 + _i]), ListVar(_i), kind=TokenKind.LIST)
+	# Y₁ - Y₀  (Function mode)
+	for i in range(10):
+		yield FuncEquationToken(i)
 
-# Y₁ - Y₀  (Function mode)
-for _i in range(10):
-	variable_token(0x5E10 + _i, bytes([0x59, 0x80 + (_i + 1) % 10]), FuncEquationVar(_i), kind=TokenKind.EQUATION)
+	# TODO: FIX THESE!
 
-# X₁ₜ/Y₁ₜ - X₆ₜ/Y₆ₜ  (Parametric mode: pairs share one index)
-for _i in range(6):
-	variable_token(0x5E20 + _i * 2,     bytes([0x58, 0x81 + _i, 0x0D]), ParEquationVar(_i, half='x'), kind=TokenKind.EQUATION)
-	variable_token(0x5E20 + _i * 2 + 1, bytes([0x59, 0x81 + _i, 0x0D]), ParEquationVar(_i, half='y'), kind=TokenKind.EQUATION)
+	# X₁ₜ/Y₁ₜ - X₆ₜ/Y₆ₜ  (Parametric mode: pairs share one index)
+	for i in range(12):
+		index = i // 2
+		variable_token(0x5E20 + i, bytes([0x58, 0x81 + index, 0x0D]), ParEquationVar(index, half='x'), kind=TokenKind.EQUATION)
+		variable_token(0x5E20 + i, bytes([0x59, 0x81 + index, 0x0D]), ParEquationVar(index, half='y'), kind=TokenKind.EQUATION)
 
-# r₁ - r₆  (Polar mode)
-for _i in range(6):
-	variable_token(0x5E40 + _i, bytes([0x72, 0x81 + _i]), PolarEquationVar(_i), kind=TokenKind.EQUATION)
+	# r₁ - r₆  (Polar mode)
+	for i in range(6):
+		variable_token(0x5E40 + i, bytes([0x72, 0x81 + i]), PolarEquationVar(i), kind=TokenKind.EQUATION)
 
-# 𝑢, 𝑣, 𝑤  (Sequence mode)
-for _i in range(3):
-	variable_token(0x5E80 + _i, bytes([0x02 + _i]), SequenceVar(_i), kind=TokenKind.SEQUENCE)
+	# 𝑢, 𝑣, 𝑤  (Sequence mode)
+	for i in range(3):
+		variable_token(0x5E80 + i, bytes([0x02 + i]), SequenceVar(i), kind=TokenKind.SEQUENCE)
 
-command_token(0x5F, b'prgm', cmds.prgm)
 
-# Pic1 - Pic0
-for _i in range(10):
-	token(0x6000 + _i, b'Pic' + bytes([0x30 + (_i + 1) % 10]))
+	yield CommandToken(0x5F, b'prgm', cmds.prgm)
 
-# GDB1 - GDB 0
-for _i in range(10):
-	token(0x6100 | _i, b'GDB' + bytes([0x30 + (_i + 1) % 10]))
+	# Pic1 - Pic0
+	for i in range(10):
+		yield Token(0x6000 + i, b'Pic' + bytes([0x30 + (i + 1) % 10]), Flag.PIC)
 
-token(0x6201, b'RegEq')
-token(0x6202, b'n')
-token(0x6203, b'\xcb')       # ẍ
-token(0x6204, b'\xc6x')      # Σx
-token(0x6205, b'\xc6x\x12')  # Σx²
-token(0x6206, b'Sx')
-token(0x6207, b'\xc7x')      # σx
-token(0x6208, b'minX')
-token(0x6209, b'maxX')
-token(0x620A, b'minY')
-token(0x620B, b'maxY')
-token(0x620C, b'\xcc')       # ȳ
-token(0x620D, b'\xc6y')      # Σy
-token(0x620E, b'\xc6y\x12')  # Σy²
-token(0x620F, b'Sy')
-token(0x6210, b'\xc7y')      # σy
-token(0x6211, b'\xc6xy')     # Σxy
-token(0x6212, b'r')
-token(0x6213, b'Med')
-token(0x6214, b'Q1')
-token(0x6215, b'Q3')
-token(0x6216, b'a')
-token(0x6217, b'b')
-token(0x6218, b'c')
-token(0x6219, b'd')
-token(0x621A, b'e')
-token(0x621B, b'x\x81')     # x₁
-token(0x621C, b'x\x82')     # x₂
-token(0x621D, b'x\x83')     # x₃
-token(0x621E, b'y\x81')     # y₁
-token(0x621F, b'y\x82')     # y₂
-token(0x6220, b'y\x83')     # y₃
-variable_token(0x6221, b'\x01', EnvVar('n'), kind=TokenKind.NUMERIC)      # 𝑛 (counts as a numeric var)
-token(0x6222, b'p')
-token(0x6223, b'z')
-token(0x6224, b't')
-token(0x6225, b'\xd9\x12')  # χ²
-token(0x6226, b'\xda')      # Mathematical Bold Capital F, known as "Stat F" in the tibasicdev docs
-token(0x6227, b'df')
-token(0x6228, b'\xd8')      # ṕ
-token(0x6229, b'\xd8\x81')  # ṕ₁
-token(0x622A, b'\xd8\x82')  # ṕ₂
-token(0x622B, b'\xcb\x81')  # ẍ₁
-token(0x622C, b'Sx\x81')    # Sx₁
-token(0x622D, b'n\x81')     # n₁
-token(0x622E, b'\xcb\x82')  # ẍ₂
-token(0x622F, b'Sx\x82')    # Sx₂
-token(0x6230, b'n\x82')     # n₂
-token(0x6231, b'Sxp')
-token(0x6232, b'lower')
-token(0x6233, b'upper')
-token(0x6234, b's')
-token(0x6235, b'r\x12')     # r²
-token(0x6236, b'R\x12')     # R²
-token(0x6237, b'df')        # Factor df
-token(0x6238, b'SS')        # Factor SS
-token(0x6239, b'MS')        # Factor MS
-token(0x623A, b'df')        # Error df
-token(0x623B, b'SS')        # Error SS
-token(0x623C, b'MS')        # Error MS
+	# GDB1 - GDB 0
+	for i in range(10):
+		yield Token(0x6100 | i, b'GDB' + bytes([0x30 + (i + 1) % 10]), Flag.GDB)
+
+
+	yield Token(0x6201, b'RegEq')
+	yield Token(0x6202, b'n')
+	yield Token(0x6203, b'\xcb')       # ẍ
+	yield Token(0x6204, b'\xc6x')      # Σx
+	yield Token(0x6205, b'\xc6x\x12')  # Σx²
+	yield Token(0x6206, b'Sx')
+	yield Token(0x6207, b'\xc7x')      # σx
+	yield Token(0x6208, b'minX')
+	yield Token(0x6209, b'maxX')
+	yield Token(0x620A, b'minY')
+	yield Token(0x620B, b'maxY')
+	yield Token(0x620C, b'\xcc')       # ȳ
+	yield Token(0x620D, b'\xc6y')      # Σy
+	yield Token(0x620E, b'\xc6y\x12')  # Σy²
+	yield Token(0x620F, b'Sy')
+	yield Token(0x6210, b'\xc7y')      # σy
+	yield Token(0x6211, b'\xc6xy')     # Σxy
+	yield Token(0x6212, b'r')
+	yield Token(0x6213, b'Med')
+	yield Token(0x6214, b'Q1')
+	yield Token(0x6215, b'Q3')
+	yield Token(0x6216, b'a')
+	yield Token(0x6217, b'b')
+	yield Token(0x6218, b'c')
+	yield Token(0x6219, b'd')
+	yield Token(0x621A, b'e')
+	yield Token(0x621B, b'x\x81')     # x₁
+	yield Token(0x621C, b'x\x82')     # x₂
+	yield Token(0x621D, b'x\x83')     # x₃
+	yield Token(0x621E, b'y\x81')     # y₁
+	yield Token(0x621F, b'y\x82')     # y₂
+	yield Token(0x6220, b'y\x83')     # y₃
+	yield RealVariable(0x6221, b'\x01', 'n')  # 𝑛 ("recursive n" for sequence equations)
+	yield Token(0x6222, b'p')
+	yield Token(0x6223, b'z')
+	yield Token(0x6224, b't')
+	yield Token(0x6225, b'\xd9\x12')  # χ²
+	yield Token(0x6226, b'\xda')      # Mathematical Bold Capital F, known as "Stat F" in the tibasicdev docs
+	yield Token(0x6227, b'df')
+	yield Token(0x6228, b'\xd8')      # ṕ (should be p-hat; this is an approximation)
+	yield Token(0x6229, b'\xd8\x81')  # ṕ₁
+	yield Token(0x622A, b'\xd8\x82')  # ṕ₂
+	yield Token(0x622B, b'\xcb\x81')  # ẍ₁ (should be x-bar; this is an approximation)
+	yield Token(0x622C, b'Sx\x81')    # Sx₁
+	yield Token(0x622D, b'n\x81')     # n₁
+	yield Token(0x622E, b'\xcb\x82')  # ẍ₂
+	yield Token(0x622F, b'Sx\x82')    # Sx₂
+	yield Token(0x6230, b'n\x82')     # n₂
+	yield Token(0x6231, b'Sxp')
+	yield Token(0x6232, b'lower')
+	yield Token(0x6233, b'upper')
+	yield Token(0x6234, b's')
+	yield Token(0x6235, b'r\x12')     # r²
+	yield Token(0x6236, b'R\x12')     # R²
+	yield Token(0x6237, b'df')        # Factor df
+	yield Token(0x6238, b'SS')        # Factor SS
+	yield Token(0x6239, b'MS')        # Factor MS
+	yield Token(0x623A, b'df')        # Error df
+	yield Token(0x623B, b'SS')        # Error SS
+	yield Token(0x623C, b'MS')        # Error MS
+	
 
 variable_token(0x6300, b'ZXscl', WindowVar('zxscl'))
 variable_token(0x6301, b'ZYscl', WindowVar('zyscl'))
@@ -379,8 +421,8 @@ variable_token(0x6302, b'Xscl', WindowVar('xscl'))
 variable_token(0x6303, b'Yscl', WindowVar('yscl'))
 variable_token(0x6304, b'\x02(nMin)', SequenceInitialVar(0))   # 𝑢(nMin)
 variable_token(0x6305, b'\x03(nMin)', SequenceInitialVar(1))   # 𝑣(nMin)
-token(0x6306, b'\x02(n-1)')             # u(n-1)
-token(0x6307, b'\x03(n-1)')             # v(n-1)
+token(0x6306, b'\x02(n-1)')             # 𝑢(n-1)
+token(0x6307, b'\x03(n-1)')             # 𝑣(n-1)
 variable_token(0x6308, b'Z\x02(nMin)', SequenceInitialVar(0))  # Z𝑢(nMin) — same slot, zoom-window alias
 variable_token(0x6309, b'Z\x03(nMin)', SequenceInitialVar(1))  # Z𝑣(nMin)
 variable_token(0x630A, b'Xmin', WindowVar('xmin'))
@@ -897,6 +939,64 @@ token(0xFC, b'Histogram')
 token(0xFD, b'xyLine')
 token(0xFE, b'Scatter')
 token(0xFF, b'LinReg(ax+b) ')
+
+
+
+ALL_TOKENS: list[Token] = list(_generate())
+
+# TEXT_INPUT: characters accepted when converting a Python string into tokens
+# (TiString.from_str).  Populated at definition time for tokens marked
+# `typeable=True` — these are the tokens whose display character is a legitimate,
+# directly-typeable equivalent (letters, digits, punctuation, Greek, ...).  Keyed
+# by the token's decoded text.
+TEXT_INPUT: dict[str, Token] = {}
+
+_TABLE: list[Token | list[Token | None] | None] = [None] * 256
+
+
+def _init():
+	for token in ALL_TOKENS:
+		if token.flags & Flag.ASCII:
+			TEXT_INPUT[token.chars] = token
+
+		code = token.code
+		if code <= 0xFF:
+			tbl = _TABLE
+			idx = code
+		else:
+			b0 = code >> 8
+			idx = code & 0xFF
+			tbl = _TABLE[b0]
+			if tbl is None:
+				_TABLE[b0] = tbl = []
+			if idx >= len(tbl):
+				tbl.extend([None] * (idx + 1 - len(tbl)))
+
+		if (dup := tbl[idx]) is not None:
+			raise ValueError(f"Duplicate token: {token} vs. {dup}")
+		tbl[idx] = token
+
+
+def get_token(code: int) -> Token:
+	if code <= 0xFF:
+		item = _TABLE[code]
+	else:
+		sub = _TABLE[code >> 8]
+		lo = code & 0xFF
+		item = sub[lo] if isinstance(sub, list) and lo < len(sub) else None
+	if not isinstance(item, Token):
+		raise KeyError(code)
+	return item
+
+
+def read_token(f: BytesIO) -> Token:
+	b0 = f.read(1)[0]
+	code = (b0 << 8) | f.read(1)[0] if isinstance(_TABLE[b0], list) else b0
+	try:
+		return get_token(code)
+	except KeyError:
+		raise ValueError(f"Invalid token code: 0x{code:0{4 if code > 0xFF else 2}X}")
+
 
 
 if __name__ == '__main__':
