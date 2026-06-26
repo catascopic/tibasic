@@ -11,7 +11,7 @@ from accessors import (
 	Accessor, NumericVar, MatrixVar, ListVar, StringVar,
 	Computed, Constant,
 	WindowVar, XresVar, IntWindowVar, FactorWindowVar, DeltaWindowVar,
-	EnvVar, TableVar, EquationVar, FuncEquationVar, ParEquationVar, PolarEquationVar, SequenceVar, SequenceInitialVar,
+	EnvVar, TableVar, FuncEquationVar, ParEquationVar, PolarEquationVar, SequenceVar, SequenceInitialVar,
 )
 import prgmcmds as cmds
 import distributions as dist
@@ -27,8 +27,6 @@ import titime
 import titoken as tk
 import zoom
 
-
-from preparse import special_func
 
 @special_func
 def _PLACEHOLDER(args):

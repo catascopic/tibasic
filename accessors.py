@@ -1,10 +1,10 @@
 """How tokens read, write, and reference the environment.
 
 An `Accessor` is a stateless flyweight that knows *how* to get/set one symbol — a
-numeric variable, a list, π, rand, a window setting — in any Environment.  A Token
-holds one (`Token.accessor`), and the parser calls `resolve`/`store` on it directly,
-passing the environment, so there's no per-environment variable object to allocate and
-no `env` threaded through every call site.
+numeric variable, a list, π, rand, a window setting — in any Environment.  A
+`VariableToken` holds one (and delegates the accessor interface to it), and the parser
+calls `resolve`/`store` on it directly, passing the environment, so there's no
+per-environment variable object to allocate and no `env` threaded through every call site.
 
 When a command needs to *hold* a variable rather than its value (For, fnInt, Input,
 DelVar, …), `Accessor.reference(env)` binds the accessor to an environment as a

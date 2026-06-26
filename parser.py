@@ -7,14 +7,14 @@ from titoken import (
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
 	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
 	SCI_E, DEG, RAD, APOS,
-	ANS, RAND, DIM,
+	ANS, DIM,
 	LIST_PREFIX,
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
 from environment import Environment
 from core import Thunk, py_int, require_num, require_real
 from accessors import Reference, UserListVar, EquationVar, SequenceVar
-from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError, UndefinedError
+from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError
 
 
 def _describe_code(code: int) -> str:
@@ -218,7 +218,7 @@ class Parser:
 		while self.has_next:
 			t = self.peek()
 			if t.code == STORE:
-				raise TiSyntaxError(f"Unexpected STORE in formula")
+				raise TiSyntaxError("Unexpected STORE in formula")
 			if t.code == NEWLINE:
 				break
 
@@ -511,7 +511,6 @@ class Parser:
 		"""
 		depth = 0
 		prev_if = False
-		start_pos = self.pos
 		while self.has_next:
 			code = self.peek().code
 			if code == THEN:
@@ -761,7 +760,7 @@ class ArgParser:
 
 
 if __name__ == '__main__':
-	from test_tibasic import toks, calc
+	from test_tibasic import toks
 
 	env = Environment()
 
