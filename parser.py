@@ -564,8 +564,6 @@ class Parser:
 		value = self.parse_expr()
 		if self.eat_if(STORE):
 			self.parse_store(value)
-		else:
-			self.env.home.disp(value)
 		self.env.ans = value
 		self.end_statement()
 
