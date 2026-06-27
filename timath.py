@@ -18,7 +18,7 @@ import random
 from functools import wraps
 from numbers import Number
 
-from accessors import Accessor
+from titoken import Accessor, Flag
 from core import TiList, TiMatrix, require_list
 from core import require_real, require_int, require_num, py_int
 from preparse import preparse_func, Real, Vectorized, VectorizedReal, MatrixVectorized, AnyValue, Thunk, NumericVar, Env
@@ -551,8 +551,11 @@ def rand_list(n: Real):
 	return TiList([random.random() for _ in range(py_int(n))])
 
 
-class RandAccessor(Accessor):
-	invocable = True
+class RandToken(Accessor):
+	"""rand — bare resolves to a random real; rand(n) returns a list; storing seeds."""
+
+	def __init__(self, code, display):
+		super().__init__(code, display, Flag.INVOKABLE)
 
 	def resolve(self, env):
 		return env.rand()

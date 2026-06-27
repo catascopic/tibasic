@@ -16,7 +16,6 @@ from graph import (
 	GraphStyle, FuncData, ParData, PolarData, SeqData,
 )
 from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
-from accessors import NumericVar
 from homescreen import HomeScreen
 from terminal import ScriptedConsole
 from titoken import Token
@@ -26,45 +25,54 @@ _NUMERIC_NAMES = tuple(chr(0x41 + i) for i in range(26)) + ('theta',)
 _MATRIX_NAMES  = tuple(chr(0x41 + i) for i in range(10))   # A–J
 
 
-class NumericVars:
-	"""Storage for the real/complex variables A–Z and θ: a fixed set of named slots,
-	None until assigned.  This is *just the data* — the access logic (auto-init, type
-	checks) lives in accessors.NumericVar — so a value can be read directly as
-	env.numerics.A (or env.numerics.theta), which is handy in tests."""
+class _NamedSlots:
+	"""Fixed-size variable storage addressable two ways: by index (`env.numerics[i]` —
+	what the accessor tokens use) and by TI name (`env.numerics.A` / `.theta` — handy in
+	tests and for the equation graph-var scoping).  Slots are None until assigned.
 
-	__slots__ = _NUMERIC_NAMES
+	The data is *just* the storage; the access logic (auto-init, type checks, copies)
+	lives on the accessor tokens (accessors.LetterToken / MatrixToken).
+	"""
 
-	def __init__(self):
-		for name in self.__slots__:
-			setattr(self, name, None)
+	def __init__(self, names):
+		object.__setattr__(self, '_index', {n: i for i, n in enumerate(names)})
+		object.__setattr__(self, '_slots', [None] * len(names))
+
+	def __getitem__(self, i):
+		return self._slots[i]
+
+	def __setitem__(self, i, value):
+		self._slots[i] = value
+
+	def __len__(self):
+		return len(self._slots)
+
+	def __iter__(self):
+		return iter(self._slots)
+
+	def __getattr__(self, name):
+		try:
+			return self._slots[self._index[name]]
+		except KeyError:
+			raise AttributeError(name)
+
+	def __setattr__(self, name, value):
+		idx = self._index.get(name)
+		if idx is None:
+			raise AttributeError(name)
+		self._slots[idx] = value
 
 	def __repr__(self):
-		live = {n: getattr(self, n) for n in self.__slots__ if getattr(self, n) is not None}
-		return f"NumericVars({live})"
-
-
-class MatrixVars:
-	"""Storage for matrix variables [A]–[J]: a fixed set of named slots, None until
-	assigned.  Access logic (UndefinedError on resolve, deep-copy on store) lives in
-	accessors.MatrixVar; env.matrices.A reads the raw TiMatrix | None directly."""
-
-	__slots__ = _MATRIX_NAMES
-
-	def __init__(self):
-		for name in self.__slots__:
-			setattr(self, name, None)
-
-	def __repr__(self):
-		live = {n: getattr(self, n) for n in self.__slots__ if getattr(self, n) is not None}
-		return f"MatrixVars({live})"
+		live = {n: self._slots[i] for n, i in self._index.items() if self._slots[i] is not None}
+		return f"_NamedSlots({live})"
 
 
 class Environment:
 
 	def __init__(self, console=None):
 		# VARIABLES
-		self.numerics   = NumericVars()     # A–Z, θ  (named slots, None until assigned)
-		self.matrices   = MatrixVars()      # [A]–[J] (named slots, None until assigned)
+		self.numerics   = _NamedSlots(_NUMERIC_NAMES)   # A–Z, θ  (index- or name-addressable)
+		self.matrices   = _NamedSlots(_MATRIX_NAMES)    # [A]–[J]
 		self.lists      = [None] * 6        # L1–L6  (TiList | None)
 		self.strings    = [None] * 10       # Str1–Str0 (TiString | None)
 		self.function   = [FuncData()  for _ in range(10)]  # Y1–Y0

@@ -9,7 +9,7 @@ import builtins
 import math
 from datetime import date
 
-from accessors import Accessor
+from titoken import Accessor, Flag
 from core import TiList, require_list
 from core import require_real, require_int, py_int
 from preparse import preparse_func, Real, VectorizedReal, Env
@@ -345,16 +345,15 @@ def tvm_fv(env: Env, n: Real = None, i_pct: Real = None, pv: Real = None, pmt: R
 	return tvm_fv_value(env)
 
 
-class TvmAccessor(Accessor):
-	"""Bare-or-called accessor for tvm_Pmt, tvm_I%, tvm_PV, tvm_N, tvm_FV.
+class TvmToken(Accessor):
+	"""Bare-or-called accessor token for tvm_Pmt, tvm_I%, tvm_PV, tvm_N, tvm_FV.
 
 	Bare (no '('): resolves the stored finance variables via `_value_fn`.
 	Called (with '('): updates the stored variables then resolves, via `_solver`.
 	"""
 
-	invocable = True
-
-	def __init__(self, value_fn, solver):
+	def __init__(self, code, display, value_fn, solver):
+		super().__init__(code, display, Flag.INVOKABLE)
 		self._value_fn = value_fn
 		self._solver = solver
 

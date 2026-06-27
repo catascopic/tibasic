@@ -1,8 +1,8 @@
-from dataclasses import dataclass
 from collections.abc import Callable
+from contextlib import contextmanager
 from enum import IntFlag, auto
 
-from errors import TiSyntaxError
+from errors import TiSyntaxError, UndefinedError
 
 
 # _CHARSET: TI-83+ byte -> Unicode character (None = undefined slot).
@@ -104,19 +104,22 @@ LBL         = 0xD6
 
 
 class Flag(IntFlag):
-	"""A token's variable classification, declared explicitly in the catalog instead of
-	inferred from its code range.  Only assignable variable kinds get a flag; VARIABLE
-	is their union — what any_var / DelVar accept.  Lexical categories (digits, name
-	chars) stay as range checks, and settings (window/stat vars) aren't variables here.
+	"""A token's role and classification, declared explicitly in the catalog rather than
+	inferred from its code range.  Roles (FUNCTION/COMMAND/INFIX/POSTFIX) drive parsing;
+	the variable kinds (NUMERIC…EQUATION) classify assignable targets and VARIABLE is
+	their union — what any_var / DelVar accept.  EXPR_START marks the structural atoms
+	that can lead an expression ('(', '{', '"', …); INVOKABLE marks accessors that take a
+	trailing '(arg)' (lists, matrices, equations).
 	"""
 	EXPR_START = auto()
-	
+	INVOKABLE  = auto()
+
 	FUNCTION = auto()
 	COMMAND  = auto()
 	INFIX    = auto()
 	POSTFIX  = auto()
 	DIGIT    = auto()
-	
+
 	NUMERIC  = auto()
 	LIST     = auto()
 	MATRIX   = auto()
@@ -124,30 +127,38 @@ class Flag(IntFlag):
 	SEQUENCE = auto()
 	EQUATION = auto()
 	STAT_VAR = auto()
-	
+
 	WINDOW_VAR = auto()
-	
+
 	PIC      = auto()
 	GDB      = auto()
-	
+
 	VARIABLE = NUMERIC | LIST | MATRIX | STRING | SEQUENCE | EQUATION
 
 
-@dataclass(slots=True, frozen=True, eq=False)
+# Structural tokens that can lead an atom but carry no role flag of their own.
+_ATOM_START = {L_PAREN, L_BRACE, L_BRACKET, QUOTE, DOT, SCI_E, NEG, LIST_PREFIX, ANS}
+
+
 class Token:
-	"""A token in a program.  The plain dataclass is the base for *inert* tokens —
-	punctuation, literals, and plain variables; the subclasses that carry behavior
-	(FunctionToken, CommandToken, OperatorToken, …) live in catalog.py, where they can
-	import the operator/command/accessor modules that titoken (a leaf module) cannot.
+	"""A token in a program.  The base class is for *inert* tokens — punctuation, literals,
+	mode keywords; behavior-carrying tokens are subclasses (FunctionToken, CommandToken,
+	OperatorToken, the Accessor variable tokens …) defined in catalog.py, where they can
+	import the operator/command modules that titoken (a leaf module) cannot.
 
 	The parser drives tokens through the polymorphic hooks below (parse_prefix /
-	parse_infix / run_statement / …) rather than inspecting nullable callable fields,
-	so each kind owns its own parse behavior next to where it's wired up.
+	parse_infix / apply_postfix / …) rather than inspecting nullable callable fields, so
+	each kind owns its own parse behavior next to where it's wired up.  `flags` records
+	the token's role/classification (see Flag); `char` is the single Unicode character it
+	stands for, when one faithfully exists (None otherwise) — used by frontends, not the
+	token spec.
 	"""
-	code: int
-	display: bytes
-	flags = Flag(0)
-	char = None
+
+	def __init__(self, code: int, display: bytes, flags: Flag = Flag(0), char: str | None = None):
+		self.code = code
+		self.display = display
+		self.flags = flags
+		self.char = char
 
 	@property
 	def text(self) -> str:
@@ -165,48 +176,49 @@ class Token:
 		return bool(self.flags & Flag.NUMERIC)
 
 	def is_list_var(self) -> bool:
-		return bool(self.flag & Flag.LIST)
+		return bool(self.flags & Flag.LIST)
 
 	def is_list_start(self):
 		return self.code == LIST_PREFIX or self.is_list_var()
 
 	def is_matrix_var(self) -> bool:
-		return bool(self.flag & Flag.MATRIX)
+		return bool(self.flags & Flag.MATRIX)
 
 	def is_sequence_var(self) -> bool:
-		return bool(self.flag & Flag.SEQUENCE)
+		return bool(self.flags & Flag.SEQUENCE)
 
 	def is_equation_var(self) -> bool:
-		return bool(self.flag & Flag.EQUATION)
+		return bool(self.flags & Flag.EQUATION)
 
 	def is_string_var(self) -> bool:
-		return bool(self.flag & Flag.STRING)
+		return bool(self.flags & Flag.STRING)
 
 	def is_stat_var(self) -> bool:
-		return bool(self.flag & Flag.STAT_VAR)
+		return bool(self.flags & Flag.STAT_VAR)
 
 	def is_window_var(self) -> bool:
-		return bool(self.flag & Flag.WINDOW_VAR)
+		return bool(self.flags & Flag.WINDOW_VAR)
 
 	def is_name_char(self):
 		return self.is_numeric_var() or self.is_digit()
 
 	def can_start_atom(self) -> bool:
-		# TODO: Check if flags contain one of EXPR_START | FUNCTION | DIGIT | VARIABLE
-		pass
+		return bool(self.flags & (Flag.EXPR_START | Flag.FUNCTION | Flag.DIGIT | Flag.VARIABLE))
+
+	def is_postfix(self) -> bool:
+		return bool(self.flags & Flag.POSTFIX)
+
+	def opens_paren_group(self) -> bool:
+		return bool(self.flags & Flag.FUNCTION) or self.code == L_PAREN
 
 	# ── Parse hooks (overridden by the behavior-carrying subclasses in catalog) ──
 
 	def parse_prefix(self, parser):
-		"""nud — produce this token's value when it leads an atom.  VariableToken reads
-		its accessor and FunctionToken invokes a call; structural/literal atoms (numbers,
-		"…", {…}, …) are handled by the parser directly.  Anything else can't start an
+		"""nud — produce this token's value when it leads an atom.  An Accessor reads its
+		value and FunctionToken invokes a call; structural/literal atoms (numbers, "…",
+		{…}, …) are handled by the parser directly.  Anything else can't start an
 		expression."""
 		raise TiSyntaxError(f"Unexpected token in expression: {self}")
-
-	def is_postfix(self) -> bool:
-		# TODO: check if POSTFIX in flags
-		pass
 
 	def apply_postfix(self, value):
 		"""Apply this postfix operator to `value`.  Only reached when is_postfix() is True."""
@@ -222,26 +234,101 @@ class Token:
 		returns a value (i.e. for OperatorToken)."""
 		raise TiSyntaxError(f"{self} is not an infix operator")
 
-	def opens_paren_group(self) -> bool:
-		# TODO: Check if flags contain FUNCTION or if self is L_PAREN
-		pass
-
-	def run_statement(self, parser):
-		# TODO: Return this logic to Parser
-	
-		"""Execute this token as the head of a statement.  The default is the expression
-		statement: evaluate, then handle a → store, a ►conversion, and Ans.  CommandToken
-		overrides to run a command instead."""
-		value = parser.parse_expr()
-		if parser.eat_if(STORE):
-			parser.parse_store(value)
-		elif parser.peek().converter is not None:
-			value = parser.advance().converter(value)
-		parser.env.ans = value
-		parser.end_statement()
-
 	def __repr__(self):
 		return f"0x{self.code:0{4 if self.code > 0xFF else 2}X}:{self.text!r}"
+
+
+class Reference:
+	"""An accessor-token bound to an environment — what commands receive when they take a
+	variable rather than its value.  Exposes a uniform mutable-variable surface so
+	consumers (For/fnInt/Input/DelVar/…) work the same for every symbol kind.  `name` is
+	the variable's source spelling as display tokens (what Prompt echoes)."""
+
+	__slots__ = ('env', 'accessor', 'name')
+
+	def __init__(self, env, accessor, name=None):
+		self.env = env
+		self.accessor = accessor
+		self.name = name
+
+	def resolve(self):
+		return self.accessor.resolve(self.env)
+
+	def store(self, value):
+		self.accessor.store(self.env, value)
+
+	def delete(self):
+		self.accessor.delete(self.env)
+
+	def get(self):
+		return self.accessor._get(self.env)
+
+	def set(self, value):
+		self.accessor._set(self.env, value)
+
+	@contextmanager
+	def scoped(self):
+		"""Save the raw value, run the block, restore it — for temporarily binding a
+		variable while evaluating a sub-expression (fnInt, solve, Σ, …)."""
+		saved = self.accessor._get(self.env)
+		try:
+			yield
+		finally:
+			self.accessor._set(self.env, saved)
+
+	def __repr__(self):
+		return f"Reference({self.accessor!r})"
+
+
+class Accessor(Token):
+	"""A token that reads/writes the environment — a variable, but also π / rand / getKey /
+	a window setting.  The token *is* the accessor: resolve/store/invoke take the env as a
+	parameter (tokens are env-less singletons), so a variable token can serve directly as
+	an expression atom or a storage target.  `_get`/`_set` are the raw slot accessors;
+	`resolve`/`store` add auto-init and type checks.  Subclasses live in catalog.py."""
+
+	@property
+	def invokable(self) -> bool:
+		return bool(self.flags & Flag.INVOKABLE)
+
+	def can_start_atom(self) -> bool:
+		return True   # every accessor resolves to a value, so it can lead an expression
+
+	def _get(self, env):
+		raise NotImplementedError(f"{type(self).__name__} does not support _get")
+
+	def _set(self, env, value):
+		raise NotImplementedError(f"{type(self).__name__} does not support _set")
+
+	def resolve(self, env):
+		value = self._get(env)
+		if value is None:
+			raise UndefinedError(f"{self} is not defined")
+		return value
+
+	def store(self, env, value):
+		raise TiSyntaxError(f"Cannot store to {self}")
+
+	def invoke(self, arg_parser):
+		raise TiSyntaxError(f"Cannot invoke {self}")
+
+	def delete(self, env):
+		raise TiSyntaxError(f"Cannot delete {self}")
+
+	def reference(self, env, name=None) -> Reference:
+		return Reference(env, self, name)
+
+	def parse_prefix(self, parser):
+		return parser._read_accessor(self)
+
+
+class Deletable:
+	"""Mixin for accessors whose DelVar clears the slot to its undefined state — None.
+	List it before Accessor in the bases so this delete overrides the base's raising one
+	(e.g. `class StringToken(Deletable, Accessor)`)."""
+
+	def delete(self, env):
+		self._set(env, None)
 
 
 class _EofToken(Token):

@@ -1,22 +1,18 @@
-"""How tokens read, write, and reference the environment.
+"""Concrete accessor *tokens* — the variable tokens that read/write the environment.
 
-An `Accessor` is a stateless flyweight that knows *how* to get/set one symbol — a
-numeric variable, a list, π, rand, a window setting — in any Environment.  A
-`VariableToken` holds one (and delegates the accessor interface to it), and the parser
-calls `resolve`/`store` on it directly, passing the environment, so there's no
-per-environment variable object to allocate and no `env` threaded through every call site.
+An `Accessor` is a `Token` (see titoken) that knows *how* to get/set one symbol — a
+numeric variable, a list, π, rand, a window setting.  The token IS the accessor:
+`resolve`/`store`/`invoke` take the env as a parameter (tokens are env-less singletons
+built once in the catalog), so a variable token serves directly as an expression atom
+or a storage target.
 
-When a command needs to *hold* a variable rather than its value (For, fnInt, Input,
-DelVar, …), `Accessor.reference(env)` binds the accessor to an environment as a
-`Reference`.  A Reference exposes a small mutable-variable surface (`resolve`,
-`store`, `delete`, `scoped`, and a `.value` get/set) so those commands can treat any
-symbol uniformly.
+This module sits below `catalog` and `parser`: it imports `core`/`graph`/`modes`/
+`titoken` but never the parser, so the parser can construct the one accessor that has no
+catalog entry — `UserListToken` for a bare `∟NAME` — without an import cycle.
 
-Every symbol has a dedicated accessor type — numeric, matrix, list, string,
-user-list, equation, sequence, window, TVM, and table variables — so values live
-directly in the Environment with no wrapper objects.
+`Accessor`, `Deletable`, and `Reference` themselves live in `titoken` (the leaf); this
+module only provides the concrete subclasses.
 """
-from abc import ABC
 from contextlib import contextmanager
 
 from core import TiList, TiString, TiEquation
@@ -24,6 +20,7 @@ from core import require_num, require_matrix, require_list, require_string, requ
 from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, DataTypeError
 from graph import eval_sequence
 from modes import GraphMode
+from titoken import Token, Accessor, Deletable, Reference, Flag, LIST_PREFIX
 
 
 def _window_affects_graph(env, attr: str) -> bool:
@@ -31,125 +28,45 @@ def _window_affects_graph(env, attr: str) -> bool:
 	return attr in env.graph_mode_handler.window_attrs
 
 
-class Accessor(ABC):
-	"""Stateless description of how to access one symbol.  Subclasses override the
-	pieces that differ; the defaults make a read-only value (store raises).
-
-	`resolve`/`store` are the validating, user-facing operations (auto-init, type
-	checks); `_get`/`_set` are the raw, unchecked accessors used internally by
-	`Reference` (e.g. by `scoped`).
-
-	A symbol is read in expression context as either `resolve` or `invoke`:
-	`invocable` accessors (lists, matrices, equations, sequences) own a trailing
-	parenthesised argument — `L1(2)`, `[A](r,c)`, `Y1(x)`, `u(n)` — which the parser
-	routes to `invoke(parser)` with the `(` already eaten.  Every other symbol is
-	read with `resolve`, so a following `(` stays implicit multiplication (`A(2)`
-	== A·2).
-	"""
-
-	invocable = False  # True ⇒ a trailing '(' is a call/index (see invoke), not implicit mult
-
-	def _get(self, env):
-		raise NotImplementedError(f"{type(self).__name__} does not support _get")
-
-	def _set(self, env, value):
-		raise NotImplementedError(f"{type(self).__name__} does not support _set")
-
-	def resolve(self, env):
-		"""Read the value, erroring if the slot is empty.  Subclasses with auto-init
-		(NumericVar), extra validation (ListVar), or computed values (rand, ΔX) override."""
-		value = self._get(env)
-		if value is None:
-			raise UndefinedError(f"{self} is not defined")
+def _normalize_eq(value) -> TiEquation:
+	"""Coerce a TiString or TiEquation to TiEquation; raise DataTypeError otherwise."""
+	if isinstance(value, TiString):
+		return TiEquation(value.tokens)
+	if isinstance(value, TiEquation):
 		return value
-
-	def store(self, env, value):
-		raise TiSyntaxError(f"Cannot store to {self}")
-
-	def invoke(self, arg_parser):
-		raise TiSyntaxError(f"Cannot invoke {self}")
-
-	def delete(self, env):
-		raise TiSyntaxError(f"Cannot delete {self}")
-
-	def reference(self, env, name: "TiString | None" = None) -> "Reference":
-		return Reference(env, self, name)
+	raise DataTypeError(f"Expected equation or string, got {value!r}")
 
 
-class Deletable:
-	"""Mixin for accessors whose `DelVar` clears the slot to its undefined state —
-	`None`.  List it before `Accessor` in the bases so this `delete` overrides the
-	base's raising one (e.g. `class StringVar(Deletable, Accessor)`)."""
+@contextmanager
+def scoped_numeric(env, name: str, value):
+	"""Temporarily set numeric variable `name` to `value`, restoring it on exit."""
+	saved = getattr(env.numerics, name)
+	setattr(env.numerics, name, value)
+	try:
+		yield
+	finally:
+		setattr(env.numerics, name, saved)
 
-	def delete(self, env):
-		self._set(env, None)
 
+# ── Data variables ──────────────────────────────────────────────────────────────
 
-class Reference:
-	"""An accessor bound to an environment — what commands receive when they take a
-	variable rather than its value.  Exposes a uniform mutable-variable surface so
-	consumers (For/fnInt/Input/DelVar/…) work the same for every symbol kind.
+class LetterToken(Deletable, Accessor):
+	"""A real/complex variable A–Z, θ — an index into env.numerics (0–25, θ = 26).
 
-	`name` is the variable's source spelling as display tokens — a single token for a
-	built-in (`A`, `Str1`, `L1`), or the bare name tokens for a user list (`PRIMES`,
-	with the ᴸ prefix dropped).  It's what Prompt echoes as "NAME=?", and lets a
-	consumer reclassify the target with the token's own `is_*_var()` methods (rather
-	than re-deriving the kind from the accessor).  Only the parser, which sees the
-	original tokens, can fill it in; commands that don't need it leave it None.
+	An undefined numeric reads as 0 (and is initialized to 0 on first resolve), matching
+	the calculator; `store` accepts any number (real or complex).
 	"""
 
-	__slots__ = ('env', 'accessor', 'name')
-
-	def __init__(self, env, accessor: Accessor, name: "TiString | None" = None):
-		self.env = env
-		self.accessor = accessor
-		self.name = name
-
-	def resolve(self):
-		return self.accessor.resolve(self.env)
-
-	def store(self, value):
-		self.accessor.store(self.env, value)
-
-	def delete(self):
-		self.accessor.delete(self.env)
-
-	def get(self):
-		return self.accessor._get(self.env)
-
-	def set(self, value):
-		self.accessor._set(self.env, value)
-
-	@contextmanager
-	def scoped(self):
-		"""Save the raw value, run the block, restore it — for temporarily binding a
-		variable while evaluating a sub-expression (fnInt, solve, Σ, …)."""
-		saved = self.accessor._get(self.env)
-		try:
-			yield
-		finally:
-			self.accessor._set(self.env, saved)
-
-	def __repr__(self):
-		return f"Reference({self.accessor!r})"
-
-
-class NumericVar(Deletable, Accessor):
-	"""A real/complex variable A–Z, θ — a named slot in env.numerics (NumericVars).
-
-	An undefined numeric reads as 0 (and is initialized to 0 on first resolve),
-	matching the calculator; `store` accepts any number (real or complex).
-	"""
-	__slots__ = ('name',)
-
-	def __init__(self, name: str):
-		self.name = name
+	def __init__(self, index: int):
+		code = 0x41 + index           # A–Z = 0x41–0x5A, θ = 0x5B
+		super().__init__(code, bytes([code]), Flag.NUMERIC, char=(chr(code) if index < 26 else 'θ'))
+		self.index = index
 
 	def _get(self, env):
-		return getattr(env.numerics, self.name)
+		return env.numerics[self.index]
 
 	def _set(self, env, value):
-		setattr(env.numerics, self.name, value)
+		env.numerics[self.index] = value
 
 	def resolve(self, env):
 		value = self._get(env)
@@ -161,45 +78,89 @@ class NumericVar(Deletable, Accessor):
 	def store(self, env, value):
 		self._set(env, require_num(value))
 
-	def __repr__(self):
-		return f"NumericVar({self.name!r})"
+
+class MatrixToken(Deletable, Accessor):
+	"""A matrix variable [A]–[J] — an index into env.matrices (0–9)."""
+
+	def __init__(self, index: int):
+		super().__init__(0x5C00 | index, bytes([0xC1, 0x41 + index, 0x5D]), Flag.MATRIX | Flag.INVOKABLE)
+		self.index = index
+
+	def _get(self, env):
+		return env.matrices[self.index]
+
+	def _set(self, env, value):
+		env.matrices[self.index] = value
+
+	def store(self, env, value):
+		self._set(env, require_matrix(value).copy())
+
+	def invoke(self, arg_parser):
+		row = py_int(arg_parser.expr(), InvalidDimError)
+		col = py_int(arg_parser.expr(), InvalidDimError)
+		arg_parser.end_func()
+		return self.resolve(arg_parser.env)[(row, col)]
 
 
-class Computed(Accessor):
-	"""A read-only 0-arg value: a constant (π, 𝑒, 𝑖) or a computed query (getKey,
-	getDate, …).  `resolve(env)` calls the wrapped function; storing is an error."""
+class ListToken(Deletable, Accessor):
+	"""A built-in list L1–L6 — a 0-based slot in env.lists (TiList | None)."""
 
-	__slots__ = ('func',)
+	def __init__(self, index: int):
+		super().__init__(0x5D00 | index, bytes([0x4C, 0x81 + index]), Flag.LIST | Flag.INVOKABLE)
+		self.index = index
 
-	def __init__(self, func):
-		self.func = func
+	def _get(self, env):
+		return env.lists[self.index]
+
+	def _set(self, env, value):
+		env.lists[self.index] = value
 
 	def resolve(self, env):
-		return self.func(env)
+		value = super().resolve(env)      # errors if undefined
+		if not value.data:
+			raise InvalidDimError("empty list")
+		return value
+
+	def store(self, env, value):
+		self._set(env, require_list(value).copy())
+
+	def invoke(self, arg_parser):
+		index = py_int(arg_parser.expr(), InvalidDimError)
+		arg_parser.end_func()
+		return self.resolve(arg_parser.env)[index]
 
 
-class Constant(Accessor):
-	__slots__ = ('value',)
+class StringToken(Deletable, Accessor):
+	"""A string variable Str1–Str0 — a 0-based slot in env.strings (TiString | None).
 
-	def __init__(self, value):
-		self.value = value
-
-	def resolve(self, env):
-		return self.value
-
-
-class UserListVar(Accessor):
-	"""A user-defined list ᴸNAME — a dict slot in env.user_lists, keyed by name.
-
-	Mirrors ListVar, but the storage is a name-keyed dict (no fixed slots) so an
-	undefined list is simply an absent key.  Preserves the complex flag of the
-	previous value on store.
+	Input/Prompt recognize a string target through its token's `is_string_var()` and
+	store the raw typed text rather than evaluating it as an expression.
 	"""
 
-	__slots__ = ('name',)
-	invocable = True
+	def __init__(self, index: int):
+		super().__init__(0xAA00 | index, b'Str' + bytes([0x30 + (index + 1) % 10]), Flag.STRING)
+		self.index = index
+
+	def _get(self, env):
+		return env.strings[self.index]
+
+	def _set(self, env, value):
+		env.strings[self.index] = value
+
+	def store(self, env, value):
+		self._set(env, require_string(value))
+
+
+class UserListToken(Accessor):
+	"""A user-defined list ᴸNAME — a dict slot in env.user_lists, keyed by name.
+
+	Unlike every other accessor this has no catalog entry: ᴸNAME is the ᴸ prefix plus
+	name characters, so the parser builds this synthetically at parse time.  Its `code`
+	is the ᴸ prefix (it's never stored in the catalog table).
+	"""
 
 	def __init__(self, name: str):
+		super().__init__(LIST_PREFIX, bytes([LIST_PREFIX]), Flag.LIST | Flag.INVOKABLE)
 		self.name = name
 
 	def _get(self, env):
@@ -226,277 +187,26 @@ class UserListVar(Accessor):
 		env.user_lists.pop(self.name, None)
 
 	def __repr__(self):
-		return f"UserListVar({self.name!r})"
+		return f"UserListToken({self.name!r})"
 
 
-class MatrixVar(Deletable, Accessor):
-	"""A matrix variable [A]–[J] — a named slot in env.matrices (MatrixVars).
+# ── Graph equations ─────────────────────────────────────────────────────────────
 
-	Undefined matrices raise UndefinedError on resolve; `store` deep-copies so the
-	stored value is isolated from the caller.
-	"""
-
-	__slots__ = ('name',)
-	invocable = True
-
-	def __init__(self, name: str):
-		self.name = name
-
-	def _get(self, env):
-		return getattr(env.matrices, self.name)
-
-	def _set(self, env, value):
-		setattr(env.matrices, self.name, value)
-
-	def store(self, env, value):
-		self._set(env, require_matrix(value).copy())
-
-	def invoke(self, arg_parser):
-		row = py_int(arg_parser.expr(), InvalidDimError)
-		col = py_int(arg_parser.expr(), InvalidDimError)
-		arg_parser.end_func()
-		return self.resolve(arg_parser.env)[(row, col)]
-
-	def __repr__(self):
-		return f"MatrixVar({self.name!r})"
-
-
-class ListVar(Deletable, Accessor):
-	"""A built-in list L1–L6 — a 0-based slot in env.lists (list[TiList | None]).
-
-	Preserves the complex flag of the previous value on store, matching the
-	calculator's behaviour for complex lists.
-	"""
-
-	__slots__ = ('index',)
-	invocable = True
-
-	def __init__(self, index: int):
-		self.index = index
-
-	def _get(self, env):
-		return env.lists[self.index]
-
-	def _set(self, env, value):
-		env.lists[self.index] = value
-
-	def resolve(self, env):
-		value = super().resolve(env)      # errors if undefined
-		if not value.data:
-			raise InvalidDimError("empty list")
-		return value
-
-	def store(self, env, value):
-		self._set(env, require_list(value).copy())
-
-	def invoke(self, arg_parser):
-		index = py_int(arg_parser.expr(), InvalidDimError)
-		arg_parser.end_func()
-		return self.resolve(arg_parser.env)[index]
-
-	def __repr__(self):
-		return f"ListVar({self.index!r})"
-
-
-class StringVar(Deletable, Accessor):
-	"""A string variable Str1–Str0 — a 0-based slot in env.strings (list[TiString | None]).
-
-	Input/Prompt recognize a string target through its token's `is_string_var()` and
-	store the raw typed text rather than evaluating it as an expression.
-	"""
-
-	__slots__ = ('index',)
-
-	def __init__(self, index: int):
-		self.index = index
-
-	def _get(self, env):
-		return env.strings[self.index]
-
-	def _set(self, env, value):
-		env.strings[self.index] = value
-
-	def store(self, env, value):
-		self._set(env, require_string(value))
-
-	def __repr__(self):
-		return f"StringVar({self.index!r})"
-
-
-class WindowVar(Accessor):
-	"""A plain real-valued window variable (Xmin, ZXmin, Tmax, …) — a named float
-	attr on env.window.  Z-variables (ZXmin, ZTmax, …) use the z-prefixed attr name
-	directly (e.g. WindowVar('zxmin')).
-
-	`resolve` raises UndefinedError for variables that were never assigned (Z-vars
-	before ZoomSto, etc.); `store` enforces require_real.
-	"""
-
-	__slots__ = ('attr',)
-
-	def __init__(self, attr: str):
-		self.attr = attr
-
-	def _get(self, env):
-		return getattr(env.window, self.attr)
-
-	def _set(self, env, value):
-		setattr(env.window, self.attr, value)
-		
-	def _store_check_valid(self, env, value):
-		if _window_affects_graph(env, self.attr) and value != self._get(env):
-			env.graph.valid = False
-		self._set(env, value)
-
-	def store(self, env, value):
-		self._store_check_valid(env, require_real(value))
-
-	def __repr__(self):
-		return f"WindowVar({self.attr!r})"
-
-
-class XresVar(WindowVar):
-	"""Xres — function-graph resolution; a whole number 1–8."""
-
-	def store(self, env, value):
-		require_int(value)
-		if not (1 <= value <= 8):
-			raise DomainError(f"Xres must be an integer 1-8, got {value:g}")
-		self._store_check_valid(env, value)
-
-
-class IntWindowVar(WindowVar):
-	"""nMin, nMax — window variables constrained to whole numbers."""
-
-	def store(self, env, value):
-		self._store_check_valid(env, require_int(value))
-
-
-class FactorWindowVar(WindowVar):
-	"""XFact, YFact — zoom-in/out scaling factors; must be ≥ 1."""
-
-	def store(self, env, value):
-		v = require_real(value)
-		if v < 1:
-			raise DomainError(f"Zoom factor must be ≥ 1, got {v:g}")
-		self._set(env, v)
-
-
-class DeltaWindowVar(Accessor):
-	"""ΔX / ΔY — computed from the window bounds; not stored directly.
-
-	resolve: (hi − lo) / divisions.
-	store(δ): adjusts the hi bound so the relation holds, leaving lo fixed.
-	"""
-
-	__slots__ = ('lo_attr', 'hi_attr', 'divisions')
-
-	def __init__(self, lo_attr: str, hi_attr: str, divisions: int):
-		self.lo_attr = lo_attr
-		self.hi_attr = hi_attr
-		self.divisions = divisions
-
-	def resolve(self, env):
-		lo = getattr(env.window, self.lo_attr)
-		hi = getattr(env.window, self.hi_attr)
-		return (hi - lo) / self.divisions
-
-	def store(self, env, value):
-		delta = require_real(value)
-		lo = getattr(env.window, self.lo_attr)
-		new_hi = lo + self.divisions * delta
-		if _window_affects_graph(env, self.hi_attr) and new_hi != getattr(env.window, self.hi_attr):
-			env.graph.valid = False
-		setattr(env.window, self.hi_attr, new_hi)
-
-	def __repr__(self):
-		return f"DeltaWindowVar({self.lo_attr!r}, {self.hi_attr!r}, {self.divisions})"
-
-
-class EnvVar(Accessor):
-	"""A plain real variable stored directly on env (TVM variables, stat n, …)."""
-
-	__slots__ = ('attr',)
-
-	def __init__(self, attr: str):
-		self.attr = attr
-
-	def _get(self, env):
-		return getattr(env, self.attr)
-
-	def _set(self, env, value):
-		setattr(env, self.attr, value)
-
-	def store(self, env, value):
-		self._set(env, require_real(value))
-
-	def __repr__(self):
-		return f"EnvVar({self.attr!r})"
-
-
-class TableVar(Accessor):
-	"""A plain real variable stored on env.table (TblStart, ΔTbl)."""
-
-	__slots__ = ('attr',)
-
-	def __init__(self, attr: str):
-		self.attr = attr
-
-	def _get(self, env):
-		return getattr(env.table, self.attr)
-
-	def _set(self, env, value):
-		setattr(env.table, self.attr, value)
-
-	def store(self, env, value):
-		self._set(env, require_real(value))
-
-	def __repr__(self):
-		return f"TableVar({self.attr!r})"
-
-
-def _normalize_eq(value) -> TiEquation:
-	"""Coerce a TiString or TiEquation to TiEquation; raise DataTypeError otherwise."""
-	if isinstance(value, TiString):
-		return TiEquation(value.tokens)
-	if isinstance(value, TiEquation):
-		return value
-	raise DataTypeError(f"Expected equation or string, got {value!r}")
-
-
-@contextmanager
-def scoped_numeric(env, name: str, value):
-	"""Temporarily set numeric variable `name` to `value`, restoring it on exit."""
-	
-	saved = getattr(env.numerics, name)
-	setattr(env.numerics, name, value)
-	try:
-		yield
-	finally:
-		saved = setattr(env.numerics, name, saved)
-
-
-class EquationVar(Deletable, Accessor):
+class EquationToken(Deletable, Accessor):
 	"""A graph equation (Y1–Y0, X1T/Y1T–X6T/Y6T, r1–r6).
 
 	An equation is not one of TI's runtime value types, so reading it as a value
-	(`resolve`) evaluates the formula at the current X.  `Y1(x)` is function
-	composition — resolve with X temporarily set to x.  The raw `TiEquation` is
-	reachable only through `get`/`set`, which is why copying a formula out
-	(Equ►String) needs a dedicated command.  `store` normalises a string/equation
-	and selects the function.
-
-	`mode` is a class-level GraphMode on each subclass.  Because GraphMode is a
-	StrEnum whose values are the Environment attribute names, `self.mode` doubles as
-	the list name: `getattr(env, self.mode)` retrieves the right equation collection.
+	(`resolve`) evaluates the formula at the current graph variable.  `Y1(x)` is function
+	composition — resolve with X temporarily set to x.  `store` normalises a
+	string/equation and selects the function.  `mode` is a GraphMode whose value doubles
+	as the Environment attribute holding the equation collection.
 	"""
 
-	__slots__ = ('index',)
-	invocable = True
 	mode: GraphMode = None
 	graph_var = None
 
-	def __init__(self, index: int):
+	def __init__(self, code: int, display: bytes, index: int):
+		super().__init__(code, display, Flag.EQUATION | Flag.INVOKABLE)
 		self.index = index
 
 	def _get(self, env):
@@ -509,7 +219,7 @@ class EquationVar(Deletable, Accessor):
 		return super().resolve(env).eval(env)
 
 	def invoke(self, arg_parser):
-		# The '(' is already eaten: Y1(x) composes by resolving with X set to x.
+		# The '(' is already eaten: Y1(x) composes by resolving with the graph var set to x.
 		x = arg_parser.expr()
 		arg_parser.end_func()
 		env = arg_parser.env
@@ -522,32 +232,27 @@ class EquationVar(Deletable, Accessor):
 		if env.graph_mode is self.mode:
 			env.graph.valid = False
 
-	def __repr__(self):
-		return f"EquationVar({self.mode!r}, {self.index})"
 
-
-class FuncEquationVar(EquationVar):
-	__slots__ = ()
+class FuncEquationToken(EquationToken):
 	mode = GraphMode.FUNC
 	graph_var = 'X'
 
+	def __init__(self, index: int):
+		super().__init__(0x5E10 + index, bytes([0x59, 0x80 + (index + 1) % 10]), index)
 
-class ParEquationVar(EquationVar):
-	"""One half of a parametric pair (XnT or YnT).
 
-	Inherits `invoke`/`resolve`/`store` from `EquationVar` but addresses the `x`
-	or `y` field on `ParData` rather than the generic `.equation` field.
-	Both halves share the same index (the pair index) so selecting either half
-	selects the pair.
-	"""
+class ParEquationToken(EquationToken):
+	"""One half of a parametric pair (XnT or YnT); both halves share the pair index."""
 
-	__slots__ = ('half',)
 	mode = GraphMode.PAR
 	graph_var = 'T'
 
 	def __init__(self, index: int, half: str):
-		super().__init__(index)
-		self.half = half   # 'x' or 'y'
+		is_y = half == 'y'
+		code = 0x5E20 + index * 2 + (1 if is_y else 0)
+		display = bytes([0x59 if is_y else 0x58, 0x81 + index, 0x0D])
+		super().__init__(code, display, index)
+		self.half = half
 
 	def _get(self, env):
 		return getattr(env.parametric[self.index], self.half)
@@ -555,25 +260,23 @@ class ParEquationVar(EquationVar):
 	def _set(self, env, value):
 		setattr(env.parametric[self.index], self.half, value)
 
-	def __repr__(self):
-		return f"ParEquationVar({self.index}, {self.half!r})"
 
-
-class PolarEquationVar(EquationVar):
-	__slots__ = ()
+class PolarEquationToken(EquationToken):
 	mode = GraphMode.POL
 	graph_var = 'theta'
 
+	def __init__(self, index: int):
+		super().__init__(0x5E40 + index, bytes([0x72, 0x81 + index]), index)
 
-class SequenceVar(EquationVar):
-	"""A recursive sequence variable 𝑢/𝑣/𝑤.
 
-	Reading it as a value (`resolve`) evaluates the sequence at the current n;
-	`u(n)` evaluates at an explicit index.  The raw `TiEquation` is reachable
-	through `_get`/`_set`.
-	"""
+class SequenceToken(EquationToken):
+	"""A recursive sequence variable 𝑢/𝑣/𝑤.  `resolve` evaluates at the current n;
+	`u(n)` evaluates at an explicit index."""
 
 	mode = GraphMode.SEQ
+
+	def __init__(self, index: int):
+		super().__init__(0x5E80 + index, bytes([0x02 + index]), index)
 
 	def resolve(self, env):
 		return eval_sequence(env, self.index, env.n)
@@ -583,17 +286,12 @@ class SequenceVar(EquationVar):
 		arg_parser.end_func()
 		return eval_sequence(arg_parser.env, self.index, n)
 
-	def __repr__(self):
-		return f"SequenceVar({chr(0x75 + self.index)})"
 
+class SequenceInitialToken(Deletable, Accessor):
+	"""The u(nMin)/v(nMin)/w(nMin) token — stores/reads the initial-value list."""
 
-class SequenceInitialVar(Deletable, Accessor):
-	"""The u(nMin)/v(nMin)/w(nMin) token — stores and reads the initial-value list
-	for a recursive sequence."""
-
-	__slots__ = ('index',)
-
-	def __init__(self, index: int):
+	def __init__(self, code: int, display: bytes, index: int):
+		super().__init__(code, display)
 		self.index = index
 
 	def _get(self, env):
@@ -612,5 +310,139 @@ class SequenceInitialVar(Deletable, Accessor):
 			env.graph.valid = False
 		self._set(env, value)
 
-	def __repr__(self):
-		return f"SequenceInitialVar({self.index})"
+
+# ── Settings / env-backed reals ─────────────────────────────────────────────────
+
+class RealToken(Accessor):
+	"""A plain real variable stored directly on env (TVM variables, stat n, …).  Takes an
+	explicit `flags` so stat 𝑛 can be classified NUMERIC while TVM vars stay unflagged."""
+
+	def __init__(self, code: int, display: bytes, attr: str, flags: Flag = Flag(0)):
+		super().__init__(code, display, flags)
+		self.attr = attr
+
+	def _get(self, env):
+		return getattr(env, self.attr)
+
+	def _set(self, env, value):
+		setattr(env, self.attr, value)
+
+	def store(self, env, value):
+		self._set(env, require_real(value))
+
+
+class WindowToken(Accessor):
+	"""A plain real-valued window variable (Xmin, ZXmin, Tmax, …) — a named float attr on
+	env.window.  Storing a value that affects the current graph invalidates it."""
+
+	def __init__(self, code: int, display: bytes, attr: str):
+		super().__init__(code, display, Flag.WINDOW_VAR)
+		self.attr = attr
+
+	def _get(self, env):
+		return getattr(env.window, self.attr)
+
+	def _set(self, env, value):
+		setattr(env.window, self.attr, value)
+
+	def _store_check_valid(self, env, value):
+		if _window_affects_graph(env, self.attr) and value != self._get(env):
+			env.graph.valid = False
+		self._set(env, value)
+
+	def store(self, env, value):
+		self._store_check_valid(env, require_real(value))
+
+
+class XresToken(WindowToken):
+	"""Xres — function-graph resolution; a whole number 1–8."""
+
+	def store(self, env, value):
+		require_int(value)
+		if not (1 <= value <= 8):
+			raise DomainError(f"Xres must be an integer 1-8, got {value:g}")
+		self._store_check_valid(env, value)
+
+
+class IntWindowToken(WindowToken):
+	"""nMin, nMax — window variables constrained to whole numbers."""
+
+	def store(self, env, value):
+		self._store_check_valid(env, require_int(value))
+
+
+class FactorWindowToken(WindowToken):
+	"""XFact, YFact — zoom-in/out scaling factors; must be ≥ 1."""
+
+	def store(self, env, value):
+		v = require_real(value)
+		if v < 1:
+			raise DomainError(f"Zoom factor must be ≥ 1, got {v:g}")
+		self._set(env, v)
+
+
+class DeltaWindowToken(Accessor):
+	"""ΔX / ΔY — computed from the window bounds; not stored directly.
+
+	resolve: (hi − lo) / divisions.  store(δ): adjusts the hi bound, leaving lo fixed.
+	"""
+
+	def __init__(self, code: int, display: bytes, lo_attr: str, hi_attr: str, divisions: int):
+		super().__init__(code, display, Flag.WINDOW_VAR)
+		self.lo_attr = lo_attr
+		self.hi_attr = hi_attr
+		self.divisions = divisions
+
+	def resolve(self, env):
+		lo = getattr(env.window, self.lo_attr)
+		hi = getattr(env.window, self.hi_attr)
+		return (hi - lo) / self.divisions
+
+	def store(self, env, value):
+		delta = require_real(value)
+		lo = getattr(env.window, self.lo_attr)
+		new_hi = lo + self.divisions * delta
+		if _window_affects_graph(env, self.hi_attr) and new_hi != getattr(env.window, self.hi_attr):
+			env.graph.valid = False
+		setattr(env.window, self.hi_attr, new_hi)
+
+
+class TableToken(Accessor):
+	"""A plain real variable stored on env.table (TblStart, ΔTbl)."""
+
+	def __init__(self, code: int, display: bytes, attr: str):
+		super().__init__(code, display)
+		self.attr = attr
+
+	def _get(self, env):
+		return getattr(env.table, self.attr)
+
+	def _set(self, env, value):
+		setattr(env.table, self.attr, value)
+
+	def store(self, env, value):
+		self._set(env, require_real(value))
+
+
+# ── Constants and computed reads ────────────────────────────────────────────────
+
+class ConstantToken(Accessor):
+	"""A constant π / 𝑒 / 𝑖 — read-only; storing is an error (inherited)."""
+
+	def __init__(self, code: int, display: bytes, value, char: str | None = None):
+		super().__init__(code, display, char=char)
+		self.value = value
+
+	def resolve(self, env):
+		return self.value
+
+
+class ComputedToken(Accessor):
+	"""A read-only 0-arg computed query (getKey, getDate, …): `resolve(env)` calls func."""
+
+	def __init__(self, code: int, display: bytes, func):
+		super().__init__(code, display)
+		self.func = func
+
+	def resolve(self, env):
+		return self.func(env)
