@@ -18,11 +18,11 @@ ZNMIN, ZXRES     = 0x6320, 0x6337
 
 def store(env, code, value):
 	"""Store through the exact path the parser uses for `value→var`."""
-	get_token(code).accessor.store(env, value)
+	get_token(code).store(env, value)
 
 
 def resolve(env, code):
-	return get_token(code).accessor.resolve(env)
+	return get_token(code).resolve(env)
 
 
 class TestDeltaDerived:

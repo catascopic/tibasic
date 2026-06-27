@@ -119,10 +119,11 @@ def var(env: Environment, name: str):
 	"""
 	if name.startswith('$'):
 		return env.user_lists[name[1:]]
+	from titoken import Accessor
 	tok = lookup[name]
-	if tok.accessor is None:
+	if not isinstance(tok, Accessor):
 		raise TypeError(f"{name!r} is not a variable")
-	return tok.accessor.reference(env).get()
+	return tok.reference(env).get()
 
 
 @pytest.fixture

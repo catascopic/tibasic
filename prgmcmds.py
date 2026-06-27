@@ -7,7 +7,8 @@ from preparse import (
 	preparse_cmd, preparse_cmd_func, preparse_bunch,
 	Thunk, NumericVar, LabelName, ProgramName, AnyVar, Real, Env, AnyValue,
 )
-from accessors import Reference, UserListVar
+from titoken import Reference
+from accessors import UserListToken
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, TiList, py_int, require_string
@@ -189,8 +190,8 @@ def _input_one(env, prompt: TiString | None, var: Reference, raw_string: bool = 
 		# makes a user list of the same name instead (a list entered for `Input A`
 		# lands in $A).  A user-list target already holds lists, so it's exempt.
 		if (isinstance(value, TiList) and var.name.tokens[0].is_numeric_var()
-				and not isinstance(var.accessor, UserListVar)):
-			UserListVar(str(var.name)).store(env, value)
+				and not isinstance(var.accessor, UserListToken)):
+			UserListToken(str(var.name)).store(env, value)
 		else:
 			var.store(value)
 

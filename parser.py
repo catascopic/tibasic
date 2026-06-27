@@ -3,7 +3,8 @@ from numbers import Number
 import operators
 from core import TiList, TiMatrix, TiString
 from titoken import (
-	Token, TokenKind, EOF_TOKEN, EOF_CODE,
+	Token, Flag, EOF_TOKEN, EOF_CODE,
+	Accessor, Reference,
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
 	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
 	SCI_E, DEG, RAD, APOS,
@@ -13,7 +14,7 @@ from titoken import (
 )
 from environment import Environment
 from core import Thunk, py_int, require_num, require_real
-from accessors import Reference, UserListVar, EquationVar, SequenceVar
+from accessors import UserListToken, EquationToken, SequenceToken
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError
 
 
@@ -318,7 +319,7 @@ class Parser:
 		# A user list's accessor is name-dependent, so it's built from the following
 		# name; every other variable carries its accessor on the token.
 		if t.code == LIST_PREFIX:
-			return self._read_accessor(UserListVar(self.read_name(5)))
+			return self._read_accessor(UserListToken(self.read_name(5)))
 
 		# FunctionToken invokes a call; a plain variable token reads its accessor;
 		# anything else raises — all via the token's own parse_prefix (see titoken).
@@ -329,7 +330,7 @@ class Parser:
 		sequence) consumes a trailing '(arg)' via invoke; anything else resolves, leaving
 		a following '(' for implicit multiplication.  Order matters: `invocable` is tested
 		before eat_if so a plain variable never has its '(' eaten."""
-		if acc.invocable and self.eat_if(L_PAREN):
+		if acc.invokable and self.eat_if(L_PAREN):
 			return acc.invoke(ArgParser(self))
 		return acc.resolve(self.env)
 
@@ -402,21 +403,20 @@ class Parser:
 		t = self.advance()
 
 		if t.is_list_var():
-			self.parse_store_list(t.accessor.reference(self.env), value)
+			self.parse_store_list(t.reference(self.env), value)
 
 		elif t.code == LIST_PREFIX:
 			self.parse_store_list(self.parse_user_list(), value)
 
 		elif t.is_matrix_var():
-			ref = t.accessor.reference(self.env)
+			ref = t.reference(self.env)
 			if self.eat_if(L_PAREN):
 				ref.resolve()[self.parse_matrix_indices()] = value
 			else:
 				ref.store(value)
 
-		elif t.accessor is not None:
-			# Plain variable, finance var, or rand (RandAccessor.store seeds the RNG).
-			t.accessor.store(self.env, value)
+		elif isinstance(t, Accessor):
+			t.store(self.env, value)
 
 		elif t.code == DIM:
 			self.parse_store_dim(value)
@@ -449,7 +449,7 @@ class Parser:
 				current.set_dim(value)
 		elif t.is_matrix_var():
 			self.advance()
-			var = t.accessor.reference(self.env)
+			var = t.reference(self.env)
 			current = var.get()
 			if current is None:
 				var.set(TiMatrix.alloc(value))
@@ -474,7 +474,7 @@ class Parser:
 		# exactly what Prompt should echo (∟PRIMES and PRIMES both display "PRIMES=?").
 		start = self.pos
 		name = self.read_name(5)
-		return UserListVar(name).reference(self.env, TiString(self.tokens[start:self.pos]))
+		return UserListToken(name).reference(self.env, TiString(self.tokens[start:self.pos]))
 
 	# SKIPPING
 
@@ -548,13 +548,26 @@ class Parser:
 			return
 
 		try:
-			# CommandToken runs its command; every other token's default run_statement
-			# is the expression statement (evaluate, then handle →store / ►conv / Ans).
-			self.peek().run_statement(self)
+			t = self.peek()
+			if t.flags & Flag.COMMAND:
+				self.advance()
+				t.run_statement(self)
+			else:
+				self._exec_expr_statement()
 		except TiError as e:
 			if e.pos is None:
 				e.pos = self.pos - 1
 			raise
+
+	def _exec_expr_statement(self):
+		"""Evaluate an expression statement: parse expr, handle → store, update Ans."""
+		value = self.parse_expr()
+		if self.eat_if(STORE):
+			self.parse_store(value)
+		else:
+			self.env.home.disp(value)
+		self.env.ans = value
+		self.end_statement()
 
 	def parse(self):
 		"""Interpret every statement in the token stream until EOF."""
@@ -655,7 +668,7 @@ class ArgParser:
 	@_parse_arg
 	def equation_var(self) -> "Reference":
 		t = self._parser.advance()
-		if isinstance(t.accessor, (EquationVar, SequenceVar)):
+		if isinstance(t, (EquationToken, SequenceToken)):
 			return t.reference(self.env)
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
@@ -679,7 +692,7 @@ class ArgParser:
 		failing later at store time.
 		"""
 		t = self._parser.advance()
-		if t.kind & TokenKind.VARIABLE:
+		if t.flags & Flag.VARIABLE:
 			return t.reference(self.env, TiString([t]))
 		if t.code == LIST_PREFIX:
 			return self._parser.parse_user_list()

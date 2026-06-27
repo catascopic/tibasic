@@ -203,7 +203,8 @@ class Token:
 		return self.is_numeric_var() or self.is_digit()
 
 	def can_start_atom(self) -> bool:
-		return bool(self.flags & (Flag.EXPR_START | Flag.FUNCTION | Flag.DIGIT | Flag.VARIABLE))
+		return (self.code in _ATOM_START or
+		        bool(self.flags & (Flag.EXPR_START | Flag.FUNCTION | Flag.DIGIT | Flag.VARIABLE)))
 
 	def is_postfix(self) -> bool:
 		return bool(self.flags & Flag.POSTFIX)

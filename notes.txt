@@ -1,9 +1,5 @@
-I'm making my own changes to the tokens and now they really are accessors. I think this works pretty well, but let me know what you think.
-Also, I've 
+env.home.echo(prompt_bytes + b''.join(t.display for t in tokens))
 
-get rid of run_statement, let's handle that in the parser like we were doing.
-
-Consider getting rid of all `Token.is_*` methods
 
 I kind of like Environment's numerics object, but let's just go back to a plain list to make things easier.
 HOWEVER, I think it would be nice if there was another, user-friendlier way to access the variables. Could we subclass list and add in virtual accessors? Or just make a separate object that implements __getattr__ and __setattr__ as accessing env.numerics[i]?
