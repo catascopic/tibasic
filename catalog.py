@@ -7,7 +7,7 @@ from parser import ArgParser
 from preparse import special_func
 from titoken import Token, Flag
 import titoken as tk
-from accessors import (
+from tokentypes import (
 	LetterToken, MatrixToken, ListToken, StringToken,
 	FuncEquationToken, ParEquationToken, PolarEquationToken,
 	SequenceToken, SequenceInitialToken,

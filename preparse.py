@@ -43,7 +43,7 @@ from core import (
 	require_matrix, require_string, require_list_or_matrix,
 	require_vectorizable, require_vectorizable_real, require_matrix_vectorizable,
 )
-from accessors import Reference
+from titoken import Reference
 from environment import Environment
 from errors import TiSyntaxError
 from parser import ArgParser

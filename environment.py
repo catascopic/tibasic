@@ -31,7 +31,7 @@ class _NamedSlots:
 	tests and for the equation graph-var scoping).  Slots are None until assigned.
 
 	The data is *just* the storage; the access logic (auto-init, type checks, copies)
-	lives on the accessor tokens (accessors.LetterToken / MatrixToken).
+	lives on the accessor tokens (tokentypes.LetterToken / MatrixToken).
 	"""
 
 	def __init__(self, names):
@@ -369,7 +369,7 @@ class Window:
 
 	Most variables are plain float | None (None = unset); the validation logic for
 	the special ones (Xres, nMin/nMax, XFact/YFact, ΔX/ΔY) lives in the accessor
-	subclasses in accessors.py and is enforced only on the TI-BASIC store path.
+	subclasses in tokentypes.py and is enforced only on the TI-BASIC store path.
 	Internal Python code (zoom.py, graphmodes.py) reads and writes them directly.
 
 	ΔX and ΔY are computed properties, not stored: they follow from the x/y bounds

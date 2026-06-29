@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from contextlib import contextmanager
 from enum import IntFlag, auto
@@ -109,8 +109,8 @@ class Flag(IntFlag):
 	inferred from its code range.  Roles (FUNCTION/COMMAND/INFIX/POSTFIX) drive parsing;
 	the variable kinds (NUMERIC…EQUATION) classify assignable targets and VARIABLE is
 	their union — what any_var / DelVar accept.  EXPR_START marks the structural atoms
-	that can lead an expression ('(', '{', '"', …); INVOKABLE marks accessors that take a
-	trailing '(arg)' (lists, matrices, equations).
+	that can lead an expression ('(', '{', '"', …); INVOKABLE marks accessor-type tokens
+	that take a trailing '(arg)' (lists, matrices, equations).
 	"""
 	EXPR_START = auto()
 	INVOKABLE  = auto()
@@ -292,12 +292,6 @@ class Accessor(ABC):
 	accessor) or a plain Accessor (e.g. UserList) built synthetically by the parser.
 	"""
 
-	flags: Flag = Flag(0)
-
-	@property
-	def invokable(self) -> bool:
-		return bool(self.flags & Flag.INVOKABLE)
-
 	def can_start_atom(self) -> bool:
 		return True   # every accessor resolves to a value, so it can lead an expression
 
@@ -316,6 +310,10 @@ class Accessor(ABC):
 	def store(self, env, value):
 		raise TiSyntaxError(f"Cannot store to {self}")
 
+	@abstractmethod
+	def is_invokable():
+		pass
+
 	def invoke(self, arg_parser):
 		raise TiSyntaxError(f"Cannot invoke {self}")
 
@@ -324,9 +322,6 @@ class Accessor(ABC):
 
 	def reference(self, env, name=None) -> Reference:
 		return Reference(env, self, name)
-
-	def parse_prefix(self, parser):
-		return parser._read_accessor(self)
 
 
 class Deletable:
@@ -351,8 +346,11 @@ class VariableToken(Token, Accessor):
 	tokens are always expression atoms and always route through _read_accessor.
 	"""
 
+	def is_invokable(self) -> bool:
+		return bool(self.flags & Flag.INVOKABLE)
+
 	def parse_prefix(self, parser):
-		return parser._read_accessor(self)
+		return parser.read_accessor(self)
 
 	def can_start_atom(self) -> bool:
 		return True

@@ -45,6 +45,9 @@ class UserList(Accessor):
 	def store(self, env, value):
 		self._set(env, require_list(value).copy())
 
+	def is_invokable(self):
+		return True
+
 	def invoke(self, arg_parser):
 		index = py_int(arg_parser.expr(), InvalidDimError)
 		arg_parser.end_func()
@@ -347,18 +350,18 @@ class Parser:
 		# A user list's accessor is name-dependent, so it's built from the following
 		# name; every other variable carries its accessor on the token.
 		if t.code == LIST_PREFIX:
-			return self._read_accessor(UserList(self.read_name(5)))
+			return self.read_accessor(UserList(self.read_name(5)))
 
 		# FunctionToken invokes a call; a plain variable token reads its accessor;
 		# anything else raises — all via the token's own parse_prefix (see titoken).
 		return t.parse_prefix(self)
 
-	def _read_accessor(self, acc):
+	def read_accessor(self, acc):
 		"""Read an accessor as an atom.  An invocable accessor (list/matrix/equation/
 		sequence) consumes a trailing '(arg)' via invoke; anything else resolves, leaving
 		a following '(' for implicit multiplication.  Order matters: `invocable` is tested
 		before eat_if so a plain variable never has its '(' eaten."""
-		if acc.invokable and self.eat_if(L_PAREN):
+		if acc.is_invokable() and self.eat_if(L_PAREN):
 			return acc.invoke(ArgParser(self))
 		return acc.resolve(self.env)
 

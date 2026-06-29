@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from core import Thunk, require_real
-from accessors import Reference
+from titoken import Reference
 from environment import Environment, ReturnSignal
 from errors import TiSyntaxError, IncrementError, LabelError
 from titoken import THEN, ELSE, LBL
