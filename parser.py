@@ -8,7 +8,7 @@ from titoken import (
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
 	L_BRACKET, R_BRACKET, L_BRACE, R_BRACE, L_PAREN, R_PAREN, QUOTE,
 	SCI_E, DEG, RAD, APOS,
-	ANS, DIM,
+	DIM,
 	LIST_PREFIX,
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
@@ -305,17 +305,6 @@ class Parser:
 		if t.code == SCI_E:
 			return self._parse_dms_num(10 ** self._parse_sci_exp())
 		
-		if t.code == ANS:
-			ans = self.env.ans
-			if self.peek().code == L_PAREN:
-				if isinstance(ans, TiList):
-					self.advance()
-					return ans[self.parse_list_index()]
-				if isinstance(ans, TiMatrix):
-					self.advance()
-					return ans[self.parse_matrix_indices()]
-			return ans
-
 		# A user list's accessor is name-dependent, so it's built from the following
 		# name; every other variable carries its accessor on the token.
 		if t.code == LIST_PREFIX:

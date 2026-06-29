@@ -34,12 +34,36 @@ class Console(ABC):
 		"""A repaint opportunity — output changed (Disp/Output(/ClrHome/a drawing
 		command).  Payload-free: pull from self.env.  Default is a no-op."""
 
-	@abstractmethod
 	def read_tokens(self, prompt: TiString | None) -> list[Token]:
-		"""Blocking: display prompt (if any) and return the tokens the user entered.
+		"""Blocking: display the prompt (if any), read the typed entry, and mirror it
+		onto the home grid so the screen reflects the interaction.
+
+		The raw read is the per-console `_input`; `_echo_entry` then writes the
+		prompt+entry back onto the model the way the calculator shows it.  The mirror
+		is needed only because input is taken out-of-band (the host's input line)
+		rather than typed straight into the grid — it's a frontend concern, not the
+		Input/Prompt command's, so it lives here."""
+		tokens = self._input(prompt)
+		self._echo_entry(prompt, tokens)
+		return tokens
+
+	@abstractmethod
+	def _input(self, prompt: TiString | None) -> list[Token]:
+		"""Blocking raw read: display prompt (if any) and return the entered tokens.
 
 		Implementations tokenize the typed text through `_tokenize`, so a caller gets a
 		well-formed token list and never a raw tokenizer error."""
+
+	def _echo_entry(self, prompt: TiString | None, tokens: list[Token]) -> None:
+		"""Mirror the entered prompt+text onto the home grid and repaint, exactly as
+		the calculator shows a typed entry.  The prompt's own bytes precede the typed
+		bytes.  A frontend that doesn't paint the grid (FreeFormConsole, whose host
+		terminal already echoes the typed line) overrides this to do nothing."""
+		if not tokens:
+			return
+		prompt_bytes = b''.join(t.display for t in prompt.tokens) if prompt is not None else b''
+		self.env.home.echo(prompt_bytes + b''.join(t.display for t in tokens))
+		self.present()
 
 	@staticmethod
 	def _tokenize(text: str) -> list[Token]:
@@ -109,7 +133,7 @@ class ScriptedConsole(Console):
 	def present(self) -> None:
 		self._capture()
 
-	def read_tokens(self, prompt: TiString | None) -> list[Token]:
+	def _input(self, prompt: TiString | None) -> list[Token]:
 		if not self.inputs:
 			raise ValueError("ScriptedConsole: no input queued")
 		return self._tokenize(self.inputs.pop(0))
@@ -150,8 +174,11 @@ class FreeFormConsole(Console):
 			print('\n'.join(decode(line) for line in value_lines(value)))
 		self._printed = len(values)
 
-	def read_tokens(self, prompt: TiString | None) -> list[Token]:
+	def _input(self, prompt: TiString | None) -> list[Token]:
 		return self._tokenize(input(str(prompt) if prompt is not None else ''))
+
+	def _echo_entry(self, prompt: TiString | None, tokens: list[Token]) -> None:
+		pass   # the host terminal echoes the typed line; FreeForm never paints the grid
 
 	def read_key(self) -> int:
 		return 0   # no key support in free-form mode
@@ -322,7 +349,7 @@ class TerminalConsole(Console):
 		self._show_cursor()         # hand the cursor back to the terminal
 		sys.stdout.flush()
 
-	def read_tokens(self, prompt: TiString | None) -> list[Token]:
+	def _input(self, prompt: TiString | None) -> list[Token]:
 		# Input/Prompt always run on the home screen; repaint it without an indicator
 		# (the cursor stands in for one) before blocking.
 		self._render(self.env.home)

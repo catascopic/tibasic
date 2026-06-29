@@ -1,7 +1,7 @@
 import math
 from io import BytesIO
 
-from core import require_real
+from core import require_real, TiList, TiMatrix
 from environment import Environment
 from parser import ArgParser
 from preparse import special_func
@@ -76,6 +76,24 @@ class PostfixToken(Token):
 
 	def apply_postfix(self, value):
 		return self._op(value)
+
+
+class AnsToken(Token):
+	"""Ans — reads env.ans, with optional index into the result when it's a list/matrix."""
+
+	def __init__(self):
+		super().__init__(tk.ANS, b'Ans', Flag.EXPR_START)
+
+	def parse_prefix(self, parser):
+		ans = parser.env.ans
+		if parser.peek().code == tk.L_PAREN:
+			if isinstance(ans, TiList):
+				parser.advance()
+				return ans[parser.parse_list_index()]
+			if isinstance(ans, TiMatrix):
+				parser.advance()
+				return ans[parser.parse_matrix_indices()]
+		return ans
 
 
 class _PyToken(RealToken):
@@ -311,7 +329,7 @@ def _generate():
 	yield OperatorToken(0x6F, b'\x18',              ops.ne,    (40, 41), char='≠')
 	yield OperatorToken(0x70, b'+',                 ops.add,   (50, 51), char='+')
 	yield OperatorToken(0x71, b'-',                 ops.sub,   (50, 51), char='-')
-	yield Token(tk.ANS, b'Ans')
+	yield AnsToken()
 	yield CommandToken(0x73, b'Fix',                modecmds.fix)
 	yield Token(0x74, b'Horiz')
 	yield Token(0x75, b'Full')

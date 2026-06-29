@@ -1,31 +1,6 @@
-env.home.echo(prompt_bytes + b''.join(t.display for t in tokens))
-
-
-I kind of like Environment's numerics object, but let's just go back to a plain list to make things easier.
-HOWEVER, I think it would be nice if there was another, user-friendlier way to access the variables. Could we subclass list and add in virtual accessors? Or just make a separate object that implements __getattr__ and __setattr__ as accessing env.numerics[i]?
-
-On real variables:
-`n` (the recursive sequence variable)
-The finance variables: N, I%, PV, PMT, FV, P/Y, and C/Y
-HOWEVER, setting P/Y alters C/Y, and vice-versa. (One of them should probably be made a virtual variable, like DeltaX/Y.) The others are independent.
-
-Replace typeable=True with ASCII flag.
+Numerics access object cleanup
 
 Move ans invoke logic to accessor
-
-char vs display
-
-does ° really deserve a char?
-
-
-
-except KeyError as bad:
-Should not be prgmcmds's job!
-
-Should tokens actually be instances of accessor?
-
-
-I think we need a way to distinguish tokens that have accessors from tokens that are true variables because, currently, there are some methods that use... that accessor is not none to test if something is a variable. But there are other tokens that have accessors like pi. I think the best way to do this would be to put a class-level attribute on accessors that tell you if they're a true variable or not.
 
 accessors -> variables
 

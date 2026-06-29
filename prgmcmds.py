@@ -172,13 +172,9 @@ def _input_one(env, prompt: TiString | None, var: Reference, raw_string: bool = 
 	expression, same as expr(.
 	"""
 	env.screen = Screen.HOME            # Input/Prompt bring up the home screen
+	# read_tokens also mirrors the entry onto the home grid (a frontend concern — see
+	# Console.read_tokens); the command just consumes the well-formed token list.
 	tokens = env.console.read_tokens(prompt)
-	# Mirror the entry onto the home grid (the console paints it on present); the
-	# prompt's own bytes precede the typed bytes, exactly as on the calculator.
-	if tokens:
-		prompt_bytes = b''.join(t.display for t in prompt.tokens) if prompt is not None else b''
-		env.home.echo(prompt_bytes + b''.join(t.display for t in tokens))
-		env.console.present()
 	if raw_string and var.name.tokens[0].is_string_var():
 		var.store(TiString(tokens))
 	else:
