@@ -2,11 +2,12 @@ import math
 
 import distributions as dist
 from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command
-from errors import DataTypeError, DomainError
+from errors import DataTypeError, DomainError, UndefinedError
 from modes import Screen
 from graphscreen import GraphScreen
 from fonts import SMALL_FONT, GLYPH_WIDTH
-from core import TiString, py_int
+from core import TiString, py_int, require_real
+from tokenbase import Flag
 from graph import (
 	MAX_ROW, MAX_COL, _round_half_up,
 	_x_to_col, _y_to_row, _col_to_x, _graph_to_pixel,
@@ -62,6 +63,56 @@ def clr_draw(env) -> None:
 	env.graph.clear()
 	if env.screen is Screen.GRAPH:
 		env.regraph()
+
+
+# ── Picture variables (StorePic / RecallPic) ───────────────────────────────────
+# The ten pictures Pic0–Pic9 are snapshots of the 96×64 graph screen, held in
+# env.pics indexed by picture number.  We keep the full screen in memory (all 64
+# rows); the 63-row legacy truncation is only a .8xi on-disk concern (see tifile).
+
+def _pic_index(n) -> int:
+	"""Validate a picture number (real value) as a whole number 0–9."""
+	i = py_int(n)
+	if not 0 <= i <= 9:
+		raise DomainError(f"Picture number must be 0–9, got {i}")
+	return i
+
+
+def _parse_pic_arg(args) -> int:
+	"""Parse a StorePic/RecallPic argument: a Pic token (Pic0–Pic9) or a number 0–9.
+
+	Pic tokens (Flag.PIC, codes 0x6000–0x6009) cannot start a general expression, so
+	they are consumed directly by peeking at the underlying token stream.  A plain
+	numeric expression (e.g. StorePic 5) goes through the normal args.expr() path.
+	"""
+	t = args.peek()
+	if t.flags & Flag.PIC:
+		args._parser.advance()
+		# Token 0x6000+i encodes Pic(i+1)%10, so pic number = (code − 0x6000 + 1) % 10.
+		return (t.code - 0x6000 + 1) % 10
+	return _pic_index(require_real(args.expr()))
+
+
+@special_func
+def store_pic(args) -> None:
+	i = _parse_pic_arg(args)
+	args.end_cmd()
+	env = args.env
+	if not env.graph.valid:
+		env.regraph()
+	env.pics[i] = env.graph.copy()
+
+
+@special_func
+def recall_pic(args) -> None:
+	i = _parse_pic_arg(args)
+	args.end_cmd()
+	env = args.env
+	pic = env.pics[i]
+	if pic is None:
+		raise UndefinedError(f"Pic{i} is not defined")
+	with env.draw_to_graph():
+		env.graph.overlay(pic)
 
 
 def _pt_action(env, x, y, mark, action) -> None:

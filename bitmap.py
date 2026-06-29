@@ -54,6 +54,22 @@ class Bitmap:
 			row.__init__(COLS)  # hack?
 		self.version += 1
 
+	def copy(self) -> 'Bitmap':
+		"""A deep copy of these pixels as a plain Bitmap (for snapshotting — StorePic)."""
+		clone = Bitmap()
+		for dst, src in zip(clone.buffer, self.buffer):
+			dst[:] = src
+		return clone
+
+	def overlay(self, other: 'Bitmap') -> None:
+		"""OR another bitmap's set pixels onto this one, leaving the rest untouched —
+		RecallPic semantics (a picture can only turn pixels on, never clear them)."""
+		for dst, src in zip(self.buffer, other.buffer):
+			for c in range(COLS):
+				if src[c]:
+					dst[c] = 1
+		self.version += 1
+
 	def blit_large(self, row: int, col: int, byte: int, invert: bool = False) -> int:
 		"""Rasterize a large-font glyph as a full CELL_WIDTH×CELL_HEIGHT (6×8) block.
 
