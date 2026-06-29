@@ -1,5 +1,5 @@
 import struct
-
+from typing import Self
 from itertools import batched
 
 from fonts import LARGE_FONT, GLYPH_HEIGHT, CELL_WIDTH, CELL_HEIGHT
@@ -54,14 +54,14 @@ class Bitmap:
 			row.__init__(COLS)  # hack?
 		self.version += 1
 
-	def copy(self) -> 'Bitmap':
+	def copy(self) -> Self:
 		"""A deep copy of these pixels as a plain Bitmap (for snapshotting — StorePic)."""
 		clone = Bitmap()
 		for dst, src in zip(clone.buffer, self.buffer):
 			dst[:] = src
 		return clone
 
-	def overlay(self, other: 'Bitmap') -> None:
+	def overlay(self, other: Self) -> None:
 		"""OR another bitmap's set pixels onto this one, leaving the rest untouched —
 		RecallPic semantics (a picture can only turn pixels on, never clear them)."""
 		for dst, src in zip(self.buffer, other.buffer):

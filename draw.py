@@ -98,9 +98,8 @@ def store_pic(args) -> None:
 	i = _parse_pic_arg(args)
 	args.end_cmd()
 	env = args.env
-	if not env.graph.valid:
-		env.regraph()
-	env.pics[i] = env.graph.copy()
+	with env.draw_to_graph():
+		env.pics[i] = env.graph.copy()
 
 
 @special_func

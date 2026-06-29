@@ -228,11 +228,13 @@ def _encode_list_name(name: str) -> bytes:
 # ── Picture files (.8xi) ───────────────────────────────────────────────────────
 # A picture is the 96-wide graph bitmap stored bit-packed MSB-first, 12 bytes per
 # row, wrapped in the usual 2-byte length prefix.  Two heights occur in the wild:
-# the native TI-83+/84+ size is the full 64 rows (768 bytes, 0x0300), while the
-# legacy TI-83 size omits the bottom screen row — 63 rows (756 bytes, 0x02F4).  The
-# OS reads both, so the stored row count is recorded (PictureFile.rows) and writes
-# reproduce the source size.  Pictures are the ten fixed variables Pic1–Pic9, Pic0,
-# named by a 0x60 token plus an index byte (Pic1→0x00, …, Pic9→0x08, Pic0→0x09).
+# 63 rows (756 bytes, 0x02F4) stores just the graph-screen height, while 64 rows
+# (768 bytes, 0x0300) also stores the extra bottom LCD row.  Which one a file uses
+# is a per-picture property — both sizes turn up mixed within a single calculator's
+# backup and the OS reads either — so the row count is captured (PictureFile.rows)
+# and writes reproduce the source size.  Pictures are the ten fixed variables
+# Pic1–Pic9, Pic0, named by a 0x60 token plus an index byte (Pic1→0x00, …,
+# Pic9→0x08, Pic0→0x09).
 
 _PIC_NAME_TOKEN = 0x60
 _PIC_ROW_BYTES  = COLS // 8   # 12 bytes per row (96 columns, 8 pixels/byte)
@@ -281,7 +283,7 @@ class PictureFile:
 	comment:  str  = ''
 	archived: bool = False
 	version:  int  = 0x00
-	rows:     int  = ROWS   # scanlines stored: 64 (full screen) or 63 (legacy TI-83)
+	rows:     int  = ROWS   # scanlines stored: 64 (full LCD) or 63 (graph screen only)
 
 	def __repr__(self):
 		return f"Pic{self.name}({COLS}x{self.rows};{'' if self.archived else 'un'}archived)"
@@ -296,7 +298,7 @@ class PictureFile:
 	def read_from(cls, f):
 		_file_type, name_bytes, archived, comment, version = _read_var_header(f)
 		pixel_len = int.from_bytes(f.read(2), 'little')   # body's 2-byte length prefix
-		rows      = pixel_len // _PIC_ROW_BYTES           # 64 (full screen) or 63 (legacy)
+		rows      = pixel_len // _PIC_ROW_BYTES           # 64 (full LCD) or 63 (graph screen)
 		bitmap    = _read_picture_data(f, rows)
 
 		return cls(

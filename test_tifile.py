@@ -358,12 +358,12 @@ class TestPictureFileRoundtrip:
 		assert pixels_of(roundtrip_pic(make_pic()).bitmap) == set()
 
 	def test_full_height_keeps_bottom_row(self):
-		# The native 64-row format stores the bottom screen row (row 63).
+		# The 64-row format stores the bottom LCD row (row 63).
 		result = roundtrip_pic(make_pic(rows=64, bitmap=make_bitmap({(63, 0), (5, 5)})))
 		assert pixels_of(result.bitmap) == {(63, 0), (5, 5)}
 
-	def test_legacy_height_drops_bottom_row(self):
-		# The legacy 63-row format omits row 63, so it never survives a roundtrip.
+	def test_graph_screen_height_drops_bottom_row(self):
+		# The 63-row format omits row 63, so it never survives a roundtrip.
 		result = roundtrip_pic(make_pic(rows=63, bitmap=make_bitmap({(63, 0), (5, 5)})))
 		assert pixels_of(result.bitmap) == {(5, 5)}
 
@@ -382,7 +382,8 @@ class TestPictureFileRoundtrip:
 
 
 # ── PictureFile real-file byte-exact roundtrip ────────────────────────────────
-# Pic9 is the legacy 63-row size (756 bytes); Pic3 is the native 64-row size (768).
+# Pic9 is the 63-row size (756 bytes, graph screen only); Pic3 is the 64-row size
+# (768 bytes, full LCD).  Both sizes occur mixed within a single TI-84+ backup.
 
 _PIC_DIR = r'C:\Users\Max\Documents\MyTiData\Backups\TI84PlusSilverEdition_11'
 _PIC_FILES = [

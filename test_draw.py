@@ -4,12 +4,12 @@ import pytest
 
 from environment import Environment as _RealEnvironment
 from graphscreen import GraphScreen
-from errors import ArgumentError, DomainError
-from modes import DrawMode
+from errors import ArgumentError, DomainError, DataTypeError, UndefinedError
+from modes import DrawMode, Screen
 from test_tibasic import calc as _calc, run as _run, toks, var
 from test_program import run as run_program
 from fonts import SMALL_FONT, LARGE_FONT
-from draw import MAX_ROW, MAX_COL
+from draw import MAX_ROW, MAX_COL, _x_to_col as _x_col
 
 
 # These tests check the pixel output of the drawing primitives in isolation, so
@@ -423,9 +423,6 @@ class TestLine:
 		assert not env.graph.get(31, 95)  # col 95 is outside MAX_COL
 
 
-from draw import MAX_ROW, MAX_COL
-
-
 # ── Circle( ───────────────────────────────────────────────────────────────────────
 
 class TestCircle:
@@ -490,7 +487,6 @@ class TestCircle:
 		env.window.ymax = 20
 		run('Circle( 10,10,2', env)
 		# Rightmost pixel column should be further from centre than topmost pixel row.
-		import math
 		# rx_pix ≈ 9.4, ry_pix ≈ 6.2 → horizontally wider
 		assert env.graph.get(31, 47 + round(2 * 94 / 20))
 		assert env.graph.get(31 - round(2 * 62 / 20), 47)
@@ -664,12 +660,6 @@ class TestShadeDistributions:
 		inside = _col_count(env, _x_col(env, 1))
 		outside = _col_count(env, _x_col(env, 4))
 		assert inside > outside
-
-
-def _x_col(env, x):
-	"""Pixel column for graph x-coordinate (test helper mirroring draw._x_to_col)."""
-	from draw import _x_to_col
-	return _x_to_col(env, x)
 
 
 # ── Use inside a stored program ─────────────────────────────────────────────────
@@ -930,6 +920,104 @@ class TestText:
 	# ── Type errors ───────────────────────────────────────────────────────────
 
 	def test_complex_raises(self):
-		from errors import DataTypeError
 		with pytest.raises(DataTypeError):
 			run('Text( 0,0,(1+2𝑖)')
+
+
+# ── StorePic / RecallPic ───────────────────────────────────────────────────────
+
+class TestStorePic:
+	def test_store_snapshots_graph(self):
+		env = run('Pxl-On( 0,0\nPxl-On( 5,10\nStorePic 1')
+		assert env.pics[1] is not None
+		assert env.pics[1].get(0, 0) and env.pics[1].get(5, 10)
+
+	def test_store_does_change_screen(self):
+		env = run('Disp 5\nStorePic 1')   # on the home screen
+		assert env.screen is Screen.GRAPH
+
+	def test_store_copy_is_independent(self):
+		# Drawing after StorePic must not mutate the stored snapshot.
+		env = run('Pxl-On( 4,4\nStorePic 4\nPxl-On( 8,8')
+		assert env.pics[4].get(4, 4)
+		assert not env.pics[4].get(8, 8)
+
+	def test_store_keeps_full_height(self):
+		# Row 63 isn't Pxl-addressable, but a full-buffer snapshot still captures it.
+		env = run('Pxl-On( 5,5')
+		env.graph.set(63, 0)
+		run('StorePic 2', env)
+		assert env.pics[2].get(63, 0)
+
+	def test_out_of_range_raises(self):
+		with pytest.raises(DomainError):
+			run('StorePic 10')
+
+	def test_non_integer_raises(self):
+		with pytest.raises(DomainError):
+			run('StorePic 2.5')
+
+
+class TestRecallPic:
+	def test_recall_restores_after_clear(self):
+		env = run('Pxl-On( 0,0\nPxl-On( 5,10\nStorePic 1\nClrDraw')
+		assert not env.graph.get(0, 0)
+		run('RecallPic 1', env)
+		assert env.graph.get(0, 0) and env.graph.get(5, 10)
+
+	def test_recall_overlays_keeps_existing(self):
+		# RecallPic ORs the picture on; it can only turn pixels on, never clear them.
+		env = run('Pxl-On( 1,1\nStorePic 3\nClrDraw\nPxl-On( 2,2\nRecallPic 3')
+		assert env.graph.get(1, 1) and env.graph.get(2, 2)
+
+	def test_recall_displays_graph(self):
+		env = run('Pxl-On( 1,1\nStorePic 1\nDisp 5')   # back to home
+		assert env.screen is Screen.HOME
+		run('RecallPic 1', env)
+		assert env.screen is Screen.GRAPH
+
+	def test_recall_undefined_raises(self):
+		with pytest.raises(UndefinedError):
+			run('RecallPic 7')
+
+	def test_roundtrip_pic0(self):
+		# Pic0 is slot 0 — the number maps straight through.
+		env = run('Pxl-On( 3,3\nStorePic 0\nClrDraw\nRecallPic 0')
+		assert env.graph.get(3, 3)
+
+	def test_recall_pic_token_form(self):
+		# RecallPic accepts a Pic variable token (e.g. RecallPic Pic1) as well as a number.
+		env = run('Pxl-On( 0,0\nStorePic 1\nClrDraw')
+		run('RecallPic Pic1', env)
+		assert env.graph.get(0, 0)
+
+	def test_recall_pic0_token(self):
+		# Pic0 token (code 0x6009) correctly maps to slot 0.
+		env = run('Pxl-On( 7,7\nStorePic 0\nClrDraw')
+		run('RecallPic Pic0', env)
+		assert env.graph.get(7, 7)
+
+
+class TestStorePicTokenForm:
+	def test_store_pic_token_form(self):
+		# StorePic accepts a Pic variable token as well as a number.
+		env = run('Pxl-On( 2,2\nStorePic Pic2')
+		assert env.pics[2] is not None
+		assert env.pics[2].get(2, 2)
+
+	def test_store_pic3_token(self):
+		env = run('Pxl-On( 9,9\nStorePic Pic3')
+		assert env.pics[3].get(9, 9)
+
+	def test_store_pic0_token(self):
+		# Pic0 token (last in the 0x60XX range, code 0x6009) → slot 0.
+		env = run('Pxl-On( 1,1\nStorePic Pic0')
+		assert env.pics[0] is not None
+		assert env.pics[0].get(1, 1)
+
+	def test_number_and_token_forms_equivalent(self):
+		# StorePic 5 and StorePic Pic5 write to the same slot.
+		env1 = run('Pxl-On( 4,4\nStorePic 5')
+		env2 = run('Pxl-On( 4,4\nStorePic Pic5')
+		assert env1.pics[5].get(4, 4)
+		assert env2.pics[5].get(4, 4)
