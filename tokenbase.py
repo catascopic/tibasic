@@ -112,11 +112,11 @@ class Flag(IntFlag):
 	"""A token's role and classification, declared explicitly in the catalog rather than
 	inferred from its code range.  Roles (FUNCTION/COMMAND/INFIX/POSTFIX) drive parsing;
 	the variable kinds (NUMERIC…EQUATION) classify assignable targets and VARIABLE is
-	their union — what any_var / DelVar accept.  EXPR_START marks the structural atoms
-	that can lead an expression ('(', '{', '"', …); INVOKABLE marks accessor-type tokens
-	that take a trailing '(arg)' (lists, matrices, equations).
+	their union — what any_var / DelVar accept.  ATOM_START marks structural tokens that
+	open an expression atom but carry no other role ('(', '{', '"', …); INVOKABLE marks
+	accessor-type tokens that take a trailing '(arg)' (lists, matrices, equations).
 	"""
-	EXPR_START = auto()
+	ATOM_START = auto()
 	INVOKABLE  = auto()
 
 	FUNCTION = auto()
@@ -139,10 +139,6 @@ class Flag(IntFlag):
 	GDB      = auto()
 
 	VARIABLE = NUMERIC | LIST | MATRIX | STRING | SEQUENCE | EQUATION
-
-
-# Structural tokens that can lead an atom but carry no role flag of their own.
-_ATOM_START = {L_PAREN, L_BRACE, L_BRACKET, QUOTE, DOT, SCI_E, NEG, LIST_PREFIX, ANS}
 
 
 class Token:
@@ -208,8 +204,7 @@ class Token:
 		return self.is_numeric_var() or self.is_digit()
 
 	def can_start_atom(self) -> bool:
-		return (self.code in _ATOM_START or
-		        bool(self.flags & (Flag.EXPR_START | Flag.FUNCTION | Flag.DIGIT | Flag.VARIABLE)))
+		return bool(self.flags & (Flag.ATOM_START | Flag.FUNCTION | Flag.DIGIT | Flag.VARIABLE))
 
 	def is_postfix(self) -> bool:
 		return bool(self.flags & Flag.POSTFIX)

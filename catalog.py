@@ -6,7 +6,7 @@ from environment import Environment
 from parser import ArgParser
 from preparse import special_func
 from tokenbase import Token, Flag
-import tokenbase as tk
+import tokenbase as tok
 from tokentypes import *
 import prgmcmds as cmds
 import distributions as dist
@@ -33,20 +33,20 @@ def _generate():
 	yield Token(0x01, b'\x05DMS')   # ►DMS
 	yield Token(0x02, b'\x05Dec')   # ►Dec
 	yield Token(0x03, b'\x05Frac')  # ►Frac
-	yield Token(tk.STORE, b'\x1c')  # →
+	yield Token(tok.STORE, b'\x1c')  # →
 	yield Token(0x05, b'Boxplot')
-	yield Token(tk.L_BRACKET, b'\xc1',              char='[')
-	yield Token(tk.R_BRACKET, b']',                 char=']')
-	yield Token(tk.L_BRACE, b'{',                   char='{')
-	yield Token(tk.R_BRACE, b'}',                   char='}')
-	yield Token(tk.RAD, b'\x15')
-	yield Token(tk.DEG, b'\x14',                    char='°')
+	yield Token(tok.L_BRACKET, b'\xc1', Flag.ATOM_START, char='[')
+	yield Token(tok.R_BRACKET, b']',                char=']')
+	yield Token(tok.L_BRACE, b'{', Flag.ATOM_START, char='{')
+	yield Token(tok.R_BRACE, b'}',                  char='}')
+	yield Token(tok.RAD, b'\x15')
+	yield Token(tok.DEG, b'\x14',                   char='°')
 	yield PostfixToken(0x0C, b'\x11',               ops.inv)
 	yield PostfixToken(0x0D, b'\x12',               ops.squared)
 	yield PostfixToken(0x0E, b'\x16',               ops.transpose)
 	yield PostfixToken(0x0F, b'\xd5',               ops.cubed)
-	yield Token(tk.L_PAREN, b'(',                   char='(')
-	yield Token(tk.R_PAREN, b')',                   char=')')
+	yield Token(tok.L_PAREN, b'(', Flag.ATOM_START, char='(')
+	yield Token(tok.R_PAREN, b')',                  char=')')
 	yield FunctionToken(0x12, b'round(',            timath.round)
 	yield FunctionToken(0x13, b'pxl-Test(',         draw.pxl_test)
 	yield FunctionToken(0x14, b'augment(',          tilist.augment)
@@ -70,8 +70,8 @@ def _generate():
 	yield FunctionToken(0x27, b'fMin(',             timath.f_min)
 	yield FunctionToken(0x28, b'fMax(',             timath.f_max)
 	yield Token(0x29, b' ',                         char=' ')
-	yield Token(tk.QUOTE, b'"',                     char='"')
-	yield Token(tk.COMMA, b',',                     char=',')
+	yield Token(tok.QUOTE, b'"', Flag.ATOM_START,   char='"')
+	yield Token(tok.COMMA, b',',                    char=',')
 	yield ConstantToken(0x2C, b'\xd7', 1j,          char='𝑖')
 	yield PostfixToken(0x2D, b'!',                  ops.factorial, char='!')
 	yield Token(0x2E, b'CubicReg ')
@@ -81,12 +81,12 @@ def _generate():
 		ch = 0x30 + i
 		yield Token(ch, bytes([ch]), Flag.DIGIT, char=chr(ch))
 
-	yield Token(tk.DOT, b'.',                       char='.')
-	yield Token(tk.SCI_E, b'\x1b')                                       # ᴇ
+	yield Token(tok.DOT, b'.', Flag.ATOM_START,     char='.')
+	yield Token(tok.SCI_E, b'\x1b', Flag.ATOM_START)                    # ᴇ
 	yield OperatorToken(0x3C, b' or ',              ops.or_,   (20, 21))
 	yield OperatorToken(0x3D, b' xor ',             ops.xor,   (20, 21))
-	yield Token(tk.COLON, b':',                     char=':')
-	yield Token(tk.NEWLINE, b'\xd6',                char='\n')
+	yield Token(tok.COLON, b':',                    char=':')
+	yield Token(tok.NEWLINE, b'\xd6',               char='\n')
 	yield OperatorToken(0x40, b' and ',             ops.and_,  (30, 31))
 
 	for i in range(27):
@@ -252,7 +252,7 @@ def _generate():
 	yield OperatorToken(0x6F, b'\x18',              ops.ne,    (40, 41), char='≠')
 	yield OperatorToken(0x70, b'+',                 ops.add,   (50, 51), char='+')
 	yield OperatorToken(0x71, b'-',                 ops.sub,   (50, 51), char='-')
-	yield AnsToken(tk.ANS, b'Ans', Flag.EXPR_START)
+	yield AnsToken(tok.ANS, b'Ans', Flag.ATOM_START)
 	yield CommandToken(0x73, b'Fix',                modecmds.fix)
 	yield Token(0x74, b'Horiz')
 	yield Token(0x75, b'Full')
@@ -332,17 +332,17 @@ def _generate():
 	for i in range(10):
 		yield StringToken(i)
 
-	yield timath.RandToken(tk.RAND, b'rand')
-	yield ConstantToken(0xAC, b'\xc4', math.pi)  # π
-	yield ComputedToken(0xAD, b'getKey', Environment.get_key)
-	yield Token(tk.APOS, b"'", char="'")
-	yield Token(0xAF, b'?',    char='?')
-	yield Token(tk.NEG, b'\x1a')  # negative sign
+	yield timath.RandToken(tok.RAND, b'rand')
+	yield ConstantToken(0xAC, b'\xc4',              math.pi)  # π
+	yield ComputedToken(0xAD, b'getKey',            Environment.get_key)
+	yield Token(tok.APOS, b"'",                     char="'")
+	yield Token(0xAF, b'?',                         char='?')
+	yield Token(tok.NEG, b'\x1a', Flag.ATOM_START)  # negative sign
 	yield FunctionToken(0xB1, b'int(',              timath.int_)
 	yield FunctionToken(0xB2, b'abs(',              timath.abs)
 	yield FunctionToken(0xB3, b'det(',              matrix.det)
 	yield FunctionToken(0xB4, b'identity(',         matrix.identity)
-	yield FunctionToken(tk.DIM, b'dim(',            tilist.dim)
+	yield FunctionToken(tok.DIM, b'dim(',           tilist.dim)
 	yield FunctionToken(0xB6, b'sum(',              tilist.sum)
 	yield FunctionToken(0xB7, b'prod(',             tilist.prod)
 	yield FunctionToken(0xB8, b'not(',              timath.not_)
@@ -601,15 +601,15 @@ def _generate():
 	yield FunctionToken(0xCB, b'cosh\x11(',         timath.acosh)        # cosh⁻¹(
 	yield FunctionToken(0xCC, b'tanh(',             timath.tanh)
 	yield FunctionToken(0xCD, b'tanh\x11(',         timath.atanh)        # tanh⁻¹(
-	yield CommandToken(tk.IF, b'If ',               cmds.if_cmd)
-	yield CommandToken(tk.THEN, b'Then',            cmds.then_cmd)
-	yield CommandToken(tk.ELSE, b'Else',            cmds.else_cmd)
-	yield CommandToken(tk.WHILE, b'While ',         cmds.while_cmd)
-	yield CommandToken(tk.REPEAT, b'Repeat ',       cmds.repeat_cmd)
-	yield CommandToken(tk.FOR, b'For(',             cmds.for_cmd)
-	yield CommandToken(tk.END, b'End',              cmds.end_cmd)
+	yield CommandToken(tok.IF, b'If ',              cmds.if_cmd)
+	yield CommandToken(tok.THEN, b'Then',           cmds.then_cmd)
+	yield CommandToken(tok.ELSE, b'Else',           cmds.else_cmd)
+	yield CommandToken(tok.WHILE, b'While ',        cmds.while_cmd)
+	yield CommandToken(tok.REPEAT, b'Repeat ',      cmds.repeat_cmd)
+	yield CommandToken(tok.FOR, b'For(',            cmds.for_cmd)
+	yield CommandToken(tok.END, b'End',             cmds.end_cmd)
 	yield CommandToken(0xD5, b'Return',             cmds.return_cmd)
-	yield CommandToken(tk.LBL, b'Lbl ',             cmds.lbl_cmd)
+	yield CommandToken(tok.LBL, b'Lbl ',            cmds.lbl_cmd)
 	yield CommandToken(0xD7, b'Goto ',              cmds.goto_cmd)
 	yield CommandToken(0xD8, b'Pause ',             cmds.pause_cmd)
 	yield CommandToken(0xD9, b'Stop',               cmds.stop_cmd)
@@ -630,7 +630,7 @@ def _generate():
 	yield Token(0xE8, b'Get(')
 	yield CommandToken(0xE9, b'PlotsOn',            _PLACEHOLDER)
 	yield CommandToken(0xEA, b'PlotsOff',           _PLACEHOLDER)
-	yield Token(tk.LIST_PREFIX, b'\xdc')
+	yield Token(tok.LIST_PREFIX, b'\xdc', Flag.ATOM_START)
 	yield Token(0xEC, b'Plot1(')
 	yield Token(0xED, b'Plot2(')
 	yield Token(0xEE, b'Plot3(')

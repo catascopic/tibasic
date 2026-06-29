@@ -201,9 +201,7 @@ class Environment:
 		random.seed(require_real(value))
 
 	# ── Graph display ────────────────────────────────────────────────────────────
-	# The graph is only (re)plotted when it's displayed — never eagerly.  display_graph
-	# is the explicit "show the graph" action (DispGraph); draw_to_graph is what a
-	# drawing command calls so the graph comes up with the functions under it.
+	# The graph is only (re)plotted when it's displayed — never eagerly.
 
 	def regraph(self):
 		"""Redraw the graph from scratch: clear it, then plot the current mode's
@@ -234,14 +232,6 @@ class Environment:
 
 	def display_graph(self):
 		"""DispGraph — make the graph the active screen and re-plot the functions if stale."""
-		self.screen = Screen.GRAPH
-		if not self.graph.valid:
-			self.regraph()
-
-	def draw_to_graph(self):
-		"""A drawing command is about to modify the graph: display it, re-plotting if stale
-		so the functions sit beneath the drawing.  No re-plot if the graph is already
-		current — that would erase earlier drawing."""
 		self.screen = Screen.GRAPH
 		if not self.graph.valid:
 			self.regraph()

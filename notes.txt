@@ -1,6 +1,3 @@
-Numerics access object cleanup
-
-accessors -> variables
 
 print screen
 

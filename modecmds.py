@@ -14,6 +14,8 @@ def _mode(attr, value):
 	@no_arg_command
 	def cmd(env: 'Environment'):
 		setattr(env, attr, value)
+	val_name = value.name if hasattr(value, 'name') else repr(value)
+	cmd.__name__ = cmd.__qualname__ = f'{attr}={val_name}'
 	return cmd
 
 

@@ -25,8 +25,6 @@ class UserList(Accessor):
 	entry since the name is determined at parse time, not compile time.
 	"""
 
-	flags = Flag.LIST | Flag.INVOKABLE
-
 	def __init__(self, name: str):
 		self.name = name
 

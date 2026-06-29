@@ -16,14 +16,14 @@ from graph import (
 )
 
 
-class _GraphDrawing(TiCall):
-	"""Wraps a drawing command so it brings up the graph *before* drawing — regraphing
-	the functions on the HOME→GRAPH transition so they sit beneath the new drawing
-	(regraph clears and re-plots, so it has to run first or it would erase the draw).
+class GraphDrawing(TiCall):
+	"""Wraps a drawing command: re-plots the functions beneath the new drawing if the
+	graph is stale, so the curve sits under the mark.  On success, makes the graph the
+	active screen and notifies the frontend once.  On exception, leaves screen and
+	frontend state unchanged.
 
-	If the command then raises (e.g. bad arguments), the screen transition is rolled
-	back, so a draw that fails doesn't leave the graph showing.  Queries (pxl-Test()
-	and ClrDraw — which clears without displaying — are not wrapped."""
+	Queries (pxl-Test() and ClrDraw) are not wrapped.
+	"""
 
 	def __init__(self, inner: TiCall):
 		super().__init__(inner.func)
@@ -31,19 +31,17 @@ class _GraphDrawing(TiCall):
 
 	def call_with_parser(self, args):
 		env = args.env
-		prev_screen = env.screen
-		env.draw_to_graph()
-		try:
-			result = self._inner.call_with_parser(args)
-		except Exception:
-			env.screen = prev_screen
-			raise
+		if not env.graph.valid:
+			env.regraph()
+		result = self._inner.call_with_parser(args)
+		env.screen = Screen.GRAPH
 		# One present() per drawing command (not per pixel): a pixel-art loop is many
 		# commands, so it animates step by step; a curve-plotting command is one, so
 		# it repaints once when done.  This is what lets a frontend show a drawing
 		# being built up in real time.
 		env.console.present()
 		return result
+
 
 # Pt-On/Off/Change mark pixel offsets (Δrow, Δcol) relative to centre.
 # mark 2/6 = 3×3 filled box (9 pixels)
@@ -61,16 +59,19 @@ def _validate(row, col):
 	return py_int(row), py_int(col)
 
 
+@GraphDrawing
 @preparse_cmd_func
 def pxl_on(env: Env, row: Real, col: Real) -> None:
 	env.graph.set(*_validate(row, col))
 
 
+@GraphDrawing
 @preparse_cmd_func
 def pxl_off(env: Env, row: Real, col: Real) -> None:
 	env.graph.set_off(*_validate(row, col))
 
 
+@GraphDrawing
 @preparse_cmd_func
 def pxl_change(env: Env, row: Real, col: Real) -> None:
 	env.graph.toggle(*_validate(row, col))
@@ -105,21 +106,25 @@ def _pt_action(env, x, y, mark, action) -> None:
 					action(env.graph, r, c)
 
 
+@GraphDrawing
 @preparse_cmd_func
 def pt_on(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
 	_pt_action(env, x, y, mark, GraphScreen.set)
 
 
+@GraphDrawing
 @preparse_cmd_func
 def pt_off(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
 	_pt_action(env, x, y, mark, GraphScreen.set_off)
 
 
+@GraphDrawing
 @preparse_cmd_func
 def pt_change(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
 	_pt_action(env, x, y, mark, GraphScreen.toggle)
 
 
+@GraphDrawing
 @preparse_cmd
 def vertical(env: Env, x: Real) -> None:
 	"""Vertical X — draw a full-height line at graph x-coordinate X."""
@@ -129,6 +134,7 @@ def vertical(env: Env, x: Real) -> None:
 			env.graph.set(row, col, True)
 
 
+@GraphDrawing
 @preparse_cmd
 def horizontal(env: Env, y: Real) -> None:
 	"""Horizontal Y — draw a full-width line at graph y-coordinate Y."""
@@ -138,6 +144,7 @@ def horizontal(env: Env, y: Real) -> None:
 			env.graph.set(row, col, True)
 
 
+@GraphDrawing
 @preparse_cmd_func
 def line(env: Env, x1: Real, y1: Real, x2: Real, y2: Real, erase: Real = 1) -> None:
 	"""Line(X1,Y1,X2,Y2[,erase]) — draw (or erase) a line between two graph points.
@@ -153,6 +160,7 @@ def line(env: Env, x1: Real, y1: Real, x2: Real, y2: Real, erase: Real = 1) -> N
 			env.graph.set(r, c, on)
 
 
+@GraphDrawing
 @preparse_cmd_func
 def circle(env: Env, x: Real, y: Real, r: Real, _fast: TiListComplex = None) -> None:
 	"""Circle(X,Y,r[,{i}]) — draw a circle (or ellipse) at graph (X,Y) with graph radius r.
@@ -201,18 +209,21 @@ def _shade_under(env, f, lo: float, hi: float) -> None:
 			env.graph.set(row, col)
 
 
+@GraphDrawing
 @preparse_cmd
 def draw_f(env: Env, formula: Thunk) -> None:
 	"""DrawF expr — graph an expression in X as Y=f(X) (Func mode, regardless of mode)."""
 	_trace_curve(env, _function_sampler(env, formula.eval))
 
 
+@GraphDrawing
 @preparse_cmd
 def draw_inv(env: Env, formula: Thunk) -> None:
 	"""DrawInv expr — graph the inverse of expr: X becomes vertical, Y horizontal."""
 	_trace_curve(env, _function_sampler(env, formula.eval), inv=True)
 
 
+@GraphDrawing
 @preparse_cmd_func
 def shade_norm(env: Env, lower: Real, upper: Real, mu: Real = 0, sigma: Real = 1) -> None:
 	"""ShadeNorm(lower,upper[,μ,σ]) — draw the normal curve, shade the interval's area."""
@@ -221,6 +232,7 @@ def shade_norm(env: Env, lower: Real, upper: Real, mu: Real = 0, sigma: Real = 1
 	_shade_under(env, f, lower, upper)
 
 
+@GraphDrawing
 @preparse_cmd_func
 def shade_t(env: Env, lower: Real, upper: Real, df: Real) -> None:
 	"""Shade_t(lower,upper,df) — draw the Student-t curve, shade the interval's area."""
@@ -229,6 +241,7 @@ def shade_t(env: Env, lower: Real, upper: Real, df: Real) -> None:
 	_shade_under(env, f, lower, upper)
 
 
+@GraphDrawing
 @preparse_cmd_func
 def shade_chi_sq(env: Env, lower: Real, upper: Real, df: Real) -> None:
 	"""Shadeχ²(lower,upper,df) — draw the chi-square curve, shade the interval's area."""
@@ -237,6 +250,7 @@ def shade_chi_sq(env: Env, lower: Real, upper: Real, df: Real) -> None:
 	_shade_under(env, f, lower, upper)
 
 
+@GraphDrawing
 @preparse_cmd_func
 def shade_f(env: Env, lower: Real, upper: Real, df1: Real, df2: Real) -> None:
 	"""Shade𝐅(lower,upper,df1,df2) — draw the F curve, shade the interval's area."""
@@ -267,6 +281,7 @@ def _shade_pixel(pattern: int, patres: int, row: int, col: int) -> bool:
 		return col % step == 0
 
 
+@GraphDrawing
 @preparse_cmd_func
 def shade(env: Env, lower: Thunk, upper: Thunk,
           xleft: Real = None, xright: Real = None,
@@ -325,6 +340,7 @@ def _numeric_derivative(f, x: float, h: float = 1e-3):
 	return (fp - fm) / (2 * h)
 
 
+@GraphDrawing
 @preparse_cmd_func
 def tangent(env: Env, formula: Thunk, value: Real) -> None:
 	"""Tangent(expr,value) — graph expr and draw the line tangent to it at X=value.
@@ -404,6 +420,7 @@ def _blit_char(graph, row: int, col: int, glyph: bytes, height: int) -> int:
 	return col + width
 
 
+@GraphDrawing
 @special_func
 def text(args):
 	"""Text(row,col,val[,val...]) — draw values on the graph screen in small font.
@@ -448,17 +465,3 @@ def text(args):
 			if cur_col + len(glyph) > MAX_COL + 1:
 				break
 			cur_col = _blit_char(graph, row, cur_col, glyph, height)
-
-
-# Wrap every command that marks the graph so that running it displays the graph
-# (regraphing on the transition).  pxl-Test( is a query and ClrDraw clears without
-# displaying, so neither appears here.
-for _name in (
-	'pxl_on', 'pxl_off', 'pxl_change',
-	'pt_on', 'pt_off', 'pt_change',
-	'vertical', 'horizontal', 'line', 'circle',
-	'draw_f', 'draw_inv', 'tangent',
-	'shade', 'shade_norm', 'shade_t', 'shade_chi_sq', 'shade_f',
-	'text',
-):
-	globals()[_name] = _GraphDrawing(globals()[_name])
