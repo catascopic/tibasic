@@ -7,8 +7,7 @@ built once in the catalog), so a variable token serves directly as an expression
 or a storage target.
 
 This module sits below `catalog` and `parser`: it imports `core`/`graph`/`modes`/
-`titoken` but never the parser, so the parser can construct the one accessor that has no
-catalog entry — `UserListToken` for a bare `∟NAME` — without an import cycle.
+`titoken` but never the parser.
 
 `Accessor`, `Deletable`, and `Reference` themselves live in `titoken` (the leaf); this
 module only provides the concrete subclasses.
@@ -20,7 +19,7 @@ from core import require_num, require_matrix, require_list, require_string, requ
 from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, DataTypeError
 from graph import eval_sequence
 from modes import GraphMode
-from titoken import Token, Accessor, Deletable, Reference, Flag, LIST_PREFIX
+from titoken import Accessor, Deletable, VariableToken, Reference, Flag, LIST_PREFIX
 
 
 def _window_affects_graph(env, attr: str) -> bool:
@@ -50,7 +49,7 @@ def scoped_numeric(env, name: str, value):
 
 # ── Data variables ──────────────────────────────────────────────────────────────
 
-class LetterToken(Deletable, Accessor):
+class LetterToken(Deletable, VariableToken):
 	"""A real/complex variable A–Z, θ — an index into env.numerics (0–25, θ = 26).
 
 	An undefined numeric reads as 0 (and is initialized to 0 on first resolve), matching
@@ -79,7 +78,7 @@ class LetterToken(Deletable, Accessor):
 		self._set(env, require_num(value))
 
 
-class MatrixToken(Deletable, Accessor):
+class MatrixToken(Deletable, VariableToken):
 	"""A matrix variable [A]–[J] — an index into env.matrices (0–9)."""
 
 	def __init__(self, index: int):
@@ -102,7 +101,7 @@ class MatrixToken(Deletable, Accessor):
 		return self.resolve(arg_parser.env)[(row, col)]
 
 
-class ListToken(Deletable, Accessor):
+class ListToken(Deletable, VariableToken):
 	"""A built-in list L1–L6 — a 0-based slot in env.lists (TiList | None)."""
 
 	def __init__(self, index: int):
@@ -130,7 +129,7 @@ class ListToken(Deletable, Accessor):
 		return self.resolve(arg_parser.env)[index]
 
 
-class StringToken(Deletable, Accessor):
+class StringToken(Deletable, VariableToken):
 	"""A string variable Str1–Str0 — a 0-based slot in env.strings (TiString | None).
 
 	Input/Prompt recognize a string target through its token's `is_string_var()` and
@@ -151,48 +150,9 @@ class StringToken(Deletable, Accessor):
 		self._set(env, require_string(value))
 
 
-class UserListToken(Accessor):
-	"""A user-defined list ᴸNAME — a dict slot in env.user_lists, keyed by name.
-
-	Unlike every other accessor this has no catalog entry: ᴸNAME is the ᴸ prefix plus
-	name characters, so the parser builds this synthetically at parse time.  Its `code`
-	is the ᴸ prefix (it's never stored in the catalog table).
-	"""
-
-	def __init__(self, name: str):
-		super().__init__(LIST_PREFIX, bytes([LIST_PREFIX]), Flag.LIST | Flag.INVOKABLE)
-		self.name = name
-
-	def _get(self, env):
-		return env.user_lists.get(self.name)
-
-	def _set(self, env, value):
-		env.user_lists[self.name] = value
-
-	def resolve(self, env):
-		value = super().resolve(env)      # errors if undefined
-		if not value.data:
-			raise InvalidDimError("empty list")
-		return value
-
-	def store(self, env, value):
-		self._set(env, require_list(value).copy())
-
-	def invoke(self, arg_parser):
-		index = py_int(arg_parser.expr(), InvalidDimError)
-		arg_parser.end_func()
-		return self.resolve(arg_parser.env)[index]
-
-	def delete(self, env):
-		env.user_lists.pop(self.name, None)
-
-	def __repr__(self):
-		return f"UserListToken({self.name!r})"
-
-
 # ── Graph equations ─────────────────────────────────────────────────────────────
 
-class EquationToken(Deletable, Accessor):
+class EquationToken(Deletable, VariableToken):
 	"""A graph equation (Y1–Y0, X1T/Y1T–X6T/Y6T, r1–r6).
 
 	An equation is not one of TI's runtime value types, so reading it as a value
@@ -287,7 +247,7 @@ class SequenceToken(EquationToken):
 		return eval_sequence(arg_parser.env, self.index, n)
 
 
-class SequenceInitialToken(Deletable, Accessor):
+class SequenceInitialToken(Deletable, VariableToken):
 	"""The u(nMin)/v(nMin)/w(nMin) token — stores/reads the initial-value list."""
 
 	def __init__(self, code: int, display: bytes, index: int):
@@ -313,7 +273,7 @@ class SequenceInitialToken(Deletable, Accessor):
 
 # ── Settings / env-backed reals ─────────────────────────────────────────────────
 
-class RealToken(Accessor):
+class RealToken(VariableToken):
 	"""A plain real variable stored directly on env (TVM variables, stat n, …).  Takes an
 	explicit `flags` so stat 𝑛 can be classified NUMERIC while TVM vars stay unflagged."""
 
@@ -331,7 +291,7 @@ class RealToken(Accessor):
 		self._set(env, require_real(value))
 
 
-class WindowToken(Accessor):
+class WindowToken(VariableToken):
 	"""A plain real-valued window variable (Xmin, ZXmin, Tmax, …) — a named float attr on
 	env.window.  Storing a value that affects the current graph invalidates it."""
 
@@ -381,7 +341,7 @@ class FactorWindowToken(WindowToken):
 		self._set(env, v)
 
 
-class DeltaWindowToken(Accessor):
+class DeltaWindowToken(VariableToken):
 	"""ΔX / ΔY — computed from the window bounds; not stored directly.
 
 	resolve: (hi − lo) / divisions.  store(δ): adjusts the hi bound, leaving lo fixed.
@@ -407,7 +367,7 @@ class DeltaWindowToken(Accessor):
 		setattr(env.window, self.hi_attr, new_hi)
 
 
-class TableToken(Accessor):
+class TableToken(VariableToken):
 	"""A plain real variable stored on env.table (TblStart, ΔTbl)."""
 
 	def __init__(self, code: int, display: bytes, attr: str):
@@ -426,7 +386,7 @@ class TableToken(Accessor):
 
 # ── Constants and computed reads ────────────────────────────────────────────────
 
-class ConstantToken(Accessor):
+class ConstantToken(VariableToken):
 	"""A constant π / 𝑒 / 𝑖 — read-only; storing is an error (inherited)."""
 
 	def __init__(self, code: int, display: bytes, value, char: str | None = None):
@@ -437,7 +397,7 @@ class ConstantToken(Accessor):
 		return self.value
 
 
-class ComputedToken(Accessor):
+class ComputedToken(VariableToken):
 	"""A read-only 0-arg computed query (getKey, getDate, …): `resolve(env)` calls func."""
 
 	def __init__(self, code: int, display: bytes, func):

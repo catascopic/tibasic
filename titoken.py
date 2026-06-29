@@ -1,3 +1,4 @@
+from abc import ABC
 from collections.abc import Callable
 from contextlib import contextmanager
 from enum import IntFlag, auto
@@ -281,12 +282,17 @@ class Reference:
 		return f"Reference({self.accessor!r})"
 
 
-class Accessor(Token):
-	"""A token that reads/writes the environment — a variable, but also π / rand / getKey /
-	a window setting.  The token *is* the accessor: resolve/store/invoke take the env as a
-	parameter (tokens are env-less singletons), so a variable token can serve directly as
-	an expression atom or a storage target.  `_get`/`_set` are the raw slot accessors;
-	`resolve`/`store` add auto-init and type checks.  Subclasses live in catalog.py."""
+class Accessor(ABC):
+	"""Protocol for environment-bound read/write targets — variables, constants, window
+	settings, user lists.  resolve/store/invoke take env as a parameter (accessors are
+	stateless singletons or lightweight named objects).  `_get`/`_set` are the raw slot
+	accessors; `resolve`/`store` add auto-init and type checks.
+
+	Concrete subclasses are either VariableToken (a catalog token that is also its own
+	accessor) or a plain Accessor (e.g. UserList) built synthetically by the parser.
+	"""
+
+	flags: Flag = Flag(0)
 
 	@property
 	def invokable(self) -> bool:
@@ -325,11 +331,31 @@ class Accessor(Token):
 
 class Deletable:
 	"""Mixin for accessors whose DelVar clears the slot to its undefined state — None.
-	List it before Accessor in the bases so this delete overrides the base's raising one
-	(e.g. `class StringToken(Deletable, Accessor)`)."""
+	List it before VariableToken in the bases so this delete overrides the base's raising
+	one (e.g. `class StringToken(Deletable, VariableToken)`)."""
 
 	def delete(self, env):
 		self._set(env, None)
+
+
+class VariableToken(Token, Accessor):
+	"""A catalog token that is also its own accessor — a variable like A, L1, [A], Y1.
+
+	Inherits Token for code/display/flags/parse hooks and Accessor for resolve/store/
+	invoke.  The flags instance attribute set by Token.__init__ shadows the class-level
+	Flag(0) default on Accessor, so invokable and the is_*_var() predicates work
+	correctly without any extra wiring.
+
+	parse_prefix and can_start_atom are overridden here because the MRO puts Token before
+	Accessor, and Token's implementations assume flag-based classification; variable
+	tokens are always expression atoms and always route through _read_accessor.
+	"""
+
+	def parse_prefix(self, parser):
+		return parser._read_accessor(self)
+
+	def can_start_atom(self) -> bool:
+		return True
 
 
 class _EofToken(Token):

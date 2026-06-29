@@ -18,7 +18,7 @@ import random
 from functools import wraps
 from numbers import Number
 
-from titoken import Accessor, Flag
+from titoken import VariableToken, Flag
 from core import TiList, TiMatrix, require_list
 from core import require_real, require_int, require_num, py_int
 from preparse import preparse_func, Real, Vectorized, VectorizedReal, MatrixVectorized, AnyValue, Thunk, NumericVar, Env
@@ -551,7 +551,7 @@ def rand_list(n: Real):
 	return TiList([random.random() for _ in range(py_int(n))])
 
 
-class RandToken(Accessor):
+class RandToken(VariableToken):
 	"""rand — bare resolves to a random real; rand(n) returns a list; storing seeds."""
 
 	def __init__(self, code, display):

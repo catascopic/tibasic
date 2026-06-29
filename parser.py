@@ -14,8 +14,47 @@ from titoken import (
 )
 from environment import Environment
 from core import Thunk, py_int, require_num, require_real
-from accessors import UserListToken, EquationToken, SequenceToken
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError
+from core import require_list
+
+
+class UserList(Accessor):
+	"""A user-defined list ᴸNAME — a dict slot in env.user_lists, keyed by name.
+
+	Built synthetically by the parser when it sees the ᴸ prefix; has no catalog
+	entry since the name is determined at parse time, not compile time.
+	"""
+
+	flags = Flag.LIST | Flag.INVOKABLE
+
+	def __init__(self, name: str):
+		self.name = name
+
+	def _get(self, env):
+		return env.user_lists.get(self.name)
+
+	def _set(self, env, value):
+		env.user_lists[self.name] = value
+
+	def resolve(self, env):
+		value = super().resolve(env)
+		if not value.data:
+			raise InvalidDimError("empty list")
+		return value
+
+	def store(self, env, value):
+		self._set(env, require_list(value).copy())
+
+	def invoke(self, arg_parser):
+		index = py_int(arg_parser.expr(), InvalidDimError)
+		arg_parser.end_func()
+		return self.resolve(arg_parser.env)[index]
+
+	def delete(self, env):
+		env.user_lists.pop(self.name, None)
+
+	def __repr__(self):
+		return f"UserList({self.name!r})"
 
 
 def _describe_code(code: int) -> str:
@@ -308,7 +347,7 @@ class Parser:
 		# A user list's accessor is name-dependent, so it's built from the following
 		# name; every other variable carries its accessor on the token.
 		if t.code == LIST_PREFIX:
-			return self._read_accessor(UserListToken(self.read_name(5)))
+			return self._read_accessor(UserList(self.read_name(5)))
 
 		# FunctionToken invokes a call; a plain variable token reads its accessor;
 		# anything else raises — all via the token's own parse_prefix (see titoken).
@@ -463,7 +502,7 @@ class Parser:
 		# exactly what Prompt should echo (∟PRIMES and PRIMES both display "PRIMES=?").
 		start = self.pos
 		name = self.read_name(5)
-		return UserListToken(name).reference(self.env, TiString(self.tokens[start:self.pos]))
+		return UserList(name).reference(self.env, TiString(self.tokens[start:self.pos]))
 
 	# SKIPPING
 
@@ -655,7 +694,7 @@ class ArgParser:
 	@_parse_arg
 	def equation_var(self) -> "Reference":
 		t = self._parser.advance()
-		if isinstance(t, (EquationToken, SequenceToken)):
+		if t.is_equation_var():
 			return t.reference(self.env)
 		raise DataTypeError(f"Expected an equation variable, got {t}")
 
