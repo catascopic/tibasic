@@ -236,6 +236,17 @@ class Environment:
 		if not self.graph.valid:
 			self.regraph()
 
+	@contextmanager
+	def draw_to_graph(self):
+		"""Context manager for drawing commands: regraph if stale, then on normal exit
+		switch to the graph screen and notify the frontend.  On exception, screen and
+		frontend state are left unchanged."""
+		if not self.graph.valid:
+			self.regraph()
+		yield
+		self.screen = Screen.GRAPH
+		self.console.present()
+
 	def zoom_store(self):
 		"""ZoomSto — copy the live window variables into the Z-window variables."""
 		w = self.window

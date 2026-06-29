@@ -1,7 +1,7 @@
 import math
 
 import distributions as dist
-from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command, TiCall
+from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command
 from errors import DataTypeError, DomainError
 from modes import Screen
 from graphscreen import GraphScreen
@@ -14,33 +14,6 @@ from graph import (
 	sample_function as _function_sampler,
 	trace_curve as _trace_curve,
 )
-
-
-class GraphDrawing(TiCall):
-	"""Wraps a drawing command: re-plots the functions beneath the new drawing if the
-	graph is stale, so the curve sits under the mark.  On success, makes the graph the
-	active screen and notifies the frontend once.  On exception, leaves screen and
-	frontend state unchanged.
-
-	Queries (pxl-Test() and ClrDraw) are not wrapped.
-	"""
-
-	def __init__(self, inner: TiCall):
-		super().__init__(inner.func)
-		self._inner = inner
-
-	def call_with_parser(self, args):
-		env = args.env
-		if not env.graph.valid:
-			env.regraph()
-		result = self._inner.call_with_parser(args)
-		env.screen = Screen.GRAPH
-		# One present() per drawing command (not per pixel): a pixel-art loop is many
-		# commands, so it animates step by step; a curve-plotting command is one, so
-		# it repaints once when done.  This is what lets a frontend show a drawing
-		# being built up in real time.
-		env.console.present()
-		return result
 
 
 # Pt-On/Off/Change mark pixel offsets (Δrow, Δcol) relative to centre.
@@ -59,22 +32,22 @@ def _validate(row, col):
 	return py_int(row), py_int(col)
 
 
-@GraphDrawing
 @preparse_cmd_func
 def pxl_on(env: Env, row: Real, col: Real) -> None:
-	env.graph.set(*_validate(row, col))
+	with env.draw_to_graph():
+		env.graph.set(*_validate(row, col))
 
 
-@GraphDrawing
 @preparse_cmd_func
 def pxl_off(env: Env, row: Real, col: Real) -> None:
-	env.graph.set_off(*_validate(row, col))
+	with env.draw_to_graph():
+		env.graph.set_off(*_validate(row, col))
 
 
-@GraphDrawing
 @preparse_cmd_func
 def pxl_change(env: Env, row: Real, col: Real) -> None:
-	env.graph.toggle(*_validate(row, col))
+	with env.draw_to_graph():
+		env.graph.toggle(*_validate(row, col))
 
 
 @preparse_cmd_func
@@ -106,45 +79,44 @@ def _pt_action(env, x, y, mark, action) -> None:
 					action(env.graph, r, c)
 
 
-@GraphDrawing
 @preparse_cmd_func
 def pt_on(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
-	_pt_action(env, x, y, mark, GraphScreen.set)
+	with env.draw_to_graph():
+		_pt_action(env, x, y, mark, GraphScreen.set)
 
 
-@GraphDrawing
 @preparse_cmd_func
 def pt_off(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
-	_pt_action(env, x, y, mark, GraphScreen.set_off)
+	with env.draw_to_graph():
+		_pt_action(env, x, y, mark, GraphScreen.set_off)
 
 
-@GraphDrawing
 @preparse_cmd_func
 def pt_change(env: Env, x: Real, y: Real, mark: Real = 1.0) -> None:
-	_pt_action(env, x, y, mark, GraphScreen.toggle)
+	with env.draw_to_graph():
+		_pt_action(env, x, y, mark, GraphScreen.toggle)
 
 
-@GraphDrawing
 @preparse_cmd
 def vertical(env: Env, x: Real) -> None:
 	"""Vertical X — draw a full-height line at graph x-coordinate X."""
-	col = _x_to_col(env, x)
-	if 0 <= col <= MAX_COL:
-		for row in range(MAX_ROW + 1):
-			env.graph.set(row, col, True)
+	with env.draw_to_graph():
+		col = _x_to_col(env, x)
+		if 0 <= col <= MAX_COL:
+			for row in range(MAX_ROW + 1):
+				env.graph.set(row, col, True)
 
 
-@GraphDrawing
 @preparse_cmd
 def horizontal(env: Env, y: Real) -> None:
 	"""Horizontal Y — draw a full-width line at graph y-coordinate Y."""
-	row = _y_to_row(env, y)
-	if 0 <= row <= MAX_ROW:
-		for col in range(MAX_COL + 1):
-			env.graph.set(row, col, True)
+	with env.draw_to_graph():
+		row = _y_to_row(env, y)
+		if 0 <= row <= MAX_ROW:
+			for col in range(MAX_COL + 1):
+				env.graph.set(row, col, True)
 
 
-@GraphDrawing
 @preparse_cmd_func
 def line(env: Env, x1: Real, y1: Real, x2: Real, y2: Real, erase: Real = 1) -> None:
 	"""Line(X1,Y1,X2,Y2[,erase]) — draw (or erase) a line between two graph points.
@@ -152,15 +124,15 @@ def line(env: Env, x1: Real, y1: Real, x2: Real, y2: Real, erase: Real = 1) -> N
 	erase=0 turns pixels off; any other value (default 1) turns them on.
 	Off-screen pixels are clipped silently.
 	"""
-	on = (erase != 0)
-	r0, c0 = _graph_to_pixel(env, x1, y1)
-	r1, c1 = _graph_to_pixel(env, x2, y2)
-	for r, c in _bresenham(r0, c0, r1, c1):
-		if _in_bounds(r, c):
-			env.graph.set(r, c, on)
+	with env.draw_to_graph():
+		on = (erase != 0)
+		r0, c0 = _graph_to_pixel(env, x1, y1)
+		r1, c1 = _graph_to_pixel(env, x2, y2)
+		for r, c in _bresenham(r0, c0, r1, c1):
+			if _in_bounds(r, c):
+				env.graph.set(r, c, on)
 
 
-@GraphDrawing
 @preparse_cmd_func
 def circle(env: Env, x: Real, y: Real, r: Real, _fast: TiListComplex = None) -> None:
 	"""Circle(X,Y,r[,{i}]) — draw a circle (or ellipse) at graph (X,Y) with graph radius r.
@@ -171,22 +143,23 @@ def circle(env: Env, x: Real, y: Real, r: Real, _fast: TiListComplex = None) -> 
 	the parametric approach, which handles non-square windows correctly.
 	Negative radius is treated as its absolute value.  Off-screen pixels are clipped.
 	"""
-	w = env.window
-	xmin = w.xmin
-	xmax = w.xmax
-	ymin = w.ymin
-	ymax = w.ymax
-	cy, cx = _graph_to_pixel(env, x, y)
-	rx = abs(r) * MAX_COL / (xmax - xmin)
-	ry = abs(r) * MAX_ROW / (ymax - ymin)
-	# Step finely enough that no pixel is skipped (~4 steps per pixel of circumference).
-	n = max(8, math.ceil(4 * math.pi * max(rx, ry)) + 1)
-	for i in range(n):
-		theta = 2 * math.pi * i / n
-		col = cx + _round_half_up(rx * math.cos(theta))
-		row = cy - _round_half_up(ry * math.sin(theta))
-		if _in_bounds(row, col):
-			env.graph.set(row, col)
+	with env.draw_to_graph():
+		w = env.window
+		xmin = w.xmin
+		xmax = w.xmax
+		ymin = w.ymin
+		ymax = w.ymax
+		cy, cx = _graph_to_pixel(env, x, y)
+		rx = abs(r) * MAX_COL / (xmax - xmin)
+		ry = abs(r) * MAX_ROW / (ymax - ymin)
+		# Step finely enough that no pixel is skipped (~4 steps per pixel of circumference).
+		n = max(8, math.ceil(4 * math.pi * max(rx, ry)) + 1)
+		for i in range(n):
+			theta = 2 * math.pi * i / n
+			col = cx + _round_half_up(rx * math.cos(theta))
+			row = cy - _round_half_up(ry * math.sin(theta))
+			if _in_bounds(row, col):
+				env.graph.set(row, col)
 
 
 # ── Function graphing (DrawF / DrawInv) and distribution shading ────────────────
@@ -209,54 +182,54 @@ def _shade_under(env, f, lo: float, hi: float) -> None:
 			env.graph.set(row, col)
 
 
-@GraphDrawing
 @preparse_cmd
 def draw_f(env: Env, formula: Thunk) -> None:
 	"""DrawF expr — graph an expression in X as Y=f(X) (Func mode, regardless of mode)."""
-	_trace_curve(env, _function_sampler(env, formula.eval))
+	with env.draw_to_graph():
+		_trace_curve(env, _function_sampler(env, formula.eval))
 
 
-@GraphDrawing
 @preparse_cmd
 def draw_inv(env: Env, formula: Thunk) -> None:
 	"""DrawInv expr — graph the inverse of expr: X becomes vertical, Y horizontal."""
-	_trace_curve(env, _function_sampler(env, formula.eval), inv=True)
+	with env.draw_to_graph():
+		_trace_curve(env, _function_sampler(env, formula.eval), inv=True)
 
 
-@GraphDrawing
 @preparse_cmd_func
 def shade_norm(env: Env, lower: Real, upper: Real, mu: Real = 0, sigma: Real = 1) -> None:
 	"""ShadeNorm(lower,upper[,μ,σ]) — draw the normal curve, shade the interval's area."""
-	f = lambda x: dist.normalpdf(x, mu, sigma)
-	_trace_curve(env, f)
-	_shade_under(env, f, lower, upper)
+	with env.draw_to_graph():
+		f = lambda x: dist.normalpdf(x, mu, sigma)
+		_trace_curve(env, f)
+		_shade_under(env, f, lower, upper)
 
 
-@GraphDrawing
 @preparse_cmd_func
 def shade_t(env: Env, lower: Real, upper: Real, df: Real) -> None:
 	"""Shade_t(lower,upper,df) — draw the Student-t curve, shade the interval's area."""
-	f = lambda x: dist.tpdf(x, df)
-	_trace_curve(env, f)
-	_shade_under(env, f, lower, upper)
+	with env.draw_to_graph():
+		f = lambda x: dist.tpdf(x, df)
+		_trace_curve(env, f)
+		_shade_under(env, f, lower, upper)
 
 
-@GraphDrawing
 @preparse_cmd_func
 def shade_chi_sq(env: Env, lower: Real, upper: Real, df: Real) -> None:
 	"""Shadeχ²(lower,upper,df) — draw the chi-square curve, shade the interval's area."""
-	f = lambda x: dist.chi_sq_pdf(x, df)
-	_trace_curve(env, f)
-	_shade_under(env, f, lower, upper)
+	with env.draw_to_graph():
+		f = lambda x: dist.chi_sq_pdf(x, df)
+		_trace_curve(env, f)
+		_shade_under(env, f, lower, upper)
 
 
-@GraphDrawing
 @preparse_cmd_func
 def shade_f(env: Env, lower: Real, upper: Real, df1: Real, df2: Real) -> None:
 	"""Shade𝐅(lower,upper,df1,df2) — draw the F curve, shade the interval's area."""
-	f = lambda x: dist.f_pdf(x, df1, df2)
-	_trace_curve(env, f)
-	_shade_under(env, f, lower, upper)
+	with env.draw_to_graph():
+		f = lambda x: dist.f_pdf(x, df1, df2)
+		_trace_curve(env, f)
+		_shade_under(env, f, lower, upper)
 
 
 def _shade_pixel(pattern: int, patres: int, row: int, col: int) -> bool:
@@ -281,7 +254,6 @@ def _shade_pixel(pattern: int, patres: int, row: int, col: int) -> bool:
 		return col % step == 0
 
 
-@GraphDrawing
 @preparse_cmd_func
 def shade(env: Env, lower: Thunk, upper: Thunk,
           xleft: Real = None, xright: Real = None,
@@ -308,23 +280,22 @@ def shade(env: Env, lower: Thunk, upper: Thunk,
 	res = py_int(patres)
 	if res < 0:
 		raise DomainError(f"Shade(: patres must be ≥ 0, got {res}")
-	# Draw both boundary curves.
-	_trace_curve(env, flo)
-	_trace_curve(env, fhi)
-	# Fill the region between them.
-	for col in range(0, MAX_COL + 1):
-		x = _col_to_x(env, col)
-		if x < lo or x > hi:
-			continue
-		ylo = flo(x)
-		yhi = fhi(x)
-		if ylo is None or yhi is None or ylo > yhi:
-			continue
-		top = _y_to_row(env, yhi)   # upper function → smaller row number
-		bot = _y_to_row(env, ylo)   # lower function → larger row number
-		for row in range(max(top, 0), min(bot, MAX_ROW) + 1):
-			if _shade_pixel(pat, res, row, col):
-				env.graph.set(row, col, True)
+	with env.draw_to_graph():
+		_trace_curve(env, flo)
+		_trace_curve(env, fhi)
+		for col in range(0, MAX_COL + 1):
+			x = _col_to_x(env, col)
+			if x < lo or x > hi:
+				continue
+			ylo = flo(x)
+			yhi = fhi(x)
+			if ylo is None or yhi is None or ylo > yhi:
+				continue
+			top = _y_to_row(env, yhi)   # upper function → smaller row number
+			bot = _y_to_row(env, ylo)   # lower function → larger row number
+			for row in range(max(top, 0), min(bot, MAX_ROW) + 1):
+				if _shade_pixel(pat, res, row, col):
+					env.graph.set(row, col, True)
 
 
 def _numeric_derivative(f, x: float, h: float = 1e-3):
@@ -340,7 +311,6 @@ def _numeric_derivative(f, x: float, h: float = 1e-3):
 	return (fp - fm) / (2 * h)
 
 
-@GraphDrawing
 @preparse_cmd_func
 def tangent(env: Env, formula: Thunk, value: Real) -> None:
 	"""Tangent(expr,value) — graph expr and draw the line tangent to it at X=value.
@@ -348,18 +318,19 @@ def tangent(env: Env, formula: Thunk, value: Real) -> None:
 	The slope is found numerically (central difference, matching nDeriv), and the
 	tangent line is drawn across the full window from Xmin to Xmax.
 	"""
-	f = _function_sampler(env, formula.eval)
-	_trace_curve(env, f)
-	m = _numeric_derivative(f, value)
-	y0 = f(value)                 # evaluated last so X/Y exit holding the tangent point
-	if m is None or y0 is None:
-		return
-	w = env.window
-	xmin, xmax = w.xmin, w.xmax
-	tan = lambda x: y0 + m * (x - value)
-	r0, c0 = _graph_to_pixel(env, xmin, tan(xmin))
-	r1, c1 = _graph_to_pixel(env, xmax, tan(xmax))
-	_plot_segment(env, r0, c0, r1, c1, True)
+	with env.draw_to_graph():
+		f = _function_sampler(env, formula.eval)
+		_trace_curve(env, f)
+		m = _numeric_derivative(f, value)
+		y0 = f(value)                 # evaluated last so X/Y exit holding the tangent point
+		if m is None or y0 is None:
+			return
+		w = env.window
+		xmin, xmax = w.xmin, w.xmax
+		tan = lambda x: y0 + m * (x - value)
+		r0, c0 = _graph_to_pixel(env, xmin, tan(xmin))
+		r1, c1 = _graph_to_pixel(env, xmax, tan(xmax))
+		_plot_segment(env, r0, c0, r1, c1, True)
 
 
 # ── Text( ────────────────────────────────────────────────────────────────────
@@ -420,7 +391,6 @@ def _blit_char(graph, row: int, col: int, glyph: bytes, height: int) -> int:
 	return col + width
 
 
-@GraphDrawing
 @special_func
 def text(args):
 	"""Text(row,col,val[,val...]) — draw values on the graph screen in small font.
@@ -450,18 +420,19 @@ def text(args):
 			chars.append(ch)
 	args.end_paren_cmd()
 
-	graph = args.env.graph
-	cur_col = col
-	for ch in chars:
-		if large_mode:
-			# Gap is optional overhang — only the glyph pixels must fit.
-			if cur_col + GLYPH_WIDTH > MAX_COL + 1:
-				break
-			cur_col = graph.blit_large(row, cur_col, ch)
-		else:
-			glyph = SMALL_FONT[ch]
-			if glyph is None:
-				continue
-			if cur_col + len(glyph) > MAX_COL + 1:
-				break
-			cur_col = _blit_char(graph, row, cur_col, glyph, height)
+	with args.env.draw_to_graph():
+		graph = args.env.graph
+		cur_col = col
+		for ch in chars:
+			if large_mode:
+				# Gap is optional overhang — only the glyph pixels must fit.
+				if cur_col + GLYPH_WIDTH > MAX_COL + 1:
+					break
+				cur_col = graph.blit_large(row, cur_col, ch)
+			else:
+				glyph = SMALL_FONT[ch]
+				if glyph is None:
+					continue
+				if cur_col + len(glyph) > MAX_COL + 1:
+					break
+				cur_col = _blit_char(graph, row, cur_col, glyph, height)
