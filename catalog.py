@@ -45,6 +45,9 @@ class FunctionToken(Token):
 	def parse_prefix(self, parser):
 		return self._func.call_with_parser(ArgParser(parser))
 
+	def __repr__(self):
+		return f"{super().__repr__()} <{self._func.__module__}.{self._func.__qualname__}>"
+
 
 class CommandToken(Token):
 	def __init__(self, code, display, cmd):
@@ -53,6 +56,9 @@ class CommandToken(Token):
 
 	def run_statement(self, parser):
 		self._cmd.call_with_parser(ArgParser(parser))
+
+	def __repr__(self):
+		return f"{super().__repr__()} <{self._cmd.__module__}.{self._cmd.__qualname__}>"
 
 
 class OperatorToken(Token):
@@ -68,6 +74,9 @@ class OperatorToken(Token):
 		rhs = parser.parse_expr(self._bp[1])
 		return parser.env.guard_real((lhs, rhs), self._op(lhs, rhs))
 
+	def __repr__(self):
+		return f"{super().__repr__()} <{self._op.__module__}.{self._op.__qualname__}>"
+
 
 class PostfixToken(Token):
 	def __init__(self, code, display, op, *, char=None):
@@ -76,6 +85,9 @@ class PostfixToken(Token):
 
 	def apply_postfix(self, value):
 		return self._op(value)
+
+	def __repr__(self):
+		return f"{super().__repr__()} <{self._op.__module__}.{self._op.__qualname__}>"
 
 
 class AnsToken(Token):
@@ -119,9 +131,9 @@ def _generate():
 	yield Token(tk.RAD, b'\x15')
 	yield Token(tk.DEG, b'\x14',                    char='°')
 	yield PostfixToken(0x0C, b'\x11',               ops.inv)
-	yield PostfixToken(0x0D, b'\x12',               lambda x: x**2)
+	yield PostfixToken(0x0D, b'\x12',               ops.squared)
 	yield PostfixToken(0x0E, b'\x16',               ops.transpose)
-	yield PostfixToken(0x0F, b'\xd5',               lambda x: x**3)
+	yield PostfixToken(0x0F, b'\xd5',               ops.cubed)
 	yield Token(tk.L_PAREN, b'(',                   char='(')
 	yield Token(tk.R_PAREN, b')',                   char=')')
 	yield FunctionToken(0x12, b'round(',            timath.round)
@@ -632,7 +644,7 @@ def _generate():
 	yield Token(0xBBD7, b'\\', char='\\')
 	yield Token(0xBBD8, b'|', char='|')
 	yield Token(0xBBD9, b'_', char='_')
-	yield PostfixToken(0xBBDA, b'%', lambda x: x / 100, char='%')
+	yield PostfixToken(0xBBDA, b'%', ops.percent, char='%')
 	yield Token(0xBBDB, b'\xce')  # …
 	yield Token(0xBBDC, b'\x13')  # ∠
 	yield Token(0xBBDD, b'\xf4')  # ß
@@ -831,4 +843,5 @@ def read_token(f: BytesIO) -> Token:
 
 
 if __name__ == '__main__':
-	print(len(ALL_TOKENS))
+	for token in ALL_TOKENS:
+		print(token)

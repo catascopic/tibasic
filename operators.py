@@ -147,6 +147,15 @@ def inv(x):
 def transpose(mat):
 	return require_matrix(mat).transpose()
 
+def squared(x):
+	return x ** 2
+
+def cubed(x):
+	return x ** 3
+
+def percent(x):
+	return x / 100
+
 @vectorize
 def factorial(n):
 	"""! — factorial (via gamma function for non-negative reals)."""
