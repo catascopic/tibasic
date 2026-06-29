@@ -12,7 +12,7 @@ up()/down()/choose() and repaints styled_rows() until it commits.  How "inverted
 shown (ANSI inverse video, flipped pixels, CSS) is the frontend's call — the model
 just says *which* spans are inverted.
 """
-from titoken import encode
+from tokenbase import encode
 
 ROWS = 8     # a menu uses the home screen's 16×8 character grid
 COLS = 16

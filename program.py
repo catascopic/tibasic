@@ -2,10 +2,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from core import Thunk, require_real
-from titoken import Reference
+from tokenbase import Reference
 from environment import Environment, ReturnSignal
 from errors import TiSyntaxError, IncrementError, LabelError
-from titoken import THEN, ELSE, LBL
+from tokenbase import THEN, ELSE, LBL
 from parser import Parser
 
 

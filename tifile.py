@@ -10,7 +10,7 @@ reals for lists.
 from dataclasses import dataclass
 from pathlib import Path
 
-from titoken import Token
+from tokenbase import Token
 from catalog import ALL_TOKENS, read_token
 
 

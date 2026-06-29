@@ -11,7 +11,7 @@ from errors import (
 	StatError, IncrementError, DataTypeError, InvalidDimError, ArgumentError,
 	UndefinedError, TiMemoryError,
 )
-from titoken import Token
+from tokenbase import Token
 from catalog import ALL_TOKENS
 from core import TiList, TiMatrix, TiString
 
@@ -119,7 +119,7 @@ def var(env: Environment, name: str):
 	"""
 	if name.startswith('$'):
 		return env.user_lists[name[1:]]
-	from titoken import Accessor
+	from tokenbase import Accessor
 	tok = lookup[name]
 	if not isinstance(tok, Accessor):
 		raise TypeError(f"{name!r} is not a variable")

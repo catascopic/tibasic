@@ -18,7 +18,7 @@ from graph import (
 from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
 from homescreen import HomeScreen
 from terminal import ScriptedConsole
-from titoken import Token
+from tokenbase import Token
 
 
 _NUMERIC_NAMES = tuple(chr(0x41 + i) for i in range(26)) + ('theta',)

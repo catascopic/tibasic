@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
 from core import TiString
-from titoken import Token, decode
+from tokenbase import Token, decode
 from tiformat import disp_lines, value_lines
 from modes import Screen
 from homescreen import HomeScreen
@@ -28,7 +28,7 @@ from scrollview import ScrollView
 
 # _CHARSET: TI-83+ display byte → Unicode character for rendering the home-screen
 # grid.  This is the canonical frontend mapping — the authoritative glyph for each
-# byte value.  The simplified debug-only version in titoken.py is used for Token
+# byte value.  The simplified debug-only version in tokenbase.py is used for Token
 # repr output and is not suitable for display.  None = undefined/unused slot.
 _CHARSET: list[str | None] = [
 #	0		1		2		3		4		5		6		7		8		9		A		B		C		D		E		F

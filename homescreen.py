@@ -1,4 +1,4 @@
-from titoken import decode
+from tokenbase import decode
 from tiformat import disp_lines
 
 # Display byte for '…' (0xCE) — what Disp truncates a too-long line with, as its

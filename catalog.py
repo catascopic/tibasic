@@ -5,15 +5,9 @@ from core import require_real, TiList, TiMatrix
 from environment import Environment
 from parser import ArgParser
 from preparse import special_func
-from titoken import Token, Flag
-import titoken as tk
-from tokentypes import (
-	LetterToken, MatrixToken, ListToken, StringToken,
-	FuncEquationToken, ParEquationToken, PolarEquationToken,
-	SequenceToken, SequenceInitialToken,
-	RealToken, WindowToken, XresToken, IntWindowToken, FactorWindowToken, DeltaWindowToken,
-	TableToken, ConstantToken, ComputedToken,
-)
+from tokenbase import Token, Flag
+import tokenbase as tk
+from tokentypes import *
 import prgmcmds as cmds
 import distributions as dist
 import draw
@@ -34,89 +28,6 @@ def _PLACEHOLDER(args):
 		args.equation_var()
 	args.end_cmd()
 
-
-# ── Behavior-carrying token subclasses ──────────────────────────────────────────
-
-class FunctionToken(Token):
-	def __init__(self, code, display, func):
-		super().__init__(code, display, Flag.FUNCTION)
-		self._func = func
-
-	def parse_prefix(self, parser):
-		return self._func.call_with_parser(ArgParser(parser))
-
-	def __repr__(self):
-		return f"{super().__repr__()} <{self._func.__module__}.{self._func.__qualname__}>"
-
-
-class CommandToken(Token):
-	def __init__(self, code, display, cmd):
-		super().__init__(code, display, Flag.COMMAND)
-		self._cmd = cmd
-
-	def run_statement(self, parser):
-		self._cmd.call_with_parser(ArgParser(parser))
-
-	def __repr__(self):
-		return f"{super().__repr__()} <{self._cmd.__module__}.{self._cmd.__qualname__}>"
-
-
-class OperatorToken(Token):
-	def __init__(self, code, display, op, bp, *, char=None):
-		super().__init__(code, display, Flag.INFIX, char=char)
-		self._op = op
-		self._bp = bp
-
-	def infix_bp(self):
-		return self._bp[0]
-
-	def parse_infix(self, parser, lhs):
-		rhs = parser.parse_expr(self._bp[1])
-		return parser.env.guard_real((lhs, rhs), self._op(lhs, rhs))
-
-	def __repr__(self):
-		return f"{super().__repr__()} <{self._op.__module__}.{self._op.__qualname__}>"
-
-
-class PostfixToken(Token):
-	def __init__(self, code, display, op, *, char=None):
-		super().__init__(code, display, Flag.POSTFIX, char=char)
-		self._op = op
-
-	def apply_postfix(self, value):
-		return self._op(value)
-
-	def __repr__(self):
-		return f"{super().__repr__()} <{self._op.__module__}.{self._op.__qualname__}>"
-
-
-class AnsToken(Token):
-	"""Ans — reads env.ans, with optional index into the result when it's a list/matrix."""
-
-	def __init__(self):
-		super().__init__(tk.ANS, b'Ans', Flag.EXPR_START)
-
-	def parse_prefix(self, parser):
-		ans = parser.env.ans
-		if parser.peek().code == tk.L_PAREN:
-			if isinstance(ans, TiList):
-				parser.advance()
-				return ans[parser.parse_list_index()]
-			if isinstance(ans, TiMatrix):
-				parser.advance()
-				return ans[parser.parse_matrix_indices()]
-		return ans
-
-
-class _PyToken(RealToken):
-	"""P/Y — storing also copies the value to C/Y (one-way coupling)."""
-
-	def store(self, env, value):
-		super().store(env, value)
-		env.cy = value
-
-
-# ── Token table ─────────────────────────────────────────────────────────────────
 
 def _generate():
 	yield Token(0x01, b'\x05DMS')   # ►DMS
@@ -317,7 +228,7 @@ def _generate():
 	yield RealToken(0x632D, b'PV',                  'pv')                # PV
 	yield RealToken(0x632E, b'PMT',                 'pmt')               # PMT
 	yield RealToken(0x632F, b'FV',                  'fv')                # FV
-	yield _PyToken(0x6330, b'P/Y',                  'py')                # P/Y → also copies to C/Y
+	yield PaymentsPerYearToken(0x6330, b'P/Y',      'py')                # P/Y → also copies to C/Y
 	yield RealToken(0x6331, b'C/Y',                 'cy')                # C/Y (independent)
 	yield SequenceInitialToken(0x6332, b'\x04(nMin)', 2)                 # 𝑤(nMin)
 	yield SequenceInitialToken(0x6333, b'Z\x04(nMin)', 2)                # Z𝑤(nMin)
@@ -341,7 +252,7 @@ def _generate():
 	yield OperatorToken(0x6F, b'\x18',              ops.ne,    (40, 41), char='≠')
 	yield OperatorToken(0x70, b'+',                 ops.add,   (50, 51), char='+')
 	yield OperatorToken(0x71, b'-',                 ops.sub,   (50, 51), char='-')
-	yield AnsToken()
+	yield AnsToken(tk.ANS, b'Ans', Flag.EXPR_START)
 	yield CommandToken(0x73, b'Fix',                modecmds.fix)
 	yield Token(0x74, b'Horiz')
 	yield Token(0x75, b'Full')
@@ -719,7 +630,7 @@ def _generate():
 	yield Token(0xE8, b'Get(')
 	yield CommandToken(0xE9, b'PlotsOn',            _PLACEHOLDER)
 	yield CommandToken(0xEA, b'PlotsOff',           _PLACEHOLDER)
-	yield Token(tk.LIST_PREFIX, b'\xdc')  # ᴸ
+	yield Token(tk.LIST_PREFIX, b'\xdc')
 	yield Token(0xEC, b'Plot1(')
 	yield Token(0xED, b'Plot2(')
 	yield Token(0xEE, b'Plot3(')

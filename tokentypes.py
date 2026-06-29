@@ -1,25 +1,42 @@
 """Concrete accessor *tokens* — the variable tokens that read/write the environment.
 
-An `Accessor` is a `Token` (see titoken) that knows *how* to get/set one symbol — a
+An `Accessor` is a `Token` (see tokenbase) that knows *how* to get/set one symbol — a
 numeric variable, a list, π, rand, a window setting.  The token IS the accessor:
 `resolve`/`store`/`invoke` take the env as a parameter (tokens are env-less singletons
 built once in the catalog), so a variable token serves directly as an expression atom
 or a storage target.
 
 This module sits below `catalog` and `parser`: it imports `core`/`graph`/`modes`/
-`titoken` but never the parser.
+`tokenbase` but never the parser.
 
-`Accessor`, `Deletable`, and `Reference` themselves live in `titoken` (the leaf); this
+`Accessor`, `Deletable`, and `Reference` themselves live in `tokenbase` (the leaf); this
 module only provides the concrete subclasses.
 """
 from contextlib import contextmanager
 
-from core import TiList, TiString, TiEquation
+from core import TiList, TiMatrix, TiString, TiEquation
 from core import require_num, require_matrix, require_list, require_string, require_real, require_int, py_int
 from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, DataTypeError
 from graph import eval_sequence
 from modes import GraphMode
-from titoken import Accessor, Deletable, VariableToken, Reference, Flag, LIST_PREFIX
+from parser import ArgParser
+from tokenbase import Token, Accessor, Deletable, VariableToken, Reference, Flag
+import tokenbase as tk
+
+__all__ = [
+    # Behavior-carrying
+    'FunctionToken', 'CommandToken', 'OperatorToken', 'PostfixToken', 'AnsToken',
+    # Numeric / constant
+    'LetterToken', 'RealToken', 'PaymentsPerYearToken', 'ConstantToken', 'ComputedToken',
+    # Aggregate variables
+    'MatrixToken', 'ListToken', 'StringToken',
+    # Equation / sequence
+    'EquationToken', 'FuncEquationToken', 'ParEquationToken', 'PolarEquationToken',
+    'SequenceToken', 'SequenceInitialToken',
+    # Window / table
+    'WindowToken', 'XresToken', 'IntWindowToken', 'FactorWindowToken', 'DeltaWindowToken',
+    'TableToken',
+]
 
 
 def _window_affects_graph(env, attr: str) -> bool:
@@ -47,7 +64,81 @@ def scoped_numeric(env, name: str, value):
 		setattr(env.numerics, name, saved)
 
 
-# ── Data variables ──────────────────────────────────────────────────────────────
+
+class FunctionToken(Token):
+	def __init__(self, code, display, func):
+		super().__init__(code, display, Flag.FUNCTION)
+		self._func = func
+
+	def parse_prefix(self, parser):
+		return self._func.call_with_parser(ArgParser(parser))
+
+	def __repr__(self):
+		return f"{super().__repr__()} <{self._func.__module__}.{self._func.__qualname__}>"
+
+
+class CommandToken(Token):
+	def __init__(self, code, display, cmd):
+		super().__init__(code, display, Flag.COMMAND)
+		self._cmd = cmd
+
+	def run_statement(self, parser):
+		self._cmd.call_with_parser(ArgParser(parser))
+
+	def __repr__(self):
+		return f"{super().__repr__()} <{self._cmd.__module__}.{self._cmd.__qualname__}>"
+
+
+class OperatorToken(Token):
+	def __init__(self, code, display, op, bp, *, char=None):
+		super().__init__(code, display, Flag.INFIX, char=char)
+		self._op = op
+		self._bp = bp
+
+	def infix_bp(self):
+		return self._bp[0]
+
+	def parse_infix(self, parser, lhs):
+		rhs = parser.parse_expr(self._bp[1])
+		return parser.env.guard_real((lhs, rhs), self._op(lhs, rhs))
+
+	def __repr__(self):
+		return f"{super().__repr__()} <{self._op.__module__}.{self._op.__qualname__}>"
+
+
+class PostfixToken(Token):
+	def __init__(self, code, display, op, *, char=None):
+		super().__init__(code, display, Flag.POSTFIX, char=char)
+		self._op = op
+
+	def apply_postfix(self, value):
+		return self._op(value)
+
+	def __repr__(self):
+		return f"{super().__repr__()} <{self._op.__module__}.{self._op.__qualname__}>"
+
+
+class ConstantToken(VariableToken):
+	"""A constant π / 𝑒 / 𝑖 — read-only; storing is an error (inherited)."""
+
+	def __init__(self, code: int, display: bytes, value, char: str | None = None):
+		super().__init__(code, display, char=char)
+		self.value = value
+
+	def resolve(self, env):
+		return self.value
+
+
+class ComputedToken(VariableToken):
+	"""A read-only 0-arg computed query (getKey, getDate, …): `resolve(env)` calls func."""
+
+	def __init__(self, code: int, display: bytes, func):
+		super().__init__(code, display)
+		self.func = func
+
+	def resolve(self, env):
+		return self.func(env)
+
 
 class LetterToken(Deletable, VariableToken):
 	"""A real/complex variable A–Z, θ — an index into env.numerics (0–25, θ = 26).
@@ -149,8 +240,6 @@ class StringToken(Deletable, VariableToken):
 	def store(self, env, value):
 		self._set(env, require_string(value))
 
-
-# ── Graph equations ─────────────────────────────────────────────────────────────
 
 class EquationToken(Deletable, VariableToken):
 	"""A graph equation (Y1–Y0, X1T/Y1T–X6T/Y6T, r1–r6).
@@ -271,8 +360,6 @@ class SequenceInitialToken(Deletable, VariableToken):
 		self._set(env, value)
 
 
-# ── Settings / env-backed reals ─────────────────────────────────────────────────
-
 class RealToken(VariableToken):
 	"""A plain real variable stored directly on env (TVM variables, stat n, …).  Takes an
 	explicit `flags` so stat 𝑛 can be classified NUMERIC while TVM vars stay unflagged."""
@@ -289,6 +376,30 @@ class RealToken(VariableToken):
 
 	def store(self, env, value):
 		self._set(env, require_real(value))
+
+
+class AnsToken(Token):
+	"""Ans — reads env.ans, with optional index into the result when it's a list/matrix."""
+
+	def parse_prefix(self, parser):
+		ans = parser.env.ans
+		if parser.peek().code == tk.L_PAREN:
+			if isinstance(ans, TiList):
+				parser.advance()
+				return ans[parser.parse_list_index()]
+			if isinstance(ans, TiMatrix):
+				parser.advance()
+				return ans[parser.parse_matrix_indices()]
+		return ans
+
+
+class PaymentsPerYearToken(RealToken):
+	"""P/Y — storing also copies the value to C/Y (one-way coupling)."""
+
+	def store(self, env, value):
+		super().store(env, value)
+		env.cy = value
+
 
 
 class WindowToken(VariableToken):
@@ -382,27 +493,3 @@ class TableToken(VariableToken):
 
 	def store(self, env, value):
 		self._set(env, require_real(value))
-
-
-# ── Constants and computed reads ────────────────────────────────────────────────
-
-class ConstantToken(VariableToken):
-	"""A constant π / 𝑒 / 𝑖 — read-only; storing is an error (inherited)."""
-
-	def __init__(self, code: int, display: bytes, value, char: str | None = None):
-		super().__init__(code, display, char=char)
-		self.value = value
-
-	def resolve(self, env):
-		return self.value
-
-
-class ComputedToken(VariableToken):
-	"""A read-only 0-arg computed query (getKey, getDate, …): `resolve(env)` calls func."""
-
-	def __init__(self, code: int, display: bytes, func):
-		super().__init__(code, display)
-		self.func = func
-
-	def resolve(self, env):
-		return self.func(env)

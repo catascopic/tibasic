@@ -1,6 +1,6 @@
 """Runtime value types and validators.
 
-Imports only from errors and titoken so nothing in the graph can cycle back here.
+Imports only from errors and tokenbase so nothing in the graph can cycle back here.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from errors import (
 	DataTypeError, DimMismatchError, DomainError,
 	InvalidDimError, SingularMatrixError, TiMemoryError, UndefinedError,
 )
-from titoken import Token
+from tokenbase import Token
 
 if TYPE_CHECKING:
 	from environment import Environment
@@ -386,7 +386,7 @@ class TiEquation:
 
 	def eval(self, env: Environment) -> Any:
 		from parser import Parser
-		from titoken import EOF_CODE
+		from tokenbase import EOF_CODE
 		try:
 			parser = Parser(self.tokens, env)
 			value = parser.parse_expr()

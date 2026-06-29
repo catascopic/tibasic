@@ -615,14 +615,14 @@ class TestPrompt:
 		assert env.home.render().split('\n')[0].startswith('A=?')
 
 	def test_user_list_prompt_strips_prefix(self):
-		# Prompt ᴸNAME should echo NAME=?, not ᴸNAME=? (per calculator behavior)
-		env = run_with('Prompt ᴸNAME', ['{1}'])
+		# Prompt ʟNAME should echo NAME=?, not ʟNAME=? (per calculator behavior)
+		env = run_with('Prompt ʟNAME', ['{1}'])
 		first = env.home.render().split('\n')[0]
 		assert first.startswith('NAME=?')
-		assert 'ᴸ' not in first
+		assert 'ʟ' not in first
 
 	def test_bare_user_list_name_is_rejected(self):
-		# Prompt requires the ᴸ prefix for user lists; bare multi-char names are an error
+		# Prompt requires the ʟ prefix for user lists; bare multi-char names are an error
 		with pytest.raises(Exception):
 			run_with('Prompt ABC', ['{1}'])
 

@@ -17,7 +17,7 @@ its tokens' display bytes splice straight in.
 from decimal import Decimal, ROUND_HALF_UP
 
 from core import TiList, TiMatrix, TiString
-from titoken import encode
+from tokenbase import encode
 
 _SIG = 10  # the TI-83+ displays 10 significant figures in Normal mode
 

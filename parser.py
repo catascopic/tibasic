@@ -2,7 +2,7 @@ from numbers import Number
 
 import operators
 from core import TiList, TiMatrix, TiString
-from titoken import (
+from tokenbase import (
 	Token, Flag, EOF_TOKEN, EOF_CODE,
 	Accessor, Reference,
 	STORE, COMMA, DOT, NEG, COLON, NEWLINE,
@@ -19,9 +19,9 @@ from core import require_list
 
 
 class UserList(Accessor):
-	"""A user-defined list ᴸNAME — a dict slot in env.user_lists, keyed by name.
+	"""A user-defined list ʟNAME — a dict slot in env.user_lists, keyed by name.
 
-	Built synthetically by the parser when it sees the ᴸ prefix; has no catalog
+	Built synthetically by the parser when it sees the ʟ prefix; has no catalog
 	entry since the name is determined at parse time, not compile time.
 	"""
 
@@ -353,7 +353,7 @@ class Parser:
 			return self.read_accessor(UserList(self.read_name(5)))
 
 		# FunctionToken invokes a call; a plain variable token reads its accessor;
-		# anything else raises — all via the token's own parse_prefix (see titoken).
+		# anything else raises — all via the token's own parse_prefix (see tokenbase).
 		return t.parse_prefix(self)
 
 	def read_accessor(self, acc):
@@ -501,7 +501,7 @@ class Parser:
 	def parse_user_list(self):
 		# A user list (dict-backed by name) shares the same accessor/Reference surface
 		# as everything else, so store/resolve/dim go through the common code paths.
-		# The ᴸ prefix is already consumed, so the captured tokens are the bare name —
+		# The ʟ prefix is already consumed, so the captured tokens are the bare name —
 		# exactly what Prompt should echo (∟PRIMES and PRIMES both display "PRIMES=?").
 		start = self.pos
 		name = self.read_name(5)
@@ -703,7 +703,7 @@ class ArgParser:
 
 	@_parse_arg
 	def list_var_prefix_optional(self) -> Reference:
-		"""Read a list variable: L1–L6, ᴸNAME, or a bare user-list name without the ᴸ prefix.
+		"""Read a list variable: L1–L6, ʟNAME, or a bare user-list name without the ʟ prefix.
 
 		SetUpEditor accepts all three forms; ordinary list contexts require the prefix.
 		"""

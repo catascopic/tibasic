@@ -9,7 +9,7 @@ import builtins
 import math
 from datetime import date
 
-from titoken import VariableToken, Flag
+from tokenbase import VariableToken, Flag
 from core import TiList, require_list
 from core import require_real, require_int, py_int
 from preparse import preparse_func, Real, VectorizedReal, Env
@@ -196,7 +196,7 @@ def nom(eff_rate: VectorizedReal, cp: VectorizedReal):
 # read the stored finance variables; called (tvm_Pmt(N,I%,PV,FV,P/Y,C/Y)) the
 # optional arguments first overwrite those variables, then the value is computed.
 # The bare form is wired as the token's `nullary`, the called form as its
-# `function` — see Token in titoken.py.
+# `function` — see Token in tokenbase.py.
 #
 # Like _bal above, I% is the rate *per period* (periodic rate = I%/100); P/Y and
 # C/Y are accepted and stored for signature compatibility but are not folded into

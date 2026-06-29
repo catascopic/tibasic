@@ -20,7 +20,7 @@ import sys
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 import catalog
-from titoken import Token
+from tokenbase import Token
 
 
 def _name(item) -> str:

@@ -23,8 +23,8 @@ _SEL = 'SELECTED'
 _CHARSET: list[str | None] = [
 #	0		1		2		3		4		5		6		7		8		9		A		B		C		D		E		F
 	' ',	'𝑛',	'𝑢',	'𝑣',	'𝑤',	'►',	'🡅',	'🡇',	'∫',	'×',	_M1,	_M2,	_M3,	'ₜ',		'³',	'𝟊',	# 0
-	'√',	'⁻¹',	'²',	'∠',	'°',	'ʳ',	'ᵀ',	'≤',	'≠',	'≥',	'-',	'ᴇ',	'→',	'10',	'↑',	'↓',	# 1
-	' ',	'!',	'"',	'#',	'⁴',		'%',	'&',	"'",	'(',	')',	'*',	'+',	',',	'−',	'.',	'/',	# 2
+	'√',	'⁻¹',	'²',	'∠',	'°',	'ʳ',	'ᵀ',	'≤',	'≠',	'≥',	'~',	'ᴇ',	'→',	'10',	'↑',	'↓',	# 1
+	' ',	'!',	'"',	'#',	'⁴',		'%',	'&',	"'",	'(',	')',	'*',	'+',	',',	'-',	'.',	'/',	# 2
 	'0',	'1',	'2',	'3',	'4',	'5',	'6',	'7',	'8',	'9',	':',	';',	'<',	'=',	'>',	'?',	# 3
 	'@',	'A',	'B',	'C',	'D',	'E',	'F',	'G',	'H',	'I',	'J',	'K',	'L',	'M',	'N',	'O',	# 4
 	'P',	'Q',	'R',	'S',	'T',	'U',	'V',	'W',	'X',	'Y',	'Z',	'θ',	'\\',	']',	'^',	'_',	# 5
@@ -149,7 +149,7 @@ class Token:
 	"""A token in a program.  The base class is for *inert* tokens — punctuation, literals,
 	mode keywords; behavior-carrying tokens are subclasses (FunctionToken, CommandToken,
 	OperatorToken, the Accessor variable tokens …) defined in catalog.py, where they can
-	import the operator/command modules that titoken (a leaf module) cannot.
+	import the operator/command modules that tokenbase (a leaf module) cannot.
 
 	The parser drives tokens through the polymorphic hooks below (parse_prefix /
 	parse_infix / apply_postfix / …) rather than inspecting nullable callable fields, so

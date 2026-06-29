@@ -1,7 +1,5 @@
 Numerics access object cleanup
 
-Move ans invoke logic to accessor
-
 accessors -> variables
 
 print screen

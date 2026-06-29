@@ -284,7 +284,7 @@ class TestListToMatr:
 			calc('List►matr( {1,2},{3,4}')
 
 
-# ── User-named lists (ᴸNAME) ─────────────────────────────────────────────────
+# ── User-named lists (ʟNAME) ─────────────────────────────────────────────────
 
 class TestUserLists:
 	"""User-named lists stored and read back via the $ (LIST_PREFIX) proxy.
@@ -299,7 +299,7 @@ class TestUserLists:
 		assert env.user_lists['AB'].data == [1, 2, 3]
 
 	def test_store_bare_name(self):
-		# When the value is already a list, →NAME (no ᴸ) stores as a user list
+		# When the value is already a list, →NAME (no ʟ) stores as a user list
 		env = run('{4,5}@AB')
 		assert env.user_lists['AB'].data == [4, 5]
 
@@ -395,27 +395,27 @@ class TestUserLists:
 	# ── Matr►list / List►matr ────────────────────────────────────────────────
 
 	def test_matr_to_list_single_column(self):
-		# Matr►list([A], 1, ᴸAB) — extract column 1 into the user list
+		# Matr►list([A], 1, ʟAB) — extract column 1 into the user list
 		env = run('[[1,2][3,4][5,6]]@ [A]')
 		run('Matr►list( [A] ,1,$AB', env)
 		assert env.user_lists['AB'].data == [1, 3, 5]
 
 	def test_matr_to_list_multi(self):
-		# Matr►list([A], ᴸAB, ᴸCD) — extract each column into a user list
+		# Matr►list([A], ʟAB, ʟCD) — extract each column into a user list
 		env = run('[[1,2][3,4]]@ [A]')
 		run('Matr►list( [A] ,$AB,$CD', env)
 		assert env.user_lists['AB'].data == [1, 3]
 		assert env.user_lists['CD'].data == [2, 4]
 
 	def test_matr_to_list_mixed(self):
-		# Matr►list([A], L1, ᴸAB) — one regular list, one user list
+		# Matr►list([A], L1, ʟAB) — one regular list, one user list
 		env = run('[[1,2][3,4][5,6]]@ [A]')
 		run('Matr►list( [A] , L1 ,$AB', env)
 		assert var(env, 'L1').data == [1, 3, 5]
 		assert env.user_lists['AB'].data == [2, 4, 6]
 
 	def test_list_to_matr_from_user_lists(self):
-		# List►matr(ᴸAB, ᴸCD, [A])
+		# List►matr(ʟAB, ʟCD, [A])
 		env = run('{1,3,5}@$AB')
 		run('{2,4,6}@$CD', env)
 		run('List►matr( $AB,$CD, [A]', env)

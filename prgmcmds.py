@@ -1,13 +1,13 @@
 import time
 
 from parser import ArgParser, Parser, UserList
-from titoken import QUOTE, ANS
+from tokenbase import QUOTE, ANS
 
 from preparse import (
 	preparse_cmd, preparse_cmd_func, preparse_bunch,
 	Thunk, NumericVar, LabelName, ProgramName, AnyVar, Real, Env, AnyValue,
 )
-from titoken import Reference
+from tokenbase import Reference
 from environment import ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, TiList, py_int, require_string
