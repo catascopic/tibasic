@@ -12,6 +12,7 @@ from pathlib import Path
 
 from tokenbase import Token
 from catalog import ALL_TOKENS, read_token
+from bitmap import Bitmap, ROWS, COLS
 
 
 # 0x5D is TI's "list name" token: a named list's 8-byte name field is this byte
@@ -224,9 +225,110 @@ def _encode_list_name(name: str) -> bytes:
 	return (bytes([_LIST_NAME_TOKEN]) + body).ljust(8, b'\x00')
 
 
+# ── Picture files (.8xi) ───────────────────────────────────────────────────────
+# A picture is the 96-wide graph bitmap stored bit-packed MSB-first, 12 bytes per
+# row, wrapped in the usual 2-byte length prefix.  Two heights occur in the wild:
+# the native TI-83+/84+ size is the full 64 rows (768 bytes, 0x0300), while the
+# legacy TI-83 size omits the bottom screen row — 63 rows (756 bytes, 0x02F4).  The
+# OS reads both, so the stored row count is recorded (PictureFile.rows) and writes
+# reproduce the source size.  Pictures are the ten fixed variables Pic1–Pic9, Pic0,
+# named by a 0x60 token plus an index byte (Pic1→0x00, …, Pic9→0x08, Pic0→0x09).
+
+_PIC_NAME_TOKEN = 0x60
+_PIC_ROW_BYTES  = COLS // 8   # 12 bytes per row (96 columns, 8 pixels/byte)
+
+
+def _read_picture_data(f, rows: int) -> Bitmap:
+	"""Unpack `rows` bit-packed scanlines into a fresh 96×64 Bitmap (MSB-first).  A
+	picture storing fewer than ROWS rows leaves the missing bottom rows off."""
+	bmp = Bitmap()
+	for row in range(rows):
+		rowbytes = f.read(_PIC_ROW_BYTES)
+		buf = bmp.buffer[row]
+		for col in range(COLS):
+			buf[col] = (rowbytes[col >> 3] >> (7 - (col & 7))) & 1
+	return bmp
+
+
+def _encode_picture_data(bmp: Bitmap, rows: int) -> bytes:
+	"""Bit-pack the top `rows` scanlines of a Bitmap into the picture body."""
+	out = bytearray()
+	for row in range(rows):
+		rowbytes = bytearray(_PIC_ROW_BYTES)
+		buf = bmp.buffer[row]
+		for col in range(COLS):
+			if buf[col]:
+				rowbytes[col >> 3] |= 0x80 >> (col & 7)
+		out += rowbytes
+	return bytes(out)
+
+
+def _decode_pic_name(name_bytes: bytes) -> str:
+	"""Picture index byte → picture number: 0x00→"1", …, 0x08→"9", 0x09→"0"."""
+	return str((name_bytes[1] + 1) % 10)
+
+
+def _encode_pic_name(name: str) -> bytes:
+	"""Picture number → 0x60 token + index byte: "1"→0x00, …, "9"→0x08, "0"→0x09."""
+	index = (int(name) - 1) % 10
+	return bytes([_PIC_NAME_TOKEN, index]).ljust(8, b'\x00')
+
+
+@dataclass
+class PictureFile:
+	name:     str
+	bitmap:   Bitmap
+	comment:  str  = ''
+	archived: bool = False
+	version:  int  = 0x00
+	rows:     int  = ROWS   # scanlines stored: 64 (full screen) or 63 (legacy TI-83)
+
+	def __repr__(self):
+		return f"Pic{self.name}({COLS}x{self.rows};{'' if self.archived else 'un'}archived)"
+
+	def print(self):
+		if self.comment:
+			print(self.comment)
+		print(f"PIC:{self.name} ({COLS}x{self.rows}, {'' if self.archived else 'un'}archived)")
+		self.bitmap.disp()
+
+	@classmethod
+	def read_from(cls, f):
+		_file_type, name_bytes, archived, comment, version = _read_var_header(f)
+		pixel_len = int.from_bytes(f.read(2), 'little')   # body's 2-byte length prefix
+		rows      = pixel_len // _PIC_ROW_BYTES           # 64 (full screen) or 63 (legacy)
+		bitmap    = _read_picture_data(f, rows)
+
+		return cls(
+			name     = _decode_pic_name(name_bytes),
+			bitmap   = bitmap,
+			comment  = comment,
+			archived = archived,
+			version  = version,
+			rows     = rows,
+		)
+
+	@classmethod
+	def load(cls, file):
+		with open(file, 'rb') as f:
+			return cls.read_from(f)
+
+	def write_to(self, f):
+		name_bytes = _encode_pic_name(self.name)
+		pixels     = _encode_picture_data(self.bitmap, self.rows)
+		body       = len(pixels).to_bytes(2, 'little') + pixels  # pixel-byte count + data
+		_write_var_file(f, 0x07, name_bytes, self.archived, self.comment, body, version=self.version)
+
+	def write(self, file):
+		with open(file, 'wb') as f:
+			self.write_to(f)
+
+
 if __name__ == '__main__':
 	import sys
 
+	_READERS = {'.8xl': ListFile, '.8xi': PictureFile}
+
 	for path in sys.argv[1:]:
-		reader = ListFile if path.lower().endswith('.8xl') else ProgramFile
+		reader = _READERS.get(path[-4:].lower(), ProgramFile)
 		reader.load(path).print()

@@ -3,7 +3,12 @@ import os
 import pytest
 from io import BytesIO
 
-from tifile import ProgramFile, ListFile, _decode_list_name, _encode_list_name
+from tifile import (
+	ProgramFile, ListFile, PictureFile,
+	_decode_list_name, _encode_list_name,
+	_decode_pic_name, _encode_pic_name,
+)
+from bitmap import Bitmap, ROWS, COLS
 from test_tibasic import toks
 
 
@@ -279,4 +284,127 @@ def test_builtin_list_byte_exact_roundtrip(expected_name, path):
 	lst = ListFile.load(path)
 	buf = BytesIO()
 	lst.write_to(buf)
+	assert buf.getvalue() == orig
+
+
+# ── PictureFile helpers ───────────────────────────────────────────────────────
+
+def roundtrip_pic(pic: PictureFile) -> PictureFile:
+	buf = BytesIO()
+	pic.write_to(buf)
+	buf.seek(0)
+	return PictureFile.read_from(buf)
+
+
+def make_bitmap(pixels=()) -> Bitmap:
+	"""A Bitmap with the given (row, col) pixels turned on."""
+	bmp = Bitmap()
+	for row, col in pixels:
+		bmp.set(row, col)
+	return bmp
+
+
+def make_pic(**kwargs) -> PictureFile:
+	kwargs.setdefault('name', '1')
+	kwargs.setdefault('bitmap', make_bitmap())
+	return PictureFile(**kwargs)
+
+
+def pixels_of(bmp: Bitmap) -> set:
+	return {(r, c) for r in range(ROWS) for c in range(COLS) if bmp.get(r, c)}
+
+
+# ── Picture name coding ───────────────────────────────────────────────────────
+
+class TestPicNameCoding:
+	# decode: index byte → picture number (Pic1→0x00, …, Pic9→0x08, Pic0→0x09)
+	def test_decode_pic1(self):
+		assert _decode_pic_name(b'\x60\x00' + b'\x00' * 6) == '1'
+
+	def test_decode_pic9(self):
+		assert _decode_pic_name(b'\x60\x08' + b'\x00' * 6) == '9'
+
+	def test_decode_pic0(self):
+		assert _decode_pic_name(b'\x60\x09' + b'\x00' * 6) == '0'
+
+	# encode: picture number → 0x60 token + index byte
+	def test_encode_pic1(self):
+		assert _encode_pic_name('1') == b'\x60\x00' + b'\x00' * 6
+
+	def test_encode_pic9(self):
+		assert _encode_pic_name('9') == b'\x60\x08' + b'\x00' * 6
+
+	def test_encode_pic0(self):
+		assert _encode_pic_name('0') == b'\x60\x09' + b'\x00' * 6
+
+	def test_all_pics_roundtrip(self):
+		for n in '1234567890':
+			assert _decode_pic_name(_encode_pic_name(n)) == n
+
+
+# ── PictureFile roundtrip ─────────────────────────────────────────────────────
+
+class TestPictureFileRoundtrip:
+	def test_name(self):
+		assert roundtrip_pic(make_pic(name='9')).name == '9'
+
+	def test_pixels_corners_and_edges(self):
+		# all four corners of the full screen (default 64-row format), plus interior
+		pix = {(0, 0), (0, COLS - 1), (ROWS - 1, 0), (ROWS - 1, COLS - 1), (31, 47)}
+		result = roundtrip_pic(make_pic(bitmap=make_bitmap(pix)))
+		assert pixels_of(result.bitmap) == pix
+
+	def test_empty_bitmap(self):
+		assert pixels_of(roundtrip_pic(make_pic()).bitmap) == set()
+
+	def test_full_height_keeps_bottom_row(self):
+		# The native 64-row format stores the bottom screen row (row 63).
+		result = roundtrip_pic(make_pic(rows=64, bitmap=make_bitmap({(63, 0), (5, 5)})))
+		assert pixels_of(result.bitmap) == {(63, 0), (5, 5)}
+
+	def test_legacy_height_drops_bottom_row(self):
+		# The legacy 63-row format omits row 63, so it never survives a roundtrip.
+		result = roundtrip_pic(make_pic(rows=63, bitmap=make_bitmap({(63, 0), (5, 5)})))
+		assert pixels_of(result.bitmap) == {(5, 5)}
+
+	def test_rows_preserved(self):
+		assert roundtrip_pic(make_pic(rows=63)).rows == 63
+		assert roundtrip_pic(make_pic(rows=64)).rows == 64
+
+	def test_archived(self):
+		assert roundtrip_pic(make_pic(archived=True)).archived is True
+
+	def test_comment(self):
+		assert roundtrip_pic(make_pic(comment='my pic')).comment == 'my pic'
+
+	def test_version_preserved(self):
+		assert roundtrip_pic(make_pic(version=0x0A)).version == 0x0A
+
+
+# ── PictureFile real-file byte-exact roundtrip ────────────────────────────────
+# Pic9 is the legacy 63-row size (756 bytes); Pic3 is the native 64-row size (768).
+
+_PIC_DIR = r'C:\Users\Max\Documents\MyTiData\Backups\TI84PlusSilverEdition_11'
+_PIC_FILES = [
+	('9', 63, rf'{_PIC_DIR}\Pic9.8xi'),
+	('3', 64, rf'{_PIC_DIR}\Pic3.8xi'),
+]
+
+
+@pytest.mark.parametrize('name,rows,path', _PIC_FILES)
+def test_pic_metadata_from_file(name, rows, path):
+	if not os.path.exists(path):
+		pytest.skip('real file not found')
+	pic = PictureFile.load(path)
+	assert pic.name == name
+	assert pic.rows == rows
+
+
+@pytest.mark.parametrize('name,rows,path', _PIC_FILES)
+def test_pic_byte_exact_roundtrip(name, rows, path):
+	if not os.path.exists(path):
+		pytest.skip('real file not found')
+	orig = open(path, 'rb').read()
+	buf = BytesIO()
+	PictureFile.load(path).write_to(buf)
 	assert buf.getvalue() == orig
