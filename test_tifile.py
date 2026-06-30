@@ -261,7 +261,57 @@ class TestListFileRoundtrip:
 		assert roundtrip_list(make_list(version=0x24)).version == 0x24
 
 
+# ── ListFile complex lists ────────────────────────────────────────────────────
+
+class TestComplexListRoundtrip:
+	def test_is_complex_flag(self):
+		assert make_list(values=[1 + 2j]).is_complex is True
+		assert make_list(values=[1.0, 2.0]).is_complex is False
+
+	def test_complex_values_preserved(self):
+		vals = [1 + 0j, 1j, 1 + 1j, -2 - 3j]
+		result = roundtrip_list(make_list(values=vals))
+		assert result.is_complex is True
+		assert result.values == pytest.approx(vals)
+
+	def test_complex_negative_parts(self):
+		# exercises the sign bit combined with the 0x0C complex flag
+		result = roundtrip_list(make_list(values=[-1.5 - 2.5j]))
+		assert result.values == pytest.approx([-1.5 - 2.5j])
+
+	def test_mixed_real_and_complex_promotes_whole_list(self):
+		# a real value in a complex list is stored as x + 0i and reads back complex
+		result = roundtrip_list(make_list(values=[3.0, 4j]))
+		assert result.is_complex is True
+		assert result.values == pytest.approx([3 + 0j, 4j])
+
+	def test_real_list_stays_real(self):
+		result = roundtrip_list(make_list(values=[1.0, 2.0, 3.0]))
+		assert result.is_complex is False
+		assert all(not isinstance(v, complex) for v in result.values)
+
+
 # ── ListFile real-file byte-exact roundtrip ───────────────────────────────────
+
+_CPX_LIST_FILE = r'C:\Users\Max\Documents\MyTiData\Backups\TI84PlusSilverEdition_12\CPX.8xl'
+
+
+def test_complex_list_from_file():
+	if not os.path.exists(_CPX_LIST_FILE):
+		pytest.skip('real file not found')
+	lst = ListFile.load(_CPX_LIST_FILE)
+	assert lst.name == 'CPX'
+	assert lst.is_complex is True
+	assert lst.values == pytest.approx([1, 1j, 1 + 1j, 2 ** 0.5, 7 ** 0.5 * 1j, 0.69314718055994 + 3.1415926535898j])
+
+
+def test_complex_list_byte_exact_roundtrip():
+	if not os.path.exists(_CPX_LIST_FILE):
+		pytest.skip('real file not found')
+	orig = open(_CPX_LIST_FILE, 'rb').read()
+	buf = BytesIO()
+	ListFile.load(_CPX_LIST_FILE).write_to(buf)
+	assert buf.getvalue() == orig
 
 _BUILTIN_LIST_FILES = [
 	(str(i), rf'C:\Users\Max\Documents\MyTiData\Backups\TI84Plus_1\L_{i+1}_.8xl')

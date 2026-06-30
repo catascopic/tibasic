@@ -131,8 +131,12 @@ class ProgramFile:
 			self.write_to(f)
 
 
-# A TI real is 9 bytes: a flags byte (bit 7 = sign), an exponent biased by 0x80,
-# and 7 BCD bytes holding 14 decimal digits as d.ddddddddddddd × 10^exponent.
+# A TI real is 9 bytes: a flags byte (bit 7 = sign, 0x0C = part of a complex
+# number), an exponent biased by 0x80, and 7 BCD bytes holding 14 decimal digits
+# as d.ddddddddddddd × 10^exponent.  A complex element is two of these back to
+# back — real part then imaginary part — each carrying the 0x0C flag.
+_COMPLEX_FLAG = 0x0C
+
 def _decode_ti_real(b9: bytes) -> float:
 	negative = bool(b9[0] & 0x80)
 	exp      = b9[1] - 0x80
@@ -141,11 +145,11 @@ def _decode_ti_real(b9: bytes) -> float:
 	return -value if negative else value
 
 
-def _encode_ti_real(value: float) -> bytes:
+def _encode_ti_real(value: float, complex_flag: bool = False) -> bytes:
 	negative       = value < 0
 	mant, exp_str  = f'{abs(value):.13e}'.split('e')  # 'd.ddddddddddddd', '±NN'
 	digits         = mant.replace('.', '')            # 14 decimal digits
-	flags          = 0x80 if negative else 0x00
+	flags          = (_COMPLEX_FLAG if complex_flag else 0x00) | (0x80 if negative else 0x00)
 	bcd            = bytes(int(digits[i:i+2], 16) for i in range(0, 14, 2))
 	return bytes([flags, int(exp_str) + 0x80]) + bcd
 
@@ -154,28 +158,52 @@ def _format_real(v: float) -> str:
 	return str(int(v)) if float(v).is_integer() else repr(v)
 
 
+def _format_value(v: float | complex) -> str:
+	if not isinstance(v, complex):
+		return _format_real(v)
+	sign = '-' if v.imag < 0 else '+'
+	return f'{_format_real(v.real)}{sign}{_format_real(abs(v.imag))}i'
+
+
+# A real list (.8xl) carries var type 0x01 and a 9-byte TI real per element; a
+# complex list carries var type 0x0D and 18 bytes per element (real then imaginary
+# TI real).  All elements of a complex list are 18 bytes — a value with no
+# imaginary part is stored as x + 0i.
+_LIST_TYPE_REAL    = 0x01
+_LIST_TYPE_COMPLEX = 0x0D
+
+
 @dataclass
 class ListFile:
 	name:     str
-	values:   list[float]
+	values:   list[float | complex]
 	comment:  str  = ''
 	archived: bool = False
 	version:  int  = 0x00
 
+	@property
+	def is_complex(self) -> bool:
+		return any(isinstance(v, complex) for v in self.values)
+
 	def __repr__(self):
-		return f"list{self.name}(values={len(self.values)};{'' if self.archived else 'un'}archived)"
+		kind = 'complex' if self.is_complex else 'values'
+		return f"list{self.name}({kind}={len(self.values)};{'' if self.archived else 'un'}archived)"
 
 	def print(self):
 		if self.comment:
 			print(self.comment)
 		print(f"LIST:{self.name} ({'' if self.archived else 'un'}archived)")
-		print('{' + ', '.join(_format_real(v) for v in self.values) + '}')
+		print('{' + ', '.join(_format_value(v) for v in self.values) + '}')
 
 	@classmethod
 	def read_from(cls, f):
-		_file_type, name_bytes, archived, comment, version = _read_var_header(f)
-		count  = int.from_bytes(f.read(2), 'little')
-		values = [_decode_ti_real(f.read(9)) for _ in range(count)]
+		file_type, name_bytes, archived, comment, version = _read_var_header(f)
+		count = int.from_bytes(f.read(2), 'little')
+		if file_type == _LIST_TYPE_COMPLEX:
+			values = [complex(_decode_ti_real(f.read(9)), _decode_ti_real(f.read(9)))
+			          for _ in range(count)]
+		else:
+			values = [_decode_ti_real(f.read(9)) for _ in range(count)]
 
 		return cls(
 			name     = _decode_list_name(name_bytes),
@@ -192,9 +220,16 @@ class ListFile:
 
 	def write_to(self, f):
 		name_bytes = _encode_list_name(self.name)
-		reals      = b''.join(_encode_ti_real(v) for v in self.values)
-		body       = len(self.values).to_bytes(2, 'little') + reals  # element count + reals
-		_write_var_file(f, 0x01, name_bytes, self.archived, self.comment, body, version=self.version)
+		if self.is_complex:
+			elements  = b''.join(_encode_ti_real(z.real, complex_flag=True)
+			                     + _encode_ti_real(z.imag, complex_flag=True)
+			                     for z in map(complex, self.values))
+			file_type = _LIST_TYPE_COMPLEX
+		else:
+			elements  = b''.join(_encode_ti_real(v) for v in self.values)
+			file_type = _LIST_TYPE_REAL
+		body = len(self.values).to_bytes(2, 'little') + elements  # element count + data
+		_write_var_file(f, file_type, name_bytes, self.archived, self.comment, body, version=self.version)
 
 	def write(self, file):
 		with open(file, 'wb') as f:
