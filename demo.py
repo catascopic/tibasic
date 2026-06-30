@@ -23,8 +23,8 @@ def run_demo(source, freeform=False):
 if __name__ == '__main__':
 	run_demo("""
 
-"AB@ Str1
-Input Str1 , Str2
+Fix 7
+Pause 3
 
 	""", freeform='--freeform' in sys.argv)
 

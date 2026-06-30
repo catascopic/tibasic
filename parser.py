@@ -813,6 +813,8 @@ if __name__ == '__main__':
 	env.angle_mode = 'DEG'
 
 	test('pi (2)')
+	test('[[1@ [A]')
 
 	# test(3,STORE,(0x5C,0),'(2,1')
 	env.dump()
+	env.matrices.K

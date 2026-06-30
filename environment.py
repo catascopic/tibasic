@@ -22,60 +22,56 @@ from tokenbase import Token
 
 
 _NUMERIC_NAMES = tuple(chr(0x41 + i) for i in range(26)) + ('theta',)
-_MATRIX_NAMES  = tuple(chr(0x41 + i) for i in range(10))   # A–J
 
-
-class _NamedSlots:
-	"""Fixed-size variable storage addressable two ways: by index (`env.numerics[i]` —
-	what the accessor tokens use) and by TI name (`env.numerics.A` / `.theta` — handy in
-	tests and for the equation graph-var scoping).  Slots are None until assigned.
-
-	The data is *just* the storage; the access logic (auto-init, type checks, copies)
-	lives on the accessor tokens (tokentypes.LetterToken / MatrixToken).
-	"""
-
-	def __init__(self, names):
-		object.__setattr__(self, '_index', {n: i for i, n in enumerate(names)})
-		object.__setattr__(self, '_slots', [None] * len(names))
+class AlphaList:
+	
+	def __init__(self, size):
+		self.data = [None] * size
 
 	def __getitem__(self, i):
-		return self._slots[i]
-
+		return self.data[i]
+	
 	def __setitem__(self, i, value):
-		self._slots[i] = value
-
+		self.data[i] = value
+	
 	def __len__(self):
-		return len(self._slots)
-
+		return len(self.data)
+	
 	def __iter__(self):
-		return iter(self._slots)
+		return iter(self.data)
+	
+	def _alpha_index(self, index):
+		if index >= len(self.data):
+			raise IndexError(f"item {_NUMERIC_NAMES[index]} ({index}) out of range")
+		return index
 
-	def __getattr__(self, name):
-		try:
-			return self._slots[self._index[name]]
-		except KeyError:
-			raise AttributeError(name)
-
-	def __setattr__(self, name, value):
-		idx = self._index.get(name)
-		if idx is None:
-			raise AttributeError(name)
-		self._slots[idx] = value
+	def items(self):
+		return zip(_NUMERIC_NAMES, self.data)
 
 	def __repr__(self):
-		live = {n: self._slots[i] for n, i in self._index.items() if self._slots[i] is not None}
-		return f"_NamedSlots({live})"
+		return f"AlphaList({''.join(f'{n}={v}' for n, v in self.items() if v is not None)})"
+
+
+def _make_prop(index):
+	def fget(self):
+		return self.data[self._alpha_index(index)]
+	def fset(self, value):
+		self.data[self._alpha_index(index)] = value
+	return property(fget, fset)
+
+for _i, _name in enumerate(_NUMERIC_NAMES):
+	setattr(AlphaList, _name, _make_prop(_i))
 
 
 class Environment:
 
 	def __init__(self, console=None):
 		# VARIABLES
-		self.numerics   = _NamedSlots(_NUMERIC_NAMES)   # A–Z, θ  (index- or name-addressable)
-		self.matrices   = _NamedSlots(_MATRIX_NAMES)    # [A]–[J]
-		self.lists      = [None] * 6        # L1–L6  (TiList | None)
-		self.strings    = [None] * 10       # Str1–Str0 (TiString | None)
-		self.pics       = [None] * 10       # Pic0–Pic9, by number (Bitmap | None)
+		self.numerics   = AlphaList(27)  # A–Z, θ  (index- or name-addressable)
+		self.matrices   = AlphaList(10)  # [A]–[J]
+		self.lists      = [None] * 6       # L1–L6  (TiList | None)
+		self.strings    = [None] * 10      # Str1–Str0 (TiString | None)
+		self.pics       = [None] * 10      # Pic0–Pic9, by number (Bitmap | None)
 		self.function   = [FuncData()  for _ in range(10)]  # Y1–Y0
 		self.parametric = [ParData()   for _ in range(6)]   # X1T/Y1T – X6T/Y6T
 		self.polar      = [PolarData() for _ in range(6)]   # r1–r6
@@ -321,15 +317,13 @@ class Environment:
 		# this doesn't depend on catalog's token tables.  Order/spelling mirror the
 		# TI charset: A–Z then θ; L₁–L₆ (subscript digits); [A]–[J]; Str1–Str0.
 		numeric_names = [chr(0x41 + i) for i in range(26)] + ['θ']
-		for disp, attr in zip(numeric_names, _NUMERIC_NAMES):
-			value = getattr(self.numerics, attr)
+		for name, value in self.numerics.items():
 			if value is not None:
-				yield disp, value
+				yield name, value
 		for i, val in enumerate(self.lists):
 			if val is not None:
 				yield f"L{chr(0x2081 + i)}", val
-		for name in _MATRIX_NAMES:
-			val = getattr(self.matrices, name)
+		for name, value in self.matrices.items():
 			if val is not None:
 				yield f"[{name}]", val
 		for i, val in enumerate(self.strings):
@@ -341,7 +335,7 @@ class Environment:
 
 	def dump(self):
 		for name, value in self._iter_values():
-			print(f"{name}= {int(value) if isinstance(value, float) and value.is_integer() else value!r}")
+			print(f"{name}={int(value) if isinstance(value, float) and value.is_integer() else value!r}")
 
 	def __repr__(self):
 		return f"ENV({','.join(f"{name}={value!r}" for name, value in self._iter_values())})"

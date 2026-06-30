@@ -1,19 +1,13 @@
-
 print screen
 
 env.screen = Screen.HOME
 Actively set so that IO device knows to switch
 env.focus_home()/focus_graph()/focus_table()
 
-
-
 *values: AnyValue
 Wrong type from function's POV
 
-
-
 seq: shared method that returns list of sequence items
-
 get rid of sequence cache, create a new one every time a sequence is evaluated
 I think the way it should work is, if the user calls u(10), it should evaluate every item in the sequence form nMin to n, then return the result.
 
