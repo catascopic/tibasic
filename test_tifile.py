@@ -287,13 +287,13 @@ class TestListFileRoundtrip:
 
 class TestComplexListRoundtrip:
 	def test_is_complex_flag(self):
-		assert make_list(values=[1 + 2j]).is_complex is True
-		assert make_list(values=[1.0, 2.0]).is_complex is False
+		assert make_list(values=[1 + 2j]).value.is_complex is True
+		assert make_list(values=[1.0, 2.0]).value.is_complex is False
 
 	def test_complex_values_preserved(self):
 		vals = [1 + 0j, 1j, 1 + 1j, -2 - 3j]
 		result = roundtrip_list(make_list(values=vals))
-		assert result.is_complex is True
+		assert result.value.is_complex is True
 		assert list(result.value) == pytest.approx(vals)
 
 	def test_complex_negative_parts(self):
@@ -304,12 +304,12 @@ class TestComplexListRoundtrip:
 	def test_mixed_real_and_complex_promotes_whole_list(self):
 		# a real value in a complex list is stored as x + 0i and reads back complex
 		result = roundtrip_list(make_list(values=[3.0, 4j]))
-		assert result.is_complex is True
+		assert result.value.is_complex is True
 		assert list(result.value) == pytest.approx([3 + 0j, 4j])
 
 	def test_real_list_stays_real(self):
 		result = roundtrip_list(make_list(values=[1.0, 2.0, 3.0]))
-		assert result.is_complex is False
+		assert result.value.is_complex is False
 		assert all(not isinstance(v, complex) for v in result.value)
 
 
@@ -657,14 +657,12 @@ def roundtrip_tokenvar(obj):
 class TestStringFileRoundtrip:
 	def test_contents(self):
 		result = roundtrip_tokenvar(StringFile(tok('Str1'), TiString(toks('ABC'))))
-		assert result.name == 'Str1'
+		assert result.name_token.code == 0xAA00
 		assert result.value.tokens == toks('ABC')
-		assert result.text == 'ABC'
 
 	def test_empty_string(self):
 		result = roundtrip_tokenvar(StringFile(tok('Str3'), TiString([])))
 		assert result.value.tokens == []
-		assert result.text == ''
 
 	def test_archived_and_comment(self):
 		result = roundtrip_tokenvar(StringFile(tok('Str9'), TiString(toks('X')), comment='hi', archived=True))
@@ -680,12 +678,12 @@ class TestStringFileRoundtrip:
 class TestEquationFileRoundtrip:
 	def test_contents(self):
 		result = roundtrip_tokenvar(EquationFile(tok('Y₁'), TiEquation(toks('X'))))
-		assert result.name == 'Y₁'
-		assert result.text == 'X'
+		assert result.name_token == tok('Y₁')
+		assert result.value.tokens == toks('X')
 
 	def test_sequence_var_name(self):
-		result = roundtrip_tokenvar(EquationFile(tok('\U0001d462'), TiEquation(toks('X'))))  # 𝑢
-		assert result.name == '\U0001d462'
+		result = roundtrip_tokenvar(EquationFile(tok('𝑢'), TiEquation(toks('X'))))  # 𝑢
+		assert result.name_token == tok('𝑢')
 
 	def test_var_type_byte(self):
 		buf = BytesIO()

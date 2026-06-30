@@ -12,50 +12,9 @@ from tokenbase import (
 	LIST_PREFIX,
 	IF, THEN, ELSE, FOR, WHILE, REPEAT, END,
 )
-from environment import Environment
+from environment import Environment, UserList
 from core import Thunk, py_int, require_num, require_real
 from errors import TiError, TiSyntaxError, ArgumentError, DataTypeError, InvalidDimError
-from core import require_list
-
-
-class UserList(Accessor):
-	"""A user-defined list ʟNAME — a dict slot in env.user_lists, keyed by name.
-
-	Built synthetically by the parser when it sees the ʟ prefix; has no catalog
-	entry since the name is determined at parse time, not compile time.
-	"""
-
-	def __init__(self, name: str):
-		self.name = name
-
-	def _get(self, env):
-		return env.user_lists.get(self.name)
-
-	def _set(self, env, value):
-		env.user_lists[self.name] = value
-
-	def resolve(self, env):
-		value = super().resolve(env)
-		if not value.data:
-			raise InvalidDimError("empty list")
-		return value
-
-	def store(self, env, value):
-		self._set(env, require_list(value).copy())
-
-	def is_invokable(self):
-		return True
-
-	def invoke(self, arg_parser):
-		index = py_int(arg_parser.expr(), InvalidDimError)
-		arg_parser.end_func()
-		return self.resolve(arg_parser.env)[index]
-
-	def delete(self, env):
-		env.user_lists.pop(self.name, None)
-
-	def __repr__(self):
-		return f"UserList({self.name!r})"
 
 
 def _describe_code(code: int) -> str:
@@ -137,9 +96,9 @@ class Parser:
 
 	def _parse_digits(self, first: Token) -> Number:
 		"""Parse a bare numeric literal with no DMS or ᴇ handling."""
-		num = [first.text]
+		num = [first.char]
 		while self.peek_digit_or_dot():
-			num.append(self.advance().text)
+			num.append(self.advance().char)
 		try:
 			return float(''.join(num))
 		except ValueError:
@@ -290,9 +249,9 @@ class Parser:
 		t = self.advance()
 		if not t.is_name_char():
 			raise TiSyntaxError("Expected a label")
-		label = t.text
+		label = t.char
 		if self.peek().is_name_char():
-			label += self.advance().text
+			label += self.advance().char
 		return label
 
 	def read_name(self, limit) -> str:
@@ -300,9 +259,9 @@ class Parser:
 		t = self.advance()
 		if not t.is_numeric_var():
 			raise TiSyntaxError("Expected a name")
-		chars = [t.text]
+		chars = [t.char]
 		while self.peek().is_name_char():
-			chars.append(self.advance().text)
+			chars.append(self.advance().char)
 		name = ''.join(chars)
 		if len(name) > limit:
 			raise TiSyntaxError(f"Name to long; limit {limit} chars but got: {name}")

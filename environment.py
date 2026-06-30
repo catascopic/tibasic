@@ -6,8 +6,7 @@ from datetime import datetime, timedelta
 
 import math as _math
 
-from core import TiList, is_complex_val
-from core import require_real, require_int, py_int
+from core import TiList, is_complex_val, require_real, require_int, py_int, require_list
 from errors import DataTypeError, IllegalNestError, InvalidCommandError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graphscreen import GraphScreen
@@ -18,7 +17,7 @@ from graph import (
 from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
 from homescreen import HomeScreen
 from terminal import ScriptedConsole
-from tokenbase import Token
+from tokenbase import Token, Accessor
 
 
 _NUMERIC_NAMES = tuple(chr(0x41 + i) for i in range(26)) + ('theta',)
@@ -429,6 +428,46 @@ class TableVars:
 		self.tbl_start: float | None = None   # TblStart
 		self.delta_tbl: float = 1.0           # ΔTbl
 		self.tbl_input = None                 # TblInput — a 7-element list (TiList | None)
+
+
+class UserList(Accessor):
+	"""A user-defined list ʟNAME — a dict slot in env.user_lists, keyed by name.
+
+	Built synthetically by the parser when it sees the ʟ prefix; has no catalog
+	entry since the name is determined at parse time, not compile time.
+	"""
+
+	def __init__(self, name: str):
+		self.name = name
+
+	def _get(self, env):
+		return env.user_lists.get(self.name)
+
+	def _set(self, env, value):
+		env.user_lists[self.name] = value
+
+	def resolve(self, env):
+		value = super().resolve(env)
+		if not value.data:
+			raise InvalidDimError("empty list")
+		return value
+
+	def store(self, env, value):
+		self._set(env, require_list(value).copy())
+
+	def is_invokable(self):
+		return True
+
+	def invoke(self, arg_parser):
+		index = py_int(arg_parser.expr(), InvalidDimError)
+		arg_parser.end_func()
+		return self.resolve(arg_parser.env)[index]
+
+	def delete(self, env):
+		env.user_lists.pop(self.name, None)
+
+	def __repr__(self):
+		return f"UserList({self.name!r})"
 
 
 class ReturnSignal(Exception):

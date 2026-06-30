@@ -162,6 +162,10 @@ class Token:
 		self.char = char
 
 	@property
+	def size(self) -> str:
+		return 1 if self.code < 0x100 else 2
+
+	@property
 	def text(self) -> str:
 		"""Human-readable rendering of the display bytes (debugging/printing only)."""
 		return decode(self.display)
@@ -309,9 +313,8 @@ class Accessor(ABC):
 	def store(self, env, value):
 		raise TiSyntaxError(f"Cannot store to {self}")
 
-	@abstractmethod
 	def is_invokable():
-		pass
+		return False
 
 	def invoke(self, arg_parser):
 		raise TiSyntaxError(f"Cannot invoke {self}")

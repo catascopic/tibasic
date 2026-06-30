@@ -1,4 +1,26 @@
-_token_name_maps
+if self.comment:
+	print(self.comment)
+print(f"{self.name_token} ({'' if self.archived else 'un'}archived)")
+
+locked: derivable from file type
+
+not Token, but Accessor
+Make Accessor implementation for programs, though it won't be used by TI-Basic
+new Accessor method: to_tokens()
+For Accessors that are themselves tokens, returns [self].
+For user lists and programs, returns their name as a list of character tokens.
+Should use the _set method (which should probably lose the underscore)
+
+
+Pic variables need accessors just so they're deletable, but store/resolve should always raise an error because they can only be used with StorePic/RecallPic (they can't be used with the Store operator or dereferenced in an expression).
+Actually, should Deletable be its own thing? Most variables will implement it, but some won't. Maybe Pics should implement delete only.
+Same for GDB.
+
+
+how is u(nMin) stored?
+
+
+
 
 Fix format
 re+theta*i

@@ -1,6 +1,6 @@
 import time
 
-from parser import ArgParser, Parser, UserList
+from parser import ArgParser, Parser
 from tokenbase import QUOTE, ANS
 
 from preparse import (
@@ -8,7 +8,7 @@ from preparse import (
 	Thunk, NumericVar, LabelName, ProgramName, AnyVar, Real, Env, AnyValue,
 )
 from tokenbase import Reference
-from environment import ReturnSignal, StopSignal
+from environment import UserList, ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, TiList, py_int, require_string
 from errors import TiSyntaxError, UndefinedError, DomainError

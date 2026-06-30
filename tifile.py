@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
-from tokenbase import Token
+from tokenbase import Token, LIST_PREFIX
 from catalog import get_token, read_token
 from bitmap import Bitmap, ROWS, COLS
 from core import TiList, TiMatrix, TiString, TiEquation
@@ -21,6 +21,20 @@ from core import TiList, TiMatrix, TiString, TiEquation
 # 0x5D is TI's "list name" token: a named list's 8-byte name field is this byte
 # followed by up to 5 ASCII characters (built-in L1-L6 use 0x5D + 0x00..0x05).
 _LIST_NAME_TOKEN = 0x5D
+
+
+def read_accessor(f: BytesIO):
+	limit = f.tell() + 8
+	t = read_token(f)
+	if t.code == LIST_PREFIX:
+		return UserList(f.read(7).rstrip('\x00').decode('ascii'))
+
+	f.seek(limit, 0)
+	return t
+
+
+def read_program_name(f: BytesIO):
+	return ProgramAccessor(f.read(8).rstrip('\x00').decode('ascii'))
 
 
 def _read_var_header(f):
@@ -224,12 +238,8 @@ class ListFile(TiFile):
 	archived: bool = False
 	version:  int  = 0x00
 
-	@property
-	def is_complex(self) -> bool:
-		return self.value.is_complex
-
 	def __repr__(self):
-		kind = 'complex' if self.is_complex else 'values'
+		kind = 'complex' if self.value.is_complex else 'values'
 		return f"L{self.name}({kind}={len(self.value)};{'' if self.archived else 'un'}archived)"
 
 	def print(self):
@@ -434,23 +444,14 @@ class TokenVarFile(TiFile):
 	archived:   bool = False
 	version:    int  = 0x00
 
-	@property
-	def name(self) -> str:
-		return self.name_token.text
-
-	@property
-	def text(self) -> str:
-		"""The token stream as text — a string's contents or an equation's formula."""
-		return str(self.value)
-
 	def __repr__(self):
-		return f"{type(self).__name__}({self.name!r}, {len(self.value.tokens)} tokens)"
+		return f"{type(self).__name__}({self.name_token}, {len(self.value.tokens)} tokens)"
 
 	def print(self):
 		if self.comment:
 			print(self.comment)
-		print(f"{self.name} ({'' if self.archived else 'un'}archived)")
-		print(self.text)
+		print(f"{self.name_token} ({'' if self.archived else 'un'}archived)")
+		print(self.value)
 
 	@classmethod
 	def read_from(cls, f):

@@ -8,7 +8,7 @@ from preparse import special_func
 from tokenbase import Token, Flag
 import tokenbase as tok
 from tokentypes import *
-import prgmcmds as cmds
+import prgmcmds as prgm
 import distributions as dist
 import draw
 import finance
@@ -111,10 +111,10 @@ def _generate():
 	for i in range(3):
 		yield SequenceToken(i)
 
-	yield CommandToken(0x5F, b'prgm', cmds.prgm)
+	yield CommandToken(0x5F, b'prgm', prgm.prgm)
 
 	for i in range(10):
-		yield Token(0x6000 + i, b'Pic' + bytes([0x30 + (i + 1) % 10]), Flag.PIC)
+		yield Token(0x6000 | i, b'Pic' + bytes([0x30 + (i + 1) % 10]), Flag.PIC)
 
 	for i in range(10):
 		yield Token(0x6100 | i, b'GDB' + bytes([0x30 + (i + 1) % 10]), Flag.GDB)
@@ -433,7 +433,7 @@ def _generate():
 	yield CommandToken(0xBB51, b'ExprOff',          modecmds.expr_off)
 	yield CommandToken(0xBB52, b'ClrAllLists',      tilist.clr_all_lists)
 	yield Token(0xBB53, b'GetCalc(')
-	yield CommandToken(0xBB54, b'DelVar ',          cmds.del_var)
+	yield CommandToken(0xBB54, b'DelVar ',          prgm.del_var)
 	yield CommandToken(0xBB55, b'Equ\x05String(',   tistring.equ_to_string)  # Equ►String(
 	yield CommandToken(0xBB56, b'String\x05Equ(',   tistring.string_to_equ)  # String►Equ(
 	yield Token(0xBB57, b'Clear Entries')
@@ -601,31 +601,31 @@ def _generate():
 	yield FunctionToken(0xCB, b'cosh\x11(',         timath.acosh)        # cosh⁻¹(
 	yield FunctionToken(0xCC, b'tanh(',             timath.tanh)
 	yield FunctionToken(0xCD, b'tanh\x11(',         timath.atanh)        # tanh⁻¹(
-	yield CommandToken(tok.IF, b'If ',              cmds.if_cmd)
-	yield CommandToken(tok.THEN, b'Then',           cmds.then_cmd)
-	yield CommandToken(tok.ELSE, b'Else',           cmds.else_cmd)
-	yield CommandToken(tok.WHILE, b'While ',        cmds.while_cmd)
-	yield CommandToken(tok.REPEAT, b'Repeat ',      cmds.repeat_cmd)
-	yield CommandToken(tok.FOR, b'For(',            cmds.for_cmd)
-	yield CommandToken(tok.END, b'End',             cmds.end_cmd)
-	yield CommandToken(0xD5, b'Return',             cmds.return_cmd)
-	yield CommandToken(tok.LBL, b'Lbl ',            cmds.lbl_cmd)
-	yield CommandToken(0xD7, b'Goto ',              cmds.goto_cmd)
-	yield CommandToken(0xD8, b'Pause ',             cmds.pause_cmd)
-	yield CommandToken(0xD9, b'Stop',               cmds.stop_cmd)
-	yield CommandToken(0xDA, b'IS>(',               cmds.is_gt_cmd)
-	yield CommandToken(0xDB, b'DS<(',               cmds.ds_lt_cmd)
-	yield CommandToken(0xDC, b'Input ',             cmds.input_cmd)
-	yield CommandToken(0xDD, b'Prompt ',            cmds.prompt_cmd)
-	yield CommandToken(0xDE, b'Disp ',              cmds.disp)
-	yield CommandToken(0xDF, b'DispGraph',          cmds.disp_graph)
-	yield CommandToken(0xE0, b'Output(',            cmds.output)
-	yield CommandToken(0xE1, b'ClrHome',            cmds.clr_home)
+	yield CommandToken(tok.IF, b'If ',              prgm.if_cmd)
+	yield CommandToken(tok.THEN, b'Then',           prgm.then_cmd)
+	yield CommandToken(tok.ELSE, b'Else',           prgm.else_cmd)
+	yield CommandToken(tok.WHILE, b'While ',        prgm.while_cmd)
+	yield CommandToken(tok.REPEAT, b'Repeat ',      prgm.repeat_cmd)
+	yield CommandToken(tok.FOR, b'For(',            prgm.for_cmd)
+	yield CommandToken(tok.END, b'End',             prgm.end_cmd)
+	yield CommandToken(0xD5, b'Return',             prgm.return_cmd)
+	yield CommandToken(tok.LBL, b'Lbl ',            prgm.lbl_cmd)
+	yield CommandToken(0xD7, b'Goto ',              prgm.goto_cmd)
+	yield CommandToken(0xD8, b'Pause ',             prgm.pause_cmd)
+	yield CommandToken(0xD9, b'Stop',               prgm.stop_cmd)
+	yield CommandToken(0xDA, b'IS>(',               prgm.is_gt_cmd)
+	yield CommandToken(0xDB, b'DS<(',               prgm.ds_lt_cmd)
+	yield CommandToken(0xDC, b'Input ',             prgm.input_cmd)
+	yield CommandToken(0xDD, b'Prompt ',            prgm.prompt_cmd)
+	yield CommandToken(0xDE, b'Disp ',              prgm.disp)
+	yield CommandToken(0xDF, b'DispGraph',          prgm.disp_graph)
+	yield CommandToken(0xE0, b'Output(',            prgm.output)
+	yield CommandToken(0xE1, b'ClrHome',            prgm.clr_home)
 	yield CommandToken(0xE2, b'Fill(',              tilist.fill)
 	yield CommandToken(0xE3, b'SortA(',             tilist.sort_a)
 	yield CommandToken(0xE4, b'SortD(',             tilist.sort_d)
-	yield CommandToken(0xE5, b'DispTable',          cmds.disp_table)
-	yield CommandToken(0xE6, b'Menu(',              cmds.menu_cmd)
+	yield CommandToken(0xE5, b'DispTable',          prgm.disp_table)
+	yield CommandToken(0xE6, b'Menu(',              prgm.menu_cmd)
 	yield Token(0xE7, b'Send(')
 	yield Token(0xE8, b'Get(')
 	yield CommandToken(0xE9, b'PlotsOn',            _PLACEHOLDER)
