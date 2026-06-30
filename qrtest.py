@@ -1,25 +1,17 @@
 from pathlib import Path
 
 from environment import Environment
-from core import TiList
 from terminal import TerminalConsole
-from program import Program
 from tifile import ProgramFile, ListFile
 from catalog import get_token, TEXT_INPUT
 
 def load(dir_):
 	env = Environment()
+	readers = {'.8xp': ProgramFile, '.8xl': ListFile}
 	for file in Path(dir_).iterdir():
-		if file.suffix == '.8xp':
-			prgm = ProgramFile.load(file)
-			env.programs[prgm.name] = Program(prgm.tokens, prgm.name)
-		if file.suffix == '.8xl':
-			lst = ListFile.load(file)
-			ti_list = TiList(lst.values)
-			if lst.name.isdigit():
-				env.lists[int(lst.name)] = ti_list
-			else:
-				env.user_lists[lst.name] = ti_list
+		reader = readers.get(file.suffix)
+		if reader:
+			reader.load(file).store_to(env)
 	return env
 
 

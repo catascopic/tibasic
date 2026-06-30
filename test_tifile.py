@@ -7,13 +7,31 @@ from tifile import (
 	ProgramFile, ListFile, PictureFile, VariableFile, MatrixFile,
 	StringFile, EquationFile,
 	_decode_list_name, _encode_list_name,
-	_decode_pic_name, _encode_pic_name,
-	_decode_var_name, _encode_var_name,
-	_decode_matrix_name, _encode_matrix_name,
-	_decode_token_name, _encode_token_name,
+	_decode_name_token, _name_field,
 )
 from bitmap import Bitmap, ROWS, COLS
+from core import TiList, TiMatrix, TiString, TiEquation
+from catalog import get_token
+from environment import Environment
 from test_tibasic import toks
+
+
+# Variable files now carry their name *token*; production code reads it from disk
+# or gets it from the environment.  Tests construct files by friendly name, so this
+# reverse map (token text → token) is a test-only convenience.
+_NAME_TOKENS = {
+	get_token(c).text: get_token(c)
+	for c in (*range(0x41, 0x5C),       # A..Z, θ          (number variables)
+	          *range(0x5C00, 0x5C0A),   # [A]..[J]         (matrices)
+	          *range(0x6000, 0x600A),   # Pic1..Pic0       (pictures)
+	          *range(0xAA00, 0xAA0A),   # Str1..Str0       (strings)
+	          *range(0x5E10, 0x5E1A), *range(0x5E20, 0x5E2C),
+	          *range(0x5E40, 0x5E46), *range(0x5E80, 0x5E83))   # equations
+}
+
+
+def tok(name: str):
+	return _NAME_TOKENS[name]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -187,8 +205,8 @@ def roundtrip_list(lst: ListFile) -> ListFile:
 
 def make_list(**kwargs) -> ListFile:
 	kwargs.setdefault('name', 'TEST')
-	kwargs.setdefault('values', [])
-	return ListFile(**kwargs)
+	kwargs['value'] = TiList(kwargs.pop('values', []))
+	return ListFile(**kwargs)  # lists keep a str name (built-in "0".."5" or user)
 
 
 # ── List name coding ──────────────────────────────────────────────────────────
@@ -250,10 +268,10 @@ class TestListFileRoundtrip:
 
 	def test_values_preserved(self):
 		result = roundtrip_list(make_list(values=[1.0, 2.5, -3.0]))
-		assert result.values == pytest.approx([1.0, 2.5, -3.0])
+		assert list(result.value) == pytest.approx([1.0, 2.5, -3.0])
 
 	def test_empty_values(self):
-		assert roundtrip_list(make_list(values=[])).values == []
+		assert list(roundtrip_list(make_list(values=[])).value) == []
 
 	def test_archived(self):
 		assert roundtrip_list(make_list(archived=True)).archived is True
@@ -276,23 +294,23 @@ class TestComplexListRoundtrip:
 		vals = [1 + 0j, 1j, 1 + 1j, -2 - 3j]
 		result = roundtrip_list(make_list(values=vals))
 		assert result.is_complex is True
-		assert result.values == pytest.approx(vals)
+		assert list(result.value) == pytest.approx(vals)
 
 	def test_complex_negative_parts(self):
 		# exercises the sign bit combined with the 0x0C complex flag
 		result = roundtrip_list(make_list(values=[-1.5 - 2.5j]))
-		assert result.values == pytest.approx([-1.5 - 2.5j])
+		assert list(result.value) == pytest.approx([-1.5 - 2.5j])
 
 	def test_mixed_real_and_complex_promotes_whole_list(self):
 		# a real value in a complex list is stored as x + 0i and reads back complex
 		result = roundtrip_list(make_list(values=[3.0, 4j]))
 		assert result.is_complex is True
-		assert result.values == pytest.approx([3 + 0j, 4j])
+		assert list(result.value) == pytest.approx([3 + 0j, 4j])
 
 	def test_real_list_stays_real(self):
 		result = roundtrip_list(make_list(values=[1.0, 2.0, 3.0]))
 		assert result.is_complex is False
-		assert all(not isinstance(v, complex) for v in result.values)
+		assert all(not isinstance(v, complex) for v in result.value)
 
 
 # ── ListFile real-file byte-exact roundtrip ───────────────────────────────────
@@ -306,7 +324,7 @@ def test_complex_list_from_file():
 	lst = ListFile.load(_CPX_LIST_FILE)
 	assert lst.name == 'CPX'
 	assert lst.is_complex is True
-	assert lst.values == pytest.approx([1, 1j, 1 + 1j, 2 ** 0.5, 7 ** 0.5 * 1j, 0.69314718055994 + 3.1415926535898j])
+	assert list(lst.value) == pytest.approx([1, 1j, 1 + 1j, 2 ** 0.5, 7 ** 0.5 * 1j, 0.69314718055994 + 3.1415926535898j])
 
 
 def test_complex_list_byte_exact_roundtrip():
@@ -359,48 +377,20 @@ def make_bitmap(pixels=()) -> Bitmap:
 
 
 def make_pic(**kwargs) -> PictureFile:
-	kwargs.setdefault('name', '1')
+	name = kwargs.pop('name', 'Pic1')
 	kwargs.setdefault('bitmap', make_bitmap())
-	return PictureFile(**kwargs)
+	return PictureFile(tok(name), **kwargs)
 
 
 def pixels_of(bmp: Bitmap) -> set:
 	return {(r, c) for r in range(ROWS) for c in range(COLS) if bmp.get(r, c)}
 
 
-# ── Picture name coding ───────────────────────────────────────────────────────
-
-class TestPicNameCoding:
-	# decode: index byte → picture number (Pic1→0x00, …, Pic9→0x08, Pic0→0x09)
-	def test_decode_pic1(self):
-		assert _decode_pic_name(b'\x60\x00' + b'\x00' * 6) == '1'
-
-	def test_decode_pic9(self):
-		assert _decode_pic_name(b'\x60\x08' + b'\x00' * 6) == '9'
-
-	def test_decode_pic0(self):
-		assert _decode_pic_name(b'\x60\x09' + b'\x00' * 6) == '0'
-
-	# encode: picture number → 0x60 token + index byte
-	def test_encode_pic1(self):
-		assert _encode_pic_name('1') == b'\x60\x00' + b'\x00' * 6
-
-	def test_encode_pic9(self):
-		assert _encode_pic_name('9') == b'\x60\x08' + b'\x00' * 6
-
-	def test_encode_pic0(self):
-		assert _encode_pic_name('0') == b'\x60\x09' + b'\x00' * 6
-
-	def test_all_pics_roundtrip(self):
-		for n in '1234567890':
-			assert _decode_pic_name(_encode_pic_name(n)) == n
-
-
 # ── PictureFile roundtrip ─────────────────────────────────────────────────────
 
 class TestPictureFileRoundtrip:
 	def test_name(self):
-		assert roundtrip_pic(make_pic(name='9')).name == '9'
+		assert roundtrip_pic(make_pic(name='Pic9')).name == 'Pic9'
 
 	def test_pixels_corners_and_edges(self):
 		# all four corners of the full screen (default 64-row format), plus interior
@@ -441,8 +431,8 @@ class TestPictureFileRoundtrip:
 
 _PIC_DIR = r'C:\Users\Max\Documents\MyTiData\Backups\TI84PlusSilverEdition_11'
 _PIC_FILES = [
-	('9', 63, rf'{_PIC_DIR}\Pic9.8xi'),
-	('3', 64, rf'{_PIC_DIR}\Pic3.8xi'),
+	('Pic9', 63, rf'{_PIC_DIR}\Pic9.8xi'),
+	('Pic3', 64, rf'{_PIC_DIR}\Pic3.8xi'),
 ]
 
 
@@ -478,29 +468,30 @@ def roundtrip_var(var: VariableFile) -> VariableFile:
 
 
 def make_var(**kwargs) -> VariableFile:
-	kwargs.setdefault('name', 'A')
 	kwargs.setdefault('value', 0.0)
-	return VariableFile(**kwargs)
+	return VariableFile(tok(kwargs.pop('name', 'A')), **kwargs)
 
 
-class TestVariableNameCoding:
+class TestNameToken:
+	# the shared 8-byte name field holds a single token; _decode_name_token reads it
+	# and _name_field writes it (1-byte letters, 2-byte matrix/pic/string/equation)
 	def test_decode_letter(self):
-		assert _decode_var_name(b'A' + b'\x00' * 7) == 'A'
+		assert _decode_name_token(b'A' + b'\x00' * 7).text == 'A'
 
 	def test_decode_theta(self):
-		assert _decode_var_name(b'\x5b' + b'\x00' * 7) == THETA
+		assert _decode_name_token(b'\x5b' + b'\x00' * 7).text == THETA
 
-	def test_encode_letter(self):
-		assert _encode_var_name('A') == b'A' + b'\x00' * 7
+	def test_decode_two_byte(self):
+		assert _decode_name_token(b'\xaa\x00' + b'\x00' * 6).text == 'Str1'   # Str1
+		assert _decode_name_token(b'\x5c\x00' + b'\x00' * 6).text == '[A]'    # matrix [A]
+		assert _decode_name_token(b'\x60\x00' + b'\x00' * 6).text == 'Pic1'   # Pic1
+		assert _decode_name_token(b'\x5e\x10' + b'\x00' * 6).text == 'Y₁'     # Y₁
 
-	def test_encode_letter_uppercased(self):
-		assert _encode_var_name('a') == b'A' + b'\x00' * 7
-
-	def test_encode_theta(self):
-		assert _encode_var_name(THETA) == b'\x5b' + b'\x00' * 7
-
-	def test_encode_theta_uppercase_form(self):
-		assert _encode_var_name(THETA.upper()) == b'\x5b' + b'\x00' * 7
+	def test_name_field_round_trips(self):
+		for name in ('A', THETA, 'Str1', '[A]', 'Pic1', 'Y₁', '\U0001d462'):
+			field = _name_field(tok(name))
+			assert len(field) == 8
+			assert _decode_name_token(field).text == name
 
 
 class TestVariableFileRoundtrip:
@@ -577,27 +568,9 @@ def roundtrip_matrix(mat: MatrixFile) -> MatrixFile:
 
 
 def make_matrix(**kwargs) -> MatrixFile:
-	kwargs.setdefault('name', 'A')
-	kwargs.setdefault('values', [[1.0, 2.0], [3.0, 4.0]])
-	return MatrixFile(**kwargs)
-
-
-class TestMatrixNameCoding:
-	def test_decode_a(self):
-		assert _decode_matrix_name(b'\x5c\x00' + b'\x00' * 6) == 'A'
-
-	def test_decode_j(self):
-		assert _decode_matrix_name(b'\x5c\x09' + b'\x00' * 6) == 'J'
-
-	def test_encode_a(self):
-		assert _encode_matrix_name('A') == b'\x5c\x00' + b'\x00' * 6
-
-	def test_encode_j(self):
-		assert _encode_matrix_name('J') == b'\x5c\x09' + b'\x00' * 6
-
-	def test_all_matrices_roundtrip(self):
-		for letter in 'ABCDEFGHIJ':
-			assert _decode_matrix_name(_encode_matrix_name(letter)) == letter
+	name = kwargs.pop('name', '[A]')
+	kwargs['value'] = TiMatrix(kwargs.pop('values', [[1.0, 2.0], [3.0, 4.0]]))
+	return MatrixFile(tok(name), **kwargs)
 
 
 class TestMatrixFileRoundtrip:
@@ -607,33 +580,33 @@ class TestMatrixFileRoundtrip:
 
 	def test_square(self):
 		vals = [[1.0, 2.0], [3.0, 4.0]]
-		assert roundtrip_matrix(make_matrix(values=vals)).values == vals
+		assert roundtrip_matrix(make_matrix(values=vals)).value.data == vals
 
 	def test_rectangular_preserves_shape(self):
 		# 2x5 — guards against a row/column transpose
 		vals = [[1.0, 2.0, 3.0, 4.0, 5.0], [6.0, 7.0, 8.0, 9.0, 10.0]]
 		result = roundtrip_matrix(make_matrix(values=vals))
 		assert (result.rows, result.cols) == (2, 5)
-		assert result.values == vals
+		assert result.value.data == vals
 
 	def test_row_vector(self):
 		vals = [[1.0, 2.0, 3.0]]
 		result = roundtrip_matrix(make_matrix(values=vals))
 		assert (result.rows, result.cols) == (1, 3)
-		assert result.values == vals
+		assert result.value.data == vals
 
 	def test_column_vector(self):
 		vals = [[1.0], [2.0], [3.0]]
 		result = roundtrip_matrix(make_matrix(values=vals))
 		assert (result.rows, result.cols) == (3, 1)
-		assert result.values == vals
+		assert result.value.data == vals
 
 	def test_negative_values(self):
 		vals = [[-1.5, 2.5], [3.0, -4.0]]
-		assert roundtrip_matrix(make_matrix(values=vals)).values == vals
+		assert roundtrip_matrix(make_matrix(values=vals)).value.data == vals
 
 	def test_name_preserved(self):
-		assert roundtrip_matrix(make_matrix(name='J')).name == 'J'
+		assert roundtrip_matrix(make_matrix(name='[J]')).name == '[J]'
 
 	def test_archived(self):
 		assert roundtrip_matrix(make_matrix(archived=True)).archived is True
@@ -646,10 +619,10 @@ class TestMatrixFileRoundtrip:
 
 _MATRIX_DIR = r'C:\Users\Max\Documents\MyTiData\Backups\TI84PlusSilverEdition_13'
 _MATRIX_FILES = [
-	('A', 1, 1, rf'{_MATRIX_DIR}\A.8xm'),
-	('B', 2, 2, rf'{_MATRIX_DIR}\B.8xm'),
-	('C', 3, 3, rf'{_MATRIX_DIR}\C.8xm'),
-	('D', 50, 1, rf'{_MATRIX_DIR}\D.8xm'),
+	('[A]', 1, 1, rf'{_MATRIX_DIR}\A.8xm'),
+	('[B]', 2, 2, rf'{_MATRIX_DIR}\B.8xm'),
+	('[C]', 3, 3, rf'{_MATRIX_DIR}\C.8xm'),
+	('[D]', 50, 1, rf'{_MATRIX_DIR}\D.8xm'),
 ]
 
 
@@ -681,57 +654,42 @@ def roundtrip_tokenvar(obj):
 	return type(obj).read_from(buf)
 
 
-class TestTokenVarNames:
-	def test_decode_string(self):
-		assert _decode_token_name(b'\xaa\x00' + b'\x00' * 6) == 'Str1'
-		assert _decode_token_name(b'\xaa\x09' + b'\x00' * 6) == 'Str0'
-
-	def test_decode_equation(self):
-		assert _decode_token_name(b'\x5e\x10' + b'\x00' * 6) == 'Y₁'           # Y₁
-		assert _decode_token_name(b'\x5e\x80' + b'\x00' * 6) == '\U0001d462'   # 𝑢
-
-	def test_encode(self):
-		assert _encode_token_name('Str1') == b'\xaa\x00' + b'\x00' * 6
-		assert _encode_token_name('Y₁')   == b'\x5e\x10' + b'\x00' * 6
-		assert _encode_token_name('\U0001d462') == b'\x5e\x80' + b'\x00' * 6
-
-
 class TestStringFileRoundtrip:
 	def test_contents(self):
-		result = roundtrip_tokenvar(StringFile(name='Str1', tokens=toks('ABC')))
+		result = roundtrip_tokenvar(StringFile(tok('Str1'), TiString(toks('ABC'))))
 		assert result.name == 'Str1'
-		assert result.tokens == toks('ABC')
+		assert result.value.tokens == toks('ABC')
 		assert result.text == 'ABC'
 
 	def test_empty_string(self):
-		result = roundtrip_tokenvar(StringFile(name='Str3', tokens=[]))
-		assert result.tokens == []
+		result = roundtrip_tokenvar(StringFile(tok('Str3'), TiString([])))
+		assert result.value.tokens == []
 		assert result.text == ''
 
 	def test_archived_and_comment(self):
-		result = roundtrip_tokenvar(StringFile(name='Str9', tokens=toks('X'), comment='hi', archived=True))
+		result = roundtrip_tokenvar(StringFile(tok('Str9'), TiString(toks('X')), comment='hi', archived=True))
 		assert result.comment == 'hi'
 		assert result.archived is True
 
 	def test_var_type_byte(self):
 		buf = BytesIO()
-		StringFile(name='Str1', tokens=toks('A')).write_to(buf)
+		StringFile(tok('Str1'), TiString(toks('A'))).write_to(buf)
 		assert buf.getvalue()[59] == 0x04
 
 
 class TestEquationFileRoundtrip:
 	def test_contents(self):
-		result = roundtrip_tokenvar(EquationFile(name='Y₁', tokens=toks('X')))
+		result = roundtrip_tokenvar(EquationFile(tok('Y₁'), TiEquation(toks('X'))))
 		assert result.name == 'Y₁'
 		assert result.text == 'X'
 
 	def test_sequence_var_name(self):
-		result = roundtrip_tokenvar(EquationFile(name='\U0001d462', tokens=toks('X')))  # 𝑢
+		result = roundtrip_tokenvar(EquationFile(tok('\U0001d462'), TiEquation(toks('X'))))  # 𝑢
 		assert result.name == '\U0001d462'
 
 	def test_var_type_byte(self):
 		buf = BytesIO()
-		EquationFile(name='Y₁', tokens=toks('X')).write_to(buf)
+		EquationFile(tok('Y₁'), TiEquation(toks('X'))).write_to(buf)
 		assert buf.getvalue()[59] == 0x03
 
 
@@ -763,3 +721,62 @@ def test_tokenvar_byte_exact_roundtrip(cls, name, path):
 	buf = BytesIO()
 	cls.load(path).write_to(buf)
 	assert buf.getvalue() == orig
+
+
+# ── store_to(env): install a loaded file into a running environment ────────────
+
+class TestStoreTo:
+	def test_number_variable(self):
+		env = Environment()
+		VariableFile(tok('A'), 7.0).store_to(env)
+		assert tok('A').resolve(env) == 7.0
+
+	def test_complex_variable(self):
+		env = Environment()
+		VariableFile(tok('B'), 3 + 4j).store_to(env)
+		assert tok('B').resolve(env) == 3 + 4j
+
+	def test_builtin_list(self):
+		env = Environment()
+		ListFile('0', TiList([1.0, 2.0, 3.0])).store_to(env)
+		assert env.lists[0].data == [1.0, 2.0, 3.0]
+
+	def test_user_list(self):
+		env = Environment()
+		ListFile('CW', TiList([5.0, 6.0])).store_to(env)
+		assert env.user_lists['CW'].data == [5.0, 6.0]
+
+	def test_matrix(self):
+		env = Environment()
+		MatrixFile(tok('[A]'), TiMatrix([[1.0, 2.0], [3.0, 4.0]])).store_to(env)
+		assert env.matrices[0].data == [[1.0, 2.0], [3.0, 4.0]]
+
+	def test_string(self):
+		env = Environment()
+		StringFile(tok('Str1'), TiString(toks('HI'))).store_to(env)
+		assert str(env.strings[0]) == 'HI'
+
+	def test_picture(self):
+		env = Environment()
+		PictureFile(tok('Pic1'), make_bitmap({(5, 5)})).store_to(env)
+		assert pixels_of(env.pics[1]) == {(5, 5)}
+
+	def test_program(self):
+		env = Environment()
+		ProgramFile('TEST', toks('5')).store_to(env)
+		assert env.programs['TEST'].tokens == toks('5')
+
+	def test_equation(self):
+		env = Environment()
+		EquationFile(tok('Y₁'), TiEquation(toks('X'))).store_to(env)
+		assert tok('Y₁')._get(env).tokens == toks('X')
+
+	def test_store_then_round_trip_through_file_and_env(self):
+		# load a real list file and install it; the env slot matches the file value
+		path = _CPX_LIST_FILE
+		if not os.path.exists(path):
+			pytest.skip('real file not found')
+		env = Environment()
+		lst = ListFile.load(path)          # name 'CPX' (user list)
+		lst.store_to(env)
+		assert list(env.user_lists['CPX']) == pytest.approx(list(lst.value))
