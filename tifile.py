@@ -1,11 +1,12 @@
-"""Read and write TI-83/84 variable files (.8xp programs, .8xl real lists).
+"""Read and write TI-83/84 variable files: programs (.8xp), lists (.8xl), number
+variables (.8xn real / .8xc complex), matrices (.8xm), and pictures (.8xi).
 
 Every TI variable file shares one envelope — an 8-byte signature, a 42-byte
 comment, a variable-entry header (type, name, archive flag), and a trailing
 checksum — wrapping a type-specific body.  `_read_var_header` / `_write_var_file`
-own that envelope; ProgramFile and ListFile each supply only the body: a
-length-prefixed token stream for programs, a count-prefixed array of 9-byte TI
-reals for lists.
+own that envelope; each file class (all subclassing `TiFile`) supplies only the
+body via its own read_from / write_to — a length-prefixed token stream for
+programs, a count-prefixed array of 9-byte TI reals for lists, and so on.
 """
 from dataclasses import dataclass
 from pathlib import Path
@@ -78,8 +79,23 @@ def _write_var_file(f, file_type, name_bytes, archived, comment, body, version):
 	f.write(checksum.to_bytes(2, 'little'))
 
 
+class TiFile:
+	"""Base for every TI variable file type.  Subclasses are dataclasses that
+	implement read_from(f) / write_to(f) for their own body format; this base adds
+	the shared path-level load() / write() wrappers around them."""
+
+	@classmethod
+	def load(cls, file):
+		with open(file, 'rb') as f:
+			return cls.read_from(f)
+
+	def write(self, file):
+		with open(file, 'wb') as f:
+			self.write_to(f)
+
+
 @dataclass
-class ProgramFile:
+class ProgramFile(TiFile):
 	name:     str
 	tokens:   list[Token]
 	comment:  str  = ''
@@ -114,21 +130,12 @@ class ProgramFile:
 			version  = version,
 		)
 
-	@classmethod
-	def load(cls, file):
-		with open(file, 'rb') as f:
-			return cls.read_from(f)
-
 	def write_to(self, f):
 		program    = b''.join(t.code_to_bytes() for t in self.tokens)
 		name_bytes = self.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
 		file_type  = 0x06 if self.locked else 0x05
 		body       = len(program).to_bytes(2, 'little') + program  # prog_len prefix + body
 		_write_var_file(f, file_type, name_bytes, self.archived, self.comment, body, version=self.version)
-
-	def write(self, file):
-		with open(file, 'wb') as f:
-			self.write_to(f)
 
 
 # A TI real is 9 bytes: a flags byte (bit 7 = sign, 0x0C = part of a complex
@@ -174,7 +181,7 @@ _LIST_TYPE_COMPLEX = 0x0D
 
 
 @dataclass
-class ListFile:
+class ListFile(TiFile):
 	name:     str
 	values:   list[float | complex]
 	comment:  str  = ''
@@ -213,11 +220,6 @@ class ListFile:
 			version  = version,
 		)
 
-	@classmethod
-	def load(cls, file):
-		with open(file, 'rb') as f:
-			return cls.read_from(f)
-
 	def write_to(self, f):
 		name_bytes = _encode_list_name(self.name)
 		if self.is_complex:
@@ -230,10 +232,6 @@ class ListFile:
 			file_type = _LIST_TYPE_REAL
 		body = len(self.values).to_bytes(2, 'little') + elements  # element count + data
 		_write_var_file(f, file_type, name_bytes, self.archived, self.comment, body, version=self.version)
-
-	def write(self, file):
-		with open(file, 'wb') as f:
-			self.write_to(f)
 
 
 def _decode_list_name(name_bytes: bytes) -> str:
@@ -290,7 +288,7 @@ def _encode_var_name(name: str) -> bytes:
 
 
 @dataclass
-class VariableFile:
+class VariableFile(TiFile):
 	name:     str
 	value:    float | complex
 	comment:  str  = ''
@@ -326,11 +324,6 @@ class VariableFile:
 			version  = version,
 		)
 
-	@classmethod
-	def load(cls, file):
-		with open(file, 'rb') as f:
-			return cls.read_from(f)
-
 	def write_to(self, f):
 		name_bytes = _encode_var_name(self.name)
 		if self.is_complex:
@@ -341,10 +334,6 @@ class VariableFile:
 			body      = _encode_ti_real(self.value)
 			file_type = _VAR_TYPE_REAL
 		_write_var_file(f, file_type, name_bytes, self.archived, self.comment, body, version=self.version)
-
-	def write(self, file):
-		with open(file, 'wb') as f:
-			self.write_to(f)
 
 
 # ── Matrix files (.8xm) ─────────────────────────────────────────────────────────
@@ -366,7 +355,7 @@ def _encode_matrix_name(name: str) -> bytes:
 
 
 @dataclass
-class MatrixFile:
+class MatrixFile(TiFile):
 	name:     str
 	values:   list[list[float]]   # row-major: values[row][col]
 	comment:  str  = ''
@@ -406,20 +395,11 @@ class MatrixFile:
 			version  = version,
 		)
 
-	@classmethod
-	def load(cls, file):
-		with open(file, 'rb') as f:
-			return cls.read_from(f)
-
 	def write_to(self, f):
 		name_bytes = _encode_matrix_name(self.name)
 		reals      = b''.join(_encode_ti_real(v) for row in self.values for v in row)
 		body       = bytes([self.cols, self.rows]) + reals  # cols, rows, then row-major reals
 		_write_var_file(f, 0x02, name_bytes, self.archived, self.comment, body, version=self.version)
-
-	def write(self, file):
-		with open(file, 'wb') as f:
-			self.write_to(f)
 
 
 # ── Picture files (.8xi) ───────────────────────────────────────────────────────
@@ -474,7 +454,7 @@ def _encode_pic_name(name: str) -> bytes:
 
 
 @dataclass
-class PictureFile:
+class PictureFile(TiFile):
 	name:     str
 	bitmap:   Bitmap
 	comment:  str  = ''
@@ -507,30 +487,28 @@ class PictureFile:
 			rows     = rows,
 		)
 
-	@classmethod
-	def load(cls, file):
-		with open(file, 'rb') as f:
-			return cls.read_from(f)
-
 	def write_to(self, f):
 		name_bytes = _encode_pic_name(self.name)
 		pixels     = _encode_picture_data(self.bitmap, self.rows)
 		body       = len(pixels).to_bytes(2, 'little') + pixels  # pixel-byte count + data
 		_write_var_file(f, 0x07, name_bytes, self.archived, self.comment, body, version=self.version)
 
-	def write(self, file):
-		with open(file, 'wb') as f:
-			self.write_to(f)
-
 
 if __name__ == '__main__':
 	import sys
 
 	_READERS = {
-		'.8xl': ListFile, '.8xi': PictureFile, '.8xm': MatrixFile,
-		'.8xn': VariableFile, '.8xc': VariableFile,
+		'.8xp': ProgramFile,
+		'.8xl': ListFile,
+		'.8xm': MatrixFile,
+		'.8xn': VariableFile,
+		'.8xc': VariableFile,
+		'.8xi': PictureFile,
 	}
 
 	for path in sys.argv[1:]:
-		reader = _READERS.get(path[-4:].lower(), ProgramFile)
+		reader = _READERS.get(path[-4:].lower())
+		if reader is None:
+			print(f"tifile: unrecognized file type: {path}", file=sys.stderr)
+			continue
 		reader.load(path).print()
