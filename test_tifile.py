@@ -1,12 +1,13 @@
-"""Tests for ProgramFile and ListFile binary file format (read_from / write_to)."""
+"""Tests for the TI variable file formats (read_from / write_to)."""
 import os
 import pytest
 from io import BytesIO
 
 from tifile import (
-	ProgramFile, ListFile, PictureFile,
+	ProgramFile, ListFile, PictureFile, VariableFile,
 	_decode_list_name, _encode_list_name,
 	_decode_pic_name, _encode_pic_name,
+	_decode_var_name, _encode_var_name,
 )
 from bitmap import Bitmap, ROWS, COLS
 from test_tibasic import toks
@@ -458,4 +459,106 @@ def test_pic_byte_exact_roundtrip(name, rows, path):
 	orig = open(path, 'rb').read()
 	buf = BytesIO()
 	PictureFile.load(path).write_to(buf)
+	assert buf.getvalue() == orig
+
+
+# ── VariableFile (.8xn real / .8xc complex) ───────────────────────────────────
+
+THETA = 'θ'
+
+
+def roundtrip_var(var: VariableFile) -> VariableFile:
+	buf = BytesIO()
+	var.write_to(buf)
+	buf.seek(0)
+	return VariableFile.read_from(buf)
+
+
+def make_var(**kwargs) -> VariableFile:
+	kwargs.setdefault('name', 'A')
+	kwargs.setdefault('value', 0.0)
+	return VariableFile(**kwargs)
+
+
+class TestVariableNameCoding:
+	def test_decode_letter(self):
+		assert _decode_var_name(b'A' + b'\x00' * 7) == 'A'
+
+	def test_decode_theta(self):
+		assert _decode_var_name(b'\x5b' + b'\x00' * 7) == THETA
+
+	def test_encode_letter(self):
+		assert _encode_var_name('A') == b'A' + b'\x00' * 7
+
+	def test_encode_letter_uppercased(self):
+		assert _encode_var_name('a') == b'A' + b'\x00' * 7
+
+	def test_encode_theta(self):
+		assert _encode_var_name(THETA) == b'\x5b' + b'\x00' * 7
+
+	def test_encode_theta_uppercase_form(self):
+		assert _encode_var_name(THETA.upper()) == b'\x5b' + b'\x00' * 7
+
+
+class TestVariableFileRoundtrip:
+	def test_real_value(self):
+		assert roundtrip_var(make_var(value=8.0)).value == pytest.approx(8.0)
+
+	def test_real_negative(self):
+		assert roundtrip_var(make_var(value=-3.5)).value == pytest.approx(-3.5)
+
+	def test_is_complex_flag(self):
+		assert make_var(value=1 + 2j).is_complex is True
+		assert make_var(value=4.0).is_complex is False
+
+	def test_complex_value(self):
+		result = roundtrip_var(make_var(value=1 + 2j))
+		assert result.is_complex is True
+		assert result.value == pytest.approx(1 + 2j)
+
+	def test_complex_negative_parts(self):
+		assert roundtrip_var(make_var(value=-1.5 - 2.5j)).value == pytest.approx(-1.5 - 2.5j)
+
+	def test_real_value_stays_real(self):
+		result = roundtrip_var(make_var(value=2.0))
+		assert result.is_complex is False
+		assert not isinstance(result.value, complex)
+
+	def test_name_preserved(self):
+		assert roundtrip_var(make_var(name='Z')).name == 'Z'
+
+	def test_theta_name_preserved(self):
+		assert roundtrip_var(make_var(name=THETA, value=5.0)).name == THETA
+
+	def test_archived(self):
+		assert roundtrip_var(make_var(archived=True)).archived is True
+
+	def test_comment(self):
+		assert roundtrip_var(make_var(comment='my var')).comment == 'my var'
+
+
+# ── VariableFile real-file byte-exact roundtrip ───────────────────────────────
+
+_VAR_FILES = [
+	('A', 8.0, r'C:\Users\Max\Documents\MyTiData\Backups\TI84PlusSilverEdition_11\A.8xn'),
+	('D', 2 ** 0.5, r'C:\Users\Max\Documents\MyTiData\Backups\TI84PlusSilverEdition_12\D.8xc'),
+]
+
+
+@pytest.mark.parametrize('name,value,path', _VAR_FILES)
+def test_var_metadata_from_file(name, value, path):
+	if not os.path.exists(path):
+		pytest.skip('real file not found')
+	var = VariableFile.load(path)
+	assert var.name == name
+	assert var.value == pytest.approx(value)
+
+
+@pytest.mark.parametrize('name,value,path', _VAR_FILES)
+def test_var_byte_exact_roundtrip(name, value, path):
+	if not os.path.exists(path):
+		pytest.skip('real file not found')
+	orig = open(path, 'rb').read()
+	buf = BytesIO()
+	VariableFile.load(path).write_to(buf)
 	assert buf.getvalue() == orig

@@ -260,6 +260,93 @@ def _encode_list_name(name: str) -> bytes:
 	return (bytes([_LIST_NAME_TOKEN]) + body).ljust(8, b'\x00')
 
 
+# ── Number variables (.8xn real / .8xc complex) ────────────────────────────────
+# The letter variables A–Z, θ.  A real variable carries var type 0x00 and a single
+# 9-byte TI real; a complex variable carries var type 0x0C and 18 bytes (real then
+# imaginary TI real, each with the 0x0C flag).  Unlike lists, the body has no count
+# prefix — it is just the one value.  (Compare list types: 0x01 real, 0x0D complex.)
+_VAR_TYPE_REAL    = 0x00
+_VAR_TYPE_COMPLEX = 0x0C
+
+# θ is a number variable like A–Z, but its name byte is 0x5D's neighbour 0x5B —
+# which is also ASCII '[', so it needs decoding to/from the real glyph.
+_THETA           = 'θ'
+_THETA_NAME_BYTE = 0x5B
+
+
+def _decode_var_name(name_bytes: bytes) -> str:
+	name = name_bytes.rstrip(b'\x00')
+	if name == bytes([_THETA_NAME_BYTE]):
+		return _THETA
+	return name.decode('ascii', errors='replace')
+
+
+def _encode_var_name(name: str) -> bytes:
+	if name in (_THETA, _THETA.upper()):   # accept lower θ or upper Θ
+		body = bytes([_THETA_NAME_BYTE])
+	else:
+		body = name.upper().encode('ascii')[:8]
+	return body.ljust(8, b'\x00')
+
+
+@dataclass
+class VariableFile:
+	name:     str
+	value:    float | complex
+	comment:  str  = ''
+	archived: bool = False
+	version:  int  = 0x00
+
+	@property
+	def is_complex(self) -> bool:
+		return isinstance(self.value, complex)
+
+	def __repr__(self):
+		return f"var{self.name}={_format_value(self.value)}({'' if self.archived else 'un'}archived)"
+
+	def print(self):
+		if self.comment:
+			print(self.comment)
+		print(f"VAR:{self.name} ({'' if self.archived else 'un'}archived)")
+		print(_format_value(self.value))
+
+	@classmethod
+	def read_from(cls, f):
+		file_type, name_bytes, archived, comment, version = _read_var_header(f)
+		if file_type == _VAR_TYPE_COMPLEX:
+			value = complex(_decode_ti_real(f.read(9)), _decode_ti_real(f.read(9)))
+		else:
+			value = _decode_ti_real(f.read(9))
+
+		return cls(
+			name     = _decode_var_name(name_bytes),
+			value    = value,
+			comment  = comment,
+			archived = archived,
+			version  = version,
+		)
+
+	@classmethod
+	def load(cls, file):
+		with open(file, 'rb') as f:
+			return cls.read_from(f)
+
+	def write_to(self, f):
+		name_bytes = _encode_var_name(self.name)
+		if self.is_complex:
+			body      = (_encode_ti_real(self.value.real, complex_flag=True)
+			             + _encode_ti_real(self.value.imag, complex_flag=True))
+			file_type = _VAR_TYPE_COMPLEX
+		else:
+			body      = _encode_ti_real(self.value)
+			file_type = _VAR_TYPE_REAL
+		_write_var_file(f, file_type, name_bytes, self.archived, self.comment, body, version=self.version)
+
+	def write(self, file):
+		with open(file, 'wb') as f:
+			self.write_to(f)
+
+
 # ── Picture files (.8xi) ───────────────────────────────────────────────────────
 # A picture is the 96-wide graph bitmap stored bit-packed MSB-first, 12 bytes per
 # row, wrapped in the usual 2-byte length prefix.  Two heights occur in the wild:
@@ -364,7 +451,7 @@ class PictureFile:
 if __name__ == '__main__':
 	import sys
 
-	_READERS = {'.8xl': ListFile, '.8xi': PictureFile}
+	_READERS = {'.8xl': ListFile, '.8xi': PictureFile, '.8xn': VariableFile, '.8xc': VariableFile}
 
 	for path in sys.argv[1:]:
 		reader = _READERS.get(path[-4:].lower(), ProgramFile)
