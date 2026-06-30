@@ -4,10 +4,11 @@ import pytest
 from io import BytesIO
 
 from tifile import (
-	ProgramFile, ListFile, PictureFile, VariableFile,
+	ProgramFile, ListFile, PictureFile, VariableFile, MatrixFile,
 	_decode_list_name, _encode_list_name,
 	_decode_pic_name, _encode_pic_name,
 	_decode_var_name, _encode_var_name,
+	_decode_matrix_name, _encode_matrix_name,
 )
 from bitmap import Bitmap, ROWS, COLS
 from test_tibasic import toks
@@ -561,4 +562,109 @@ def test_var_byte_exact_roundtrip(name, value, path):
 	orig = open(path, 'rb').read()
 	buf = BytesIO()
 	VariableFile.load(path).write_to(buf)
+	assert buf.getvalue() == orig
+
+
+# ── MatrixFile (.8xm) ─────────────────────────────────────────────────────────
+
+def roundtrip_matrix(mat: MatrixFile) -> MatrixFile:
+	buf = BytesIO()
+	mat.write_to(buf)
+	buf.seek(0)
+	return MatrixFile.read_from(buf)
+
+
+def make_matrix(**kwargs) -> MatrixFile:
+	kwargs.setdefault('name', 'A')
+	kwargs.setdefault('values', [[1.0, 2.0], [3.0, 4.0]])
+	return MatrixFile(**kwargs)
+
+
+class TestMatrixNameCoding:
+	def test_decode_a(self):
+		assert _decode_matrix_name(b'\x5c\x00' + b'\x00' * 6) == 'A'
+
+	def test_decode_j(self):
+		assert _decode_matrix_name(b'\x5c\x09' + b'\x00' * 6) == 'J'
+
+	def test_encode_a(self):
+		assert _encode_matrix_name('A') == b'\x5c\x00' + b'\x00' * 6
+
+	def test_encode_j(self):
+		assert _encode_matrix_name('J') == b'\x5c\x09' + b'\x00' * 6
+
+	def test_all_matrices_roundtrip(self):
+		for letter in 'ABCDEFGHIJ':
+			assert _decode_matrix_name(_encode_matrix_name(letter)) == letter
+
+
+class TestMatrixFileRoundtrip:
+	def test_dims_property(self):
+		mat = make_matrix(values=[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+		assert (mat.rows, mat.cols) == (2, 3)
+
+	def test_square(self):
+		vals = [[1.0, 2.0], [3.0, 4.0]]
+		assert roundtrip_matrix(make_matrix(values=vals)).values == vals
+
+	def test_rectangular_preserves_shape(self):
+		# 2x5 — guards against a row/column transpose
+		vals = [[1.0, 2.0, 3.0, 4.0, 5.0], [6.0, 7.0, 8.0, 9.0, 10.0]]
+		result = roundtrip_matrix(make_matrix(values=vals))
+		assert (result.rows, result.cols) == (2, 5)
+		assert result.values == vals
+
+	def test_row_vector(self):
+		vals = [[1.0, 2.0, 3.0]]
+		result = roundtrip_matrix(make_matrix(values=vals))
+		assert (result.rows, result.cols) == (1, 3)
+		assert result.values == vals
+
+	def test_column_vector(self):
+		vals = [[1.0], [2.0], [3.0]]
+		result = roundtrip_matrix(make_matrix(values=vals))
+		assert (result.rows, result.cols) == (3, 1)
+		assert result.values == vals
+
+	def test_negative_values(self):
+		vals = [[-1.5, 2.5], [3.0, -4.0]]
+		assert roundtrip_matrix(make_matrix(values=vals)).values == vals
+
+	def test_name_preserved(self):
+		assert roundtrip_matrix(make_matrix(name='J')).name == 'J'
+
+	def test_archived(self):
+		assert roundtrip_matrix(make_matrix(archived=True)).archived is True
+
+	def test_comment(self):
+		assert roundtrip_matrix(make_matrix(comment='my matrix')).comment == 'my matrix'
+
+
+# ── MatrixFile real-file byte-exact roundtrip ─────────────────────────────────
+
+_MATRIX_DIR = r'C:\Users\Max\Documents\MyTiData\Backups\TI84PlusSilverEdition_13'
+_MATRIX_FILES = [
+	('A', 1, 1, rf'{_MATRIX_DIR}\A.8xm'),
+	('B', 2, 2, rf'{_MATRIX_DIR}\B.8xm'),
+	('C', 3, 3, rf'{_MATRIX_DIR}\C.8xm'),
+	('D', 50, 1, rf'{_MATRIX_DIR}\D.8xm'),
+]
+
+
+@pytest.mark.parametrize('name,rows,cols,path', _MATRIX_FILES)
+def test_matrix_metadata_from_file(name, rows, cols, path):
+	if not os.path.exists(path):
+		pytest.skip('real file not found')
+	mat = MatrixFile.load(path)
+	assert mat.name == name
+	assert (mat.rows, mat.cols) == (rows, cols)
+
+
+@pytest.mark.parametrize('name,rows,cols,path', _MATRIX_FILES)
+def test_matrix_byte_exact_roundtrip(name, rows, cols, path):
+	if not os.path.exists(path):
+		pytest.skip('real file not found')
+	orig = open(path, 'rb').read()
+	buf = BytesIO()
+	MatrixFile.load(path).write_to(buf)
 	assert buf.getvalue() == orig

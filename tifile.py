@@ -347,6 +347,81 @@ class VariableFile:
 			self.write_to(f)
 
 
+# ── Matrix files (.8xm) ─────────────────────────────────────────────────────────
+# A matrix [A]–[J] holds only real numbers (var type 0x02).  The name is the 0x5C
+# matrix-name token plus an index byte ([A]→0x00 … [J]→0x09).  The body is two
+# dimension bytes — COLUMNS then ROWS, in that (TI) order — followed by rows×cols
+# 9-byte TI reals in row-major order (row 1 left-to-right, then row 2, …).  (Note:
+# the format spec claims elements may be complex, but matrices are real-only.)
+_MATRIX_NAME_TOKEN = 0x5C
+
+
+def _decode_matrix_name(name_bytes: bytes) -> str:
+	return chr(ord('A') + name_bytes[1])  # 0x00→"A", …, 0x09→"J"
+
+
+def _encode_matrix_name(name: str) -> bytes:
+	index = ord(name.upper()) - ord('A')
+	return bytes([_MATRIX_NAME_TOKEN, index]).ljust(8, b'\x00')
+
+
+@dataclass
+class MatrixFile:
+	name:     str
+	values:   list[list[float]]   # row-major: values[row][col]
+	comment:  str  = ''
+	archived: bool = False
+	version:  int  = 0x00
+
+	@property
+	def rows(self) -> int:
+		return len(self.values)
+
+	@property
+	def cols(self) -> int:
+		return len(self.values[0]) if self.values else 0
+
+	def __repr__(self):
+		return f"matrix[{self.name}]({self.rows}x{self.cols};{'' if self.archived else 'un'}archived)"
+
+	def print(self):
+		if self.comment:
+			print(self.comment)
+		print(f"MATRIX:[{self.name}] ({self.rows}x{self.cols}, {'' if self.archived else 'un'}archived)")
+		for row in self.values:
+			print('[' + ' '.join(_format_real(v) for v in row) + ']')
+
+	@classmethod
+	def read_from(cls, f):
+		_file_type, name_bytes, archived, comment, version = _read_var_header(f)
+		cols   = f.read(1)[0]
+		rows   = f.read(1)[0]
+		values = [[_decode_ti_real(f.read(9)) for _ in range(cols)] for _ in range(rows)]
+
+		return cls(
+			name     = _decode_matrix_name(name_bytes),
+			values   = values,
+			comment  = comment,
+			archived = archived,
+			version  = version,
+		)
+
+	@classmethod
+	def load(cls, file):
+		with open(file, 'rb') as f:
+			return cls.read_from(f)
+
+	def write_to(self, f):
+		name_bytes = _encode_matrix_name(self.name)
+		reals      = b''.join(_encode_ti_real(v) for row in self.values for v in row)
+		body       = bytes([self.cols, self.rows]) + reals  # cols, rows, then row-major reals
+		_write_var_file(f, 0x02, name_bytes, self.archived, self.comment, body, version=self.version)
+
+	def write(self, file):
+		with open(file, 'wb') as f:
+			self.write_to(f)
+
+
 # ── Picture files (.8xi) ───────────────────────────────────────────────────────
 # A picture is the 96-wide graph bitmap stored bit-packed MSB-first, 12 bytes per
 # row, wrapped in the usual 2-byte length prefix.  Two heights occur in the wild:
@@ -451,7 +526,10 @@ class PictureFile:
 if __name__ == '__main__':
 	import sys
 
-	_READERS = {'.8xl': ListFile, '.8xi': PictureFile, '.8xn': VariableFile, '.8xc': VariableFile}
+	_READERS = {
+		'.8xl': ListFile, '.8xi': PictureFile, '.8xm': MatrixFile,
+		'.8xn': VariableFile, '.8xc': VariableFile,
+	}
 
 	for path in sys.argv[1:]:
 		reader = _READERS.get(path[-4:].lower(), ProgramFile)
