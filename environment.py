@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import math as _math
 
 from core import TiList, is_complex_val, require_real, require_int, py_int, require_list
-from errors import DataTypeError, IllegalNestError, InvalidCommandError, NonRealAnsError
+from errors import DataTypeError, IllegalNestError, InvalidCommandError, InvalidDimError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graphscreen import GraphScreen
 from graph import (

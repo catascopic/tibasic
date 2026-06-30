@@ -6,23 +6,25 @@ from io import BytesIO
 from tifile import (
 	ProgramFile, ListFile, PictureFile, VariableFile, MatrixFile,
 	StringFile, EquationFile,
-	_decode_list_name, _encode_list_name,
-	_decode_name_token, _name_field,
+	ProgramAccessor, PicAccessor, read_accessor, write_accessor,
 )
 from bitmap import Bitmap, ROWS, COLS
 from core import TiList, TiMatrix, TiString, TiEquation
 from catalog import get_token
-from environment import Environment
+from tokenbase import Flag
+from environment import Environment, UserList
 from test_tibasic import toks
 
 
-# Variable files now carry their name *token*; production code reads it from disk
-# or gets it from the environment.  Tests construct files by friendly name, so this
-# reverse map (token text → token) is a test-only convenience.
+# A file's name is an Accessor; production code reads it from disk or carries the
+# token directly.  Tests construct files by friendly name, so this reverse map
+# (token text → accessor) is a test-only convenience.  Most names are catalog
+# tokens (which are accessors); pictures resolve to a PicAccessor.
 _NAME_TOKENS = {
 	get_token(c).text: get_token(c)
 	for c in (*range(0x41, 0x5C),       # A..Z, θ          (number variables)
 	          *range(0x5C00, 0x5C0A),   # [A]..[J]         (matrices)
+	          *range(0x5D00, 0x5D06),   # L₁..L₆           (built-in lists)
 	          *range(0x6000, 0x600A),   # Pic1..Pic0       (pictures)
 	          *range(0xAA00, 0xAA0A),   # Str1..Str0       (strings)
 	          *range(0x5E10, 0x5E1A), *range(0x5E20, 0x5E2C),
@@ -31,7 +33,10 @@ _NAME_TOKENS = {
 
 
 def tok(name: str):
-	return _NAME_TOKENS[name]
+	"""The accessor a file with this name carries — the catalog token, or a
+	PicAccessor for a picture (whose token isn't an accessor)."""
+	t = _NAME_TOKENS[name]
+	return PicAccessor((t.code - 0x6000 + 1) % 10) if (t.flags & Flag.PIC) else t
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -46,9 +51,9 @@ def roundtrip(prog: ProgramFile) -> ProgramFile:
 
 def make_prog(**kwargs) -> ProgramFile:
 	"""Construct a ProgramFile with sensible defaults."""
-	kwargs.setdefault('name', 'TEST')
-	kwargs.setdefault('tokens', [])
-	return ProgramFile(**kwargs)
+	name   = kwargs.pop('name', 'TEST')
+	tokens = kwargs.pop('tokens', [])
+	return ProgramFile(name, tokens, **kwargs)
 
 
 # ── Roundtrip: metadata ───────────────────────────────────────────────────────
@@ -59,7 +64,7 @@ class TestRoundtripMetadata:
 
 	def test_name_lowercase_normalised(self):
 		# write() uppercases the name in the binary; read() decodes it as-is
-		prog = ProgramFile(name='hello', tokens=[])
+		prog = ProgramFile('hello', [])
 		assert roundtrip(prog).name == 'HELLO'
 
 	def test_name_short(self):
@@ -204,54 +209,45 @@ def roundtrip_list(lst: ListFile) -> ListFile:
 
 
 def make_list(**kwargs) -> ListFile:
-	kwargs.setdefault('name', 'TEST')
-	kwargs['value'] = TiList(kwargs.pop('values', []))
-	return ListFile(**kwargs)  # lists keep a str name (built-in "0".."5" or user)
+	# a built-in list name ("L₁".."L₆") resolves to its token; anything else is a user list
+	name  = kwargs.pop('name', 'CW')
+	value = TiList(kwargs.pop('values', []))
+	acc   = _NAME_TOKENS.get(name) or UserList(name)
+	return ListFile(acc, value, **kwargs)
 
 
-# ── List name coding ──────────────────────────────────────────────────────────
+# ── List name coding via read_accessor / write_accessor ───────────────────────
 
 class TestListNameCoding:
-	# built-in decode: L₁ is "0", L₂ is "1", ..., L₆ is "5" (raw index byte)
-	def test_decode_l1(self):
-		assert _decode_list_name(b'\x5d\x00' + b'\x00' * 6) == '0'
+	def test_decode_builtin(self):
+		# 0x5D + index 0x00..0x05 → the built-in list's token (L₁..L₆)
+		assert read_accessor(b'\x5d\x00' + b'\x00' * 6).text == 'L₁'
+		assert read_accessor(b'\x5d\x05' + b'\x00' * 6).text == 'L₆'
 
-	def test_decode_l2(self):
-		assert _decode_list_name(b'\x5d\x01' + b'\x00' * 6) == '1'
-
-	def test_decode_l6(self):
-		assert _decode_list_name(b'\x5d\x05' + b'\x00' * 6) == '5'
-
-	# user-list decode
 	def test_decode_user_list(self):
-		assert _decode_list_name(b'\x5d\x43\x57' + b'\x00' * 5) == 'CW'
+		acc = read_accessor(b'\x5d\x43\x57' + b'\x00' * 5)
+		assert isinstance(acc, UserList) and acc.name == 'CW'
 
 	def test_decode_user_list_named_l1(self):
-		# A user list literally named "L1" (distinct from built-in L₁)
-		assert _decode_list_name(b'\x5d\x4c\x31' + b'\x00' * 5) == 'L1'
+		# a user list literally named "L1" (0x5D + 'L','1'), distinct from built-in L₁
+		acc = read_accessor(b'\x5d\x4c\x31' + b'\x00' * 5)
+		assert isinstance(acc, UserList) and acc.name == 'L1'
 
-	# built-in encode
-	def test_encode_l1(self):
-		assert _encode_list_name('0') == b'\x5d\x00' + b'\x00' * 6
+	def test_encode_builtin(self):
+		assert write_accessor(_NAME_TOKENS['L₁']) == b'\x5d\x00' + b'\x00' * 6
+		assert write_accessor(_NAME_TOKENS['L₆']) == b'\x5d\x05' + b'\x00' * 6
 
-	def test_encode_l6(self):
-		assert _encode_list_name('5') == b'\x5d\x05' + b'\x00' * 6
-
-	# user-list encode
 	def test_encode_user_list(self):
-		assert _encode_list_name('CW') == b'\x5d\x43\x57' + b'\x00' * 5
+		assert write_accessor(UserList('CW')) == b'\x5d\x43\x57' + b'\x00' * 5
 
 	def test_encode_user_list_lowercase_normalised(self):
-		assert _encode_list_name('cw') == b'\x5d\x43\x57' + b'\x00' * 5
-
-	def test_encode_user_list_named_l1(self):
-		assert _encode_list_name('L1') == b'\x5d\x4c\x31' + b'\x00' * 5
+		assert write_accessor(UserList('cw')) == b'\x5d\x43\x57' + b'\x00' * 5
 
 	# roundtrip consistency for all built-ins
 	def test_all_builtins_roundtrip(self):
 		for i in range(6):
-			name = str(i)
-			assert _decode_list_name(_encode_list_name(name)) == name
+			t = _NAME_TOKENS[f'L{chr(0x2080 + i + 1)}']   # L₁..L₆
+			assert read_accessor(write_accessor(t)) is t
 
 
 # ── ListFile roundtrip ────────────────────────────────────────────────────────
@@ -261,10 +257,10 @@ class TestListFileRoundtrip:
 		assert roundtrip_list(make_list(name='CW')).name == 'CW'
 
 	def test_builtin_list_name_l1(self):
-		assert roundtrip_list(make_list(name='0')).name == '0'
+		assert roundtrip_list(make_list(name='L₁')).name == 'L₁'
 
 	def test_builtin_list_name_l6(self):
-		assert roundtrip_list(make_list(name='5')).name == '5'
+		assert roundtrip_list(make_list(name='L₆')).name == 'L₆'
 
 	def test_values_preserved(self):
 		result = roundtrip_list(make_list(values=[1.0, 2.5, -3.0]))
@@ -336,8 +332,8 @@ def test_complex_list_byte_exact_roundtrip():
 	assert buf.getvalue() == orig
 
 _BUILTIN_LIST_FILES = [
-	(str(i), rf'C:\Users\Max\Documents\MyTiData\Backups\TI84Plus_1\L_{i+1}_.8xl')
-	for i in range(6)
+	(f'L{chr(0x2080 + i + 1)}', rf'C:\Users\Max\Documents\MyTiData\Backups\TI84Plus_1\L_{i+1}_.8xl')
+	for i in range(6)   # L₁..L₆
 ]
 
 
@@ -377,9 +373,11 @@ def make_bitmap(pixels=()) -> Bitmap:
 
 
 def make_pic(**kwargs) -> PictureFile:
-	name = kwargs.pop('name', 'Pic1')
-	kwargs.setdefault('bitmap', make_bitmap())
-	return PictureFile(tok(name), **kwargs)
+	name  = kwargs.pop('name', 'Pic1')
+	value = kwargs.pop('bitmap', None)
+	if value is None:
+		value = make_bitmap()
+	return PictureFile(tok(name), value, **kwargs)
 
 
 def pixels_of(bmp: Bitmap) -> set:
@@ -473,25 +471,26 @@ def make_var(**kwargs) -> VariableFile:
 
 
 class TestNameToken:
-	# the shared 8-byte name field holds a single token; _decode_name_token reads it
-	# and _name_field writes it (1-byte letters, 2-byte matrix/pic/string/equation)
+	# the 8-byte name field decodes to an accessor; read_accessor reads it and
+	# write_accessor writes it back (1-byte letters, 2-byte matrix/pic/string/equation)
 	def test_decode_letter(self):
-		assert _decode_name_token(b'A' + b'\x00' * 7).text == 'A'
+		assert read_accessor(b'A' + b'\x00' * 7).text == 'A'
 
 	def test_decode_theta(self):
-		assert _decode_name_token(b'\x5b' + b'\x00' * 7).text == THETA
+		assert read_accessor(b'\x5b' + b'\x00' * 7).text == THETA
 
 	def test_decode_two_byte(self):
-		assert _decode_name_token(b'\xaa\x00' + b'\x00' * 6).text == 'Str1'   # Str1
-		assert _decode_name_token(b'\x5c\x00' + b'\x00' * 6).text == '[A]'    # matrix [A]
-		assert _decode_name_token(b'\x60\x00' + b'\x00' * 6).text == 'Pic1'   # Pic1
-		assert _decode_name_token(b'\x5e\x10' + b'\x00' * 6).text == 'Y₁'     # Y₁
+		assert read_accessor(b'\xaa\x00' + b'\x00' * 6).text == 'Str1'      # Str1
+		assert read_accessor(b'\x5c\x00' + b'\x00' * 6).text == '[A]'       # matrix [A]
+		assert read_accessor(b'\x5e\x10' + b'\x00' * 6).text == 'Y₁'        # Y₁
+		assert read_accessor(b'\x60\x00' + b'\x00' * 6).name == 'Pic1'      # Pic1 (PicAccessor)
 
 	def test_name_field_round_trips(self):
 		for name in ('A', THETA, 'Str1', '[A]', 'Pic1', 'Y₁', '\U0001d462'):
-			field = _name_field(tok(name))
+			field = write_accessor(tok(name))
 			assert len(field) == 8
-			assert _decode_name_token(field).text == name
+			back = read_accessor(field)
+			assert (back.text if hasattr(back, 'text') else back.name) == name
 
 
 class TestVariableFileRoundtrip:
@@ -657,7 +656,7 @@ def roundtrip_tokenvar(obj):
 class TestStringFileRoundtrip:
 	def test_contents(self):
 		result = roundtrip_tokenvar(StringFile(tok('Str1'), TiString(toks('ABC'))))
-		assert result.name_token.code == 0xAA00
+		assert result.name == 'Str1'
 		assert result.value.tokens == toks('ABC')
 
 	def test_empty_string(self):
@@ -678,12 +677,12 @@ class TestStringFileRoundtrip:
 class TestEquationFileRoundtrip:
 	def test_contents(self):
 		result = roundtrip_tokenvar(EquationFile(tok('Y₁'), TiEquation(toks('X'))))
-		assert result.name_token == tok('Y₁')
+		assert result.name == 'Y₁'
 		assert result.value.tokens == toks('X')
 
 	def test_sequence_var_name(self):
 		result = roundtrip_tokenvar(EquationFile(tok('𝑢'), TiEquation(toks('X'))))  # 𝑢
-		assert result.name_token == tok('𝑢')
+		assert result.name == '𝑢'
 
 	def test_var_type_byte(self):
 		buf = BytesIO()
@@ -736,12 +735,12 @@ class TestStoreTo:
 
 	def test_builtin_list(self):
 		env = Environment()
-		ListFile('0', TiList([1.0, 2.0, 3.0])).store_to(env)
+		ListFile(tok('L₁'), TiList([1.0, 2.0, 3.0])).store_to(env)
 		assert env.lists[0].data == [1.0, 2.0, 3.0]
 
 	def test_user_list(self):
 		env = Environment()
-		ListFile('CW', TiList([5.0, 6.0])).store_to(env)
+		ListFile(UserList('CW'), TiList([5.0, 6.0])).store_to(env)
 		assert env.user_lists['CW'].data == [5.0, 6.0]
 
 	def test_matrix(self):
