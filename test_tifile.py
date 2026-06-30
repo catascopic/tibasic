@@ -5,10 +5,12 @@ from io import BytesIO
 
 from tifile import (
 	ProgramFile, ListFile, PictureFile, VariableFile, MatrixFile,
+	StringFile, EquationFile,
 	_decode_list_name, _encode_list_name,
 	_decode_pic_name, _encode_pic_name,
 	_decode_var_name, _encode_var_name,
 	_decode_matrix_name, _encode_matrix_name,
+	_decode_token_name, _encode_token_name,
 )
 from bitmap import Bitmap, ROWS, COLS
 from test_tibasic import toks
@@ -667,4 +669,97 @@ def test_matrix_byte_exact_roundtrip(name, rows, cols, path):
 	orig = open(path, 'rb').read()
 	buf = BytesIO()
 	MatrixFile.load(path).write_to(buf)
+	assert buf.getvalue() == orig
+
+
+# ── StringFile (.8xs) and EquationFile (.8xy) ─────────────────────────────────
+
+def roundtrip_tokenvar(obj):
+	buf = BytesIO()
+	obj.write_to(buf)
+	buf.seek(0)
+	return type(obj).read_from(buf)
+
+
+class TestTokenVarNames:
+	def test_decode_string(self):
+		assert _decode_token_name(b'\xaa\x00' + b'\x00' * 6) == 'Str1'
+		assert _decode_token_name(b'\xaa\x09' + b'\x00' * 6) == 'Str0'
+
+	def test_decode_equation(self):
+		assert _decode_token_name(b'\x5e\x10' + b'\x00' * 6) == 'Y₁'           # Y₁
+		assert _decode_token_name(b'\x5e\x80' + b'\x00' * 6) == '\U0001d462'   # 𝑢
+
+	def test_encode(self):
+		assert _encode_token_name('Str1') == b'\xaa\x00' + b'\x00' * 6
+		assert _encode_token_name('Y₁')   == b'\x5e\x10' + b'\x00' * 6
+		assert _encode_token_name('\U0001d462') == b'\x5e\x80' + b'\x00' * 6
+
+
+class TestStringFileRoundtrip:
+	def test_contents(self):
+		result = roundtrip_tokenvar(StringFile(name='Str1', tokens=toks('ABC')))
+		assert result.name == 'Str1'
+		assert result.tokens == toks('ABC')
+		assert result.text == 'ABC'
+
+	def test_empty_string(self):
+		result = roundtrip_tokenvar(StringFile(name='Str3', tokens=[]))
+		assert result.tokens == []
+		assert result.text == ''
+
+	def test_archived_and_comment(self):
+		result = roundtrip_tokenvar(StringFile(name='Str9', tokens=toks('X'), comment='hi', archived=True))
+		assert result.comment == 'hi'
+		assert result.archived is True
+
+	def test_var_type_byte(self):
+		buf = BytesIO()
+		StringFile(name='Str1', tokens=toks('A')).write_to(buf)
+		assert buf.getvalue()[59] == 0x04
+
+
+class TestEquationFileRoundtrip:
+	def test_contents(self):
+		result = roundtrip_tokenvar(EquationFile(name='Y₁', tokens=toks('X')))
+		assert result.name == 'Y₁'
+		assert result.text == 'X'
+
+	def test_sequence_var_name(self):
+		result = roundtrip_tokenvar(EquationFile(name='\U0001d462', tokens=toks('X')))  # 𝑢
+		assert result.name == '\U0001d462'
+
+	def test_var_type_byte(self):
+		buf = BytesIO()
+		EquationFile(name='Y₁', tokens=toks('X')).write_to(buf)
+		assert buf.getvalue()[59] == 0x03
+
+
+# ── StringFile / EquationFile real-file byte-exact roundtrip ──────────────────
+
+_TOKENVAR_DIR = r'C:\Users\Max\Documents\MyTiData\Backups\14'
+_TOKENVAR_FILES = [
+	(StringFile,   'Str1',        rf'{_TOKENVAR_DIR}\Str1.8xs'),
+	(StringFile,   'Str2',        rf'{_TOKENVAR_DIR}\Str2.8xs'),
+	(StringFile,   'Str3',        rf'{_TOKENVAR_DIR}\Str3.8xs'),   # empty string
+	(EquationFile, 'Y₁',     rf'{_TOKENVAR_DIR}\Y_1_.8xy'),
+	(EquationFile, 'Y₂',     rf'{_TOKENVAR_DIR}\Y_2_.8xy'),
+	(EquationFile, '\U0001d462',  rf'{_TOKENVAR_DIR}\u.8xy'),       # 𝑢 (sequence)
+]
+
+
+@pytest.mark.parametrize('cls,name,path', _TOKENVAR_FILES)
+def test_tokenvar_name_from_file(cls, name, path):
+	if not os.path.exists(path):
+		pytest.skip('real file not found')
+	assert cls.load(path).name == name
+
+
+@pytest.mark.parametrize('cls,name,path', _TOKENVAR_FILES)
+def test_tokenvar_byte_exact_roundtrip(cls, name, path):
+	if not os.path.exists(path):
+		pytest.skip('real file not found')
+	orig = open(path, 'rb').read()
+	buf = BytesIO()
+	cls.load(path).write_to(buf)
 	assert buf.getvalue() == orig

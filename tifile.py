@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from tokenbase import Token
-from catalog import ALL_TOKENS, read_token
+from catalog import get_token, read_token
 from bitmap import Bitmap, ROWS, COLS
 
 
@@ -94,6 +94,22 @@ class TiFile:
 			self.write_to(f)
 
 
+def _read_token_stream(f) -> list[Token]:
+	"""Read a 2-byte length-prefixed run of tokens — the body shared by programs,
+	strings, and equations — and return them as a list."""
+	end = int.from_bytes(f.read(2), 'little') + f.tell()
+	tokens = []
+	while f.tell() < end:
+		tokens.append(read_token(f))
+	return tokens
+
+
+def _token_stream_body(tokens: list[Token]) -> bytes:
+	"""Encode tokens as a 2-byte length-prefixed byte run (program/string/equation body)."""
+	data = b''.join(t.code_to_bytes() for t in tokens)
+	return len(data).to_bytes(2, 'little') + data
+
+
 @dataclass
 class ProgramFile(TiFile):
 	name:     str
@@ -109,17 +125,14 @@ class ProgramFile(TiFile):
 	def print(self):
 		if self.comment:
 			print(self.comment)
-		print(f"PRGM:{self.name} ({'' if self.archived else 'un'}archived/{'' if self.locked else 'un'}locked)")
+		print(f"prgm{self.name} ({'' if self.archived else 'un'}archived/{'' if self.locked else 'un'}locked)")
 		print(''.join(t.text for t in self.tokens))
 
 	@classmethod
 	def read_from(cls, f):
 		file_type, name_bytes, archived, comment, version = _read_var_header(f)
 		name = name_bytes.rstrip(b'\x00').decode('ascii')
-		end = int.from_bytes(f.read(2), 'little') + f.tell()
-		tokens = []
-		while f.tell() < end:
-			tokens.append(read_token(f))
+		tokens = _read_token_stream(f)
 
 		return cls(
 			name     = name,
@@ -131,11 +144,10 @@ class ProgramFile(TiFile):
 		)
 
 	def write_to(self, f):
-		program    = b''.join(t.code_to_bytes() for t in self.tokens)
 		name_bytes = self.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
 		file_type  = 0x06 if self.locked else 0x05
-		body       = len(program).to_bytes(2, 'little') + program  # prog_len prefix + body
-		_write_var_file(f, file_type, name_bytes, self.archived, self.comment, body, version=self.version)
+		_write_var_file(f, file_type, name_bytes, self.archived, self.comment,
+		                _token_stream_body(self.tokens), version=self.version)
 
 
 # A TI real is 9 bytes: a flags byte (bit 7 = sign, 0x0C = part of a complex
@@ -194,7 +206,7 @@ class ListFile(TiFile):
 
 	def __repr__(self):
 		kind = 'complex' if self.is_complex else 'values'
-		return f"list{self.name}({kind}={len(self.values)};{'' if self.archived else 'un'}archived)"
+		return f"L{self.name}({kind}={len(self.values)};{'' if self.archived else 'un'}archived)"
 
 	def print(self):
 		if self.comment:
@@ -305,7 +317,7 @@ class VariableFile(TiFile):
 	def print(self):
 		if self.comment:
 			print(self.comment)
-		print(f"VAR:{self.name} ({'' if self.archived else 'un'}archived)")
+		print(f"{self.name} ({'' if self.archived else 'un'}archived)")
 		print(_format_value(self.value))
 
 	@classmethod
@@ -376,7 +388,7 @@ class MatrixFile(TiFile):
 	def print(self):
 		if self.comment:
 			print(self.comment)
-		print(f"MATRIX:[{self.name}] ({self.rows}x{self.cols}, {'' if self.archived else 'un'}archived)")
+		print(f"[{self.name}] ({self.rows}x{self.cols}, {'' if self.archived else 'un'}archived)")
 		for row in self.values:
 			print('[' + ' '.join(_format_real(v) for v in row) + ']')
 
@@ -400,6 +412,81 @@ class MatrixFile(TiFile):
 		reals      = b''.join(_encode_ti_real(v) for row in self.values for v in row)
 		body       = bytes([self.cols, self.rows]) + reals  # cols, rows, then row-major reals
 		_write_var_file(f, 0x02, name_bytes, self.archived, self.comment, body, version=self.version)
+
+
+# ── Strings (.8xs) and equations (.8xy) ──────────────────────────────────────────
+# Both store their body exactly like a program — a 2-byte length-prefixed token
+# stream — and differ only in the var type byte (string 0x04, equation 0x03) and in
+# how the 8-byte name field encodes the variable name.  In both cases the name is
+# itself a token: string names are 0xAA + index (Str1..Str0); equation names are
+# 0x5E + code (Y₁..Y₀, X₁ₜ.., r₁.., 𝑢/𝑣/𝑤).  So the catalog's own text for that
+# token is the canonical name, and both directions are just a lookup.
+
+# The 8-byte name field of a string or equation is a single 2-byte token: 0xAA +
+# index for Str1..Str0, and 0x5E + code for Y₁.., X₁ₜ.., r₁.., 𝑢/𝑣/𝑤.  get_token
+# turns the stored code straight into that name; _NAME_TO_CODE is the small reverse
+# map (these specific codes only) used for writing.
+_NAME_TOKEN_CODES = (
+	*range(0xAA00, 0xAA0A),   # Str1..Str0
+	*range(0x5E10, 0x5E1A),   # Y₁..Y₀
+	*range(0x5E20, 0x5E2C),   # X₁ₜ/Y₁ₜ .. X₆ₜ/Y₆ₜ
+	*range(0x5E40, 0x5E46),   # r₁..r₆
+	*range(0x5E80, 0x5E83),   # 𝑢, 𝑣, 𝑤
+)
+_NAME_TO_CODE = {get_token(code).text: code for code in _NAME_TOKEN_CODES}
+
+
+def _decode_token_name(name_bytes: bytes) -> str:
+	return get_token(int.from_bytes(name_bytes[:2], 'big')).text
+
+
+def _encode_token_name(name: str) -> bytes:
+	return _NAME_TO_CODE[name].to_bytes(2, 'big').ljust(8, b'\x00')
+
+
+@dataclass
+class TokenVarFile(TiFile):
+	"""Base for variables whose body is a length-prefixed token stream and whose
+	name is a single token (strings and equations).  A subclass only sets _VAR_TYPE
+	(the var type byte)."""
+	name:     str
+	tokens:   list[Token]
+	comment:  str  = ''
+	archived: bool = False
+	version:  int  = 0x00
+
+	@property
+	def text(self) -> str:
+		"""The token stream as text — a string's contents or an equation's formula."""
+		return ''.join(t.text for t in self.tokens)
+
+	def __repr__(self):
+		return f"{type(self).__name__}({self.name!r}, {len(self.tokens)} tokens)"
+
+	def print(self):
+		if self.comment:
+			print(self.comment)
+		print(f"{self.name} ({'' if self.archived else 'un'}archived)")
+		print(self.text)
+
+	@classmethod
+	def read_from(cls, f):
+		_file_type, name_bytes, archived, comment, version = _read_var_header(f)
+		tokens = _read_token_stream(f)
+		return cls(_decode_token_name(name_bytes), tokens, comment, archived, version)
+
+	def write_to(self, f):
+		_write_var_file(f, self._VAR_TYPE, _encode_token_name(self.name),
+		                self.archived, self.comment, _token_stream_body(self.tokens),
+		                version=self.version)
+
+
+class StringFile(TokenVarFile):
+	_VAR_TYPE = 0x04
+
+
+class EquationFile(TokenVarFile):
+	_VAR_TYPE = 0x03
 
 
 # ── Picture files (.8xi) ───────────────────────────────────────────────────────
@@ -468,7 +555,7 @@ class PictureFile(TiFile):
 	def print(self):
 		if self.comment:
 			print(self.comment)
-		print(f"PIC:{self.name} ({COLS}x{self.rows}, {'' if self.archived else 'un'}archived)")
+		print(f"Pic{self.name} ({COLS}x{self.rows}, {'' if self.archived else 'un'}archived)")
 		self.bitmap.disp()
 
 	@classmethod
@@ -503,6 +590,8 @@ if __name__ == '__main__':
 		'.8xm': MatrixFile,
 		'.8xn': VariableFile,
 		'.8xc': VariableFile,
+		'.8xs': StringFile,
+		'.8xy': EquationFile,
 		'.8xi': PictureFile,
 	}
 
