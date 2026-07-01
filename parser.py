@@ -593,6 +593,7 @@ class ArgParser:
 
 	def __init__(self, parser: Parser):
 		self._parser = parser
+		# TODO: initialize this based on whether it's a command or function?
 		self._next = parser.peek().code not in {EOF_CODE, COLON, NEWLINE, R_PAREN}
 
 	def _arg(self, parse_func):
@@ -626,10 +627,7 @@ class ArgParser:
 
 	@_parse_arg
 	def numeric_var(self) -> Reference:
-		t = self._parser.advance()
-		if not t.is_numeric_var():
-			raise DataTypeError(f"Expected a numeric variable, got {t}")
-		return t.reference(self.env)
+		return self._var(Flag.NUMERIC)
 
 	@_parse_arg
 	def list_var(self) -> Reference:
@@ -637,24 +635,15 @@ class ArgParser:
 
 	@_parse_arg
 	def matrix_var(self) -> Reference:
-		t = self._parser.advance()
-		if t.is_matrix_var():
-			return t.reference(self.env)
-		raise DataTypeError(f"Expected a matrix variable, got {t}")
+		return self._var(Flag.MATRIX)
 
 	@_parse_arg
 	def string_var(self) -> Reference:
-		t = self._parser.advance()
-		if t.is_string_var():
-			return t.reference(self.env)
-		raise DataTypeError(f"Expected a string variable, got {t}")
+		return self._var(Flag.STRING)
 
 	@_parse_arg
 	def equation_var(self) -> Reference:
-		t = self._parser.advance()
-		if t.is_equation_var():
-			return t.reference(self.env)
-		raise DataTypeError(f"Expected an equation variable, got {t}")
+		return self._var(Flag.EQUATION)
 
 	@_parse_arg
 	def list_var_prefix_optional(self) -> Reference:
@@ -682,17 +671,11 @@ class ArgParser:
 			return self._parser.parse_user_list()
 		raise TiSyntaxError(f"Expected a variable, got {t}")
 
-	@_parse_arg
-	def token(self, flag: Flag) -> Token:
-		"""Consume a single token positionally and verify it carries `flag`; return it.
-
-		Hands back the raw token for the caller to adapt (e.g. `.reference(env)` for a
-		variable, or extracting a picture number).
-		"""
+	def _var(self, flag: Flag) -> Token:
 		t = self._parser.advance()
 		if not (t.flags & flag):
 			raise DataTypeError(f"Expected {flag.name} token, got {t}")
-		return t
+		return t.reference(self.env)
 
 	@_parse_arg
 	def pic_index(self) -> int:
