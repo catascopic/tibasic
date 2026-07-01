@@ -18,26 +18,24 @@ store_to; each subclass supplies only its body via `_parse_body`/`_encode_body`/
 """
 from io import BytesIO
 
-from tokenbase import Token, Flag, Accessor, Deletable
+from tokenbase import Token, Accessor
 from catalog import get_token, read_token
 from bitmap import Bitmap, ROWS, COLS
 from core import TiList, TiMatrix, TiString, TiEquation
 from environment import UserList
-from errors import TiSyntaxError
 
 
 # 0x5D is TI's "list name" token: a named list's 8-byte name field is this byte
 # followed by up to 5 ASCII characters (built-in L1-L6 use 0x5D + 0x00..0x05).
 _LIST_NAME_TOKEN = 0x5D
-_PIC_CODE_BASE   = 0x6000   # Pic1..Pic0 are tokens 0x6000+i; pic number = (i+1)%10
 
 
 # ── Accessors: a variable file's name *is* a storage location ───────────────────
 # Most variables name themselves with a catalog token that is already an Accessor
-# (VariableToken).  Programs, user lists, and pictures aren't catalog tokens, so
-# they get accessors here.  read_accessor/write_accessor are the file layer's name
-# codec — translating the 8-byte name field to/from an accessor.  (Serialization
-# lives here, not on the Accessor classes, which belong to the runtime.)
+# (a VariableToken — including pictures, see PicToken).  User lists carry a UserList;
+# only programs (no token, not an expression value) need an accessor here.
+# read_accessor/write_accessor are the file layer's name codec — translating the
+# 8-byte name field to/from an accessor.
 
 class ProgramAccessor(Accessor):
 	"""A program prgmNAME — a slot in env.programs keyed by name.  Programs aren't
@@ -61,34 +59,6 @@ class ProgramAccessor(Accessor):
 		return f"ProgramAccessor({self.name!r})"
 
 
-class PicAccessor(Deletable, Accessor):
-	"""A picture Pic0–Pic9 — slot `number` in env.pics.  Pictures can only be used
-	with StorePic/RecallPic, never the Store arrow or an expression, so store/resolve
-	raise; but DelVar can clear them, so it's Deletable (delete clears the slot)."""
-
-	def __init__(self, number: int):
-		self.number = number
-
-	@property
-	def name(self) -> str:
-		return f"Pic{self.number}"
-
-	def _get(self, env):
-		return env.pics[self.number]
-
-	def _set(self, env, value):
-		env.pics[self.number] = value
-
-	def resolve(self, env):
-		raise TiSyntaxError(f"{self.name} can't be used in an expression")
-
-	def is_invokable(self) -> bool:
-		return False
-
-	def __repr__(self):
-		return f"PicAccessor({self.number})"
-
-
 def read_accessor(name_bytes: bytes) -> Accessor:
 	"""Decode an 8-byte name field (everything except a program) into its accessor."""
 	if name_bytes[0] == _LIST_NAME_TOKEN:
@@ -98,10 +68,7 @@ def read_accessor(name_bytes: bytes) -> Accessor:
 			return get_token(_LIST_NAME_TOKEN << 8 | name_bytes[1])
 		return UserList(name_bytes[1:].rstrip(b'\x00').decode('ascii', errors='replace'))
 
-	token = read_token(BytesIO(name_bytes))
-	if token.flags & Flag.PIC:
-		return PicAccessor((token.code - _PIC_CODE_BASE + 1) % 10)
-	return token
+	return read_token(BytesIO(name_bytes))   # a VariableToken (var/matrix/string/equation/picture)
 
 
 def read_program_name(name_bytes: bytes) -> ProgramAccessor:
@@ -110,13 +77,11 @@ def read_program_name(name_bytes: bytes) -> ProgramAccessor:
 
 def write_accessor(acc: Accessor) -> bytes:
 	"""Encode an accessor back into the 8-byte, null-padded name field."""
-	if isinstance(acc, PicAccessor):
-		return (_PIC_CODE_BASE + (acc.number - 1) % 10).to_bytes(2, 'big').ljust(8, b'\x00')
 	if isinstance(acc, UserList):
 		return (bytes([_LIST_NAME_TOKEN]) + acc.name.upper().encode('ascii')[:5]).ljust(8, b'\x00')
 	if isinstance(acc, ProgramAccessor):
 		return acc.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
-	return acc.code_to_bytes().ljust(8, b'\x00')   # a Token: var / matrix / string / equation / built-in list
+	return acc.code_to_bytes().ljust(8, b'\x00')   # a Token: var / matrix / string / equation / picture / built-in list
 
 
 # ── Shared envelope ─────────────────────────────────────────────────────────────

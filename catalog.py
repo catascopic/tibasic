@@ -114,7 +114,7 @@ def _generate():
 	yield CommandToken(0x5F, b'prgm', prgm.prgm)
 
 	for i in range(10):
-		yield Token(0x6000 | i, b'Pic' + bytes([0x30 + (i + 1) % 10]), Flag.PIC)
+		yield PicToken(i)
 
 	for i in range(10):
 		yield Token(0x6100 | i, b'GDB' + bytes([0x30 + (i + 1) % 10]), Flag.GDB)

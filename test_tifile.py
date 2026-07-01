@@ -6,12 +6,11 @@ from io import BytesIO
 from tifile import (
 	ProgramFile, ListFile, PictureFile, VariableFile, MatrixFile,
 	StringFile, EquationFile,
-	ProgramAccessor, PicAccessor, read_accessor, write_accessor,
+	ProgramAccessor, read_accessor, write_accessor,
 )
 from bitmap import Bitmap, ROWS, COLS
 from core import TiList, TiMatrix, TiString, TiEquation
 from catalog import get_token
-from tokenbase import Flag
 from environment import Environment, UserList
 from test_tibasic import toks
 
@@ -33,10 +32,9 @@ _NAME_TOKENS = {
 
 
 def tok(name: str):
-	"""The accessor a file with this name carries — the catalog token, or a
-	PicAccessor for a picture (whose token isn't an accessor)."""
-	t = _NAME_TOKENS[name]
-	return PicAccessor((t.code - 0x6000 + 1) % 10) if (t.flags & Flag.PIC) else t
+	"""The accessor a file with this name carries — its catalog token (every named
+	variable, including pictures via PicToken, is its own accessor)."""
+	return _NAME_TOKENS[name]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -483,14 +481,13 @@ class TestNameToken:
 		assert read_accessor(b'\xaa\x00' + b'\x00' * 6).text == 'Str1'      # Str1
 		assert read_accessor(b'\x5c\x00' + b'\x00' * 6).text == '[A]'       # matrix [A]
 		assert read_accessor(b'\x5e\x10' + b'\x00' * 6).text == 'Y₁'        # Y₁
-		assert read_accessor(b'\x60\x00' + b'\x00' * 6).name == 'Pic1'      # Pic1 (PicAccessor)
+		assert read_accessor(b'\x60\x00' + b'\x00' * 6).text == 'Pic1'      # Pic1 (PicToken)
 
 	def test_name_field_round_trips(self):
 		for name in ('A', THETA, 'Str1', '[A]', 'Pic1', 'Y₁', '\U0001d462'):
 			field = write_accessor(tok(name))
 			assert len(field) == 8
-			back = read_accessor(field)
-			assert (back.text if hasattr(back, 'text') else back.name) == name
+			assert read_accessor(field).text == name
 
 
 class TestVariableFileRoundtrip:

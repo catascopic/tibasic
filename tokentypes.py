@@ -29,7 +29,7 @@ __all__ = [
     # Numeric / constant
     'LetterToken', 'RealToken', 'PaymentsPerYearToken', 'ConstantToken', 'ComputedToken',
     # Aggregate variables
-    'MatrixToken', 'ListToken', 'StringToken',
+    'MatrixToken', 'ListToken', 'StringToken', 'PicToken',
     # Equation / sequence
     'EquationToken', 'FuncEquationToken', 'ParEquationToken', 'PolarEquationToken',
     'SequenceToken', 'SequenceInitialToken',
@@ -190,6 +190,29 @@ class MatrixToken(Deletable, VariableToken):
 		col = py_int(arg_parser.expr(), InvalidDimError)
 		arg_parser.end_func()
 		return self.resolve(arg_parser.env)[(row, col)]
+
+
+class PicToken(Deletable, VariableToken):
+	"""A picture Pic1–Pic9, Pic0 (token 0x6000+i) — a slot in env.pics.  Pictures can
+	only be used with StorePic/RecallPic, never the Store arrow or an expression, so
+	store and resolve raise; but DelVar can clear one, so it's Deletable.  `number` is
+	its env.pics slot — token 0x6000+i names Pic(i+1)%10."""
+
+	def __init__(self, index: int):
+		super().__init__(0x6000 | index, b'Pic' + bytes([0x30 + (index + 1) % 10]), Flag.PIC)
+		self.number = (index + 1) % 10
+
+	def can_start_atom(self) -> bool:
+		return False   # unlike other variables, a picture is never an expression atom
+
+	def _get(self, env):
+		return env.pics[self.number]
+
+	def _set(self, env, value):
+		env.pics[self.number] = value
+
+	def resolve(self, env):
+		raise TiSyntaxError(f"{self.text} can't be used in an expression")
 
 
 class ListToken(Deletable, VariableToken):
