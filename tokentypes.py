@@ -152,21 +152,21 @@ class LetterToken(Deletable, VariableToken):
 		super().__init__(code, bytes([code]), Flag.NUMERIC, char=(chr(code) if index < 26 else 'θ'))
 		self.index = index
 
-	def _get(self, env):
+	def get(self, env):
 		return env.numerics[self.index]
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		env.numerics[self.index] = value
 
 	def resolve(self, env):
-		value = self._get(env)
+		value = self.get(env)
 		if value is None:
 			value = 0.0
-			self._set(env, value)
+			self.set(env, value)
 		return value
 
 	def store(self, env, value):
-		self._set(env, require_num(value))
+		self.set(env, require_num(value))
 
 
 class MatrixToken(Deletable, VariableToken):
@@ -176,14 +176,14 @@ class MatrixToken(Deletable, VariableToken):
 		super().__init__(0x5C00 | index, bytes([0xC1, 0x41 + index, 0x5D]), Flag.MATRIX | Flag.INVOKABLE)
 		self.index = index
 
-	def _get(self, env):
+	def get(self, env):
 		return env.matrices[self.index]
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		env.matrices[self.index] = value
 
 	def store(self, env, value):
-		self._set(env, require_matrix(value).copy())
+		self.set(env, require_matrix(value).copy())
 
 	def invoke(self, arg_parser):
 		row = py_int(arg_parser.expr(), InvalidDimError)
@@ -205,10 +205,10 @@ class PicToken(Deletable, VariableToken):
 	def can_start_atom(self) -> bool:
 		return False   # unlike other variables, a picture is never an expression atom
 
-	def _get(self, env):
+	def get(self, env):
 		return env.pics[self.number]
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		env.pics[self.number] = value
 
 	def resolve(self, env):
@@ -222,10 +222,10 @@ class ListToken(Deletable, VariableToken):
 		super().__init__(0x5D00 | index, bytes([0x4C, 0x81 + index]), Flag.LIST | Flag.INVOKABLE)
 		self.index = index
 
-	def _get(self, env):
+	def get(self, env):
 		return env.lists[self.index]
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		env.lists[self.index] = value
 
 	def resolve(self, env):
@@ -235,7 +235,7 @@ class ListToken(Deletable, VariableToken):
 		return value
 
 	def store(self, env, value):
-		self._set(env, require_list(value).copy())
+		self.set(env, require_list(value).copy())
 
 	def invoke(self, arg_parser):
 		index = py_int(arg_parser.expr(), InvalidDimError)
@@ -254,14 +254,14 @@ class StringToken(Deletable, VariableToken):
 		super().__init__(0xAA00 | index, b'Str' + bytes([0x30 + (index + 1) % 10]), Flag.STRING)
 		self.index = index
 
-	def _get(self, env):
+	def get(self, env):
 		return env.strings[self.index]
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		env.strings[self.index] = value
 
 	def store(self, env, value):
-		self._set(env, require_string(value))
+		self.set(env, require_string(value))
 
 
 class EquationToken(Deletable, VariableToken):
@@ -281,10 +281,10 @@ class EquationToken(Deletable, VariableToken):
 		super().__init__(code, display, Flag.EQUATION | Flag.INVOKABLE)
 		self.index = index
 
-	def _get(self, env):
+	def get(self, env):
 		return getattr(env, self.mode)[self.index].equation
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		getattr(env, self.mode)[self.index].equation = value
 
 	def resolve(self, env):
@@ -299,7 +299,7 @@ class EquationToken(Deletable, VariableToken):
 			return self.resolve(env)
 
 	def store(self, env, value):
-		self._set(env, _normalize_eq(value))
+		self.set(env, _normalize_eq(value))
 		getattr(env, self.mode)[self.index].selected = True
 		if env.graph_mode is self.mode:
 			env.graph.valid = False
@@ -326,10 +326,10 @@ class ParEquationToken(EquationToken):
 		super().__init__(code, display, index)
 		self.half = half
 
-	def _get(self, env):
+	def get(self, env):
 		return getattr(env.parametric[self.index], self.half)
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		setattr(env.parametric[self.index], self.half, value)
 
 
@@ -366,10 +366,10 @@ class SequenceInitialToken(Deletable, VariableToken):
 		super().__init__(code, display)
 		self.index = index
 
-	def _get(self, env):
+	def get(self, env):
 		return env.sequence[self.index].initial
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		env.sequence[self.index].initial = value
 
 	def store(self, env, value):
@@ -378,9 +378,9 @@ class SequenceInitialToken(Deletable, VariableToken):
 				raise InvalidDimError("u/v/w(nMin) list may have at most 2 elements")
 		else:
 			value = TiList([require_real(value)])
-		if value != self._get(env) and env.graph_mode is GraphMode.SEQ:
+		if value != self.get(env) and env.graph_mode is GraphMode.SEQ:
 			env.graph.valid = False
-		self._set(env, value)
+		self.set(env, value)
 
 
 class RealToken(VariableToken):
@@ -391,14 +391,14 @@ class RealToken(VariableToken):
 		super().__init__(code, display, flags)
 		self.attr = attr
 
-	def _get(self, env):
+	def get(self, env):
 		return getattr(env, self.attr)
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		setattr(env, self.attr, value)
 
 	def store(self, env, value):
-		self._set(env, require_real(value))
+		self.set(env, require_real(value))
 
 
 class AnsToken(Token):
@@ -433,16 +433,16 @@ class WindowToken(VariableToken):
 		super().__init__(code, display, Flag.WINDOW_VAR)
 		self.attr = attr
 
-	def _get(self, env):
+	def get(self, env):
 		return getattr(env.window, self.attr)
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		setattr(env.window, self.attr, value)
 
 	def _store_check_valid(self, env, value):
-		if _window_affects_graph(env, self.attr) and value != self._get(env):
+		if _window_affects_graph(env, self.attr) and value != self.get(env):
 			env.graph.valid = False
-		self._set(env, value)
+		self.set(env, value)
 
 	def store(self, env, value):
 		self._store_check_valid(env, require_real(value))
@@ -472,7 +472,7 @@ class FactorWindowToken(WindowToken):
 		v = require_real(value)
 		if v < 1:
 			raise DomainError(f"Zoom factor must be ≥ 1, got {v:g}")
-		self._set(env, v)
+		self.set(env, v)
 
 
 class DeltaWindowToken(VariableToken):
@@ -508,11 +508,11 @@ class TableToken(VariableToken):
 		super().__init__(code, display)
 		self.attr = attr
 
-	def _get(self, env):
+	def get(self, env):
 		return getattr(env.table, self.attr)
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		setattr(env.table, self.attr, value)
 
 	def store(self, env, value):
-		self._set(env, require_real(value))
+		self.set(env, require_real(value))

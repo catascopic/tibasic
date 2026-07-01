@@ -266,20 +266,20 @@ class Reference:
 		self.accessor.delete(self.env)
 
 	def get(self):
-		return self.accessor._get(self.env)
+		return self.accessor.get(self.env)
 
 	def set(self, value):
-		self.accessor._set(self.env, value)
+		self.accessor.set(self.env, value)
 
 	@contextmanager
 	def scoped(self):
 		"""Save the raw value, run the block, restore it — for temporarily binding a
 		variable while evaluating a sub-expression (fnInt, solve, Σ, …)."""
-		saved = self.accessor._get(self.env)
+		saved = self.accessor.get(self.env)
 		try:
 			yield
 		finally:
-			self.accessor._set(self.env, saved)
+			self.accessor.set(self.env, saved)
 
 	def __repr__(self):
 		return f"Reference({self.accessor!r})"
@@ -288,7 +288,7 @@ class Reference:
 class Accessor(ABC):
 	"""Protocol for environment-bound read/write targets — variables, constants, window
 	settings, user lists.  resolve/store/invoke take env as a parameter (accessors are
-	stateless singletons or lightweight named objects).  `_get`/`_set` are the raw slot
+	stateless singletons or lightweight named objects).  `get`/`set` are the raw slot
 	accessors; `resolve`/`store` add auto-init and type checks.
 
 	Concrete subclasses are either VariableToken (a catalog token that is also its own
@@ -298,14 +298,17 @@ class Accessor(ABC):
 	def can_start_atom(self) -> bool:
 		return True   # every accessor resolves to a value, so it can lead an expression
 
-	def _get(self, env):
-		raise NotImplementedError(f"{type(self).__name__} does not support _get")
+	def get(self, env):
+		"""Raw slot read — no auto-init (may return None).  Prefer resolve()."""
+		raise NotImplementedError(f"{type(self).__name__} does not support get")
 
-	def _set(self, env, value):
-		raise NotImplementedError(f"{type(self).__name__} does not support _set")
+	def set(self, env, value):
+		"""Raw slot write — no validation, copy, or side-effects.  Prefer store() for a
+		calculator Store; use set() only for direct installs (e.g. loading a file)."""
+		raise NotImplementedError(f"{type(self).__name__} does not support set")
 
 	def resolve(self, env):
-		value = self._get(env)
+		value = self.get(env)
 		if value is None:
 			raise UndefinedError(f"{self} is not defined")
 		return value
@@ -332,7 +335,7 @@ class Deletable:
 	one (e.g. `class StringToken(Deletable, VariableToken)`)."""
 
 	def delete(self, env):
-		self._set(env, None)
+		self.set(env, None)
 
 
 class VariableToken(Token, Accessor):

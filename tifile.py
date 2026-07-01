@@ -8,7 +8,7 @@ checksum — wrapping a type-specific body.  A file is modelled as:
 
   * an `accessor` — the variable's storage location (a catalog VariableToken for
     A–Z/[A]/Str1/Y1/L1, a `UserList`, a `ProgramAccessor`, or a `PicAccessor`).  It
-    supplies the name and, via `_set`, where `store_to` installs the value.
+    supplies the name and, via `set`, where `store_to` installs the value.
   * a `value` — the runtime model (a number, TiList, TiMatrix, TiString,
     TiEquation, token list, or Bitmap).
 
@@ -23,6 +23,7 @@ from catalog import get_token, read_token
 from bitmap import Bitmap, ROWS, COLS
 from core import TiList, TiMatrix, TiString, TiEquation
 from environment import UserList
+from program import Program
 
 
 # 0x5D is TI's "list name" token: a named list's 8-byte name field is this byte
@@ -39,24 +40,20 @@ _LIST_NAME_TOKEN = 0x5D
 
 class ProgramAccessor(Accessor):
 	"""A program prgmNAME — a slot in env.programs keyed by name.  Programs aren't
-	expression values, so they have no token; a file load installs one via `_set`,
+	expression values, so they have no token; a file load installs one via `set`,
 	wrapping its token list in a Program."""
 
 	def __init__(self, name: str):
 		self.name = name
 
-	def _get(self, env):
+	def get(self, env):
 		return env.programs.get(self.name)
 
-	def _set(self, env, tokens):
-		from program import Program
+	def set(self, env, tokens):
 		env.programs[self.name] = Program(tokens, self.name)
 
-	def is_invokable(self) -> bool:
-		return False
-
 	def __repr__(self):
-		return f"ProgramAccessor({self.name!r})"
+		return f"prgm({self.name!r})"
 
 
 def read_accessor(name_bytes: bytes) -> Accessor:
@@ -194,10 +191,10 @@ class TiFile:
 
 	def store_to(self, env):
 		"""Install this variable into a running environment.  A file load isn't a
-		Store command, so it uses the accessor's raw `_set` — bypassing store()'s
+		Store command, so it uses the accessor's raw `set` — bypassing store()'s
 		validation/side-effects and working even for write-protected accessors
 		(pictures)."""
-		self.accessor._set(env, self.value)
+		self.accessor.set(env, self.value)
 
 	@staticmethod
 	def _read_accessor(name_bytes):

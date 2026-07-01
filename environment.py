@@ -440,10 +440,10 @@ class UserList(Accessor):
 	def __init__(self, name: str):
 		self.name = name
 
-	def _get(self, env):
+	def get(self, env):
 		return env.user_lists.get(self.name)
 
-	def _set(self, env, value):
+	def set(self, env, value):
 		env.user_lists[self.name] = value
 
 	def resolve(self, env):
@@ -453,7 +453,7 @@ class UserList(Accessor):
 		return value
 
 	def store(self, env, value):
-		self._set(env, require_list(value).copy())
+		self.set(env, require_list(value).copy())
 
 	def is_invokable(self):
 		return True

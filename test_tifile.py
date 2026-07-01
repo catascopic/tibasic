@@ -17,8 +17,8 @@ from test_tibasic import toks
 
 # A file's name is an Accessor; production code reads it from disk or carries the
 # token directly.  Tests construct files by friendly name, so this reverse map
-# (token text → accessor) is a test-only convenience.  Most names are catalog
-# tokens (which are accessors); pictures resolve to a PicAccessor.
+# (token text → accessor) is a test-only convenience.  Every named variable —
+# including pictures (PicToken) — is a catalog token, which is its own accessor.
 _NAME_TOKENS = {
 	get_token(c).text: get_token(c)
 	for c in (*range(0x41, 0x5C),       # A..Z, θ          (number variables)
@@ -763,7 +763,7 @@ class TestStoreTo:
 	def test_equation(self):
 		env = Environment()
 		EquationFile(tok('Y₁'), TiEquation(toks('X'))).store_to(env)
-		assert tok('Y₁')._get(env).tokens == toks('X')
+		assert tok('Y₁').get(env).tokens == toks('X')
 
 	def test_store_then_round_trip_through_file_and_env(self):
 		# load a real list file and install it; the env slot matches the file value
