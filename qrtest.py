@@ -3,7 +3,7 @@ from pathlib import Path
 from environment import Environment
 from terminal import TerminalConsole
 from tifile import ProgramFile, ListFile
-from catalog import get_token, TEXT_INPUT
+from catalog import get_token, CHAR_TABLE
 
 def load(dir_):
 	env = Environment()
@@ -19,7 +19,7 @@ env = load(r'enigma')
 env.console = TerminalConsole()
 
 def run(prgm_name):
-	env.submit([get_token(0x5F), *(TEXT_INPUT[c] for c in prgm_name)])
+	env.submit([get_token(0x5F), *(CHAR_TABLE[c] for c in prgm_name)])
 
 
 run('ENIGMA2')

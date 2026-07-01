@@ -344,7 +344,14 @@ class TiMatrix:
 
 # ── TiString / TiEquation ─────────────────────────────────────────────────────
 
-class TiString:
+
+def str_to_tokens(s: str) -> list[Token]:
+    """Convert a plain Python string into the token list that spells it."""
+    from catalog import CHAR_TABLE
+    return [CHAR_TABLE[c] for c in s]
+
+
+class TokenSequence:
 	__slots__ = ('tokens',)
 
 	def __init__(self, tokens: list[Token]) -> None:
@@ -352,12 +359,19 @@ class TiString:
 
 	@classmethod
 	def from_str(cls, s: str) -> TiString:
-		"""Create a TiString from a plain Python string."""
-		from catalog import TEXT_INPUT
-		return cls([TEXT_INPUT[c] for c in s])
+		return cls(str_to_tokens(s))
 
 	def __len__(self) -> int:
 		return len(self.tokens)
+
+	def __str__(self) -> str:
+		return ''.join(t.text for t in self.tokens)
+
+	def __repr__(self) -> str:
+		return f"{type(self).__name__}({str(self)!r}"
+
+
+class TiString(TokenSequence):
 
 	def __add__(self, other: Any) -> TiString:
 		if isinstance(other, TiString):
@@ -371,35 +385,19 @@ class TiString:
 			return self.tokens == other.tokens
 		raise DataTypeError(f"Expected string but got {other}")
 
-	def __str__(self) -> str:
-		return ''.join(t.text for t in self.tokens)
 
-	def __repr__(self) -> str:
-		return '"' + str(self) + '"'
-
-
-class TiEquation:
-	__slots__ = ('tokens',)
-
-	def __init__(self, tokens: list[Token]) -> None:
-		self.tokens = tokens
+class TiEquation(TokenSequence):
 
 	def eval(self, env: Environment) -> Any:
 		from parser import Parser
-		from tokenbase import EOF_CODE
 		try:
 			parser = Parser(self.tokens, env)
 			value = parser.parse_expr()
-			parser.expect(EOF_CODE)
+			if parser.has_next:
+				raise ValueError(f"Expected end of equation; remaining: {parser.tokens[parser.pos:]}")
 			return value
 		except RecursionError:
-			raise TiMemoryError("Equation recursion overflow (ERR:MEMORY)")
-
-	def __str__(self) -> str:
-		return ''.join(t.text for t in self.tokens)
-
-	def __repr__(self) -> str:
-		return '"' + str(self) + '"'
+			raise TiMemoryError(f"Infinite recursion in {self}")
 
 
 # ── Type guards ───────────────────────────────────────────────────────────────

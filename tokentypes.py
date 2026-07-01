@@ -211,6 +211,13 @@ class PicToken(Deletable, VariableToken):
 	def set(self, env, value):
 		env.pics[self.number] = value
 
+	def load(self, env):
+		"""Return the stored bitmap, or raise UndefinedError if this slot is empty."""
+		bitmap = self.get(env)
+		if bitmap is None:
+			raise UndefinedError(f"{self.text} is not defined")
+		return bitmap
+
 	def resolve(self, env):
 		raise TiSyntaxError(f"{self.text} can't be used in an expression")
 

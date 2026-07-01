@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import math as _math
 
-from core import TiList, is_complex_val, require_real, require_int, py_int, require_list
+from core import TiList, TiString, is_complex_val, require_real, require_int, py_int, require_list
 from errors import DataTypeError, IllegalNestError, InvalidCommandError, InvalidDimError, NonRealAnsError
 from modes import AngleMode, NumberMode, GraphMode, ComplexMode, DrawMode, GraphOrder, Screen
 from graphscreen import GraphScreen
@@ -465,6 +465,13 @@ class UserList(Accessor):
 
 	def delete(self, env):
 		env.user_lists.pop(self.name, None)
+
+	def prompt_name(self):
+		return TiString.from_str(self.name)   # bare name (no ʟ), as Prompt echoes it
+
+	def name_bytes(self) -> bytes:
+		# 0x5D is the list-name token; a user list's name field is it + up to 5 ASCII chars
+		return (bytes([0x5D]) + self.name.upper().encode('ascii')[:5]).ljust(8, b'\x00')
 
 	def __repr__(self):
 		return f"UserList({self.name!r})"

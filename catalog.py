@@ -703,7 +703,6 @@ def _generate():
 
 ALL_TOKENS: list[Token] = []
 CHAR_TABLE: dict[str, Token] = {}
-TEXT_INPUT = CHAR_TABLE  # alias: char → token for keyboard-entered text
 _TABLE: list[Token | list[Token | None] | None] = [None] * 256
 
 

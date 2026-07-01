@@ -246,15 +246,18 @@ class Token:
 class Reference:
 	"""An accessor-token bound to an environment — what commands receive when they take a
 	variable rather than its value.  Exposes a uniform mutable-variable surface so
-	consumers (For/fnInt/Input/DelVar/…) work the same for every symbol kind.  `name` is
-	the variable's source spelling as display tokens (what Prompt echoes)."""
+	consumers (For/fnInt/Input/DelVar/…) work the same for every symbol kind.  `name`
+	forwards to the accessor's source spelling as display tokens (what Prompt echoes)."""
 
-	__slots__ = ('env', 'accessor', 'name')
+	__slots__ = ('env', 'accessor')
 
-	def __init__(self, env, accessor, name=None):
+	def __init__(self, env, accessor):
 		self.env = env
 		self.accessor = accessor
-		self.name = name
+
+	@property
+	def name(self):
+		return self.accessor.prompt_name()
 
 	def resolve(self):
 		return self.accessor.resolve(self.env)
@@ -325,8 +328,16 @@ class Accessor(ABC):
 	def delete(self, env):
 		raise TiSyntaxError(f"Cannot delete {self}")
 
-	def reference(self, env, name=None) -> Reference:
-		return Reference(env, self, name)
+	def prompt_name(self):
+		"""The variable's source spelling as a TiString — what Prompt echoes."""
+		raise NotImplementedError(f"{type(self).__name__} has no prompt name")
+
+	def name_bytes(self) -> bytes:
+		"""The 8-byte, null-padded name field this accessor writes to a .8x* file."""
+		raise NotImplementedError(f"{type(self).__name__} is not a file variable")
+
+	def reference(self, env) -> Reference:
+		return Reference(env, self)
 
 
 class Deletable:
@@ -359,6 +370,13 @@ class VariableToken(Token, Accessor):
 
 	def can_start_atom(self) -> bool:
 		return True
+
+	def prompt_name(self):
+		from core import TiString
+		return TiString([self])   # a variable token spells itself
+
+	def name_bytes(self) -> bytes:
+		return self.code_to_bytes().ljust(8, b'\x00')
 
 
 class _EofToken(Token):

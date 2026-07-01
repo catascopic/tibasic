@@ -458,11 +458,9 @@ class Parser:
 	def parse_user_list(self):
 		# A user list (dict-backed by name) shares the same accessor/Reference surface
 		# as everything else, so store/resolve/dim go through the common code paths.
-		# The ʟ prefix is already consumed, so the captured tokens are the bare name —
-		# exactly what Prompt should echo (∟PRIMES and PRIMES both display "PRIMES=?").
-		start = self.pos
-		name = self.read_name(5)
-		return UserList(name).reference(self.env, TiString(self.tokens[start:self.pos]))
+		# The Reference's name comes from UserList.prompt_name() — the bare name (no ʟ),
+		# which is exactly what Prompt echoes (∟PRIMES and PRIMES both show "PRIMES=?").
+		return UserList(self.read_name(5)).reference(self.env)
 
 	# SKIPPING
 
@@ -679,10 +677,28 @@ class ArgParser:
 		"""
 		t = self._parser.advance()
 		if t.flags & Flag.VARIABLE:
-			return t.reference(self.env, TiString([t]))
+			return t.reference(self.env)
 		if t.code == LIST_PREFIX:
 			return self._parser.parse_user_list()
 		raise TiSyntaxError(f"Expected a variable, got {t}")
+
+	def token(self, flag: Flag) -> Token:
+		"""Consume a single token positionally and verify it carries `flag`; return it.
+
+		The primitive for tokens taken by position rather than as an expression — the
+		single-token variable kinds (Flag.NUMERIC/MATRIX/…) and the Pic/GDB tokens, which
+		can't start an expression atom (so the has_next atom check doesn't apply — we test
+		the underlying stream instead).  Consumes a trailing comma like the value parsers,
+		then hands back the raw token for the caller to adapt (e.g. `.reference(env)` for a
+		variable, or extracting a picture number).
+		"""
+		if not self._parser.has_next:
+			raise ArgumentError("Missing argument")
+		t = self._parser.advance()
+		if not (t.flags & flag):
+			raise DataTypeError(f"Expected {flag.name} token, got {t}")
+		self._next = self._parser.eat_if(COMMA)
+		return t
 
 	@_parse_arg
 	def label_name(self) -> str:

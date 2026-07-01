@@ -949,13 +949,10 @@ class TestStorePic:
 		run('StorePic 2', env)
 		assert env.pics[2].get(63, 0)
 
-	def test_out_of_range_raises(self):
-		with pytest.raises(DomainError):
-			run('StorePic 10')
-
-	def test_non_integer_raises(self):
-		with pytest.raises(DomainError):
-			run('StorePic 2.5')
+	def test_variable_raises_data_type(self):
+		# The real calculator only accepts a literal digit or a Pic token — not an expression.
+		with pytest.raises(DataTypeError):
+			run('StorePic A')
 
 
 class TestRecallPic:

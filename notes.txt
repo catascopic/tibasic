@@ -1,3 +1,5 @@
+_parse_pic_arg 
+
 if self.comment:
 	print(self.comment)
 print(f"{self.name_token} ({'' if self.archived else 'un'}archived)")

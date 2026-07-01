@@ -7,8 +7,8 @@ comment, a variable-entry header (type, name, archive flag), and a trailing
 checksum — wrapping a type-specific body.  A file is modelled as:
 
   * an `accessor` — the variable's storage location (a catalog VariableToken for
-    A–Z/[A]/Str1/Y1/L1, a `UserList`, a `ProgramAccessor`, or a `PicAccessor`).  It
-    supplies the name and, via `set`, where `store_to` installs the value.
+    A–Z/[A]/Str1/Y1/L1/Pic1, a `UserList`, or a `ProgramAccessor`).  It supplies the
+    name (prompt_name / name_bytes) and, via `set`, where `store_to` installs the value.
   * a `value` — the runtime model (a number, TiList, TiMatrix, TiString,
     TiEquation, token list, or Bitmap).
 
@@ -52,6 +52,12 @@ class ProgramAccessor(Accessor):
 	def set(self, env, tokens):
 		env.programs[self.name] = Program(tokens, self.name)
 
+	def prompt_name(self):
+		return TiString.from_str(self.name)
+
+	def name_bytes(self) -> bytes:
+		return self.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
+
 	def __repr__(self):
 		return f"prgm({self.name!r})"
 
@@ -73,12 +79,9 @@ def read_program_name(name_bytes: bytes) -> ProgramAccessor:
 
 
 def write_accessor(acc: Accessor) -> bytes:
-	"""Encode an accessor back into the 8-byte, null-padded name field."""
-	if isinstance(acc, UserList):
-		return (bytes([_LIST_NAME_TOKEN]) + acc.name.upper().encode('ascii')[:5]).ljust(8, b'\x00')
-	if isinstance(acc, ProgramAccessor):
-		return acc.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
-	return acc.code_to_bytes().ljust(8, b'\x00')   # a Token: var / matrix / string / equation / picture / built-in list
+	"""Encode an accessor into its 8-byte, null-padded name field — each accessor
+	knows how (Token → code bytes, UserList → 0x5D + ASCII, program → ASCII)."""
+	return acc.name_bytes()
 
 
 # ── Shared envelope ─────────────────────────────────────────────────────────────
@@ -162,8 +165,7 @@ class TiFile:
 
 	@property
 	def name(self) -> str:
-		acc = self.accessor
-		return acc.text if isinstance(acc, Token) else acc.name
+		return str(self.accessor.prompt_name())
 
 	def __repr__(self):
 		return f"{type(self).__name__}({self.name!r})"

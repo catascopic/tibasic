@@ -72,7 +72,9 @@
       "Bash(python -c \"import draw; help\\(draw.text\\)\")",
       "mcp__visualize__read_me",
       "PowerShell(python C:\\\\Users\\\\Max\\\\Documents\\\\code\\\\tibasic\\\\_tmp_listtest.py)",
-      "Bash(python -X utf8 -c ' *)"
+      "Bash(python -X utf8 -c ' *)",
+      "Bash(PYTHONUTF8=1 py -m pytest test_io.py::TestPrompt::test_user_list_prompt_strips_prefix -q)",
+      "PowerShell(cd \"C:\\\\Users\\\\Max\\\\Documents\\\\code\\\\tibasic\"; $env:PYTHONUTF8=1; py -m pytest -q 2>&1 | Select-Object -Last 6)"
     ]
   }
 }
