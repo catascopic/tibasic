@@ -17,16 +17,8 @@ its tokens' display bytes splice straight in.
 from decimal import Decimal, ROUND_HALF_UP
 
 from core import TiList, TiMatrix, TiString
-from tokenbase import encode
 
 _SIG = 10  # the TI-83+ displays 10 significant figures in Normal mode
-
-# Separator/bracket display bytes, encoded through the charset rather than written
-# as ASCII literals: most punctuation shares its ASCII code, but '[' does not —
-# ASCII 0x5B is θ on the TI, whose '[' glyph is 0xC1 — so b'[' would be wrong.
-_LBRACE, _RBRACE = encode('{'), encode('}')
-_LBRACK, _RBRACK = encode('['), encode(']')
-_COMMA, _SPACE = encode(','), encode(' ')
 
 
 def ti83_format(x) -> str:
@@ -104,11 +96,11 @@ def output_text(value) -> bytes:
 	if isinstance(value, TiString):
 		return _string_bytes(value)
 	if isinstance(value, TiList):
-		return _LBRACE + _COMMA.join(_scalar_bytes(v) for v in value.data) + _RBRACE
+		return b'{' + b','.join(_scalar_bytes(v) for v in value.data) + b'}'
 	if isinstance(value, TiMatrix):
-		return _LBRACK + b''.join(
-			_LBRACK + _COMMA.join(_scalar_bytes(v) for v in row) + _RBRACK for row in value.data
-		) + _RBRACK
+		return b'\xc1' + b''.join(
+			b'\xc1' + b','.join(_scalar_bytes(v) for v in row) + b']' for row in value.data
+		) + b']'
 	return _scalar_bytes(value)
 
 
@@ -126,7 +118,7 @@ def value_lines(value) -> list[bytes]:
 	if isinstance(value, TiString):
 		return [_string_bytes(value)]
 	if isinstance(value, TiList):
-		return [_LBRACE + _SPACE.join(_scalar_bytes(v) for v in value.data) + _RBRACE]
+		return [b'{' + b' '.join(_scalar_bytes(v) for v in value.data) + b'}']
 	if isinstance(value, TiMatrix):
 		return _matrix_disp_lines(value)
 	return [_scalar_bytes(value)]
@@ -151,15 +143,13 @@ def _matrix_disp_lines(mat: TiMatrix) -> list[bytes]:
 	the last.  Column widths ignore magnitude/decimals — purely the rendered
 	text length of each entry.
 	"""
-	if not mat.data:
-		return [_LBRACK + _RBRACK]
 	cells = [[_scalar_bytes(v) for v in row] for row in mat.data]
 	widths = [max(len(row[c]) for row in cells) for c in range(mat.cols)]
 	lines = []
 	for i, row in enumerate(cells):
-		body  = _SPACE.join(cell.ljust(w) for cell, w in zip(row, widths))
-		left  = _LBRACK + _LBRACK if i == 0 else _SPACE + _LBRACK
-		right = _RBRACK + _RBRACK if i == mat.rows - 1 else _RBRACK
+		body  = b' '.join(cell.ljust(w) for cell, w in zip(row, widths))
+		left  = b'\xc1\xc1' if i == 0 else b' \xc1'
+		right = b']]' if i == mat.rows - 1 else b']'
 		lines.append(left + body + right)
 	return lines
 

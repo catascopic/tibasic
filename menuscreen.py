@@ -12,7 +12,9 @@ up()/down()/choose() and repaints styled_rows() until it commits.  How "inverted
 shown (ANSI inverse video, flipped pixels, CSS) is the frontend's call — the model
 just says *which* spans are inverted.
 """
+from core import TiString
 from tokenbase import encode
+from bitmap import Bitmap
 
 ROWS = 8     # a menu uses the home screen's 16×8 character grid
 COLS = 16
@@ -23,9 +25,9 @@ class MenuScreen:
 	ROWS = ROWS
 	COLS = COLS
 
-	def __init__(self, title: str, options: list[str]):
+	def __init__(self, title: str, options: list[TiString]):
 		self.title = title
-		self.options = list(options)
+		self.options = options
 		self.selected = 0
 
 	def up(self) -> None:
@@ -62,7 +64,6 @@ class MenuScreen:
 		"""Save the menu as a monochrome BMP, like home/graph: each character is
 		rasterized through the large font into the shared 96×64 Bitmap, with the
 		inverted title and selection drawn as flipped pixels (fonts.blit_cell)."""
-		from bitmap import Bitmap
 		surface = Bitmap()
 		for r, row in enumerate(self.styled_rows()):
 			c = 0

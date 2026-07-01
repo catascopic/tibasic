@@ -47,20 +47,11 @@ class ProgramAccessor(Accessor):
 	def __init__(self, name: str):
 		self.name = name
 
-	def get(self, env):
-		return env.programs.get(self.name)
-
 	def set(self, env, tokens):
 		env.programs[self.name] = Program(tokens, self.name)
 
-	def prompt_name(self):
-		return TiString.from_str(self.name)
-
 	def name_bytes(self) -> bytes:
 		return self.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
-
-	def __repr__(self):
-		return f"prgm({self.name!r})"
 
 
 def read_accessor(name_bytes: bytes) -> Accessor:
@@ -166,7 +157,7 @@ class TiFile:
 
 	@property
 	def name(self) -> str:
-		return str(self.accessor.prompt_name())
+		return str(self.accessor.name_bytes())
 
 	def __repr__(self):
 		return f"{type(self).__name__}({self.name!r})"

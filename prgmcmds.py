@@ -10,7 +10,7 @@ from preparse import (
 from tokenbase import Reference
 from environment import UserList, ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
-from core import TiString, TiList, py_int, require_string
+from core import TiString, TiList, py_int, require_string, str_to_tokens
 from errors import TiSyntaxError, UndefinedError, DomainError
 from tiformat import output_text
 from menuscreen import MenuScreen
@@ -162,7 +162,7 @@ def pause_cmd(env: Env, value: AnyValue = None):
 	env.console.pause(value)
 
 
-def _input_one(env, prompt: TiString | None, var: Reference, raw_string: bool = False) -> None:
+def _input_one(env, prompt: list[Token], var: Reference, raw_string: bool = False) -> None:
 	"""Read one value for `var` and store it.  Shared by Input and Prompt.
 
 	When `raw_string` is True (Input only), a string variable stores the typed
@@ -210,14 +210,14 @@ def input_cmd(args: ArgParser):
 	if not args.has_next:
 		raise TiSyntaxError("Input: the graph-cursor form is not supported yet")
 	env = args.env
-	prompt = TiString.from_str('?')
+	prompt = str_to_tokens('?')
 	t = args.peek()
 	if t.is_string_var() or t.code in {QUOTE, ANS, _SUB}:
 		first = args.thunk()
 		# Ideally we'd reject 0xEFxx tokens here, but they're still valid within a string so it's more complex than it's worth
 		if args.has_next:
 			# the first arg was the prompt
-			prompt = first.eval()
+			prompt = first.eval().tokens
 			var = args.any_var()
 		else:
 			var = t.reference(env)
@@ -233,10 +233,10 @@ def prompt_cmd(args: ArgParser):
 	"""Prompt var[,var...] — Input each variable in turn, with an implicit
 	"NAME=?" prompt instead of a custom one."""
 	env = args.env
-	suffix = TiString.from_str('=?')
+	suffix = str_to_tokens('=?')
 	while args.has_next:
 		var = args.any_var()
-		_input_one(env, var.name + suffix, var)
+		_input_one(env, var.accessor.prompt_name() + suffix, var)
 	args.end_cmd()
 
 
@@ -250,10 +250,10 @@ def menu_cmd(args: ArgParser):
 	"""
 	program = args.env.current_execution()       # raises ERR:INVALID outside a program
 	title = str(require_string(args.expr()))
-	options: list[str] = []
+	options: list[TiString] = []
 	labels: list[str] = []
 	for _ in range(7):
-		options.append(str(require_string(args.expr())))
+		options.append(require_string(args.expr()))
 		labels.append(args.label_name())
 		if not args.has_next:
 			break

@@ -1,5 +1,6 @@
-from tokenbase import decode
+from tokenbase import CHARSET
 from tiformat import disp_lines
+from bitmap import Bitmap
 
 # Display byte for '…' (0xCE) — what Disp truncates a too-long line with, as its
 # 16th column.  An empty cell holds 0x00, which decodes to a blank glyph.
@@ -161,9 +162,9 @@ class HomeScreen:
 		index = self.top + r
 		return self.lines[index] if index < len(self.lines) else self._blank()
 
-	def render(self) -> str:
+	def render(self) -> bytes:
 		"""The visible window as 8 lines of 16 characters (trailing blanks preserved)."""
-		return '\n'.join(decode(bytes(self._window_row(r))) for r in range(self.ROWS))
+		return b'\n'.join(self._window_row(r) for r in range(self.ROWS))
 
 	def print_screen(self, path, pixel_size: int = 1) -> None:
 		"""Save the visible window as a monochrome BMP.
@@ -172,7 +173,6 @@ class HomeScreen:
 		a 6×8 pixel block, so the 16×8 window fills exactly the same 96×64 LCD the graph
 		uses — the home screen and the graph are two views of one Bitmap.
 		"""
-		from bitmap import Bitmap
 		surface = Bitmap()
 		for r in range(self.ROWS):
 			row = self._window_row(r)
@@ -181,4 +181,4 @@ class HomeScreen:
 		surface.print_screen(path, pixel_size)
 
 	def __str__(self) -> str:
-		return self.render()
+		return self.render().decode(CHARSET)
