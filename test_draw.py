@@ -929,8 +929,8 @@ class TestText:
 class TestStorePic:
 	def test_store_snapshots_graph(self):
 		env = run('Pxl-On( 0,0\nPxl-On( 5,10\nStorePic 1')
-		assert env.pics[1] is not None
-		assert env.pics[1].get(0, 0) and env.pics[1].get(5, 10)
+		assert env.pics[0] is not None
+		assert env.pics[0].get(0, 0) and env.pics[0].get(5, 10)
 
 	def test_store_does_change_screen(self):
 		env = run('Disp 5\nStorePic 1')   # on the home screen
@@ -939,15 +939,15 @@ class TestStorePic:
 	def test_store_copy_is_independent(self):
 		# Drawing after StorePic must not mutate the stored snapshot.
 		env = run('Pxl-On( 4,4\nStorePic 4\nPxl-On( 8,8')
-		assert env.pics[4].get(4, 4)
-		assert not env.pics[4].get(8, 8)
+		assert env.pics[3].get(4, 4)
+		assert not env.pics[3].get(8, 8)
 
 	def test_store_keeps_full_height(self):
 		# Row 63 isn't Pxl-addressable, but a full-buffer snapshot still captures it.
 		env = run('Pxl-On( 5,5')
 		env.graph.set(63, 0)
 		run('StorePic 2', env)
-		assert env.pics[2].get(63, 0)
+		assert env.pics[1].get(63, 0)
 
 	def test_variable_raises_data_type(self):
 		# The real calculator only accepts a literal digit or a Pic token — not an expression.
@@ -978,7 +978,7 @@ class TestRecallPic:
 			run('RecallPic 7')
 
 	def test_roundtrip_pic0(self):
-		# Pic0 is slot 0 — the number maps straight through.
+		# Pic0 is slot 9 — same catalog-index convention as Str0, [J], etc.
 		env = run('Pxl-On( 3,3\nStorePic 0\nClrDraw\nRecallPic 0')
 		assert env.graph.get(3, 3)
 
@@ -989,7 +989,7 @@ class TestRecallPic:
 		assert env.graph.get(0, 0)
 
 	def test_recall_pic0_token(self):
-		# Pic0 token (code 0x6009) correctly maps to slot 0.
+		# Pic0 token (code 0x6009, catalog index 9) correctly maps to slot 9.
 		env = run('Pxl-On( 7,7\nStorePic 0\nClrDraw')
 		run('RecallPic Pic0', env)
 		assert env.graph.get(7, 7)
@@ -999,22 +999,22 @@ class TestStorePicTokenForm:
 	def test_store_pic_token_form(self):
 		# StorePic accepts a Pic variable token as well as a number.
 		env = run('Pxl-On( 2,2\nStorePic Pic2')
-		assert env.pics[2] is not None
-		assert env.pics[2].get(2, 2)
+		assert env.pics[1] is not None
+		assert env.pics[1].get(2, 2)
 
 	def test_store_pic3_token(self):
 		env = run('Pxl-On( 9,9\nStorePic Pic3')
-		assert env.pics[3].get(9, 9)
+		assert env.pics[2].get(9, 9)
 
 	def test_store_pic0_token(self):
-		# Pic0 token (last in the 0x60XX range, code 0x6009) → slot 0.
+		# Pic0 token (catalog index 9) → slot 9.
 		env = run('Pxl-On( 1,1\nStorePic Pic0')
-		assert env.pics[0] is not None
-		assert env.pics[0].get(1, 1)
+		assert env.pics[9] is not None
+		assert env.pics[9].get(1, 1)
 
 	def test_number_and_token_forms_equivalent(self):
 		# StorePic 5 and StorePic Pic5 write to the same slot.
 		env1 = run('Pxl-On( 4,4\nStorePic 5')
 		env2 = run('Pxl-On( 4,4\nStorePic Pic5')
-		assert env1.pics[5].get(4, 4)
-		assert env2.pics[5].get(4, 4)
+		assert env1.pics[4].get(4, 4)
+		assert env2.pics[4].get(4, 4)

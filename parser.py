@@ -700,6 +700,24 @@ class ArgParser:
 		self._next = self._parser.eat_if(COMMA)
 		return t
 
+	def pic_index(self) -> int:
+		"""Parse a StorePic/RecallPic picture number: a Pic variable (Pic0–Pic9) or a digit.
+
+		The real calculator accepts only a single token — a Pic variable or a bare digit;
+		expressions like StorePic A are ERR:DATA TYPE.  Bypasses the atom-based has_next
+		check like token() does, because Pic tokens can't start an expression atom.
+		"""
+		if not self._parser.has_next:
+			raise ArgumentError("Missing argument")
+		t = self._parser.advance()
+		if t.flags & Flag.PIC:
+			self._next = self._parser.eat_if(COMMA)
+			return t.number
+		if t.flags & Flag.DIGIT:
+			self._next = self._parser.eat_if(COMMA)
+			return (t.value - 1) % 10
+		raise DataTypeError("StorePic/RecallPic: argument must be a digit 0–9 or a Pic variable")
+
 	@_parse_arg
 	def label_name(self) -> str:
 		"""Read up to 2 alphanumeric characters as a label name (for Lbl / Goto)."""

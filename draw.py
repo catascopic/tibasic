@@ -1,14 +1,12 @@
 import math
 
 import distributions as dist
-from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command
+from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command, PicIndex
 from errors import DataTypeError, DomainError, UndefinedError
 from modes import Screen
 from graphscreen import GraphScreen
 from fonts import SMALL_FONT, GLYPH_WIDTH
 from core import TiString, py_int
-from tokenbase import Flag
-from tokentypes import PicToken
 from graph import (
 	MAX_ROW, MAX_COL, _round_half_up,
 	_x_to_col, _y_to_row, _col_to_x, _graph_to_pixel,
@@ -71,36 +69,17 @@ def clr_draw(env) -> None:
 # env.pics indexed by picture number.  We keep the full screen in memory (all 64
 # rows); the 63-row legacy truncation is only a .8xi on-disk concern (see tifile).
 
-def _parse_pic_arg(args) -> PicToken:
-	"""Parse a StorePic/RecallPic argument: a Pic token (Pic0–Pic9) or a literal digit 0–9.
-
-	The real calculator only accepts a single token — a Pic variable or a bare digit; an
-	expression like StorePic A is ERR:DATA TYPE even if A holds a valid number.
-	"""
-	t = args.peek()
-	if t.flags & Flag.PIC:
-		return args.token(Flag.PIC)
-	if t.flags & Flag.DIGIT:
-		digit_tok = args.token(Flag.DIGIT)
-		return PicToken((digit_tok.code - 0x30 - 1) % 10)
-	raise DataTypeError("StorePic/RecallPic: argument must be a digit 0–9 or a Pic variable")
-
-
-@special_func
-def store_pic(args) -> None:
-	pic = _parse_pic_arg(args)
-	args.end_cmd()
-	env = args.env
+@preparse_cmd
+def store_pic(env: Env, num: PicIndex) -> None:
 	with env.draw_to_graph():
-		pic.set(env, env.graph.copy())
+		env.pics[num] = env.graph.copy()
 
 
-@special_func
-def recall_pic(args) -> None:
-	pic = _parse_pic_arg(args)
-	args.end_cmd()
-	env = args.env
-	bitmap = pic.load(env)
+@preparse_cmd
+def recall_pic(env: Env, num: PicIndex) -> None:
+	bitmap = env.pics[num]
+	if bitmap is None:
+		raise UndefinedError(f"Pic{(num + 1) % 10} is not defined")
 	with env.draw_to_graph():
 		env.graph.overlay(bitmap)
 

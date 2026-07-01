@@ -27,7 +27,7 @@ __all__ = [
     # Behavior-carrying
     'FunctionToken', 'CommandToken', 'OperatorToken', 'PostfixToken', 'AnsToken',
     # Numeric / constant
-    'LetterToken', 'RealToken', 'PaymentsPerYearToken', 'ConstantToken', 'ComputedToken',
+    'DigitToken', 'LetterToken', 'RealToken', 'PaymentsPerYearToken', 'ConstantToken', 'ComputedToken',
     # Aggregate variables
     'MatrixToken', 'ListToken', 'StringToken', 'PicToken',
     # Equation / sequence
@@ -37,6 +37,13 @@ __all__ = [
     'WindowToken', 'XresToken', 'IntWindowToken', 'FactorWindowToken', 'DeltaWindowToken',
     'TableToken',
 ]
+
+
+class DigitToken(Token):
+	def __init__(self, value: int):
+		ch = 0x30 + value
+		super().__init__(ch, bytes([ch]), Flag.DIGIT, char=chr(ch))
+		self.value = value
 
 
 def _window_affects_graph(env, attr: str) -> bool:
@@ -192,18 +199,16 @@ class MatrixToken(Deletable, VariableToken):
 		return self.resolve(arg_parser.env)[(row, col)]
 
 
-class PicToken(Deletable, VariableToken):
-	"""A picture Pic1–Pic9, Pic0 (token 0x6000+i) — a slot in env.pics.  Pictures can
-	only be used with StorePic/RecallPic, never the Store arrow or an expression, so
-	store and resolve raise; but DelVar can clear one, so it's Deletable.  `number` is
-	its env.pics slot — token 0x6000+i names Pic(i+1)%10."""
+class PicToken(Deletable, Token):
+	"""A picture Pic1–Pic9, Pic0 (token 0x6000+i) — a slot in env.pics.
+
+	Not an expression atom or Store-arrow target — only usable with StorePic/RecallPic
+	(and DelVar to clear the slot).  `number` is the env.pics slot index.
+	"""
 
 	def __init__(self, index: int):
-		super().__init__(0x6000 | index, b'Pic' + bytes([0x30 + (index + 1) % 10]), Flag.PIC)
-		self.number = (index + 1) % 10
-
-	def can_start_atom(self) -> bool:
-		return False   # unlike other variables, a picture is never an expression atom
+		Token.__init__(self, 0x6000 | index, b'Pic' + bytes([0x30 + (index + 1) % 10]), Flag.PIC)
+		self.number = index
 
 	def get(self, env):
 		return env.pics[self.number]
@@ -211,15 +216,8 @@ class PicToken(Deletable, VariableToken):
 	def set(self, env, value):
 		env.pics[self.number] = value
 
-	def load(self, env):
-		"""Return the stored bitmap, or raise UndefinedError if this slot is empty."""
-		bitmap = self.get(env)
-		if bitmap is None:
-			raise UndefinedError(f"{self.text} is not defined")
-		return bitmap
-
-	def resolve(self, env):
-		raise TiSyntaxError(f"{self.text} can't be used in an expression")
+	def name_bytes(self) -> bytes:
+		return self.code_to_bytes().ljust(8, b'\x00')
 
 
 class ListToken(Deletable, VariableToken):

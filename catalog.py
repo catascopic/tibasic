@@ -78,8 +78,7 @@ def _generate():
 	yield Token(0x2F, b'QuartReg ')
 
 	for i in range(10):
-		ch = 0x30 + i
-		yield Token(ch, bytes([ch]), Flag.DIGIT, char=chr(ch))
+		yield DigitToken(i)
 
 	yield Token(tok.DOT, b'.', Flag.ATOM_START,     char='.')
 	yield Token(tok.SCI_E, b'\x1b', Flag.ATOM_START)                    # ᴇ

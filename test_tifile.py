@@ -753,7 +753,7 @@ class TestStoreTo:
 	def test_picture(self):
 		env = Environment()
 		PictureFile(tok('Pic1'), make_bitmap({(5, 5)})).store_to(env)
-		assert pixels_of(env.pics[1]) == {(5, 5)}
+		assert pixels_of(env.pics[0]) == {(5, 5)}
 
 	def test_program(self):
 		env = Environment()

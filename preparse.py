@@ -85,6 +85,9 @@ type EquationVar = Reference
 type AnyVar = Reference
 type ListVarPrefixOptional = Reference
 
+# Picture / GDB argument: a Pic variable token or a literal digit → int slot index
+type PicIndex = int
+
 # Names and environment
 type LabelName = str
 type ProgramName = str
@@ -131,6 +134,7 @@ _REGISTRY = {
 	EquationVar:           ArgParser.equation_var,
 	AnyVar:                ArgParser.any_var,
 	ListVarPrefixOptional: ArgParser.list_var_prefix_optional,
+	PicIndex:              ArgParser.pic_index,
 	LabelName:             ArgParser.label_name,
 	ProgramName:           ArgParser.program_name,
 	Env:                   ArgParser.pass_env,

@@ -6,9 +6,10 @@ Every TI variable file shares one envelope — an 8-byte signature, a 42-byte
 comment, a variable-entry header (type, name, archive flag), and a trailing
 checksum — wrapping a type-specific body.  A file is modelled as:
 
-  * an `accessor` — the variable's storage location (a catalog VariableToken for
-    A–Z/[A]/Str1/Y1/L1/Pic1, a `UserList`, or a `ProgramAccessor`).  It supplies the
-    name (prompt_name / name_bytes) and, via `set`, where `store_to` installs the value.
+  * an `accessor` — the variable's storage location.  A catalog VariableToken for most
+    variables (A–Z/[A]/Str1/Y1/L1), a plain Token with get/set/name_bytes for pictures
+    (PicToken), a `UserList`, or a `ProgramAccessor`.  Supplies name_bytes for writing
+    and set() for store_to.
   * a `value` — the runtime model (a number, TiList, TiMatrix, TiString,
     TiEquation, token list, or Bitmap).
 
@@ -492,6 +493,10 @@ class PictureFile(TiFile):
 	def __init__(self, accessor, value, comment='', archived=False, version=None, rows=ROWS):
 		super().__init__(accessor, value, comment, archived, version)
 		self.rows = rows   # scanlines stored: 64 (full LCD) or 63 (graph screen only)
+
+	@property
+	def name(self) -> str:
+		return self.accessor.text   # PicToken.text → 'Pic1', 'Pic0', etc.
 
 	@property
 	def bitmap(self) -> Bitmap:

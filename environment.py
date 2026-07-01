@@ -70,7 +70,7 @@ class Environment:
 		self.matrices   = AlphaList(10)  # [A]–[J]
 		self.lists      = [None] * 6       # L1–L6  (TiList | None)
 		self.strings    = [None] * 10      # Str1–Str0 (TiString | None)
-		self.pics       = [None] * 10      # Pic0–Pic9, by number (Bitmap | None)
+		self.pics       = [None] * 10      # Pic1–Pic0, by catalog index (Bitmap | None)
 		self.function   = [FuncData()  for _ in range(10)]  # Y1–Y0
 		self.parametric = [ParData()   for _ in range(6)]   # X1T/Y1T – X6T/Y6T
 		self.polar      = [PolarData() for _ in range(6)]   # r1–r6
