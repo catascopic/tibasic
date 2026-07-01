@@ -572,8 +572,8 @@ class Parser:
 
 
 def _parse_arg(method):
-	def wrapper(self):
-		return self._arg(lambda: method(self))
+	def wrapper(self, *args, **kwargs):
+		return self._arg(lambda: method(self, *args, **kwargs))
 	return wrapper
 
 
@@ -593,7 +593,7 @@ class ArgParser:
 
 	def __init__(self, parser: Parser):
 		self._parser = parser
-		self._next = parser.peek().can_start_atom()
+		self._next = parser.peek().code not in {EOF_CODE, COLON, NEWLINE, R_PAREN}
 
 	def _arg(self, parse_func):
 		if not self.has_next:
@@ -625,32 +625,32 @@ class ArgParser:
 		return self._parser.capture()
 
 	@_parse_arg
-	def numeric_var(self) -> "Reference":
+	def numeric_var(self) -> Reference:
 		t = self._parser.advance()
 		if not t.is_numeric_var():
 			raise DataTypeError(f"Expected a numeric variable, got {t}")
 		return t.reference(self.env)
 
 	@_parse_arg
-	def list_var(self) -> "Reference":
+	def list_var(self) -> Reference:
 		return self._parser.parse_list_var()
 
 	@_parse_arg
-	def matrix_var(self) -> "Reference":
+	def matrix_var(self) -> Reference:
 		t = self._parser.advance()
 		if t.is_matrix_var():
 			return t.reference(self.env)
 		raise DataTypeError(f"Expected a matrix variable, got {t}")
 
 	@_parse_arg
-	def string_var(self) -> "Reference":
+	def string_var(self) -> Reference:
 		t = self._parser.advance()
 		if t.is_string_var():
 			return t.reference(self.env)
 		raise DataTypeError(f"Expected a string variable, got {t}")
 
 	@_parse_arg
-	def equation_var(self) -> "Reference":
+	def equation_var(self) -> Reference:
 		t = self._parser.advance()
 		if t.is_equation_var():
 			return t.reference(self.env)
@@ -667,7 +667,7 @@ class ArgParser:
 		return self._parser.parse_list_var()
 
 	@_parse_arg
-	def any_var(self) -> "Reference":
+	def any_var(self) -> Reference:
 		"""Read any variable reference: numeric, list, matrix, string, equation, or user list.
 
 		Classified positively from the token, so symbols that merely carry an accessor
@@ -682,39 +682,29 @@ class ArgParser:
 			return self._parser.parse_user_list()
 		raise TiSyntaxError(f"Expected a variable, got {t}")
 
+	@_parse_arg
 	def token(self, flag: Flag) -> Token:
 		"""Consume a single token positionally and verify it carries `flag`; return it.
 
-		The primitive for tokens taken by position rather than as an expression — the
-		single-token variable kinds (Flag.NUMERIC/MATRIX/…) and the Pic/GDB tokens, which
-		can't start an expression atom (so the has_next atom check doesn't apply — we test
-		the underlying stream instead).  Consumes a trailing comma like the value parsers,
-		then hands back the raw token for the caller to adapt (e.g. `.reference(env)` for a
+		Hands back the raw token for the caller to adapt (e.g. `.reference(env)` for a
 		variable, or extracting a picture number).
 		"""
-		if not self._parser.has_next:
-			raise ArgumentError("Missing argument")
 		t = self._parser.advance()
 		if not (t.flags & flag):
 			raise DataTypeError(f"Expected {flag.name} token, got {t}")
-		self._next = self._parser.eat_if(COMMA)
 		return t
 
+	@_parse_arg
 	def pic_index(self) -> int:
 		"""Parse a StorePic/RecallPic picture number: a Pic variable (Pic0–Pic9) or a digit.
 
 		The real calculator accepts only a single token — a Pic variable or a bare digit;
-		expressions like StorePic A are ERR:DATA TYPE.  Bypasses the atom-based has_next
-		check like token() does, because Pic tokens can't start an expression atom.
+		expressions like StorePic A are ERR:DATA TYPE.
 		"""
-		if not self._parser.has_next:
-			raise ArgumentError("Missing argument")
 		t = self._parser.advance()
 		if t.flags & Flag.PIC:
-			self._next = self._parser.eat_if(COMMA)
 			return t.number
 		if t.flags & Flag.DIGIT:
-			self._next = self._parser.eat_if(COMMA)
 			return (t.value - 1) % 10
 		raise DataTypeError("StorePic/RecallPic: argument must be a digit 0–9 or a Pic variable")
 
