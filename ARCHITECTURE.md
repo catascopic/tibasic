@@ -14,7 +14,9 @@ command; they capture the edge cases.
 - **Tokens are the unit of everything.** `catalog.py::_generate()` yields every `Token`
   with its hex code, display bytes, and behavior. A token IS its own accessor/parser hook
   — variable tokens (`tokenbase.py`: `VariableToken`/`Accessor`) carry `resolve`/`store`/
-  `invoke` and take `env` as a parameter (they're env-less singletons built once). Codes
+  `invoke` and take `env` as a parameter (they're stateless and env-less; the catalog
+  builds one of each, but tokens are value objects comparing by code — a fresh
+  `StringToken(3)` equals the catalog's Str4). Codes
   ≤0xFF are one byte; >0xFF are two. `Flag` (an `IntFlag`) classifies role
   (FUNCTION/COMMAND/INFIX/…) and variable kind — the parser dispatches on flags, not code
   ranges.

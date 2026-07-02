@@ -11,6 +11,7 @@ from tifile import (
 from bitmap import Bitmap, ROWS, COLS
 from core import TiList, TiMatrix, TiString, TiEquation
 from catalog import get_token
+from tokentypes import StringToken, FuncEquationToken, ParEquationToken, PolarEquationToken, SequenceToken
 from environment import Environment, UserList
 from test_tibasic import toks
 
@@ -715,6 +716,64 @@ def test_tokenvar_byte_exact_roundtrip(cls, name, path):
 	buf = BytesIO()
 	cls.load(path).write_to(buf)
 	assert buf.getvalue() == orig
+
+
+# ── Friendly-name construction (accessor looked up from the catalog) ──────────
+
+class TestNamedConstruction:
+	def test_token_equality_is_by_code(self):
+		# Tokens are value objects: a freshly built StringToken(3) IS Str4.  The
+		# catalog still holds one of each, but identity is not load-bearing.
+		assert StringToken(3) == tok('Str4')
+		assert hash(StringToken(3)) == hash(tok('Str4'))
+		assert StringToken(3) != StringToken(4)
+
+	def test_string_by_digit(self):
+		assert StringFile(1, TiString([])).accessor == tok('Str1')
+		assert StringFile(0, TiString([])).accessor == tok('Str0')
+
+	def test_picture_by_digit(self):
+		assert PictureFile(9, Bitmap()).accessor == tok('Pic9')
+
+	def test_matrix_by_letter(self):
+		assert MatrixFile('B', TiMatrix([[1.0]])).accessor == tok('[B]')
+
+	def test_variable_letter_and_theta(self):
+		assert VariableFile('Z', 5.0).accessor == tok('Z')
+		assert VariableFile('theta', 5.0).accessor == tok('θ')
+
+	def test_list_int_is_builtin(self):
+		assert ListFile(3, TiList([1.0])).accessor == tok('L₃')
+
+	def test_list_string_is_user_list(self):
+		acc = ListFile('CW', TiList([1.0])).accessor
+		assert isinstance(acc, UserList) and acc.name == 'CW'
+
+	def test_equation_takes_accessor_only(self):
+		assert EquationFile(FuncEquationToken(0), TiEquation([])).accessor == tok('Y₁')
+		assert EquationFile(ParEquationToken(1, 'x'), TiEquation([])).accessor == tok('X₂ₜ')
+		assert EquationFile(PolarEquationToken(2), TiEquation([])).accessor == tok('r₃')
+		assert EquationFile(SequenceToken(0), TiEquation([])).accessor == tok('𝑢')
+		with pytest.raises(TypeError):
+			EquationFile('Y1', TiEquation([]))   # no name form — equations aren't typed on-calc
+
+	def test_named_file_roundtrips(self):
+		result = roundtrip_tokenvar(StringFile(2, TiString(toks('HI'))))
+		assert result.name == 'Str2'
+		assert result.accessor is tok('Str2')   # the read path returns the catalog instance
+
+	def test_accessor_instance_still_accepted(self):
+		assert StringFile(tok('Str1'), TiString([])).accessor is tok('Str1')
+
+	def test_bad_names_rejected(self):
+		with pytest.raises(ValueError):
+			StringFile('4', TiString([]))          # digits are ints, not strings
+		with pytest.raises(ValueError):
+			ListFile(7, TiList([1.0]))
+		with pytest.raises(ValueError):
+			MatrixFile('[A]', TiMatrix([[1.0]]))   # the letter alone is the name
+		with pytest.raises(ValueError):
+			MatrixFile('K', TiMatrix([[1.0]]))
 
 
 # ── Envelope validation: checksum, truncation, 0x0B header ────────────────────

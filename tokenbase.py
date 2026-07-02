@@ -152,6 +152,18 @@ class Token:
 	def size(self) -> int:
 		return 1 if self.code < 0x100 else 2
 
+	def __eq__(self, other):
+		"""Tokens are value objects: equal iff same code.  Codes are unique in the
+		catalog and the calculator itself compares tokens by their byte value, so a
+		freshly constructed StringToken(3) IS Str4 — the catalog builds one instance
+		of each, but identity is a convenience, not an invariant."""
+		if isinstance(other, Token):
+			return self.code == other.code
+		return NotImplemented
+
+	def __hash__(self):
+		return hash(self.code)
+
 	@property
 	def text(self) -> str:
 		"""Human-readable rendering of the display bytes (debugging/printing only)."""

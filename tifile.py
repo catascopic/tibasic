@@ -9,6 +9,12 @@ checksum — wrapping a type-specific body.  A file is modelled as:
   * an `accessor` — the variable's storage location: a FileVar Accessor.  A catalog
     token for token-named variables (A–Z/[A]/Str1/Y1/L1/Pic1), a `UserList`, or a
     `ProgramAccessor`.  Supplies name_bytes for writing and set() for store_to.
+    Constructors also take the variable's natural name — in its natural type, no
+    alternate spellings (`_named_accessor`): StringFile(4) is Str4, MatrixFile('A')
+    is [A], VariableFile('Z') is Z, ListFile(3) is L₃ while ListFile('CW') is ʟCW.
+    Equations, whose names aren't typeable, take only an accessor
+    (EquationFile(FuncEquationToken(0)) is Y₁ — tokens compare by code, so a fresh
+    instance is as good as the catalog's).
   * a `value` — the runtime model (a number, TiList, TiMatrix, TiString,
     TiEquation, token list, or Bitmap).
 
@@ -19,6 +25,7 @@ store_to; each subclass supplies only its body via `_parse_body`/`_encode_body`/
 from io import BytesIO
 
 from tokenbase import Token, Accessor, FileVar
+from tokentypes import LetterToken, MatrixToken, ListToken, StringToken, PicToken
 from catalog import get_token, read_token
 from bitmap import Bitmap, ROWS, COLS
 from core import TiList, TiMatrix, TiString, TiEquation, str_to_tokens
@@ -88,6 +95,15 @@ def write_accessor(acc: FileVar) -> bytes:
 	return field.ljust(8, b'\x00')
 
 
+def _digit_slot(digit) -> int:
+	"""A digit-named variable's display digit (1..9, 0 = the tenth) → its 0-based
+	slot index (Str4 → 3, Pic0 → 9).  The one place this conversion lives — the
+	token classes take slot indices, the TiFile API takes the visible digit."""
+	if isinstance(digit, int) and 0 <= digit <= 9:
+		return (digit - 1) % 10
+	raise ValueError(f"Expected a variable digit 0-9, got {digit!r}")
+
+
 # ── Shared envelope ─────────────────────────────────────────────────────────────
 
 def _read_var_header(f):
@@ -155,11 +171,21 @@ class TiFile:
 	DEFAULT_VERSION = 0x00
 
 	def __init__(self, accessor, value, comment='', archived=False, version=None):
+		if not isinstance(accessor, FileVar):
+			accessor = self._named_accessor(accessor)
 		self.accessor = accessor
 		self.value    = value
 		self.comment  = comment
 		self.archived = archived
 		self.version  = self.DEFAULT_VERSION if version is None else version
+
+	@classmethod
+	def _named_accessor(cls, spec) -> FileVar:
+		"""The accessor for a friendly variable name — each subclass accepts its
+		family's natural spelling (StringFile(1) → Str1, MatrixFile('A') → [A],
+		ListFile('CW') → ʟCW, …).  Always a *lookup* of the catalog singleton,
+		never a fresh token: tokens are identity-compared throughout."""
+		raise TypeError(f"{cls.__name__} cannot name a variable from {spec!r}; pass a FileVar accessor")
 
 	@property
 	def name(self) -> str:
@@ -255,10 +281,12 @@ class ProgramFile(TiFile):
 	DEFAULT_VERSION = 0x01   # 0x01 is TI-Connect's default for fresh programs
 
 	def __init__(self, accessor, value, comment='', archived=False, locked=False, version=None):
-		if isinstance(accessor, str):
-			accessor = ProgramAccessor(accessor)
 		super().__init__(accessor, value, comment, archived, version)
 		self.locked = locked
+
+	@staticmethod
+	def _named_accessor(spec) -> ProgramAccessor:
+		return ProgramAccessor(spec)
 
 	@property
 	def tokens(self) -> list[Token]:
@@ -349,6 +377,16 @@ _VAR_TYPE_COMPLEX = 0x0C
 
 class VariableFile(TiFile):
 
+	@staticmethod
+	def _named_accessor(spec):
+		"""A letter variable: 'A'..'Z', or 'θ' (also spelled 'theta')."""
+		s = str(spec)
+		if len(s) == 1 and 'A' <= s <= 'Z':
+			return LetterToken(ord(s) - ord('A'))
+		if s in ('θ', 'theta'):
+			return LetterToken(26)
+		raise ValueError(f"Expected a variable letter A-Z or θ, got {spec!r}")
+
 	@classmethod
 	def _parse_body(cls, f, file_type):
 		return _decode_real_body(f, file_type, _VAR_TYPE_COMPLEX)
@@ -376,6 +414,19 @@ _LIST_TYPE_COMPLEX = 0x0D
 
 
 class ListFile(TiFile):
+	@staticmethod
+	def _named_accessor(spec):
+		"""An int 1-6 is a built-in list (ListFile(3) is L₃); a string is the user
+		list of that name (ListFile('CW') is ʟCW).  The *type* disambiguates, so a
+		user list named 'L1' can't collide with a built-in."""
+		if isinstance(spec, int):
+			if not 1 <= spec <= 6:
+				raise ValueError(f"Built-in lists are L1-L6, got {spec!r}")
+			return ListToken(spec - 1)
+		if isinstance(spec, str):
+			return UserList(spec)
+		raise TypeError(f"Expected a list digit or user-list name, got {spec!r}")
+
 	@classmethod
 	def _parse_body(cls, f, file_type):
 		count = int.from_bytes(f.read(2), 'little')
@@ -403,6 +454,15 @@ class ListFile(TiFile):
 # the format spec claims elements may be complex, but matrices are real-only.)
 
 class MatrixFile(TiFile):
+	@staticmethod
+	def _named_accessor(spec):
+		"""A matrix letter 'A'..'J' — the letter alone is the name (no brackets:
+		the [] is display dressing, and matrices have no number on the calculator)."""
+		s = str(spec)
+		if len(s) == 1 and 'A' <= s <= 'J':
+			return MatrixToken(ord(s) - ord('A'))
+		raise ValueError(f"Expected a matrix letter A-J, got {spec!r}")
+
 	@classmethod
 	def _parse_body(cls, f, file_type):
 		cols = f.read(1)[0]
@@ -465,8 +525,16 @@ class StringFile(TokenVarFile):
 	_VAR_TYPE = 0x04
 	_MODEL    = TiString
 
+	@staticmethod
+	def _named_accessor(spec):
+		"""A string variable by digit: StringFile(4) is Str4, StringFile(0) is Str0."""
+		return StringToken(_digit_slot(spec))
+
 
 class EquationFile(TokenVarFile):
+	# No _named_accessor: equations have no typed name on the calculator (they're
+	# picked from a menu) and span four families — pass the token itself, e.g.
+	# EquationFile(FuncEquationToken(0), …) for Y₁.
 	_VAR_TYPE = 0x03
 	_MODEL    = TiEquation
 
@@ -512,6 +580,11 @@ class PictureFile(TiFile):
 	def __init__(self, accessor, value, comment='', archived=False, version=None, rows=ROWS):
 		super().__init__(accessor, value, comment, archived, version)
 		self.rows = rows   # scanlines stored: 64 (full LCD) or 63 (graph screen only)
+
+	@staticmethod
+	def _named_accessor(spec):
+		"""A picture by digit: PictureFile(4) is Pic4, PictureFile(0) is Pic0."""
+		return PicToken(_digit_slot(spec))
 
 	@classmethod
 	def read_from(cls, f):
