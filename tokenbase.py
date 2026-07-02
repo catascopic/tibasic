@@ -149,7 +149,7 @@ class Token:
 		self.char = char
 
 	@property
-	def size(self) -> str:
+	def size(self) -> int:
 		return 1 if self.code < 0x100 else 2
 
 	@property
@@ -281,9 +281,6 @@ class Accessor(ABC):
 	accessor) or a plain Accessor (e.g. UserList) built synthetically by the parser.
 	"""
 
-	def can_start_atom(self) -> bool:
-		return True   # every accessor resolves to a value, so it can lead an expression
-
 	def get(self, env):
 		"""Raw slot read — no auto-init (may return None).  Prefer resolve()."""
 		raise NotImplementedError(f"{type(self).__name__} does not support get")
@@ -302,7 +299,7 @@ class Accessor(ABC):
 	def store(self, env, value):
 		raise TiSyntaxError(f"Cannot store to {self}")
 
-	def is_invokable():
+	def is_invokable(self):
 		return False
 
 	def invoke(self, arg_parser):
@@ -311,16 +308,39 @@ class Accessor(ABC):
 	def delete(self, env):
 		raise TiSyntaxError(f"Cannot delete {self}")
 
-	def prompt_name(self):
-		"""The variable's source spelling as a TiString — what Prompt echoes."""
-		raise NotImplementedError(f"{type(self).__name__} has no prompt name")
-
-	def name_bytes(self) -> bytes:
-		"""The 8-byte, null-padded name field this accessor writes to a .8x* file."""
-		raise NotImplementedError(f"{type(self).__name__} is not a file variable")
+	def name_tokens(self) -> list:
+		"""The variable's source spelling as display tokens — what Prompt echoes and
+		what a file's human-readable name decodes from.  Every accessor has one (a
+		token spells itself, a named accessor spells its letters)."""
+		raise NotImplementedError(f"{type(self).__name__} has no name spelling")
 
 	def reference(self, env) -> Reference:
 		return Reference(env, self)
+
+
+class FileVar(ABC):
+	"""Mixin for accessors that have a .8x* file identity — a name field in the
+	variable file's VAT entry.  This is a genuine partial capability (window/stat
+	variables, Ans, constants have no file format), so it is declared by mixing this
+	in rather than by a raising stub on Accessor: tifile's `write_accessor` takes a
+	FileVar, and mis-filing a non-file variable fails at the type level.
+
+	Implementors must also be Accessors — a file load installs its value through the
+	accessor's raw `set`.  `name_bytes` returns only the *meaningful* bytes of the
+	name; padding to the VAT's fixed 8-byte field is the file format's business and
+	happens in tifile's name codec (write_accessor), not here."""
+
+	@abstractmethod
+	def name_bytes(self) -> bytes:
+		"""The identifying bytes of this variable's file name field, unpadded."""
+
+
+class TokenFileVar(FileVar):
+	"""FileVar for token-named variables (A–Z/θ, L1–L6, [A]–[J], Str/Y/Pic vars):
+	the name field is simply the token's code bytes."""
+
+	def name_bytes(self) -> bytes:
+		return self.code_to_bytes()
 
 
 class Deletable:
@@ -336,13 +356,15 @@ class VariableToken(Token, Accessor):
 	"""A catalog token that is also its own accessor — a variable like A, L1, [A], Y1.
 
 	Inherits Token for code/display/flags/parse hooks and Accessor for resolve/store/
-	invoke.  The flags instance attribute set by Token.__init__ shadows the class-level
-	Flag(0) default on Accessor, so invokable and the is_*_var() predicates work
-	correctly without any extra wiring.
+	invoke.  Token and Accessor share no method names, so the base order carries no
+	behavior; the overrides below do the wiring:
 
-	parse_prefix and can_start_atom are overridden here because the MRO puts Token before
-	Accessor, and Token's implementations assume flag-based classification; variable
-	tokens are always expression atoms and always route through _read_accessor.
+	  * parse_prefix — Token's default raises (inert tokens can't lead an expression);
+	    a variable token always routes through read_accessor.
+	  * can_start_atom — hard True rather than Token's flag mask, because some variable
+	    tokens carry flags outside the VARIABLE union (window/stat/TVM vars, constants
+	    like π) yet still lead expressions and implicitly multiply (2π).
+	  * is_invokable — flag-based (Flag.INVOKABLE), replacing Accessor's False.
 	"""
 
 	def is_invokable(self) -> bool:
@@ -354,11 +376,8 @@ class VariableToken(Token, Accessor):
 	def can_start_atom(self) -> bool:
 		return True
 
-	def prompt_name(self):
-		return [self]
-
-	def name_bytes(self) -> bytes:
-		return self.code_to_bytes().ljust(8, b'\x00')
+	def name_tokens(self) -> list:
+		return [self]   # a variable token spells itself
 
 
 class _EofToken(Token):
@@ -375,4 +394,4 @@ class _EofToken(Token):
 		return '<EOF>'
 
 
-EOF_TOKEN = Token(-1, b'')
+EOF_TOKEN = _EofToken(EOF_CODE, b'')

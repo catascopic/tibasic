@@ -174,7 +174,7 @@ def _input_one(env, prompt: list[Token], var: Reference, raw_string: bool = Fals
 	# read_tokens also mirrors the entry onto the home grid (a frontend concern — see
 	# Console.read_tokens); the command just consumes the well-formed token list.
 	tokens = env.console.read_tokens(prompt)
-	name = var.accessor.prompt_name()   # the target's spelling, as a list[Token]
+	name = var.accessor.name_tokens()   # the target's spelling, as a list[Token]
 	if raw_string and name[0].is_string_var():
 		var.store(TiString(tokens))
 	else:
@@ -237,7 +237,7 @@ def prompt_cmd(args: ArgParser):
 	suffix = str_to_tokens('=?')
 	while args.has_next:
 		var = args.any_var()
-		_input_one(env, var.accessor.prompt_name() + suffix, var)
+		_input_one(env, var.accessor.name_tokens() + suffix, var)
 	args.end_cmd()
 
 

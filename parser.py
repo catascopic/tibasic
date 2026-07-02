@@ -458,7 +458,7 @@ class Parser:
 	def parse_user_list(self):
 		# A user list (dict-backed by name) shares the same accessor/Reference surface
 		# as everything else, so store/resolve/dim go through the common code paths.
-		# The Reference's name comes from UserList.prompt_name() — the bare name (no ʟ),
+		# Prompt's echo comes from UserList.name_tokens() — the bare name (no ʟ),
 		# which is exactly what Prompt echoes (∟PRIMES and PRIMES both show "PRIMES=?").
 		return UserList(self.read_name(5)).reference(self.env)
 

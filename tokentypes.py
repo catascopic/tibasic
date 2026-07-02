@@ -20,7 +20,7 @@ from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, 
 from graph import eval_sequence
 from modes import GraphMode
 from parser import ArgParser
-from tokenbase import Token, Accessor, Deletable, VariableToken, Reference, Flag
+from tokenbase import Token, Accessor, Deletable, VariableToken, TokenFileVar, Reference, Flag
 import tokenbase as tk
 
 __all__ = [
@@ -147,7 +147,7 @@ class ComputedToken(VariableToken):
 		return self.func(env)
 
 
-class LetterToken(Deletable, VariableToken):
+class LetterToken(Deletable, TokenFileVar, VariableToken):
 	"""A real/complex variable A–Z, θ — an index into env.numerics (0–25, θ = 26).
 
 	An undefined numeric reads as 0 (and is initialized to 0 on first resolve), matching
@@ -176,7 +176,7 @@ class LetterToken(Deletable, VariableToken):
 		self.set(env, require_num(value))
 
 
-class MatrixToken(Deletable, VariableToken):
+class MatrixToken(Deletable, TokenFileVar, VariableToken):
 	"""A matrix variable [A]–[J] — an index into env.matrices (0–9)."""
 
 	def __init__(self, index: int):
@@ -199,11 +199,14 @@ class MatrixToken(Deletable, VariableToken):
 		return self.resolve(arg_parser.env)[(row, col)]
 
 
-class PicToken(Deletable, Token):
+class PicToken(Deletable, TokenFileVar, Token, Accessor):
 	"""A picture Pic1–Pic9, Pic0 (token 0x6000+i) — a slot in env.pics.
 
-	Not an expression atom or Store-arrow target — only usable with StorePic/RecallPic
-	(and DelVar to clear the slot).  `number` is the env.pics slot index.
+	A full Accessor (get/set/delete/name_tokens/name_bytes), but not a VariableToken:
+	pictures aren't expression atoms or Store-arrow targets — only usable with
+	StorePic/RecallPic (and DelVar to clear the slot); Token's flag-based
+	can_start_atom/parse_prefix keep it out of expressions.  `number` is the env.pics
+	slot index.
 	"""
 
 	def __init__(self, index: int):
@@ -216,11 +219,11 @@ class PicToken(Deletable, Token):
 	def set(self, env, value):
 		env.pics[self.number] = value
 
-	def name_bytes(self) -> bytes:
-		return self.code_to_bytes().ljust(8, b'\x00')
+	def name_tokens(self) -> list:
+		return [self]   # like a VariableToken, the token spells itself
 
 
-class ListToken(Deletable, VariableToken):
+class ListToken(Deletable, TokenFileVar, VariableToken):
 	"""A built-in list L1–L6 — a 0-based slot in env.lists (TiList | None)."""
 
 	def __init__(self, index: int):
@@ -248,7 +251,7 @@ class ListToken(Deletable, VariableToken):
 		return self.resolve(arg_parser.env)[index]
 
 
-class StringToken(Deletable, VariableToken):
+class StringToken(Deletable, TokenFileVar, VariableToken):
 	"""A string variable Str1–Str0 — a 0-based slot in env.strings (TiString | None).
 
 	Input/Prompt recognize a string target through its token's `is_string_var()` and
@@ -269,7 +272,7 @@ class StringToken(Deletable, VariableToken):
 		self.set(env, require_string(value))
 
 
-class EquationToken(Deletable, VariableToken):
+class EquationToken(Deletable, TokenFileVar, VariableToken):
 	"""A graph equation (Y1–Y0, X1T/Y1T–X6T/Y6T, r1–r6).
 
 	An equation is not one of TI's runtime value types, so reading it as a value

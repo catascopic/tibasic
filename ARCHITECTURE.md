@@ -47,7 +47,9 @@ command; they capture the edge cases.
 
 - **`tifile.py`** reads/writes `.8x*` files (programs, lists, pictures). Real TI files have
   a 57-byte header + a 9-byte VAT entry (in-RAM symbol-table overhead, *not* part of the
-  variable data) + a 2-byte data-length prefix. Pictures are either 63 rows ("graph area" only,
+  variable data) + a 2-byte data-length prefix. File-writable variables are `FileVar`
+  accessors (tokenbase); their `name_bytes()` is the *meaningful* name bytes only — the
+  8-byte-field padding is the file layer's job (`write_accessor`/`read_accessor`). Pictures are either 63 rows ("graph area" only,
   756 bytes) or 64 rows (native TI-83+/84+, 768 bytes) — derive the row count from the
   length prefix.
 

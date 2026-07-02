@@ -6,10 +6,9 @@ Every TI variable file shares one envelope — an 8-byte signature, a 42-byte
 comment, a variable-entry header (type, name, archive flag), and a trailing
 checksum — wrapping a type-specific body.  A file is modelled as:
 
-  * an `accessor` — the variable's storage location.  A catalog VariableToken for most
-    variables (A–Z/[A]/Str1/Y1/L1), a plain Token with get/set/name_bytes for pictures
-    (PicToken), a `UserList`, or a `ProgramAccessor`.  Supplies name_bytes for writing
-    and set() for store_to.
+  * an `accessor` — the variable's storage location: a FileVar Accessor.  A catalog
+    token for token-named variables (A–Z/[A]/Str1/Y1/L1/Pic1), a `UserList`, or a
+    `ProgramAccessor`.  Supplies name_bytes for writing and set() for store_to.
   * a `value` — the runtime model (a number, TiList, TiMatrix, TiString,
     TiEquation, token list, or Bitmap).
 
@@ -19,7 +18,7 @@ store_to; each subclass supplies only its body via `_parse_body`/`_encode_body`/
 """
 from io import BytesIO
 
-from tokenbase import Token, Accessor
+from tokenbase import Token, Accessor, FileVar
 from catalog import get_token, read_token
 from bitmap import Bitmap, ROWS, COLS
 from core import TiList, TiMatrix, TiString, TiEquation, str_to_tokens
@@ -33,28 +32,33 @@ _LIST_NAME_TOKEN = 0x5D
 
 
 # ── Accessors: a variable file's name *is* a storage location ───────────────────
-# Most variables name themselves with a catalog token that is already an Accessor
-# (a VariableToken — including pictures, see PicToken).  User lists carry a UserList;
-# only programs (no token, not an expression value) need an accessor here.
+# Most variables name themselves with a catalog token that is already a FileVar
+# Accessor (a TokenFileVar — including pictures, see PicToken).  User lists carry a
+# UserList; only programs (no token, not an expression value) need an accessor here.
 # read_accessor/write_accessor are the file layer's name codec — translating the
-# 8-byte name field to/from an accessor.
+# 8-byte name field to/from an accessor; the fixed-field padding lives entirely in
+# this pair (ljust on write, rstrip on read), never in the accessors.
 
-class ProgramAccessor(Accessor):
+class ProgramAccessor(FileVar, Accessor):
 	"""A program prgmNAME — a slot in env.programs keyed by name.  Programs aren't
 	expression values, so they have no token; a file load installs one via `set`,
 	wrapping its token list in a Program."""
 
 	def __init__(self, name: str):
+		if not 1 <= len(name) <= 8:
+			# The calculator's own limit; checked at construction rather than
+			# silently truncated at write time.
+			raise ValueError(f"Program name must be 1-8 characters: {name!r}")
 		self.name = name
 
 	def set(self, env, tokens):
 		env.programs[self.name] = Program(tokens, self.name)
 
-	def prompt_name(self):
+	def name_tokens(self) -> list:
 		return str_to_tokens(self.name)
 
 	def name_bytes(self) -> bytes:
-		return self.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
+		return self.name.upper().encode('ascii')   # uppercased in the binary
 
 
 def read_accessor(name_bytes: bytes) -> Accessor:
@@ -73,10 +77,15 @@ def read_program_name(name_bytes: bytes) -> ProgramAccessor:
 	return ProgramAccessor(name_bytes.rstrip(b'\x00').decode('ascii', errors='replace'))
 
 
-def write_accessor(acc: Accessor) -> bytes:
-	"""Encode an accessor into its 8-byte, null-padded name field — each accessor
-	knows how (Token → code bytes, UserList → 0x5D + ASCII, program → ASCII)."""
-	return acc.name_bytes()
+def write_accessor(acc: FileVar) -> bytes:
+	"""Encode an accessor into its 8-byte, null-padded name field.  Each accessor
+	supplies its meaningful bytes (Token → code bytes, UserList → 0x5D + ASCII,
+	program → ASCII); padding to the VAT's fixed 8-byte field is a fact about the
+	file format, not the variable, so it happens here — the write-side half of the
+	name codec, mirroring the rstrip on read."""
+	field = acc.name_bytes()
+	assert len(field) <= 8, f"name field too long: {field!r}"   # accessors validate names
+	return field.ljust(8, b'\x00')
 
 
 # ── Shared envelope ─────────────────────────────────────────────────────────────
@@ -160,10 +169,22 @@ class TiFile:
 
 	@property
 	def name(self) -> str:
-		return str(TiString(self.accessor.prompt_name()))
+		return str(TiString(self.accessor.name_tokens()))
 
 	def __repr__(self):
 		return f"{type(self).__name__}({self.name!r})"
+
+	def print(self):
+		"""Human-readable dump: comment, a name + summary header, then the body.
+		Subclasses supply `_summary` extras and the body."""
+		if self.comment:
+			print(self.comment)
+		print(f"{self.name} ({self._summary()})")
+		self._print_body()
+
+	def _summary(self) -> str:
+		"""The parenthetical after the name; subclasses prepend/append their extras."""
+		return ('' if self.archived else 'un') + 'archived'
 
 	# ── path wrappers ──────────────────────────────────────────────────────────
 	@classmethod
@@ -183,8 +204,14 @@ class TiFile:
 		           comment, archived, version)
 
 	def write_to(self, f):
-		_write_var_file(f, self._var_type(), write_accessor(self.accessor),
-		                self.archived, self.comment, self._encode_body(), version=self.version)
+		_write_var_file(f,
+			self._var_type(), 
+			write_accessor(self.accessor),
+			self.archived,
+			self.comment,
+			self._encode_body(),
+			version=self.version,
+		)
 
 	def store_to(self, env):
 		"""Install this variable into a running environment.  A file load isn't a
@@ -247,10 +274,10 @@ class ProgramFile(TiFile):
 	def _encode_body(self):
 		return _token_stream_body(self.value)
 
-	def print(self):
-		if self.comment:
-			print(self.comment)
-		print(f"{self.name} ({'' if self.archived else 'un'}archived/{'' if self.locked else 'un'}locked)")
+	def _summary(self) -> str:
+		return f"{super()._summary()}/{'' if self.locked else 'un'}locked"
+
+	def _print_body(self):
 		print(''.join(t.text for t in self.value))
 
 
@@ -329,10 +356,7 @@ class VariableFile(TiFile):
 	def is_complex(self) -> bool:
 		return isinstance(self.value, complex)
 
-	def print(self):
-		if self.comment:
-			print(self.comment)
-		print(f"{self.name} ({'' if self.archived else 'un'}archived)")
+	def _print_body(self):
 		print(_format_value(self.value))
 
 
@@ -361,10 +385,7 @@ class ListFile(TiFile):
 	def is_complex(self) -> bool:
 		return self.value.is_complex
 
-	def print(self):
-		if self.comment:
-			print(self.comment)
-		print(f"{self.name} ({'' if self.archived else 'un'}archived)")
+	def _print_body(self):
 		print('{' + ', '.join(_format_value(v) for v in self.value) + '}')
 
 
@@ -397,10 +418,10 @@ class MatrixFile(TiFile):
 	def cols(self) -> int:
 		return self.value.cols
 
-	def print(self):
-		if self.comment:
-			print(self.comment)
-		print(f"{self.name} ({self.rows}x{self.cols}, {'' if self.archived else 'un'}archived)")
+	def _summary(self) -> str:
+		return f"{self.rows}x{self.cols}, {super()._summary()}"
+
+	def _print_body(self):
 		for row in self.value.data:
 			print('[' + ' '.join(_format_real(v) for v in row) + ']')
 
@@ -429,10 +450,7 @@ class TokenVarFile(TiFile):
 		"""The token stream as text — a string's contents or an equation's formula."""
 		return str(self.value)
 
-	def print(self):
-		if self.comment:
-			print(self.comment)
-		print(f"{self.name} ({'' if self.archived else 'un'}archived)")
+	def _print_body(self):
 		print(self.text)
 
 
@@ -488,14 +506,6 @@ class PictureFile(TiFile):
 		super().__init__(accessor, value, comment, archived, version)
 		self.rows = rows   # scanlines stored: 64 (full LCD) or 63 (graph screen only)
 
-	@property
-	def name(self) -> str:
-		return self.accessor.text   # PicToken.text → 'Pic1', 'Pic0', etc.
-
-	@property
-	def bitmap(self) -> Bitmap:
-		return self.value
-
 	@classmethod
 	def read_from(cls, f):
 		_file_type, name_bytes, archived, comment, version = _read_var_header(f)
@@ -511,10 +521,10 @@ class PictureFile(TiFile):
 		pixels = _encode_picture_data(self.value, self.rows)
 		return len(pixels).to_bytes(2, 'little') + pixels  # pixel-byte count + data
 
-	def print(self):
-		if self.comment:
-			print(self.comment)
-		print(f"{self.name} ({COLS}x{self.rows}, {'' if self.archived else 'un'}archived)")
+	def _summary(self) -> str:
+		return f"{COLS}x{self.rows}, {super()._summary()}"
+
+	def _print_body(self):
 		self.value.disp()
 
 

@@ -17,7 +17,7 @@ from graph import (
 from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
 from homescreen import HomeScreen
 from terminal import ScriptedConsole
-from tokenbase import Token, Accessor
+from tokenbase import Token, Accessor, FileVar
 
 
 _NUMERIC_NAMES = tuple(chr(0x41 + i) for i in range(26)) + ('theta',)
@@ -430,7 +430,7 @@ class TableVars:
 		self.tbl_input = None                 # TblInput — a 7-element list (TiList | None)
 
 
-class UserList(Accessor):
+class UserList(FileVar, Accessor):
 	"""A user-defined list ʟNAME — a dict slot in env.user_lists, keyed by name.
 
 	Built synthetically by the parser when it sees the ʟ prefix; has no catalog
@@ -438,6 +438,11 @@ class UserList(Accessor):
 	"""
 
 	def __init__(self, name: str):
+		if not 1 <= len(name) <= 5:
+			# The calculator's own entry limit (the parser enforces it too); checked
+			# here so a name that skipped the parser (a malformed file) can't silently
+			# produce an oversized name field at write time.
+			raise ValueError(f"User list name must be 1-5 characters: {name!r}")
 		self.name = name
 
 	def get(self, env):
@@ -466,12 +471,13 @@ class UserList(Accessor):
 	def delete(self, env):
 		env.user_lists.pop(self.name, None)
 
-	def prompt_name(self):
+	def name_tokens(self) -> list:
 		return str_to_tokens(self.name)   # bare name (no ʟ), as Prompt echoes it
 
 	def name_bytes(self) -> bytes:
-		# 0x5D is the list-name token; a user list's name field is it + up to 5 ASCII chars
-		return (bytes([0x5D]) + self.name.upper().encode('ascii')[:5]).ljust(8, b'\x00')
+		# 0x5D is the list-name token; a user list's name field is it + the (≤5,
+		# uppercased in the binary) ASCII name
+		return bytes([0x5D]) + self.name.upper().encode('ascii')
 
 	def __repr__(self):
 		return f"UserList({self.name!r})"
