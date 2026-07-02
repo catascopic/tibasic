@@ -7,7 +7,7 @@ from preparse import (
 	preparse_cmd, preparse_cmd_func, preparse_bunch,
 	Thunk, NumericVar, LabelName, ProgramName, AnyVar, Real, Env, AnyValue,
 )
-from tokenbase import Reference
+from tokenbase import Reference, Token
 from environment import UserList, ReturnSignal, StopSignal
 from preparse import special_func, no_arg_command
 from core import TiString, TiList, py_int, require_string, str_to_tokens
@@ -174,7 +174,8 @@ def _input_one(env, prompt: list[Token], var: Reference, raw_string: bool = Fals
 	# read_tokens also mirrors the entry onto the home grid (a frontend concern — see
 	# Console.read_tokens); the command just consumes the well-formed token list.
 	tokens = env.console.read_tokens(prompt)
-	if raw_string and var.name.tokens[0].is_string_var():
+	name = var.accessor.prompt_name()   # the target's spelling, as a list[Token]
+	if raw_string and name[0].is_string_var():
 		var.store(TiString(tokens))
 	else:
 		parser = Parser(tokens, env)
@@ -184,9 +185,9 @@ def _input_one(env, prompt: list[Token], var: Reference, raw_string: bool = Fals
 		# A list typed into a numeric variable isn't stored to it: the calculator
 		# makes a user list of the same name instead (a list entered for `Input A`
 		# lands in $A).  A user-list target already holds lists, so it's exempt.
-		if (isinstance(value, TiList) and var.name.tokens[0].is_numeric_var()
+		if (isinstance(value, TiList) and name[0].is_numeric_var()
 				and not isinstance(var.accessor, UserList)):
-			UserList(str(var.name)).store(env, value)
+			UserList(str(TiString(name))).store(env, value)
 		else:
 			var.store(value)
 
@@ -249,7 +250,7 @@ def menu_cmd(args: ArgParser):
 	zero options, and end_paren_cmd's leftover-token error covers more than seven.
 	"""
 	program = args.env.current_execution()       # raises ERR:INVALID outside a program
-	title = str(require_string(args.expr()))
+	title = require_string(args.expr())
 	options: list[TiString] = []
 	labels: list[str] = []
 	for _ in range(7):

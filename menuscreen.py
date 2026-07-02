@@ -13,11 +13,16 @@ shown (ANSI inverse video, flipped pixels, CSS) is the frontend's call — the m
 just says *which* spans are inverted.
 """
 from core import TiString
-from tokenbase import encode
+from tokenbase import decode
 from bitmap import Bitmap
 
 ROWS = 8     # a menu uses the home screen's 16×8 character grid
 COLS = 16
+
+
+def _display_bytes(ts: TiString) -> bytes:
+	"""A TiString's display bytes — the concatenated glyph bytes of its tokens."""
+	return b''.join(t.display for t in ts.tokens)
 
 
 class MenuScreen:
@@ -25,7 +30,7 @@ class MenuScreen:
 	ROWS = ROWS
 	COLS = COLS
 
-	def __init__(self, title: str, options: list[TiString]):
+	def __init__(self, title: TiString, options: list[TiString]):
 		self.title = title
 		self.options = options
 		self.selected = 0
@@ -40,35 +45,39 @@ class MenuScreen:
 		"""Jump the highlight straight to `index` (a number-key selection)."""
 		self.selected = index
 
-	def styled_rows(self) -> list[list[tuple[str, bool]]]:
-		"""The canonical layout: ROWS rows, each a list of (text, inverted) segments.
+	def styled_rows(self) -> list[list[tuple[bytes, bool]]]:
+		"""The canonical layout: ROWS rows, each a list of (display-bytes, inverted)
+		segments.
 
 		The title bar is inverted; on the selected option only its "N:" prefix is.
 		Options past the title fill one row each, truncated to the 16 columns, and
-		the rest of the screen is padded with blank rows.
+		the rest of the screen is padded with blank rows.  Segments are display bytes
+		(the model's native form) — a frontend decodes them to characters (terminal)
+		or blits them through the font (print_screen).
 		"""
-		title = self.title[:COLS]
-		rows = [[(title, True), (' ' * (COLS - len(title)), False)]]
+		title = _display_bytes(self.title)[:COLS]
+		rows = [[(title, True), (b' ' * (COLS - len(title)), False)]]
 		for i, option in enumerate(self.options):
-			prefix = f'{i + 1}:'
-			body = option[:COLS - len(prefix)].ljust(COLS - len(prefix))
+			prefix = f'{i + 1}:'.encode('ascii')
+			body = _display_bytes(option)[:COLS - len(prefix)].ljust(COLS - len(prefix))
 			rows.append([(prefix, i == self.selected), (body, False)])
-		rows += [[(' ' * COLS, False)] for _ in range(ROWS - len(rows))]
+		rows += [[(b' ' * COLS, False)] for _ in range(ROWS - len(rows))]
 		return rows
 
 	def rows(self) -> list[str]:
-		"""Each row's plain text, styling dropped — for simple frontends and tests."""
-		return [''.join(text for text, _ in row) for row in self.styled_rows()]
+		"""Each row's plain text (styling dropped, bytes decoded) — for simple
+		frontends and tests."""
+		return [decode(b''.join(text for text, _ in row)) for row in self.styled_rows()]
 
 	def print_screen(self, path, pixel_size: int = 1) -> None:
-		"""Save the menu as a monochrome BMP, like home/graph: each character is
-		rasterized through the large font into the shared 96×64 Bitmap, with the
-		inverted title and selection drawn as flipped pixels (fonts.blit_cell)."""
+		"""Save the menu as a monochrome BMP, like home/graph: each cell's display
+		byte is rasterized through the large font into the shared 96×64 Bitmap, with
+		the inverted title and selection drawn as flipped pixels (fonts.blit_cell)."""
 		surface = Bitmap()
 		for r, row in enumerate(self.styled_rows()):
 			c = 0
 			for text, inverted in row:
-				for ch in text:
-					surface.blit_cell(r, c, encode(ch)[0], invert=inverted)
+				for byte in text:
+					surface.blit_cell(r, c, byte, invert=inverted)
 					c += 1
 		surface.print_screen(path, pixel_size)

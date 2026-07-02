@@ -157,7 +157,7 @@ class ScriptedConsole(Console):
 		if self.env.screen is Screen.GRAPH:
 			self.frames.append('\n'.join(self.env.graph.rows()))
 		else:
-			self.frames.append(self.env.home.render())
+			self.frames.append(str(self.env.home))
 
 	def present(self) -> None:
 		self._capture()
@@ -204,7 +204,7 @@ class FreeFormConsole(Console):
 		self._printed = len(values)
 
 	def _input(self, prompt: list[Token]) -> list[Token]:
-		return self._tokenize(input(str(prompt) if prompt is not None else ''))
+		return self._tokenize(input(decode(b''.join(t.display for t in prompt))))
 
 	def _echo_entry(self, prompt: list[Token], tokens: list[Token]) -> None:
 		pass   # the host terminal echoes the typed line; FreeForm never paints the grid
@@ -315,7 +315,7 @@ class TerminalConsole(Console):
 			self._render(self.env.home, indicator)
 
 	def _render(self, home: HomeScreen, indicator: str | None = None) -> None:
-		self._paint(home.render().split('\n'), indicator)
+		self._paint(str(home).split('\n'), indicator)
 
 	def _paint(self, rows: list, indicator: str | None = None, width: int = HomeScreen.COLS) -> None:
 		"""Repaint `rows` (each `width` visible characters, ANSI styling allowed)
@@ -383,7 +383,7 @@ class TerminalConsole(Console):
 		# (the cursor stands in for one) before blocking.
 		self._render(self.env.home)
 		with self._input_cursor():
-			text = input(''.join(t.decode(_CHARSET) for t in prompt))
+			text = input(decode(b''.join(t.display for t in prompt)))
 		return self._tokenize(text)
 
 	def read_key(self) -> int:
@@ -570,11 +570,12 @@ class TerminalConsole(Console):
 
 	def _menu_rows(self, menu) -> list:
 		"""The menu's display rows as ANSI strings — the model's canonical layout
-		(menu.styled_rows()) with each inverted segment wrapped in inverse-video
-		codes.  The plain text is sized to the 16 columns by the model; the ANSI
-		codes are invisible, so _paint is given the visible width explicitly."""
+		(menu.styled_rows(), whose segments are display bytes) decoded to characters,
+		with each inverted segment wrapped in inverse-video codes.  The plain text is
+		sized to the 16 columns by the model; the ANSI codes are invisible, so _paint
+		is given the visible width explicitly."""
 		return [
-			''.join((_INV_ON + text + _INV_OFF) if inverted else text
+			''.join((_INV_ON + decode(text) + _INV_OFF) if inverted else decode(text)
 			        for text, inverted in row)
 			for row in menu.styled_rows()
 		]

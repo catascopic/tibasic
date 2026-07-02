@@ -1,4 +1,4 @@
-from tokenbase import CHARSET
+from tokenbase import decode
 from tiformat import disp_lines
 from bitmap import Bitmap
 
@@ -38,8 +38,8 @@ class HomeScreen:
 	diffs against to decide whether a repaint is worth doing.
 
 	Text is stored as display bytes (from tiformat / token.display) — exactly what a
-	canvas frontend draws through the font tables; render() decodes back to characters
-	for the terminal frontend.
+	canvas frontend draws through the font tables; render() returns those bytes and
+	str(home) decodes them back to characters for a text frontend.
 	"""
 
 	ROWS = 8
@@ -163,7 +163,9 @@ class HomeScreen:
 		return self.lines[index] if index < len(self.lines) else self._blank()
 
 	def render(self) -> bytes:
-		"""The visible window as 8 lines of 16 characters (trailing blanks preserved)."""
+		"""The visible window as 8 rows of 16 display bytes, joined by newlines — the
+		model's native byte form (a canvas frontend draws these through the font
+		tables).  str(home) decodes it back to characters for a text frontend/tests."""
 		return b'\n'.join(self._window_row(r) for r in range(self.ROWS))
 
 	def print_screen(self, path, pixel_size: int = 1) -> None:
@@ -181,4 +183,7 @@ class HomeScreen:
 		surface.print_screen(path, pixel_size)
 
 	def __str__(self) -> str:
-		return self.render().decode(CHARSET)
+		"""The visible window decoded to characters — 8 lines of 16, newline-joined.
+		Decodes each row separately (not render()'s bytes) so a 0x0A display byte on
+		the screen is never mistaken for the row separator."""
+		return '\n'.join(decode(self._window_row(r)) for r in range(self.ROWS))

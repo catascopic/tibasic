@@ -37,7 +37,7 @@ class TestFreeFormOutput:
 		# so nothing is emitted, but the grid reflects the write.
 		env = run('Output( 1,1,7', freeform_env())
 		assert capsys.readouterr().out == ''
-		assert env.home.render().split('\n')[0].startswith('7')
+		assert str(env.home).split('\n')[0].startswith('7')
 
 
 class TestFreeFormPause:

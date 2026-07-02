@@ -26,7 +26,7 @@ def grid(value, *, down=0, right=0):
 		sv.move('right')
 	home = HomeScreen()
 	sv.render_into(home)
-	return sv, home.render().split('\n')
+	return sv, str(home).split('\n')
 
 
 # ── Scrollability ─────────────────────────────────────────────────────────────

@@ -22,7 +22,7 @@ from io import BytesIO
 from tokenbase import Token, Accessor
 from catalog import get_token, read_token
 from bitmap import Bitmap, ROWS, COLS
-from core import TiList, TiMatrix, TiString, TiEquation
+from core import TiList, TiMatrix, TiString, TiEquation, str_to_tokens
 from environment import UserList
 from program import Program
 
@@ -49,6 +49,9 @@ class ProgramAccessor(Accessor):
 
 	def set(self, env, tokens):
 		env.programs[self.name] = Program(tokens, self.name)
+
+	def prompt_name(self):
+		return str_to_tokens(self.name)
 
 	def name_bytes(self) -> bytes:
 		return self.name.upper().encode('ascii')[:8].ljust(8, b'\x00')
@@ -157,7 +160,7 @@ class TiFile:
 
 	@property
 	def name(self) -> str:
-		return str(self.accessor.name_bytes())
+		return str(TiString(self.accessor.prompt_name()))
 
 	def __repr__(self):
 		return f"{type(self).__name__}({self.name!r})"

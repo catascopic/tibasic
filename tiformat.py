@@ -75,8 +75,11 @@ def format_scalar(value) -> str:
 
 
 def _scalar_bytes(value) -> bytes:
-	"""A scalar's display bytes: format to ASCII, then encode to the charset."""
-	return encode(format_scalar(value))
+	"""A scalar's display bytes.  A formatted number is pure ASCII (digits, '.', '-',
+	'+', 'e', 'i'), and every one of those characters shares its ASCII code with its
+	TI display byte, so the ASCII encoding *is* the display-byte encoding — no charset
+	round-trip needed (only '[' would differ, and a number never contains one)."""
+	return format_scalar(value).encode('ascii')
 
 
 def _string_bytes(value: TiString) -> bytes:

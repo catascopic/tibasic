@@ -6,10 +6,10 @@ from enum import IntFlag, auto
 from errors import TiSyntaxError, UndefinedError
 
 
-# _CHARSET: TI-83+ byte -> Unicode character (None = undefined slot).
+# CHARSET: TI-83+ byte -> Unicode character (None = undefined slot).
 #
-# This is the private source of truth for decoding a token's display bytes into a
-# human-readable string (Token.text), used purely for debugging/printing.  The
+# This is the token layer's source of truth for decoding a token's display bytes
+# into a human-readable string (Token.text), used purely for debugging/printing.  The
 # characters are convenient renderings, not a canonical mapping: several have no
 # faithful Unicode equivalent (𝐅, 𝟑, ẍ, ṕ, ...) and a couple of font glyphs are
 # duplicated.  Byte D6 decodes to '\n' (the newline token) rather than its ↵ glyph
@@ -39,6 +39,15 @@ CHARSET: list[str | None] = [
 	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	# E
 	None,	None,	'$',	None,	'ß',	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	None,	# F
 ]
+
+def decode(display: bytes) -> str:
+	"""Render display bytes as a human-readable string.
+
+	The token layer's *debug/convenience* decoder — behind Token.text, TiString's
+	str(), and the screen models' str() rendering.  A frontend that actually paints
+	the screen owns its own, richer charset (see terminal.py); this one only has to
+	round-trip the ASCII a program types and read it back."""
+	return ''.join(CHARSET[b] for b in display)
 
 
 # ── Named token codes ─────────────────────────────────────────────────────────
@@ -143,6 +152,11 @@ class Token:
 	def size(self) -> str:
 		return 1 if self.code < 0x100 else 2
 
+	@property
+	def text(self) -> str:
+		"""Human-readable rendering of the display bytes (debugging/printing only)."""
+		return decode(self.display)
+
 	def code_to_bytes(self) -> bytes:
 		"""Encode this token's code as the 1 or 2 bytes stored in a .8xp program."""
 		return self.code.to_bytes(1 + (self.code > 0xFF))
@@ -213,7 +227,7 @@ class Token:
 		raise TiSyntaxError(f"{self} is not an infix operator")
 
 	def __repr__(self):
-		return f"0x{self.code:0{4 if self.code > 0xFF else 2}X}:{''.join(_CHARSET[b] for b in self.display)}"
+		return f"0x{self.code:0{4 if self.code > 0xFF else 2}X}:{self.text!r}"
 
 
 class Reference:

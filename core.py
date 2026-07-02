@@ -346,9 +346,9 @@ class TiMatrix:
 
 
 def str_to_tokens(s: str) -> list[Token]:
-    """Convert a plain Python string into the token list that spells it."""
-    from catalog import CHAR_TABLE
-    return [CHAR_TABLE[c] for c in s]
+	"""Convert a plain Python string into the token list that spells it."""
+	from catalog import CHAR_TABLE
+	return [CHAR_TABLE[c] for c in s]
 
 
 class TokenSequence:

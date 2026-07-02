@@ -33,56 +33,56 @@ def run_program(src: str, *, choices=(), inputs=()):
 
 class TestHomeScreen:
 	def test_blank_grid_shape(self):
-		lines = HomeScreen().render().split('\n')
+		lines = str(HomeScreen()).split('\n')
 		assert len(lines) == 8
 		assert all(line == ' ' * 16 for line in lines)
 
 	def test_output_writes_at_position(self):
 		h = HomeScreen()
 		h.output(2, 3, b'AB')
-		assert h.render().split('\n')[2] == '   AB' + ' ' * 11
+		assert str(h).split('\n')[2] == '   AB' + ' ' * 11
 
 	def test_output_wraps_to_next_row(self):
 		h = HomeScreen()
 		h.output(0, 14, b'ABCD')        # 14,15 on row 0; 0,1 on row 1
-		rows = h.render().split('\n')
+		rows = str(h).split('\n')
 		assert rows[0].endswith('AB')
 		assert rows[1].startswith('CD')
 
 	def test_output_clips_at_bottom(self):
 		h = HomeScreen()
 		h.output(7, 14, b'ABCDEF')      # only AB fit; CDEF fall off the bottom
-		assert h.render().split('\n')[7].endswith('AB')
+		assert str(h).split('\n')[7].endswith('AB')
 
 	def test_disp_appends_and_advances(self):
 		h = HomeScreen()
 		h.write_line(b'one')
 		h.write_line(b'two')
-		rows = h.render().split('\n')
+		rows = str(h).split('\n')
 		assert rows[0].startswith('one') and rows[1].startswith('two')
 		assert h.cursor_row == 2
 
 	def test_disp_truncates_with_ellipsis(self):
 		h = HomeScreen()
 		h.write_line(b'X' * 20)
-		assert h.render().split('\n')[0] == 'X' * 15 + '…'
+		assert str(h).split('\n')[0] == 'X' * 15 + '…'
 
 	def test_disp_exact_width_no_ellipsis(self):
 		h = HomeScreen()
 		h.write_line(b'X' * 16)
-		assert h.render().split('\n')[0] == 'X' * 16
+		assert str(h).split('\n')[0] == 'X' * 16
 
 	def test_output_wraps_long_text_across_rows(self):
 		h = HomeScreen()
 		h.output(0, 0, b'X' * 20)
-		rows = h.render().split('\n')
+		rows = str(h).split('\n')
 		assert rows[0] == 'X' * 16
 		assert rows[1].startswith('X' * 4)
 
 	def test_echo_wraps_instead_of_truncating(self):
 		h = HomeScreen()
 		h.echo(b'X' * 20)
-		rows = h.render().split('\n')
+		rows = str(h).split('\n')
 		assert rows[0] == 'X' * 16
 		assert rows[1].startswith('X' * 4)
 		assert h.cursor_row == 2
@@ -104,7 +104,7 @@ class TestHomeScreen:
 		for i in range(7):
 			h.write_line(str(i).encode())
 		h.echo(b'LAST')
-		assert h.render().split('\n')[7].startswith('LAST')
+		assert str(h).split('\n')[7].startswith('LAST')
 
 	def test_disp_scrolls_past_bottom(self):
 		# Disp guarantees a blank trailing line, so filling the bottom row
@@ -113,7 +113,7 @@ class TestHomeScreen:
 		h = HomeScreen()
 		for i in range(9):
 			h.write_line(str(i).encode())
-		rows = h.render().split('\n')
+		rows = str(h).split('\n')
 		assert rows[0].startswith('2')   # '0' and '1' both scrolled off
 		assert rows[6].startswith('8')
 		assert rows[7] == ' ' * 16
@@ -122,14 +122,14 @@ class TestHomeScreen:
 		h = HomeScreen()
 		for i in range(20):       # many more than fit; screen scrolls repeatedly
 			h.write_line(str(i).encode())
-		assert h.render().split('\n')[7] == ' ' * 16
+		assert str(h).split('\n')[7] == ' ' * 16
 		assert h.cursor_row == 7
 
 	def test_clear_resets_grid_and_cursor(self):
 		h = HomeScreen()
 		h.write_line(b'stuff')
 		h.clear()
-		assert h.render() == '\n'.join([' ' * 16] * 8)
+		assert str(h) == '\n'.join([' ' * 16] * 8)
 		assert h.cursor_row == 0
 
 	def test_output_to_bottom_does_not_advance_disp_scroll(self):
@@ -140,11 +140,11 @@ class TestHomeScreen:
 		h.output(7, 0, b'BOTTOM')           # window row 7 (0-indexed)
 		for i in range(7):                  # 7 disps fill rows 0..6, no scroll
 			h.write_line(str(i).encode())
-		rows = h.render().split('\n')
+		rows = str(h).split('\n')
 		assert rows[0].startswith('0')      # nothing scrolled off yet
 		assert rows[7].startswith('BOTTOM') # Output's row still showing
 		h.write_line(b'7')                  # the 8th disp writes row 7 and scrolls
-		rows = h.render().split('\n')
+		rows = str(h).split('\n')
 		assert rows[0].startswith('1')      # '0' has now scrolled out of view
 		assert rows[6].startswith('7')
 		assert rows[7] == ' ' * 16          # blank bottom line restored
@@ -154,14 +154,14 @@ class TestHomeScreen:
 		h = HomeScreen()
 		h.write_line(b'keep')
 		h.clear()
-		assert h.render().strip() == ''     # window blank
+		assert str(h).strip() == ''     # window blank
 		assert h.lines and bytes(h.lines[0]).startswith(b'keep')   # still in scrollback
 
 
 # ── Disp / Output( / ClrHome through the interpreter ──────────────────────────
 
 def _line(env, n):
-	return env.home.render().split('\n')[n]
+	return str(env.home).split('\n')[n]
 
 
 class TestDisp:
@@ -215,19 +215,19 @@ class TestHomeScreenLogs:
 	def test_scrollback_retains_lines_that_left_the_window(self):
 		env = run('\n'.join(f'Disp {i}' for i in range(12)))
 		assert len(env.home.lines) == 12                          # every line kept
-		assert env.home.render().split('\n')[0].strip() == '5'    # window has scrolled
+		assert str(env.home).split('\n')[0].strip() == '5'    # window has scrolled
 
 	def test_clrhome_scrolls_out_of_view_but_keeps_history(self):
 		env = run('Disp 7')
 		run('ClrHome', env)
-		assert env.home.render().strip() == ''      # window blank
+		assert str(env.home).strip() == ''      # window blank
 		assert env.home.values[0] == 7              # values log kept
 		assert env.home.lines                       # byte scrollback kept
 
 	def test_matrix_disp_is_one_value_two_lines(self):
 		env = run('Disp [[1,2][3,4]]')
 		assert len(env.home.values) == 1            # one value...
-		rows = env.home.render().split('\n')
+		rows = str(env.home).split('\n')
 		assert rows[0].rstrip().endswith('[[1 2]')  # ...spread over two grid lines
 		assert rows[1].rstrip().endswith('[3 4]]')
 
@@ -286,18 +286,18 @@ class TestClrHome:
 	def test_clears_and_resets(self):
 		env = run('Disp 7')
 		run('ClrHome', env)
-		assert env.home.render() == '\n'.join([' ' * 16] * 8)
+		assert str(env.home) == '\n'.join([' ' * 16] * 8)
 		assert env.home.cursor_row == 0
 
 
 class TestPause:
 	def test_bare_pause_blocks_and_renders(self):
 		env = run_program('Pause')
-		assert env.console.frames == [env.home.render()]
+		assert env.console.frames == [str(env.home)]
 
 	def test_value_displayed_like_disp(self):
 		env = run_program('Pause 5')
-		assert env.home.render().split('\n')[0] == '5'.rjust(16)
+		assert str(env.home).split('\n')[0] == '5'.rjust(16)
 
 	def test_value_stored_to_ans(self):
 		assert run_program('Pause 5').ans == 5
@@ -306,7 +306,7 @@ class TestPause:
 		# Guards against treating a falsy-but-present value (0) as "no argument".
 		env = run_program('Pause 0')
 		assert env.ans == 0
-		assert env.home.render().split('\n')[0] == '0'.rjust(16)
+		assert str(env.home).split('\n')[0] == '0'.rjust(16)
 
 	def test_string_value_stored_to_ans(self):
 		env = run_program('Pause "HI')
@@ -325,11 +325,11 @@ class TestPause:
 	def test_complex_displayed_like_disp(self):
 		# Pause shows any value Disp can — including complex, right-aligned.
 		env = run_program('Pause 3+4i')
-		assert env.home.render().split('\n')[0] == '3+4i'.rjust(16)
+		assert str(env.home).split('\n')[0] == '3+4i'.rjust(16)
 
 	def test_list_displayed_like_disp(self):
 		env = run_program('Pause {1,2,3}')
-		assert env.home.render().split('\n')[0] == '{1 2 3}'.rjust(16)
+		assert str(env.home).split('\n')[0] == '{1 2 3}'.rjust(16)
 
 
 _MENU_PROG = """Menu( "PICK","ONE",A,"TWO",B
@@ -361,23 +361,31 @@ class TestMenu:
 		assert env.menu is None
 
 
+def _menu(title, *options, selected=0):
+	"""Build a MenuScreen from plain strings — the model takes TiStrings (options
+	are TiStrings on the real path), so the test spells them out here."""
+	m = MenuScreen(TiString.from_str(title), [TiString.from_str(o) for o in options])
+	m.selected = selected
+	return m
+
+
 class TestMenuScreen:
 	"""The MenuScreen model: canonical layout + navigation, frontend-independent."""
 
 	def test_down_and_up_wrap_around(self):
-		m = MenuScreen('T', ['A', 'B', 'C'])
+		m = _menu('T', 'A', 'B', 'C')
 		m.down()
 		assert m.selected == 1
 		m.up(); m.up()                  # 1 → 0 → wraps to 2
 		assert m.selected == 2
 
 	def test_choose_jumps_directly(self):
-		m = MenuScreen('T', ['A', 'B', 'C'])
+		m = _menu('T', 'A', 'B', 'C')
 		m.choose(2)
 		assert m.selected == 2
 
 	def test_rows_layout_and_padding(self):
-		rows = MenuScreen('PICK', ['ONE', 'TWO']).rows()
+		rows = _menu('PICK', 'ONE', 'TWO').rows()
 		assert len(rows) == 8
 		assert rows[0] == 'PICK' + ' ' * 12
 		assert rows[1] == '1:ONE' + ' ' * 11
@@ -385,16 +393,15 @@ class TestMenuScreen:
 		assert rows[3] == ' ' * 16
 
 	def test_styled_rows_mark_title_and_selection(self):
-		m = MenuScreen('T', ['A', 'B'])
-		m.selected = 1
-		styled = m.styled_rows()
-		assert styled[0][0] == ('T', True)        # title inverted
-		assert styled[1][0] == ('1:', False)      # unselected prefix plain
-		assert styled[2][0] == ('2:', True)       # selected prefix inverted
+		# styled_rows segments are display bytes (the model's native form).
+		styled = _menu('T', 'A', 'B', selected=1).styled_rows()
+		assert styled[0][0] == (b'T', True)         # title inverted
+		assert styled[1][0] == (b'1:', False)       # unselected prefix plain
+		assert styled[2][0] == (b'2:', True)        # selected prefix inverted
 
 	def test_print_screen_writes_bmp(self, tmp_path):
 		path = tmp_path / 'menu.bmp'
-		MenuScreen('PICK', ['ONE', 'TWO']).print_screen(str(path))
+		_menu('PICK', 'ONE', 'TWO').print_screen(str(path))
 		data = path.read_bytes()
 		assert data[:2] == b'BM'
 
@@ -414,7 +421,7 @@ class TestTerminalMenuRendering:
 
 	@staticmethod
 	def _menu(title, options, selected=0):
-		m = MenuScreen(title, options)
+		m = MenuScreen(TiString.from_str(title), [TiString.from_str(o) for o in options])
 		m.selected = selected
 		return m
 
@@ -533,7 +540,7 @@ class TestInput:
 		# across rows like Output(, not get Disp's truncate-with-ellipsis.
 		typed = '1+1+1+1+1+1+1+1+1+1+1'
 		env = run_with('Input X', [typed])
-		lines = env.home.render().split('\n')
+		lines = str(env.home).split('\n')
 		assert lines[0] == ('?' + typed)[:16]
 		assert lines[1].startswith(('?' + typed)[16:])
 		assert '…' not in lines[0] and '…' not in lines[1]
@@ -612,12 +619,12 @@ class TestPrompt:
 	def test_prompt_echoes_name(self):
 		# The home screen echo shows NAME=?<typed> after a Prompt
 		env = run_with('Prompt A', ['1'])
-		assert env.home.render().split('\n')[0].startswith('A=?')
+		assert str(env.home).split('\n')[0].startswith('A=?')
 
 	def test_user_list_prompt_strips_prefix(self):
 		# Prompt ʟNAME should echo NAME=?, not ʟNAME=? (per calculator behavior)
 		env = run_with('Prompt ʟNAME', ['{1}'])
-		first = env.home.render().split('\n')[0]
+		first = str(env.home).split('\n')[0]
 		assert first.startswith('NAME=?')
 		assert 'ʟ' not in first
 
@@ -640,7 +647,7 @@ class TestScriptedConsole:
 		env = Environment()                 # default console is a ScriptedConsole
 		env.home.write_line(b'hi')
 		env.console.present()
-		assert env.console.frames == [env.home.render()]
+		assert env.console.frames == [str(env.home)]
 
 	def test_read_key_empty_is_zero(self):
 		assert ScriptedConsole().read_key() == 0
