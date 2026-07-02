@@ -91,12 +91,21 @@ def write_accessor(acc: FileVar) -> bytes:
 # ── Shared envelope ─────────────────────────────────────────────────────────────
 
 def _read_var_header(f):
-	"""Read the shared .8x* envelope and leave `f` at the start of the variable
-	data (the body's own length/count prefix).
+	"""Read and verify the shared .8x* envelope, leaving `f` at the start of the
+	variable data (the body's own length/count prefix).
 
 	Returns (file_type, name_bytes, archived, comment, version).  `name_bytes` is
 	the raw 8-byte name field.  `version` is the source file's var-version byte,
 	captured so writers can reproduce it byte-for-byte.
+
+	The whole var entry is read up front (they cap out around the calculator's 64K
+	of RAM) so the trailing checksum can be verified before anything is parsed —
+	corrupt and truncated files fail here, not with a confusing token error later —
+	and `f` is then rewound to the body for the caller.
+
+	The entry's leading word is the length of the sub-header that follows it:
+	0x0D (TI-83+/84+: version and archive-flag bytes present) or 0x0B (original
+	TI-83: both absent — no Flash, so nothing could be archived).
 	"""
 	signature = f.read(8)
 	if not signature.startswith(b'**TI8'):  # could be 82, 83, 83F
@@ -104,15 +113,28 @@ def _read_var_header(f):
 
 	f.seek(3, 1)  # skip 1a 0a 00
 	comment = f.read(42).rstrip(b'\x00 ').decode('ascii', errors='replace')
-	f.seek(2, 1)  # skip total var-entry length
-	_entry_type = int.from_bytes(f.read(2), 'little')  # 0x000B or 0x000D
-	f.seek(2, 1)  # skip data length
-	(file_type,) = f.read(1)
-	name_bytes = f.read(8)
-	version, archived = f.read(2)  # TODO: field missing when entry_type != 0x000d???
-	f.seek(2, 1)  # skip data length duplicate
-	# TODO: checksum check
-	return file_type, name_bytes, bool(archived & 0x80), comment, version
+	entry_len = int.from_bytes(f.read(2), 'little')
+	entry_start = f.tell()
+	entry = f.read(entry_len)
+	if len(entry) < entry_len:
+		raise ValueError(f"Truncated file: var entry is {len(entry)} of {entry_len} bytes")
+	stored = int.from_bytes(f.read(2), 'little')
+	computed = sum(entry) & 0xFFFF
+	if stored != computed:
+		raise ValueError(f"Checksum mismatch: file has 0x{stored:04X}, contents sum to 0x{computed:04X}")
+
+	header_len = int.from_bytes(entry[0:2], 'little')
+	file_type  = entry[4]
+	name_bytes = entry[5:13]
+	if header_len == 0x0D:
+		version, flag = entry[13:15]
+	elif header_len == 0x0B:
+		version, flag = 0x00, 0x00
+	else:
+		raise ValueError(f"Unrecognized var-entry header length: 0x{header_len:04X}")
+	# entry = header word (2) + sub-header (header_len) + data length duplicate (2) + body
+	f.seek(entry_start + header_len + 4)
+	return file_type, name_bytes, bool(flag & 0x80), comment, version
 
 
 class TiFile:
@@ -326,6 +348,7 @@ _VAR_TYPE_COMPLEX = 0x0C
 
 
 class VariableFile(TiFile):
+
 	@classmethod
 	def _parse_body(cls, f, file_type):
 		return _decode_real_body(f, file_type, _VAR_TYPE_COMPLEX)

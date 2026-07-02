@@ -717,6 +717,86 @@ def test_tokenvar_byte_exact_roundtrip(cls, name, path):
 	assert buf.getvalue() == orig
 
 
+# ── Envelope validation: checksum, truncation, 0x0B header ────────────────────
+
+def _ti83_file(name: bytes, body: bytes, file_type: int = 0x05) -> bytes:
+	"""Hand-build an original-TI-83 file: **TI83** signature and the 0x0B entry
+	layout — an 11-byte sub-header with no version/flag bytes."""
+	entry = (b'\x0B\x00' + len(body).to_bytes(2, 'little') + bytes([file_type])
+	         + name.ljust(8, b'\x00') + len(body).to_bytes(2, 'little') + body)
+	return (b'**TI83**\x1a\x0a\x00' + b'\x00' * 42
+	        + len(entry).to_bytes(2, 'little') + entry
+	        + (sum(entry) & 0xFFFF).to_bytes(2, 'little'))
+
+
+def _prog_body(tokens) -> bytes:
+	"""A program body: the 2-byte-length-prefixed token stream."""
+	data = b''.join(t.code_to_bytes() for t in tokens)
+	return len(data).to_bytes(2, 'little') + data
+
+
+class TestEnvelopeValidation:
+	def test_reads_ti83_0x0b_header(self):
+		# The 0x0B layout has no version/flag bytes; the body follows the repeated
+		# data length directly.  A TI-BASIC program saved by original-TI-83 link
+		# software reads like any other (version defaults to 0, nothing archived —
+		# the TI-83 had no Flash).
+		data = _ti83_file(b'ABC', _prog_body(toks('Disp 42')))
+		prog = ProgramFile.read_from(BytesIO(data))
+		assert prog.name == 'ABC'
+		assert prog.tokens == toks('Disp 42')
+		assert prog.version == 0
+		assert prog.archived is False
+		assert prog.locked is False
+
+	def test_0x0b_protected_program_is_locked(self):
+		data = _ti83_file(b'ASM', _prog_body([]), file_type=0x06)
+		assert ProgramFile.read_from(BytesIO(data)).locked is True
+
+	def test_checksum_mismatch_rejected(self):
+		buf = BytesIO()
+		make_prog(tokens=toks('Disp 42')).write_to(buf)
+		corrupt = bytearray(buf.getvalue())
+		corrupt[-4] ^= 0xFF                    # flip a body byte, keep the stored checksum
+		with pytest.raises(ValueError, match='Checksum'):
+			ProgramFile.read_from(BytesIO(bytes(corrupt)))
+
+	def test_truncated_file_rejected(self):
+		buf = BytesIO()
+		make_prog(tokens=toks('Disp 42')).write_to(buf)
+		with pytest.raises(ValueError, match='Truncated'):
+			ProgramFile.read_from(BytesIO(buf.getvalue()[:-10]))
+
+	def test_unknown_header_length_rejected(self):
+		# A well-checksummed entry whose leading word is neither 0x0B nor 0x0D.
+		body = _prog_body([])
+		entry = (b'\x0C\x00' + len(body).to_bytes(2, 'little') + b'\x05'
+		         + b'X'.ljust(8, b'\x00') + len(body).to_bytes(2, 'little') + body)
+		data = (b'**TI83F*\x1a\x0a\x00' + b'\x00' * 42
+		        + len(entry).to_bytes(2, 'little') + entry
+		        + (sum(entry) & 0xFFFF).to_bytes(2, 'little'))
+		with pytest.raises(ValueError, match='header length'):
+			ProgramFile.read_from(BytesIO(data))
+
+
+_TI83_ASM_FILE = r'C:\Users\Max\Documents\LegacyTiData\Backups\Bomberk.8xp'
+
+
+def test_real_ti83_header_fields():
+	"""Bomberk.8xp is a real original-TI-83 file (0x0B layout).  Its body is Z80
+	assembly, not tokens, so only the envelope/header is checked here."""
+	if not os.path.exists(_TI83_ASM_FILE):
+		pytest.skip('real file not found')
+	from tifile import _read_var_header
+	with open(_TI83_ASM_FILE, 'rb') as f:
+		file_type, name_bytes, archived, comment, version = _read_var_header(f)
+		assert file_type == 0x06                     # protected program
+		assert name_bytes == b'BOMBERK\x00'
+		assert version == 0 and archived is False    # fields absent in the 0x0B layout
+		inner = int.from_bytes(f.read(2), 'little')
+		assert len(f.read()) - 2 == inner            # f left at body: prefix matches content (+2 checksum)
+
+
 # ── store_to(env): install a loaded file into a running environment ────────────
 
 class TestStoreTo:
