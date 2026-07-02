@@ -115,38 +115,6 @@ def _read_var_header(f):
 	return file_type, name_bytes, bool(archived & 0x80), comment, version
 
 
-def _write_var_file(f, file_type, name_bytes, archived, comment, body, version):
-	"""Write a complete .8x* file wrapping `body` (the variable data, including
-	its own length/count prefix) in the standard envelope.
-
-	`version` is the var-version byte.  It varies per file (e.g. real .8xp files
-	carry 0x00 or 0x03, not the 0x01 TI-Connect emits for fresh programs), so
-	callers pass through the value captured on read to round-trip byte-for-byte.
-	"""
-	data_len = len(body)
-	flag     = 0x80 if archived else 0x00
-
-	var_entry = (
-		b'\x0D\x00'                       # entry header type: 0x000D (includes version + flag)
-		+ data_len.to_bytes(2, 'little')  # length of var data
-		+ bytes([file_type])              # 0x01 list, 0x05 program, 0x06 locked program
-		+ name_bytes                      # variable name, null-padded to 8 bytes
-		+ bytes([version])                # var version
-		+ bytes([flag])                   # 0x80 = archived in flash, 0x00 = RAM
-		+ data_len.to_bytes(2, 'little')  # length of var data (repeated)
-		+ body
-	)
-
-	comment_bytes = comment.encode('ascii')[:42].ljust(42, b'\x00')
-	checksum = sum(var_entry) & 0xFFFF
-	f.write(b'**TI83F*')
-	f.write(b'\x1a\x0a\x00')
-	f.write(comment_bytes)
-	f.write(len(var_entry).to_bytes(2, 'little'))
-	f.write(var_entry)
-	f.write(checksum.to_bytes(2, 'little'))
-
-
 class TiFile:
 	"""Base for every TI variable file.
 
@@ -156,6 +124,10 @@ class TiFile:
 	supplies only its body via `_parse_body` (read), `_encode_body` (write), and
 	`_var_type`.  Programs and pictures override read_from for their extra field
 	(locked / rows).
+
+	`version` is the var-version byte.  It varies per file (e.g. real .8xp files
+	carry 0x00 or 0x03, not the 0x01 TI-Connect emits for fresh programs), so it is
+	captured on read and passed back through to round-trip byte-for-byte.
 	"""
 
 	DEFAULT_VERSION = 0x00
@@ -204,14 +176,26 @@ class TiFile:
 		           comment, archived, version)
 
 	def write_to(self, f):
-		_write_var_file(f,
-			self._var_type(), 
-			write_accessor(self.accessor),
-			self.archived,
-			self.comment,
-			self._encode_body(),
-			version=self.version,
+		"""Write the complete .8x* file.  The entry header carries the body's length
+		(twice) and the trailing checksum covers header+body, so the body must be
+		encoded to bytes first — this format cannot be streamed."""
+		body = self._encode_body()
+		header = (
+			b'\x0D\x00'                            # entry header type: 0x000D (includes version + flag)
+			+ len(body).to_bytes(2, 'little')      # length of var data
+			+ bytes([self._var_type()])            # 0x01 list, 0x05 program, 0x06 locked program
+			+ write_accessor(self.accessor)        # variable name, null-padded to 8 bytes
+			+ bytes([self.version])                # var version (round-tripped from read)
+			+ bytes([0x80 if self.archived else 0x00])   # 0x80 = archived in flash, 0x00 = RAM
+			+ len(body).to_bytes(2, 'little')      # length of var data (repeated)
 		)
+		f.write(b'**TI83F*')
+		f.write(b'\x1a\x0a\x00')
+		f.write(self.comment.encode('ascii')[:42].ljust(42, b'\x00'))
+		f.write((len(header) + len(body)).to_bytes(2, 'little'))   # total var-entry length
+		f.write(header)
+		f.write(body)
+		f.write(((sum(header) + sum(body)) & 0xFFFF).to_bytes(2, 'little'))
 
 	def store_to(self, env):
 		"""Install this variable into a running environment.  A file load isn't a

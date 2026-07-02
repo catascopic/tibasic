@@ -392,20 +392,20 @@ class TestPictureFileRoundtrip:
 		# all four corners of the full screen (default 64-row format), plus interior
 		pix = {(0, 0), (0, COLS - 1), (ROWS - 1, 0), (ROWS - 1, COLS - 1), (31, 47)}
 		result = roundtrip_pic(make_pic(bitmap=make_bitmap(pix)))
-		assert pixels_of(result.bitmap) == pix
+		assert pixels_of(result.value) == pix
 
 	def test_empty_bitmap(self):
-		assert pixels_of(roundtrip_pic(make_pic()).bitmap) == set()
+		assert pixels_of(roundtrip_pic(make_pic()).value) == set()
 
 	def test_full_height_keeps_bottom_row(self):
 		# The 64-row format stores the bottom LCD row (row 63).
 		result = roundtrip_pic(make_pic(rows=64, bitmap=make_bitmap({(63, 0), (5, 5)})))
-		assert pixels_of(result.bitmap) == {(63, 0), (5, 5)}
+		assert pixels_of(result.value) == {(63, 0), (5, 5)}
 
 	def test_graph_screen_height_drops_bottom_row(self):
 		# The 63-row format omits row 63, so it never survives a roundtrip.
 		result = roundtrip_pic(make_pic(rows=63, bitmap=make_bitmap({(63, 0), (5, 5)})))
-		assert pixels_of(result.bitmap) == {(5, 5)}
+		assert pixels_of(result.value) == {(5, 5)}
 
 	def test_rows_preserved(self):
 		assert roundtrip_pic(make_pic(rows=63)).rows == 63
