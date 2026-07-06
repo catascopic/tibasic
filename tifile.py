@@ -22,7 +22,9 @@ The base `TiFile` owns the envelope (read_from/write_to), the name, load/write, 
 store_to; each subclass supplies only its body via `_parse_body`/`_encode_body`/
 `_var_type`.
 """
+import sys
 from io import BytesIO
+from pathlib import Path
 
 from tokenbase import Token, Accessor, FileVar
 from tokentypes import LetterToken, MatrixToken, ListToken, StringToken, PicToken
@@ -137,7 +139,7 @@ def _read_var_header(f):
 	stored = int.from_bytes(f.read(2), 'little')
 	computed = sum(entry) & 0xFFFF
 	if stored != computed:
-		raise ValueError(f"Checksum mismatch: file has 0x{stored:04X}, contents sum to 0x{computed:04X}")
+		raise ValueError(f"Checksum mismatch: {f} has 0x{stored:04X}, contents sum to 0x{computed:04X}")
 
 	header_len = int.from_bytes(entry[0:2], 'little')
 	file_type  = entry[4]
@@ -608,19 +610,29 @@ class PictureFile(TiFile):
 		self.value.disp()
 
 
+_READERS = {
+	'.8xp': ProgramFile,
+	'.8xl': ListFile,
+	'.8xm': MatrixFile,
+	'.8xn': VariableFile,
+	'.8xc': VariableFile,
+	'.8xs': StringFile,
+	'.8xy': EquationFile,
+	'.8xi': PictureFile,
+}
+
+def load_environment(env, dir_):
+	for file in Path(dir_).iterdir():
+		reader = _READERS.get(file.suffix)
+		if reader:
+			try:
+				reader.load(file).store_to(env)
+			except ValueError as e:
+				print(e, file=sys.stderr)
+
+
 if __name__ == '__main__':
 	import sys
-
-	_READERS = {
-		'.8xp': ProgramFile,
-		'.8xl': ListFile,
-		'.8xm': MatrixFile,
-		'.8xn': VariableFile,
-		'.8xc': VariableFile,
-		'.8xs': StringFile,
-		'.8xy': EquationFile,
-		'.8xi': PictureFile,
-	}
 
 	for path in sys.argv[1:]:
 		reader = _READERS.get(path[-4:].lower())

@@ -298,17 +298,29 @@ class TerminalConsole(Console):
 		self._last_run_frame = -1
 
 	def present(self) -> None:
+		# A repaint opportunity from a command.  Note show_graph is not set: a drawing
+		# command's per-pixel present() leaves the graph unpainted (see _paint_current)
+		# — it surfaces at the next Pause or at finish.  Home/menu output repaints live.
 		self._paint_current(_spinner_frame(_RUNNING_SPINNER))
 		if self._present_delay:
 			time.sleep(self._present_delay)
 
-	def _paint_current(self, indicator: str | None) -> None:
-		"""Repaint whichever screen is active — the graph (96-wide pixel art), a Menu(
-		modal, or the home grid (16-wide chars) — with `indicator` in the border.  This
-		is the one place that consults env.screen, so present/finish/the getKey tick and
-		the menu loop all show the right surface."""
+	def _paint_current(self, indicator: str | None, *, show_graph: bool = False) -> None:
+		"""Repaint whichever screen is active — a Menu( modal or the home grid (16-wide
+		chars) — with `indicator` in the border.  This is the one place that consults
+		env.screen, so present/finish/the getKey tick and the menu loop all show the
+		right surface.
+
+		The graph (96×32 half-blocks) is the deliberate exception: this console is a
+		text-oriented testing utility, and drawing commands present() per pixel, so the
+		graph is painted only when `show_graph` is set — the settle points (a Pause or
+		the program finishing) that are worth the space.  A drawing command's present()
+		and the getKey tick leave the prior frame up rather than flood the terminal; a
+		graph-screen game that repaints on getKey is out of scope here (a fully
+		pixel-based console would be the tool for that)."""
 		if self.env.screen is Screen.GRAPH:
-			self._paint(self.env.graph.rows(), indicator, width=_GRAPH_COLS)
+			if show_graph:
+				self._paint(self.env.graph.rows(), indicator, width=_GRAPH_COLS)
 		elif self.env.screen is Screen.MENU:
 			self._paint(self._menu_rows(self.env.menu), indicator)
 		else:
@@ -374,7 +386,10 @@ class TerminalConsole(Console):
 			sys.stdout.flush()
 
 	def finish(self) -> None:
-		self._paint_current(None)   # final repaint with no indicator — the program is done
+		# Final repaint with no indicator — the program is done.  show_graph: if the
+		# graph is the active screen, this is the moment to show it (the drawing that
+		# built it up was suppressed).
+		self._paint_current(None, show_graph=True)
 		self._show_cursor()         # hand the cursor back to the terminal
 		sys.stdout.flush()
 
@@ -447,10 +462,12 @@ class TerminalConsole(Console):
 	def pause(self, value=None) -> None:
 		"""Animate the spinner in real time until Enter or Space is pressed.
 
-		The value (if any) is rendered onto the home grid here — Pause shows it like
-		Disp but doesn't log it to the Disp `values` log, so it uses write_line, not
-		home.disp.  A list/matrix too big for the screen is shown through a ScrollView
-		the arrow keys page instead.
+		Pause shows whatever screen is active: the home grid (with the value, if any),
+		or the graph when a drawing program pauses on it — the one place besides finish
+		where this console paints the graph.  The value (if any) is rendered onto the
+		home grid here — Pause shows it like Disp but doesn't log it to the Disp
+		`values` log, so it uses write_line, not home.disp.  A list/matrix too big for
+		the screen is shown through a ScrollView the arrow keys page instead.
 
 		Needs msvcrt for non-blocking key polling (Windows-only) AND a real
 		interactive terminal: msvcrt.kbhit() polls the console's own input buffer,
@@ -473,7 +490,7 @@ class TerminalConsole(Console):
 		if msvcrt is None or not sys.stdin.isatty():
 			if view is not None:
 				view.render_into(home)
-			self._render(home, _PAUSE_SPINNER[0])   # static: no key polling to animate it
+			self._paint_current(_PAUSE_SPINNER[0], show_graph=True)   # static: no key polling to animate it
 			with self._input_cursor():
 				input()
 			return
@@ -482,7 +499,7 @@ class TerminalConsole(Console):
 		while True:
 			if view is not None:
 				view.render_into(home)
-			self._render(home, _spinner_frame(_PAUSE_SPINNER))
+			self._paint_current(_spinner_frame(_PAUSE_SPINNER), show_graph=True)
 			if view is None:
 				if self._wait_for_key(msvcrt, {'\r', ' '}):
 					return
