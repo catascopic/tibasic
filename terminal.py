@@ -236,13 +236,17 @@ class FreeFormConsole(Console):
 		self.present()
 
 
-# The border carries one status indicator that stands in for the calculator's
-# busy/pause icons.  Which spinner shows says what the program is doing; that it
-# animates says the program is alive.  A third state — no indicator at all — means
-# the program is either waiting for the user to type (Input/Prompt) or finished.
-_RUNNING_SPINNER = '▙▛▜▟'	# the program is running
-_PAUSE_SPINNER   = '▚▞'		# the program is blocked on the user (Pause / Menu)
-_FRAME_SECONDS = 0.1        # spinner advances one frame this often (~10 fps)
+# Indicator states passed through _paint_current — what the program is doing right
+# now.  A third state, None, means it's waiting for typed input or finished.  How a
+# console shows them is its own business: TerminalConsole animates a spinner glyph
+# in the border; PixelConsole paints the calculator's real run indicator into the
+# LCD's rightmost pixel column (_indicator_pixels).
+_RUN   = 'run'
+_PAUSE = 'pause'
+
+_RUNNING_SPINNER = '▙▛▜▟'	# border glyphs for _RUN (TerminalConsole)
+_PAUSE_SPINNER   = '▚▞'		# border glyphs for _PAUSE (TerminalConsole)
+_FRAME_SECONDS = 0.1        # the indicator advances one frame this often (~10 fps)
 _POLL_SECONDS = 0.01        # how often we check for a keypress within a frame
 _BOUNDARY = '░'
 
@@ -259,6 +263,18 @@ def _spinner_frame(spinner: str) -> str:
 	"""The glyph `spinner` should show right now (see _now_frame)."""
 	return spinner[_now_frame() % len(spinner)]
 
+
+def _indicator_pixels(state: str | None, t: int) -> list | None:
+	"""The run indicator as the 8 pixels of the LCD's rightmost column (rows 0–7)
+	at animation frame `t` — the pattern the calculator draws in that corner.
+	Busy: a 4-pixel run scrolling down and wrapping.  Pause: alternating pixels,
+	flipping between rows 0,2,4,6 and 1,3,5,7 each frame."""
+	if state is None:
+		return None
+	if state == _PAUSE:
+		return [(r - t) % 2 == 0 for r in range(8)]
+	return [(r - t) % 8 < 4 for r in range(8)]
+
 # Extended scan-code letter (after the '\x00'/'\xe0' prefix) → scroll direction,
 # for paging a scrollable Pause value (see _poll_scroll_key).
 _ARROW_DIRECTIONS = {'H': 'up', 'P': 'down', 'K': 'left', 'M': 'right'}
@@ -273,9 +289,11 @@ class FramedConsole(Console):
 	in-place framed repaints, cursor management, status spinners, and msvcrt key
 	polling for getKey/Pause/Menu.
 
-	A subclass decides only what the active screen looks like — `_screen_rows()`
-	returns the printable rows for the current env.screen (TerminalConsole: text;
-	PixelConsole: rasterized LCD pixels) — and every repaint path shares one _paint.
+	A subclass decides only what the frame looks like: `_screen_rows()` returns the
+	printable rows for the current env.screen (TerminalConsole: text; PixelConsole:
+	rasterized LCD pixels) and `_frame()` wraps them in its border, showing the
+	run/pause indicator state however it chooses.  Every repaint path shares one
+	_paint.
 	"""
 
 	# The terminal's hardware cursor is kept hidden the whole time a program runs
@@ -308,57 +326,47 @@ class FramedConsole(Console):
 		# A repaint opportunity from a command — not a settle point: a drawing
 		# command's per-pixel present() reaches _screen_rows with settled=False,
 		# which TerminalConsole uses to skip graph repaints (see its docstring).
-		self._paint_current(_spinner_frame(_RUNNING_SPINNER))
+		self._paint_current(_RUN)
 		if self._present_delay:
 			time.sleep(self._present_delay)
 
-	def _paint_current(self, indicator: str | None, *, settled: bool = False) -> None:
-		"""Repaint the active screen — home grid, Menu( modal, or graph — with
-		`indicator` in the border.  Every repaint path (present/finish/the getKey
-		tick/the pause and menu loops) funnels through here.
+	def _paint_current(self, state: str | None, *, settled: bool = False) -> None:
+		"""Repaint the active screen — home grid, Menu( modal, or graph — showing
+		the _RUN/_PAUSE indicator `state` (None: taking input or finished).  Every
+		repaint path (present/finish/the getKey tick/the pause and menu loops)
+		funnels through here.
 
 		`settled` marks the moments the program comes to rest on a screen — a Pause,
 		the program finishing — as opposed to a mid-flight repaint.  _screen_rows may
 		use it to decide a surface isn't worth painting yet; returning None skips the
 		repaint and leaves the previous frame up."""
-		painted = self._screen_rows(settled)
+		painted = self._screen_rows(state, settled)
 		if painted is None:
 			return
 		rows, width = painted
-		self._paint(rows, indicator, width=width)
+		self._paint(rows, state, width)
 
-	def _screen_rows(self, settled: bool) -> tuple[list, int] | None:
+	def _screen_rows(self, state: str | None, settled: bool) -> tuple[list, int] | None:
 		"""The active screen (env.screen) as (rows, visible_width) for _paint, or
 		None to leave the previous frame in place.  Subclasses own the choice of
-		representation."""
+		representation — including how (or whether) `state` shows up in the rows
+		themselves (PixelConsole paints it as indicator pixels)."""
 		raise NotImplementedError
 
-	def _paint(self, rows: list, indicator: str | None = None, width: int = HomeScreen.COLS) -> None:
-		"""Repaint `rows` (each `width` visible characters, ANSI styling allowed)
-		framed in the border, with `indicator` optionally overlaid one cell left of
-		the top-right corner.  Shared by the home grid, the graph, and the menu —
-		none carries any state for the others.
-
-		Repaints in place: home the cursor, overwrite each row clearing to its
-		end, then erase anything below.  This avoids \033[2J — which clears only
-		the viewport (old frames linger in scrollback) and is a no-op where VT is
-		off — so the screen never scrolls.  The trailing newline drops the cursor
-		below the grid so an Input prompt appears there (wiped on the next repaint).
+	def _paint(self, rows: list, state: str | None, width: int) -> None:
+		"""Repaint `rows` (each `width` visible characters, ANSI styling allowed),
+		wrapped in the subclass's border (_frame), in place: home the cursor,
+		overwrite each row clearing to its end, then erase anything below.  This
+		avoids \033[2J — which clears only the viewport (old frames linger in
+		scrollback) and is a no-op where VT is off — so the screen never scrolls.
+		The trailing newline drops the cursor below the grid so an Input prompt
+		appears there (wiped on the next repaint).
 
 		`width` is given explicitly rather than measured from `rows` because the menu
 		embeds invisible ANSI codes (so len() overcounts); callers pass the visible
-		width (16 for home/menu, 96 for the graph).
-
-		`indicator` is the calculator's status icon (the running or pause spinner);
-		None means show none — the program is taking input or has finished.  It
-		lives in the border, not a content cell, so it can never collide with
-		anything a program Output(s, and nothing needs restoring afterward: the
-		next repaint without it just redraws a plain border.
+		width (16 for home/menu, 96 for pixels).
 		"""
-		framed = [(_BOUNDARY * (width + 1)) + (indicator or _BOUNDARY)]
-		for row in rows:
-			framed.append(_BOUNDARY + row + _BOUNDARY)
-		framed.append(_BOUNDARY * (width + 2))
+		framed = self._frame(rows, state, width)
 		painted = '\033[H' + '\n'.join(f'{row}\033[K' for row in framed) + '\033[J\n'
 		sys.stdout.write(painted)
 		# A painted frame parks the cursor in the corner, so hide it by default;
@@ -366,6 +374,11 @@ class FramedConsole(Console):
 		# program via finish) re-show it explicitly after painting.
 		self._hide_cursor()
 		sys.stdout.flush()
+
+	def _frame(self, rows: list, state: str | None, width: int) -> list:
+		"""Wrap screen rows in this console's border, showing the indicator `state`
+		however this console represents it."""
+		raise NotImplementedError
 
 	def _hide_cursor(self) -> None:
 		if not self._cursor_hidden:
@@ -460,7 +473,7 @@ class FramedConsole(Console):
 		if frame == self._last_run_frame:
 			return
 		self._last_run_frame = frame
-		self._paint_current(_spinner_frame(_RUNNING_SPINNER))
+		self._paint_current(_RUN)
 
 	def pause(self, value=None) -> None:
 		"""Animate the spinner in real time until Enter or Space is pressed.
@@ -493,7 +506,7 @@ class FramedConsole(Console):
 		if msvcrt is None or not sys.stdin.isatty():
 			if view is not None:
 				view.render_into(home)
-			self._paint_current(_PAUSE_SPINNER[0], settled=True)   # static: no key polling to animate it
+			self._paint_current(_PAUSE, settled=True)   # painted once — no key polling to animate it
 			with self._input_cursor():
 				input()
 			return
@@ -502,7 +515,7 @@ class FramedConsole(Console):
 		while True:
 			if view is not None:
 				view.render_into(home)
-			self._paint_current(_spinner_frame(_PAUSE_SPINNER), settled=True)
+			self._paint_current(_PAUSE, settled=True)
 			if view is None:
 				if self._wait_for_key(msvcrt, {'\r', ' '}):
 					return
@@ -573,7 +586,7 @@ class FramedConsole(Console):
 		# _paint keeps the cursor hidden while the menu animates; like Pause, the
 		# menu never collects keystrokes through input(), so it stays hidden.
 		while True:
-			self._paint_current(_spinner_frame(_PAUSE_SPINNER))
+			self._paint_current(_PAUSE)
 			result = self._poll_menu_key(msvcrt, len(menu.options))
 			if result is None:
 				continue
@@ -623,7 +636,7 @@ class TerminalConsole(FramedConsole):
 	that repaints on getKey is out of scope here; PixelConsole is the tool for that.
 	"""
 
-	def _screen_rows(self, settled: bool) -> tuple[list, int] | None:
+	def _screen_rows(self, state: str | None, settled: bool) -> tuple[list, int] | None:
 		if self.env.screen is Screen.GRAPH:
 			if not settled:
 				return None
@@ -631,6 +644,21 @@ class TerminalConsole(FramedConsole):
 		if self.env.screen is Screen.MENU:
 			return self._menu_rows(self.env.menu), HomeScreen.COLS
 		return str(self.env.home).split('\n'), HomeScreen.COLS
+
+	def _frame(self, rows: list, state: str | None, width: int) -> list:
+		"""The ░ border, with `state` shown as an animated spinner glyph overlaid one
+		cell left of the top-right corner.  The indicator lives in the border, not a
+		content cell, so it can never collide with anything a program Output(s, and
+		nothing needs restoring afterward: the next repaint without it just redraws a
+		plain border.  Which spinner shows says what the program is doing; that it
+		animates says the program is alive; none at all means it's waiting for typed
+		input or finished."""
+		glyph = _spinner_frame(_RUNNING_SPINNER if state == _RUN else _PAUSE_SPINNER) if state else None
+		framed = [(_BOUNDARY * (width + 1)) + (glyph or _BOUNDARY)]
+		for row in rows:
+			framed.append(_BOUNDARY + row + _BOUNDARY)
+		framed.append(_BOUNDARY * (width + 2))
+		return framed
 
 	def _menu_rows(self, menu) -> list:
 		"""The menu's display rows as ANSI strings — the model's canonical layout
@@ -653,14 +681,25 @@ class PixelConsole(FramedConsole):
 	present() always repaints, so a drawing builds up live and a getKey graph loop
 	animates (the indicator tick already self-throttles to ~10fps).  The trade is
 	space and glyph fidelity: text is font pixels, not characters.  TerminalConsole
-	is the lighter tool when the graph only matters at settle points."""
+	is the lighter tool when the graph only matters at settle points.
 
-	def _screen_rows(self, settled: bool) -> tuple[list, int]:
+	The run/pause indicator is the calculator's real one: pixels in the LCD's
+	rightmost column (_indicator_pixels), painted over the content by Bitmap.rows
+	without ever being set in the screen's own buffer."""
+
+	def _screen_rows(self, state: str | None, settled: bool) -> tuple[list, int]:
+		pixels = _indicator_pixels(state, _now_frame())
 		if self.env.screen is Screen.GRAPH:
-			return self.env.graph.rows(), _GRAPH_COLS
+			return self.env.graph.rows(pixels), _GRAPH_COLS
 		if self.env.screen is Screen.MENU:
-			return self.env.menu.rasterize().rows(), _GRAPH_COLS
-		return self.env.home.rasterize().rows(), _GRAPH_COLS
+			return self.env.menu.rasterize().rows(pixels), _GRAPH_COLS
+		return self.env.home.rasterize().rows(pixels), _GRAPH_COLS
+
+	def _frame(self, rows: list, state: str | None, width: int) -> list:
+		"""Bitmap.disp's border — ▒▒ flanks, a single ▒ row above and below.  No
+		border indicator: the run/pause state is already in the screen pixels."""
+		border = '▒' * (width + 4)
+		return [border, *('▒▒' + row + '▒▒' for row in rows), border]
 
 
 def _enable_windows_vt() -> None:

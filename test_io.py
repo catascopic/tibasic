@@ -2,8 +2,9 @@
 import re
 import pytest
 
+from bitmap import Bitmap
 from homescreen import HomeScreen
-from terminal import ScriptedConsole, TerminalConsole, PixelConsole
+from terminal import ScriptedConsole, TerminalConsole, PixelConsole, _indicator_pixels
 from errors import DomainError, DataTypeError, TiSyntaxError, InvalidCommandError
 from environment import Environment
 from program import Program
@@ -493,32 +494,32 @@ class TestScreenRows:
 		return c
 
 	def test_terminal_home_is_text(self):
-		rows, width = self._console(TerminalConsole)._screen_rows(False)
+		rows, width = self._console(TerminalConsole)._screen_rows(None, False)
 		assert width == HomeScreen.COLS
 		assert len(rows) == 8 and all(len(r) == 16 for r in rows)
 
 	def test_terminal_graph_skipped_until_settled(self):
 		c = self._console(TerminalConsole)
 		c.env.screen = Screen.GRAPH
-		assert c._screen_rows(False) is None            # mid-flight: leave prior frame
-		rows, width = c._screen_rows(True)              # Pause/finish: paint it
+		assert c._screen_rows(None, False) is None      # mid-flight: leave prior frame
+		rows, width = c._screen_rows(None, True)        # Pause/finish: paint it
 		assert width == 96 and len(rows) == 32
 
 	def test_pixel_home_is_rasterized(self):
-		rows, width = self._console(PixelConsole)._screen_rows(False)
+		rows, width = self._console(PixelConsole)._screen_rows(None, False)
 		assert width == 96
 		assert len(rows) == 32 and all(len(r) == 96 for r in rows)
 
 	def test_pixel_graph_paints_mid_flight(self):
 		c = self._console(PixelConsole)
 		c.env.screen = Screen.GRAPH
-		assert c._screen_rows(False) is not None        # never suppressed
+		assert c._screen_rows(None, False) is not None  # never suppressed
 
 	def test_pixel_menu_is_rasterized(self):
 		c = self._console(PixelConsole)
 		c.env.menu = _menu('PICK', 'ONE')
 		c.env.screen = Screen.MENU
-		rows, width = c._screen_rows(False)
+		rows, width = c._screen_rows(None, False)
 		assert width == 96 and len(rows) == 32
 
 	def test_home_rasterize_draws_glyph_pixels(self):
@@ -527,6 +528,38 @@ class TestScreenRows:
 		env.home.write_line(b'A')
 		drawn = sum(px for row in env.home.rasterize().buffer for px in row)
 		assert blank == 0 and drawn > 0                 # the glyph set some pixels
+
+	def test_pixel_frame_matches_bitmap_disp(self):
+		framed = PixelConsole.__new__(PixelConsole)._frame(['x' * 96] * 32, None, 96)
+		assert framed[0] == '▒' * 100 and framed[-1] == '▒' * 100
+		assert framed[1] == '▒▒' + 'x' * 96 + '▒▒'
+
+	def test_terminal_frame_carries_border_glyph(self):
+		framed = TerminalConsole.__new__(TerminalConsole)._frame(['x' * 16] * 8, 'run', 16)
+		assert framed[0][-1] in '▙▛▜▟'                  # spinner in the border corner
+
+
+class TestIndicatorPixels:
+	"""The run indicator as LCD pixels (PixelConsole) — pure pattern functions."""
+
+	def test_pause_alternates_and_flips_each_frame(self):
+		assert _indicator_pixels('pause', 0) == [True, False] * 4    # rows 0,2,4,6
+		assert _indicator_pixels('pause', 1) == [False, True] * 4    # rows 1,3,5,7
+
+	def test_busy_scrolls_down_and_wraps(self):
+		assert _indicator_pixels('run', 0) == [True] * 4 + [False] * 4
+		assert _indicator_pixels('run', 1) == [False] + [True] * 4 + [False] * 3
+		assert _indicator_pixels('run', 6) == [True, True, False, False, False, False, True, True]
+
+	def test_no_state_no_pixels(self):
+		assert _indicator_pixels(None, 5) is None
+
+	def test_bitmap_overlay_replaces_without_touching_buffer(self):
+		bmp = Bitmap()
+		rows = bmp.rows([1] * 8)
+		assert all(r[-1] == ' ' for r in rows[:4])       # indicator on → dark (space)
+		assert all(r[-1] == '█' for r in rows[4:])       # below it: untouched blank
+		assert not any(any(row) for row in bmp.buffer)   # buffer itself unchanged
 
 
 class TestInput:

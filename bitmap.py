@@ -122,14 +122,23 @@ class Bitmap:
 				for _ in range(pixel_size):
 					f.write(row)
 
-	def rows(self) -> list[str]:
+	def rows(self, indicator=None) -> list[str]:
 		"""The buffer as 32 rows of 96 half-block characters — two pixel rows packed
 		into each text row (▀ top, ▄ bottom, █ both, space neither).  Border/framing
-		is the caller's concern; this is the shared content a text frontend paints."""
-		return [
+		is the caller's concern; this is the shared content a text frontend paints.
+
+		`indicator` optionally paints the run/pause indicator — 8 pixel values for
+		the rightmost column, rows 0–7 — over the content, replacing whatever is
+		underneath.  Like the real OS driving that LCD corner, it never touches the
+		buffer: the screen memory underneath is unchanged."""
+		out = [
 			''.join(' ▀▄█'[~(px1 | (px2 << 1))] for px1, px2 in zip(row1, row2, strict=True))
 			for row1, row2 in batched(self.buffer, 2)
 		]
+		if indicator is not None:
+			for t, (px1, px2) in enumerate(batched(indicator, 2)):
+				out[t] = out[t][:-1] + ' ▀▄█'[~(px1 | (px2 << 1))]
+		return out
 
 	def disp(self) -> None:
 		border = '▒' * (COLS + 4)
