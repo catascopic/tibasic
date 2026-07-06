@@ -268,8 +268,15 @@ _ARROW_DIRECTIONS = {'H': 'up', 'P': 'down', 'K': 'left', 'M': 'right'}
 _INV_ON  = '\033[7m'
 _INV_OFF = '\033[27m'
 
-class TerminalConsole(Console):
-	"""Interactive command-line console for quick prototyping."""
+class FramedConsole(Console):
+	"""Shared machinery for the interactive terminal consoles: VT/ANSI setup,
+	in-place framed repaints, cursor management, status spinners, and msvcrt key
+	polling for getKey/Pause/Menu.
+
+	A subclass decides only what the active screen looks like — `_screen_rows()`
+	returns the printable rows for the current env.screen (TerminalConsole: text;
+	PixelConsole: rasterized LCD pixels) — and every repaint path shares one _paint.
+	"""
 
 	# The terminal's hardware cursor is kept hidden the whole time a program runs
 	# (it would otherwise blink in the bottom-left corner where _paint parks it),
@@ -298,36 +305,33 @@ class TerminalConsole(Console):
 		self._last_run_frame = -1
 
 	def present(self) -> None:
-		# A repaint opportunity from a command.  Note show_graph is not set: a drawing
-		# command's per-pixel present() leaves the graph unpainted (see _paint_current)
-		# — it surfaces at the next Pause or at finish.  Home/menu output repaints live.
+		# A repaint opportunity from a command — not a settle point: a drawing
+		# command's per-pixel present() reaches _screen_rows with settled=False,
+		# which TerminalConsole uses to skip graph repaints (see its docstring).
 		self._paint_current(_spinner_frame(_RUNNING_SPINNER))
 		if self._present_delay:
 			time.sleep(self._present_delay)
 
-	def _paint_current(self, indicator: str | None, *, show_graph: bool = False) -> None:
-		"""Repaint whichever screen is active — a Menu( modal or the home grid (16-wide
-		chars) — with `indicator` in the border.  This is the one place that consults
-		env.screen, so present/finish/the getKey tick and the menu loop all show the
-		right surface.
+	def _paint_current(self, indicator: str | None, *, settled: bool = False) -> None:
+		"""Repaint the active screen — home grid, Menu( modal, or graph — with
+		`indicator` in the border.  Every repaint path (present/finish/the getKey
+		tick/the pause and menu loops) funnels through here.
 
-		The graph (96×32 half-blocks) is the deliberate exception: this console is a
-		text-oriented testing utility, and drawing commands present() per pixel, so the
-		graph is painted only when `show_graph` is set — the settle points (a Pause or
-		the program finishing) that are worth the space.  A drawing command's present()
-		and the getKey tick leave the prior frame up rather than flood the terminal; a
-		graph-screen game that repaints on getKey is out of scope here (a fully
-		pixel-based console would be the tool for that)."""
-		if self.env.screen is Screen.GRAPH:
-			if show_graph:
-				self._paint(self.env.graph.rows(), indicator, width=_GRAPH_COLS)
-		elif self.env.screen is Screen.MENU:
-			self._paint(self._menu_rows(self.env.menu), indicator)
-		else:
-			self._render(self.env.home, indicator)
+		`settled` marks the moments the program comes to rest on a screen — a Pause,
+		the program finishing — as opposed to a mid-flight repaint.  _screen_rows may
+		use it to decide a surface isn't worth painting yet; returning None skips the
+		repaint and leaves the previous frame up."""
+		painted = self._screen_rows(settled)
+		if painted is None:
+			return
+		rows, width = painted
+		self._paint(rows, indicator, width=width)
 
-	def _render(self, home: HomeScreen, indicator: str | None = None) -> None:
-		self._paint(str(home).split('\n'), indicator)
+	def _screen_rows(self, settled: bool) -> tuple[list, int] | None:
+		"""The active screen (env.screen) as (rows, visible_width) for _paint, or
+		None to leave the previous frame in place.  Subclasses own the choice of
+		representation."""
+		raise NotImplementedError
 
 	def _paint(self, rows: list, indicator: str | None = None, width: int = HomeScreen.COLS) -> None:
 		"""Repaint `rows` (each `width` visible characters, ANSI styling allowed)
@@ -386,17 +390,16 @@ class TerminalConsole(Console):
 			sys.stdout.flush()
 
 	def finish(self) -> None:
-		# Final repaint with no indicator — the program is done.  show_graph: if the
-		# graph is the active screen, this is the moment to show it (the drawing that
-		# built it up was suppressed).
-		self._paint_current(None, show_graph=True)
+		# Final repaint with no indicator — the program is done.  This is a settle
+		# point: if the program ended on the graph, now is when it's worth showing.
+		self._paint_current(None, settled=True)
 		self._show_cursor()         # hand the cursor back to the terminal
 		sys.stdout.flush()
 
 	def _input(self, prompt: list[Token]) -> list[Token]:
 		# Input/Prompt always run on the home screen; repaint it without an indicator
 		# (the cursor stands in for one) before blocking.
-		self._render(self.env.home)
+		self._paint_current(None)
 		with self._input_cursor():
 			text = input(decode(b''.join(t.display for t in prompt)))
 		return self._tokenize(text)
@@ -463,9 +466,9 @@ class TerminalConsole(Console):
 		"""Animate the spinner in real time until Enter or Space is pressed.
 
 		Pause shows whatever screen is active: the home grid (with the value, if any),
-		or the graph when a drawing program pauses on it — the one place besides finish
-		where this console paints the graph.  The value (if any) is rendered onto the
-		home grid here — Pause shows it like Disp but doesn't log it to the Disp
+		or the graph when a drawing program pauses on it — a settle point, so even
+		TerminalConsole paints the graph here.  The value (if any) is rendered onto
+		the home grid — Pause shows it like Disp but doesn't log it to the Disp
 		`values` log, so it uses write_line, not home.disp.  A list/matrix too big for
 		the screen is shown through a ScrollView the arrow keys page instead.
 
@@ -490,7 +493,7 @@ class TerminalConsole(Console):
 		if msvcrt is None or not sys.stdin.isatty():
 			if view is not None:
 				view.render_into(home)
-			self._paint_current(_PAUSE_SPINNER[0], show_graph=True)   # static: no key polling to animate it
+			self._paint_current(_PAUSE_SPINNER[0], settled=True)   # static: no key polling to animate it
 			with self._input_cursor():
 				input()
 			return
@@ -499,7 +502,7 @@ class TerminalConsole(Console):
 		while True:
 			if view is not None:
 				view.render_into(home)
-			self._paint_current(_spinner_frame(_PAUSE_SPINNER), show_graph=True)
+			self._paint_current(_spinner_frame(_PAUSE_SPINNER), settled=True)
 			if view is None:
 				if self._wait_for_key(msvcrt, {'\r', ' '}):
 					return
@@ -585,18 +588,6 @@ class TerminalConsole(Console):
 				return menu.selected
 			sys.stdout.flush()
 
-	def _menu_rows(self, menu) -> list:
-		"""The menu's display rows as ANSI strings — the model's canonical layout
-		(menu.styled_rows(), whose segments are display bytes) decoded to characters,
-		with each inverted segment wrapped in inverse-video codes.  The plain text is
-		sized to the 16 columns by the model; the ANSI codes are invisible, so _paint
-		is given the visible width explicitly."""
-		return [
-			''.join((_INV_ON + decode(text) + _INV_OFF) if inverted else decode(text)
-			        for text, inverted in row)
-			for row in menu.styled_rows()
-		]
-
 	def _poll_menu_key(self, msvcrt, n_options: int):
 		"""Poll for up to _FRAME_SECONDS; returns None (nothing relevant), 'up',
 		'down', 'enter', or an int 0..n_options-1 (a number key, chosen directly).
@@ -619,6 +610,57 @@ class TerminalConsole(Console):
 						return index
 			time.sleep(_POLL_SECONDS)
 		return None
+
+
+class TerminalConsole(FramedConsole):
+	"""Text-first interactive console for quick prototyping: the home grid and menus
+	paint as 16-wide character rows.
+
+	The graph (96×32 half-blocks) is the deliberate exception: it dwarfs the home
+	grid, and drawing commands present() per pixel, so it is painted only at settle
+	points — a Pause on the graph, the program finishing — and mid-flight repaints
+	leave the previous frame up rather than flood the terminal.  A graph-screen game
+	that repaints on getKey is out of scope here; PixelConsole is the tool for that.
+	"""
+
+	def _screen_rows(self, settled: bool) -> tuple[list, int] | None:
+		if self.env.screen is Screen.GRAPH:
+			if not settled:
+				return None
+			return self.env.graph.rows(), _GRAPH_COLS
+		if self.env.screen is Screen.MENU:
+			return self._menu_rows(self.env.menu), HomeScreen.COLS
+		return str(self.env.home).split('\n'), HomeScreen.COLS
+
+	def _menu_rows(self, menu) -> list:
+		"""The menu's display rows as ANSI strings — the model's canonical layout
+		(menu.styled_rows(), whose segments are display bytes) decoded to characters,
+		with each inverted segment wrapped in inverse-video codes.  The plain text is
+		sized to the 16 columns by the model; the ANSI codes are invisible, so _paint
+		is given the visible width explicitly."""
+		return [
+			''.join((_INV_ON + decode(text) + _INV_OFF) if inverted else decode(text)
+			        for text, inverted in row)
+			for row in menu.styled_rows()
+		]
+
+
+class PixelConsole(FramedConsole):
+	"""Everything through the LCD: home, menu, and graph all rasterize through the
+	font tables into the shared 96×64 Bitmap and paint as 32 rows of half-block
+	pixels — one visual pipeline, the way the real screen works.
+
+	present() always repaints, so a drawing builds up live and a getKey graph loop
+	animates (the indicator tick already self-throttles to ~10fps).  The trade is
+	space and glyph fidelity: text is font pixels, not characters.  TerminalConsole
+	is the lighter tool when the graph only matters at settle points."""
+
+	def _screen_rows(self, settled: bool) -> tuple[list, int]:
+		if self.env.screen is Screen.GRAPH:
+			return self.env.graph.rows(), _GRAPH_COLS
+		if self.env.screen is Screen.MENU:
+			return self.env.menu.rasterize().rows(), _GRAPH_COLS
+		return self.env.home.rasterize().rows(), _GRAPH_COLS
 
 
 def _enable_windows_vt() -> None:

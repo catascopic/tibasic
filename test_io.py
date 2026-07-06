@@ -3,7 +3,7 @@ import re
 import pytest
 
 from homescreen import HomeScreen
-from terminal import ScriptedConsole, TerminalConsole
+from terminal import ScriptedConsole, TerminalConsole, PixelConsole
 from errors import DomainError, DataTypeError, TiSyntaxError, InvalidCommandError
 from environment import Environment
 from program import Program
@@ -479,6 +479,54 @@ class _FakeMsvcrt:
 
 	def getwch(self):
 		return self.events.pop(0)
+
+
+class TestScreenRows:
+	"""What each console paints for the active screen (_screen_rows) — pure data:
+	TerminalConsole is text-first and skips mid-flight graph repaints; PixelConsole
+	rasterizes every screen to 32 rows of 96 half-block pixels."""
+
+	@staticmethod
+	def _console(cls):
+		c = cls.__new__(cls)     # skip __init__: no VT setup / stdout reconfig in tests
+		c.env = Environment()
+		return c
+
+	def test_terminal_home_is_text(self):
+		rows, width = self._console(TerminalConsole)._screen_rows(False)
+		assert width == HomeScreen.COLS
+		assert len(rows) == 8 and all(len(r) == 16 for r in rows)
+
+	def test_terminal_graph_skipped_until_settled(self):
+		c = self._console(TerminalConsole)
+		c.env.screen = Screen.GRAPH
+		assert c._screen_rows(False) is None            # mid-flight: leave prior frame
+		rows, width = c._screen_rows(True)              # Pause/finish: paint it
+		assert width == 96 and len(rows) == 32
+
+	def test_pixel_home_is_rasterized(self):
+		rows, width = self._console(PixelConsole)._screen_rows(False)
+		assert width == 96
+		assert len(rows) == 32 and all(len(r) == 96 for r in rows)
+
+	def test_pixel_graph_paints_mid_flight(self):
+		c = self._console(PixelConsole)
+		c.env.screen = Screen.GRAPH
+		assert c._screen_rows(False) is not None        # never suppressed
+
+	def test_pixel_menu_is_rasterized(self):
+		c = self._console(PixelConsole)
+		c.env.menu = _menu('PICK', 'ONE')
+		c.env.screen = Screen.MENU
+		rows, width = c._screen_rows(False)
+		assert width == 96 and len(rows) == 32
+
+	def test_home_rasterize_draws_glyph_pixels(self):
+		env = Environment()
+		blank = sum(px for row in env.home.rasterize().buffer for px in row)
+		env.home.write_line(b'A')
+		drawn = sum(px for row in env.home.rasterize().buffer for px in row)
+		assert blank == 0 and drawn > 0                 # the glyph set some pixels
 
 
 class TestInput:

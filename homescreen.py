@@ -168,19 +168,21 @@ class HomeScreen:
 		tables).  str(home) decodes it back to characters for a text frontend/tests."""
 		return b'\n'.join(self._window_row(r) for r in range(self.ROWS))
 
-	def print_screen(self, path, pixel_size: int = 1) -> None:
-		"""Save the visible window as a monochrome BMP.
-
-		Each cell's glyph is rasterized through the large font (fonts.blit_cell) into
-		a 6×8 pixel block, so the 16×8 window fills exactly the same 96×64 LCD the graph
-		uses — the home screen and the graph are two views of one Bitmap.
-		"""
+	def rasterize(self) -> Bitmap:
+		"""The visible window rasterized through the large font (fonts.blit_cell):
+		each cell's glyph fills a 6×8 pixel block, so the 16×8 window fills exactly
+		the same 96×64 LCD the graph uses — the home screen and the graph are two
+		views of one Bitmap."""
 		surface = Bitmap()
 		for r in range(self.ROWS):
 			row = self._window_row(r)
 			for c in range(self.COLS):
 				surface.blit_cell(r, c, row[c])
-		surface.print_screen(path, pixel_size)
+		return surface
+
+	def print_screen(self, path, pixel_size: int = 1) -> None:
+		"""Save the visible window as a monochrome BMP (see rasterize)."""
+		self.rasterize().print_screen(path, pixel_size)
 
 	def __str__(self) -> str:
 		"""The visible window decoded to characters — 8 lines of 16, newline-joined.

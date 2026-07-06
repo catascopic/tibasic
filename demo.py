@@ -1,7 +1,7 @@
 import sys
 
 from environment import Environment
-from terminal import TerminalConsole, FreeFormConsole
+from terminal import TerminalConsole, FreeFormConsole, PixelConsole
 from program import Program
 from test_tibasic import toks
 
@@ -13,7 +13,7 @@ def run_demo(source, freeform=False):
 	pass freeform=True (or `--freeform` on the command line) for the grid-less
 	print()/input() device instead.
 	"""
-	env = Environment(console=TerminalConsole())
+	env = Environment(console=PixelConsole())
 	if freeform:
 		env.console = FreeFormConsole()
 	env.programs['DEMO'] = Program(toks(source), 'DEMO')
@@ -23,8 +23,39 @@ def run_demo(source, freeform=False):
 if __name__ == '__main__':
 	run_demo("""
 
-Fix 7
-Pause 3
+
+Lbl 1
+Disp "X--------------O
+Disp "_X------------O
+Disp "__X----------O
+Disp "___X--------O
+Disp "____X------O
+Disp "_____X----O
+Disp "______X--O
+Disp "_______XO
+Disp "_______OX
+Disp "______O--X
+Disp "_____O----X
+Disp "____O------X
+Disp "___O--------X
+Disp "__O----------X
+Disp "_O------------X
+Disp "O--------------X
+Disp "_O------------X
+Disp "__O----------X
+Disp "___O--------X
+Disp "____O------X
+Disp "_____O----X
+Disp "______O--X
+Disp "_______OX
+Disp "_______XO
+Disp "______X--O
+Disp "_____X----O
+Disp "____X------O
+Disp "___X--------O
+Disp "__X----------O
+Disp "_X------------O
+Goto 1
 
 	""", freeform='--freeform' in sys.argv)
 

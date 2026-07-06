@@ -69,10 +69,10 @@ class MenuScreen:
 		frontends and tests."""
 		return [decode(b''.join(text for text, _ in row)) for row in self.styled_rows()]
 
-	def print_screen(self, path, pixel_size: int = 1) -> None:
-		"""Save the menu as a monochrome BMP, like home/graph: each cell's display
-		byte is rasterized through the large font into the shared 96×64 Bitmap, with
-		the inverted title and selection drawn as flipped pixels (fonts.blit_cell)."""
+	def rasterize(self) -> Bitmap:
+		"""The menu rasterized through the large font into the shared 96×64 Bitmap:
+		each cell's display byte fills a 6×8 block, with the inverted title and
+		selection drawn as flipped pixels (fonts.blit_cell)."""
 		surface = Bitmap()
 		for r, row in enumerate(self.styled_rows()):
 			c = 0
@@ -80,4 +80,8 @@ class MenuScreen:
 				for byte in text:
 					surface.blit_cell(r, c, byte, invert=inverted)
 					c += 1
-		surface.print_screen(path, pixel_size)
+		return surface
+
+	def print_screen(self, path, pixel_size: int = 1) -> None:
+		"""Save the menu as a monochrome BMP, like home/graph (see rasterize)."""
+		self.rasterize().print_screen(path, pixel_size)
