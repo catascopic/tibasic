@@ -259,6 +259,17 @@ def _now_frame() -> int:
 	return int(time.monotonic() / _FRAME_SECONDS)
 
 
+def _next_frame() -> float:
+	"""Monotonic time of the next animation-frame boundary.  The paced poll loops
+	wait to here rather than `now + _FRAME_SECONDS`, so each repaint lands on a
+	fresh frame and the indicator advances exactly one step per paint.  A fixed-
+	length wait instead drifts against the grid — the loop period is _FRAME_SECONDS
+	*plus* the paint time, so it periodically straddles two boundaries and _now_frame
+	jumps by 2, stalling a short-period pattern (the pause indicator) for a beat.
+	The busy tick doesn't drift because it already repaints on frame *change*."""
+	return (_now_frame() + 1) * _FRAME_SECONDS
+
+
 def _spinner_frame(spinner: str) -> str:
 	"""The glyph `spinner` should show right now (see _now_frame)."""
 	return spinner[_now_frame() % len(spinner)]
@@ -530,7 +541,7 @@ class FramedConsole(Console):
 		"""Poll for up to _FRAME_SECONDS; return 'exit' (Enter/Space), a scroll
 		direction ('up'/'down'/'left'/'right'), or None if nothing relevant arrived.
 		"""
-		deadline = time.monotonic() + _FRAME_SECONDS
+		deadline = _next_frame()
 		while time.monotonic() < deadline:
 			if msvcrt.kbhit():
 				ch = msvcrt.getwch()
@@ -546,7 +557,7 @@ class FramedConsole(Console):
 
 		Other keys are consumed (so they don't pile up) but don't end the wait.
 		"""
-		deadline = time.monotonic() + _FRAME_SECONDS
+		deadline = _next_frame()
 		while time.monotonic() < deadline:
 			if msvcrt.kbhit() and msvcrt.getwch() in accept:
 				return True
@@ -605,7 +616,7 @@ class FramedConsole(Console):
 		"""Poll for up to _FRAME_SECONDS; returns None (nothing relevant), 'up',
 		'down', 'enter', or an int 0..n_options-1 (a number key, chosen directly).
 		"""
-		deadline = time.monotonic() + _FRAME_SECONDS
+		deadline = _next_frame()
 		while time.monotonic() < deadline:
 			if msvcrt.kbhit():
 				ch = msvcrt.getwch()
