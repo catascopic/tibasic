@@ -187,7 +187,10 @@ def _input_one(env, prompt: list[Token], var: Reference, raw_string: bool = Fals
 		# lands in $A).  A user-list target already holds lists, so it's exempt.
 		if (isinstance(value, TiList) and name[0].is_numeric_var()
 				and not isinstance(var.accessor, UserList)):
-			UserList(str(TiString(name))).store(env, value)
+			# The list's name is the variable's spelling.  Take it from the token's
+			# `char` (the sanctioned token→character path) — not str()/decode, which
+			# are debug/display charsets and must never feed a value into logic.
+			UserList(''.join(t.char for t in name)).store(env, value)
 		else:
 			var.store(value)
 

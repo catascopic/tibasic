@@ -539,6 +539,24 @@ class TestScreenRows:
 		assert framed[0][-1] in '▙▛▜▟'                  # spinner in the border corner
 
 
+class TestDisplayCharset:
+	"""The terminal's display charset is tokenbase's debug charset plus a small,
+	documented set of cell overrides — derived, not duplicated, so they can't drift."""
+
+	def test_derives_from_tokenbase_with_only_documented_overrides(self):
+		from tokenbase import CHARSET as base
+		from terminal import _CHARSET as term, _DISPLAY_OVERRIDES
+		assert len(term) == len(base) == 256
+		for b in range(256):
+			assert term[b] == _DISPLAY_OVERRIDES.get(b, base[b])
+
+	def test_every_display_glyph_is_a_single_cell(self):
+		# One display byte must paint exactly one grid cell: each override is one
+		# codepoint (the whole reason the combining-sequence cells are overridden).
+		from terminal import _DISPLAY_OVERRIDES
+		assert all(len(g) == 1 for g in _DISPLAY_OVERRIDES.values())
+
+
 class TestIndicatorPixels:
 	"""The run indicator as LCD pixels (PixelConsole) — pure pattern functions."""
 
