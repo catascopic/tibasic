@@ -686,7 +686,7 @@ class ArgParser:
 		"""
 		t = self._parser.advance()
 		if t.flags & Flag.PIC:
-			return t.number
+			return t.index
 		if t.flags & Flag.DIGIT:
 			return (t.value - 1) % 10
 		raise DataTypeError("StorePic/RecallPic: argument must be a digit 0–9 or a Pic variable")

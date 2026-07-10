@@ -48,7 +48,7 @@ _LIST_NAME_TOKEN = 0x5D
 # 8-byte name field to/from an accessor; the fixed-field padding lives entirely in
 # this pair (ljust on write, rstrip on read), never in the accessors.
 
-class ProgramAccessor(FileVar, Accessor):
+class ProgramAccessor(FileVar):
 	"""A program prgmNAME — a slot in env.programs keyed by name.  Programs aren't
 	expression values, so they have no token; a file load installs one via `set`,
 	wrapping its token list in a Program."""
@@ -185,8 +185,9 @@ class TiFile:
 	def _named_accessor(cls, spec) -> FileVar:
 		"""The accessor for a friendly variable name — each subclass accepts its
 		family's natural spelling (StringFile(1) → Str1, MatrixFile('A') → [A],
-		ListFile('CW') → ʟCW, …).  Always a *lookup* of the catalog singleton,
-		never a fresh token: tokens are identity-compared throughout."""
+		ListFile('CW') → ʟCW, …).  Implementations construct the token fresh: the
+		file-variable families derive everything from their index and tokens compare
+		by code, so a fresh instance is indistinguishable from the catalog's."""
 		raise TypeError(f"{cls.__name__} cannot name a variable from {spec!r}; pass a FileVar accessor")
 
 	@property

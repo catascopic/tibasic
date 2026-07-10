@@ -1,5 +1,7 @@
 Should prompts be strings? I say no
 
+PicToken stores its slot as self.number where every sibling uses self.index — its own docstring even says "number is the env.pics slot index."
+
 
 _parse_pic_arg 
 

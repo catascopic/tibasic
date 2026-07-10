@@ -326,17 +326,18 @@ class Accessor(ABC):
 		return Reference(env, self)
 
 
-class FileVar(ABC):
-	"""Mixin for accessors that have a .8x* file identity — a name field in the
-	variable file's VAT entry.  This is a genuine partial capability (window/stat
-	variables, Ans, constants have no file format), so it is declared by mixing this
-	in rather than by a raising stub on Accessor: tifile's `write_accessor` takes a
-	FileVar, and mis-filing a non-file variable fails at the type level.
+class FileVar(Accessor):
+	"""An Accessor with a .8x* file identity — a name field in the variable file's
+	VAT entry.  This is a genuine partial capability (window/stat variables, Ans,
+	constants have no file format), so it is declared by subclassing rather than by
+	a raising stub on Accessor: tifile's `write_accessor` takes a FileVar, and
+	mis-filing a non-file variable fails at the type level.
 
-	Implementors must also be Accessors — a file load installs its value through the
-	accessor's raw `set`.  `name_bytes` returns only the *meaningful* bytes of the
-	name; padding to the VAT's fixed 8-byte field is the file format's business and
-	happens in tifile's name codec (write_accessor), not here."""
+	Subclassing Accessor is not a convenience — a file *is* the serialization of an
+	env slot (a load installs its value through the accessor's raw `set`), so every
+	FileVar is necessarily an Accessor.  `name_bytes` returns only the *meaningful*
+	bytes of the name; padding to the VAT's fixed 8-byte field is the file format's
+	business and happens in tifile's name codec (write_accessor), not here."""
 
 	@abstractmethod
 	def name_bytes(self) -> bytes:

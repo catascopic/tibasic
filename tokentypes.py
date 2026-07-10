@@ -20,7 +20,7 @@ from errors import TiSyntaxError, UndefinedError, InvalidDimError, DomainError, 
 from graph import eval_sequence
 from modes import GraphMode
 from parser import ArgParser
-from tokenbase import Token, Accessor, Deletable, VariableToken, TokenFileVar, Reference, Flag
+from tokenbase import Token, Deletable, VariableToken, TokenFileVar, Reference, Flag
 import tokenbase as tk
 
 __all__ = [
@@ -199,25 +199,26 @@ class MatrixToken(Deletable, TokenFileVar, VariableToken):
 		return self.resolve(arg_parser.env)[(row, col)]
 
 
-class PicToken(Deletable, TokenFileVar, Token, Accessor):
+class PicToken(Deletable, TokenFileVar, Token):
 	"""A picture Pic1–Pic9, Pic0 (token 0x6000+i) — a slot in env.pics.
 
-	A full Accessor (get/set/delete/name_tokens/name_bytes), but not a VariableToken:
-	pictures aren't expression atoms or Store-arrow targets — only usable with
-	StorePic/RecallPic (and DelVar to clear the slot); Token's flag-based
-	can_start_atom/parse_prefix keep it out of expressions.  `number` is the env.pics
-	slot index.
+	An Accessor (via TokenFileVar) with only the storage half implemented
+	(get/set/delete/name_tokens/name_bytes), and not a VariableToken: pictures
+	aren't expression atoms or Store-arrow targets — only usable with StorePic/
+	RecallPic (and DelVar to clear the slot).  Accessor's raising resolve/store/
+	invoke defaults and Token's flag-based can_start_atom/parse_prefix keep it out
+	of expressions, matching the calculator.  `index` is the env.pics slot index.
 	"""
 
 	def __init__(self, index: int):
 		Token.__init__(self, 0x6000 | index, b'Pic' + bytes([0x30 + (index + 1) % 10]), Flag.PIC)
-		self.number = index
+		self.index = index
 
 	def get(self, env):
-		return env.pics[self.number]
+		return env.pics[self.index]
 
 	def set(self, env, value):
-		env.pics[self.number] = value
+		env.pics[self.index] = value
 
 	def name_tokens(self) -> list:
 		return [self]   # like a VariableToken, the token spells itself

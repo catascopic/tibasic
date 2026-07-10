@@ -17,7 +17,7 @@ from graph import (
 from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
 from homescreen import HomeScreen
 from terminal import ScriptedConsole
-from tokenbase import Token, Accessor, FileVar
+from tokenbase import Token, FileVar
 
 
 _NUMERIC_NAMES = tuple(chr(0x41 + i) for i in range(26)) + ('theta',)
@@ -430,7 +430,7 @@ class TableVars:
 		self.tbl_input = None                 # TblInput — a 7-element list (TiList | None)
 
 
-class UserList(FileVar, Accessor):
+class UserList(FileVar):
 	"""A user-defined list ʟNAME — a dict slot in env.user_lists, keyed by name.
 
 	Built synthetically by the parser when it sees the ʟ prefix; has no catalog
