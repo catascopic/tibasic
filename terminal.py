@@ -18,18 +18,13 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
 from core import TiString
-from tokenbase import Token, CHARSET
+from tokenbase import Token, CHARSET, decode
 from tiformat import disp_lines, value_lines
 from modes import Screen
 from homescreen import HomeScreen
 from graphscreen import COLS as _GRAPH_COLS
 from scrollview import ScrollView
 
-
-def decode(display: bytes) -> str:
-	"""Render display bytes as characters for the text terminal — an approximation of
-	the LCD glyphs (see _DISPLAY_OVERRIDES), never a source of TI-BASIC values."""
-	return ''.join(CHARSET[b] for b in display)
 
 
 class Console(ABC):

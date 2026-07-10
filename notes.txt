@@ -1,4 +1,5 @@
-homescreen: render(CHARSET)
+Should prompts be strings? I say no
+
 
 _parse_pic_arg 
 

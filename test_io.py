@@ -540,21 +540,24 @@ class TestScreenRows:
 
 
 class TestDisplayCharset:
-	"""The terminal's display charset is tokenbase's debug charset plus a small,
-	documented set of cell overrides — derived, not duplicated, so they can't drift."""
+	"""Structural invariants on tokenbase.CHARSET — the single source of truth for
+	token display bytes, used directly by both the terminal and debug printing."""
 
-	def test_derives_from_tokenbase_with_only_documented_overrides(self):
-		from tokenbase import CHARSET as base
-		from terminal import _CHARSET as term, _DISPLAY_OVERRIDES
-		assert len(term) == len(base) == 256
-		for b in range(256):
-			assert term[b] == _DISPLAY_OVERRIDES.get(b, base[b])
+	def test_no_token_display_byte_is_undefined(self):
+		# Every byte that appears in any token's display field must map to a glyph.
+		import catalog
+		from tokenbase import CHARSET
+		undefined = {b for t in catalog.ALL_TOKENS for b in t.display if CHARSET[b] is None}
+		assert not undefined, f"Undefined display bytes: {[hex(b) for b in sorted(undefined)]}"
 
-	def test_every_display_glyph_is_a_single_cell(self):
-		# One display byte must paint exactly one grid cell: each override is one
-		# codepoint (the whole reason the combining-sequence cells are overridden).
-		from terminal import _DISPLAY_OVERRIDES
-		assert all(len(g) == 1 for g in _DISPLAY_OVERRIDES.values())
+	def test_no_cell_starts_with_combining_character(self):
+		# A cell that starts with a combining mark would attach to the previous cell
+		# in a fixed-width grid.  Base+combining sequences (x̄, p̂) are allowed because
+		# the combining mark follows its own base letter within the same cell.
+		import unicodedata
+		from tokenbase import CHARSET
+		bad = [hex(i) for i, g in enumerate(CHARSET) if g and unicodedata.combining(g[0]) != 0]
+		assert not bad, f"Cells starting with a combining character: {bad}"
 
 
 class TestIndicatorPixels:
