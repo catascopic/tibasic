@@ -10,13 +10,15 @@ from catalog import get_token, CHAR_TABLE
 env = Environment()
 tifile.load_environment(env, r'enigma')
 env.console = TerminalConsole()
+print(env.programs.keys())
+input()
 
 def run(prgm_name):
 	env.submit([get_token(0x5F), *(CHAR_TABLE[c] for c in prgm_name)])
 
 
 # run('ENIGMA2')
-run('QR')
+run('QRBASIC')
 env.graph.disp()
 # env.graph.print_screen('qr.bmp', 3)
 # env.dump()
