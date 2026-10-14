@@ -1,7 +1,7 @@
 import math
 
 import distributions as dist
-from preparse import preparse_cmd, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command, PicIndex
+from preparse import preparse_cmd, preparse_func, preparse_cmd_func, Env, TiListComplex, Real, Thunk, special_func, no_arg_command, PicIndex
 from errors import DataTypeError, DomainError, UndefinedError
 from modes import Screen
 from graphscreen import GraphScreen
@@ -50,7 +50,7 @@ def pxl_change(env: Env, row: Real, col: Real) -> None:
 		env.graph.toggle(*_validate(row, col))
 
 
-@preparse_cmd_func
+@preparse_func
 def pxl_test(env: Env, row: Real, col: Real) -> float:
 	return float(env.graph.get(*_validate(row, col)))
 
