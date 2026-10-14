@@ -61,10 +61,27 @@ class TestRoundtripMetadata:
 	def test_name(self):
 		assert roundtrip(make_prog(name='HELLO')).name == 'HELLO'
 
-	def test_name_lowercase_normalised(self):
-		# write() uppercases the name in the binary; read() decodes it as-is
-		prog = ProgramFile('hello', [])
-		assert roundtrip(prog).name == 'HELLO'
+	def test_name_theta(self):
+		# θ is charset byte 0x5B — ASCII would read it back as '['
+		prog = make_prog(name='θQRBIT')
+		buf = BytesIO()
+		prog.write_to(buf)
+		assert b'\x5bQRBIT\x00\x00' in buf.getvalue()
+		assert roundtrip(prog).name == 'θQRBIT'
+
+	def test_name_with_digits(self):
+		assert roundtrip(make_prog(name='A1B2')).name == 'A1B2'
+
+	@pytest.mark.parametrize('name', ['hello', '1ABC', 'A_B', 'AB[', '', 'ABCDEFGHI'])
+	def test_invalid_name_rejected(self, name):
+		# a letter (A–Z, θ) then letters/digits, at most 8 — the calculator's rule
+		with pytest.raises(ValueError):
+			ProgramAccessor(name)
+
+	def test_invalid_name_in_file_rejected(self):
+		from tifile import read_program_name
+		with pytest.raises(ValueError):
+			read_program_name(b'hello\x00\x00\x00')
 
 	def test_name_short(self):
 		assert roundtrip(make_prog(name='A')).name == 'A'
@@ -239,8 +256,17 @@ class TestListNameCoding:
 	def test_encode_user_list(self):
 		assert write_accessor(UserList('CW')) == b'\x5d\x43\x57' + b'\x00' * 5
 
-	def test_encode_user_list_lowercase_normalised(self):
-		assert write_accessor(UserList('cw')) == b'\x5d\x43\x57' + b'\x00' * 5
+	def test_encode_user_list_theta(self):
+		assert write_accessor(UserList('θ1')) == b'\x5d\x5b\x31' + b'\x00' * 5
+
+	def test_decode_user_list_theta(self):
+		acc = read_accessor(b'\x5d\x5b\x31' + b'\x00' * 5)
+		assert isinstance(acc, UserList) and acc.name == 'θ1'
+
+	@pytest.mark.parametrize('name', ['cw', '1CW', 'C W', '', 'ABCDEF'])
+	def test_invalid_user_list_name_rejected(self, name):
+		with pytest.raises(ValueError):
+			UserList(name)
 
 	# roundtrip consistency for all built-ins
 	def test_all_builtins_roundtrip(self):

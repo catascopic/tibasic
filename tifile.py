@@ -26,7 +26,7 @@ import sys
 from io import BytesIO
 from pathlib import Path
 
-from tokenbase import Token, Accessor, FileVar
+from tokenbase import Token, Accessor, FileVar, validate_name, encode_name, decode_name
 from tokentypes import LetterToken, MatrixToken, ListToken, StringToken, PicToken
 from catalog import get_token, read_token
 from bitmap import Bitmap, ROWS, COLS
@@ -54,11 +54,9 @@ class ProgramAccessor(FileVar):
 	wrapping its token list in a Program."""
 
 	def __init__(self, name: str):
-		if not 1 <= len(name) <= 8:
-			# The calculator's own limit; checked at construction rather than
-			# silently truncated at write time.
-			raise ValueError(f"Program name must be 1-8 characters: {name!r}")
-		self.name = name
+		# The calculator's own rule; checked at construction rather than silently
+		# truncated or mangled at write time.
+		self.name = validate_name(name, 8, 'Program')
 
 	def set(self, env, tokens):
 		env.programs[self.name] = Program(tokens, self.name)
@@ -67,29 +65,29 @@ class ProgramAccessor(FileVar):
 		return str_to_tokens(self.name)
 
 	def name_bytes(self) -> bytes:
-		return self.name.upper().encode('ascii')   # uppercased in the binary
+		return encode_name(self.name)
 
 
 def read_accessor(name_bytes: bytes) -> Accessor:
 	"""Decode an 8-byte name field (everything except a program) into its accessor."""
 	if name_bytes[0] == _LIST_NAME_TOKEN:
 		# 0x5D + index 0x00..0x05 is a built-in list (its catalog token is the
-		# accessor); 0x5D + ASCII is a user list (whose name starts with a letter).
+		# accessor); 0x5D + a name is a user list (whose name starts with a letter).
 		if name_bytes[1] <= 0x05:
 			return get_token(_LIST_NAME_TOKEN << 8 | name_bytes[1])
-		return UserList(name_bytes[1:].rstrip(b'\x00').decode('ascii', errors='replace'))
+		return UserList(decode_name(name_bytes[1:]))
 
 	return read_token(BytesIO(name_bytes))   # a VariableToken (var/matrix/string/equation/picture)
 
 
 def read_program_name(name_bytes: bytes) -> ProgramAccessor:
-	return ProgramAccessor(name_bytes.rstrip(b'\x00').decode('ascii', errors='replace'))
+	return ProgramAccessor(decode_name(name_bytes))
 
 
 def write_accessor(acc: FileVar) -> bytes:
 	"""Encode an accessor into its 8-byte, null-padded name field.  Each accessor
-	supplies its meaningful bytes (Token → code bytes, UserList → 0x5D + ASCII,
-	program → ASCII); padding to the VAT's fixed 8-byte field is a fact about the
+	supplies its meaningful bytes (Token → code bytes, UserList → 0x5D + name,
+	program → name); padding to the VAT's fixed 8-byte field is a fact about the
 	file format, not the variable, so it happens here — the write-side half of the
 	name codec, mirroring the rstrip on read."""
 	field = acc.name_bytes()

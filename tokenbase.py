@@ -46,6 +46,36 @@ def decode(display: bytes) -> str:
 	return ''.join(CHARSET[b] for b in display)
 
 
+# ── Variable names (programs, user lists) ─────────────────────────────────────
+# A program or user-list name is a letter (A–Z or θ) followed by letters and
+# digits.  In a file's name field these are stored as charset bytes, not ASCII
+# (θ is 0x5B, which ASCII would read as '[') and not tokens — though for these
+# characters the two coincide.
+
+NAME_START_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZθ'
+NAME_CHARS       = NAME_START_CHARS + '0123456789'
+
+
+def validate_name(name: str, limit: int, kind: str) -> str:
+	"""Check `name` against the calculator's naming rule for a `kind` ('Program',
+	'User list') of at most `limit` characters; returns it unchanged."""
+	if not (1 <= len(name) <= limit
+	        and name[0] in NAME_START_CHARS
+	        and all(c in NAME_CHARS for c in name)):
+		raise ValueError(f"{kind} name must be 1-{limit} letters/digits starting with a letter: {name!r}")
+	return name
+
+
+def encode_name(name: str) -> bytes:
+	"""A validated name → its charset bytes, for a file's name field."""
+	return bytes(CHARSET.index(c) for c in name)
+
+
+def decode_name(field: bytes) -> str:
+	"""A name field's charset bytes (null padding stripped) → the name."""
+	return decode(field.rstrip(b'\x00'))
+
+
 # ── Named token codes ─────────────────────────────────────────────────────────
 # Codes for tokens referenced directly by the parser/program (the only tokens
 # that need a name outside catalog).  catalog passes these to token(); the parser

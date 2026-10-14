@@ -1,5 +1,8 @@
 {
   "permissions": {
-    "additionalDirectories": ["C:\\Users\\Max\\Documents\\code\\boiler"]
+    "additionalDirectories": ["C:\\Users\\Max\\Documents\\code\\boiler"],
+	"allow": [
+      "PowerShell(python -m pytest*)"
+    ]
   }
 }

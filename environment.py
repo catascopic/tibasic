@@ -17,7 +17,7 @@ from graph import (
 from graphmodes import HANDLERS as GRAPH_MODE_HANDLERS
 from homescreen import HomeScreen
 from terminal import ScriptedConsole
-from tokenbase import Token, FileVar
+from tokenbase import Token, FileVar, validate_name, encode_name
 
 
 _NUMERIC_NAMES = tuple(chr(0x41 + i) for i in range(26)) + ('theta',)
@@ -438,12 +438,10 @@ class UserList(FileVar):
 	"""
 
 	def __init__(self, name: str):
-		if not 1 <= len(name) <= 5:
-			# The calculator's own entry limit (the parser enforces it too); checked
-			# here so a name that skipped the parser (a malformed file) can't silently
-			# produce an oversized name field at write time.
-			raise ValueError(f"User list name must be 1-5 characters: {name!r}")
-		self.name = name
+		# The calculator's own rule (the parser enforces it too); checked here so a
+		# name that skipped the parser (a malformed file) can't silently produce a
+		# bad name field at write time.
+		self.name = validate_name(name, 5, 'User list')
 
 	def get(self, env):
 		return env.user_lists.get(self.name)
@@ -475,9 +473,8 @@ class UserList(FileVar):
 		return str_to_tokens(self.name)   # bare name (no ʟ), as Prompt echoes it
 
 	def name_bytes(self) -> bytes:
-		# 0x5D is the list-name token; a user list's name field is it + the (≤5,
-		# uppercased in the binary) ASCII name
-		return bytes([0x5D]) + self.name.upper().encode('ascii')
+		# 0x5D is the list-name token; a user list's name field is it + the name
+		return bytes([0x5D]) + encode_name(self.name)
 
 	def __repr__(self):
 		return f"UserList({self.name!r})"
