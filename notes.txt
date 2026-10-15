@@ -1,3 +1,5 @@
+Move tests to folder
+
 tivars!!
 
 Should prompts be strings? I say no

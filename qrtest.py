@@ -3,18 +3,18 @@ from pathlib import Path
 
 import tifile
 from environment import Environment
-from terminal import TerminalConsole
+from terminal import TerminalConsole, PixelConsole
 from catalog import get_token, CHAR_TABLE
 
 
 env = Environment()
 tifile.load_environment(env, r'enigma')
-env.console = TerminalConsole()
-print(env.programs.keys())
-input()
+# env.console = TerminalConsole()
+env.console = PixelConsole()
 
 def run(prgm_name):
 	env.submit([get_token(0x5F), *(CHAR_TABLE[c] for c in prgm_name)])
+	env.print_screen()
 
 
 # run('ENIGMA2')

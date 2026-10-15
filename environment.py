@@ -140,6 +140,8 @@ class Environment:
 		except StopSignal:
 			# It's correct to catch here because doing `prgmTEST:1->A` (where TEST just runs Stop) will not reach the following store command.
 			pass
+		except KeyboardInterrupt:
+			self.print_screen()
 		self.console.finish()
 
 	def to_rad(self, x: float):
@@ -350,9 +352,15 @@ class Environment:
 			raise InvalidCommandError("This command cannot be used outside a program")
 		return self.execution_stack[-1]
 
-	def print_screen(self, path):
+	def print_screen(self, path=None):
 		"""Save the active screen to `path` as a BMP — the graph's pixels, the home
 		grid, or a Menu( modal, rasterized through the font, whichever is displayed."""
+		if path is None:
+			import os
+			screen_captures_dir = 'screencaptures'
+			os.makedirs(screen_captures_dir, exist_ok=True)
+			file = f"{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.bmp"
+			path = f"{screen_captures_dir}/{file}"
 		surface = {Screen.GRAPH: self.graph, Screen.MENU: self.menu}.get(self.screen, self.home)
 		surface.print_screen(path)
 
